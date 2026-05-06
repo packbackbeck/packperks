@@ -1,0 +1,158 @@
+/* Reward card — Figma spec */
+.reward-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  width: 335px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-screen);
+}
+
+.reward-card__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  width: 100%;
+}
+
+/* Image with orange background — Figma: #FEA01E bg, rounded 10px */
+.reward-card__image-wrap {
+  flex: 1;
+  height: 127px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bk-orange);
+  box-shadow: 0px 20px 40px rgba(212, 212, 212, 0.25);
+}
+
+.reward-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reward-card__info {
+  display: flex;
+  flex-direction: column;
+  width: 159px;
+  gap: var(--sp-3);
+}
+
+.reward-card__name {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
+  line-height: 1;
+  color: var(--black);
+}
+
+.reward-card__desc {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+  color: var(--black);
+}
+
+/* ── Chips row ── */
+.reward-card__chips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.reward-card__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: 10px;
+  letter-spacing: 0.3px;
+}
+
+.reward-card__chip--free {
+  background: var(--bk-brown);
+  color: var(--white);
+}
+
+.reward-card__chip--cups {
+  background: #FFF3D6;
+  color: var(--bk-brown);
+  border: 1px solid #FEA01E;
+}
+
+/* ── Progress bar footer ── */
+.reward-card__progress {
+  width: 100%;
+}
+
+.reward-card__progress-track {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 25px;
+  background: var(--gray-track);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Step divider lines — one per cup slot boundary */
+.reward-card__divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(255, 255, 255, 0.5);
+  z-index: 2;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.reward-card__progress-fill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0,0,0,0.15);
+  overflow: hidden;
+  min-width: 10px;
+  transition: width var(--duration-slow) var(--ease-out-expo);
+}
+
+.reward-card__progress-fill--green {
+  background: linear-gradient(90deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0) 100%),
+              var(--bk-green);
+}
+
+.reward-card__progress-fill--orange {
+  background: linear-gradient(90deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0) 100%),
+              var(--bk-orange);
+  border-color: #FE8118;
+}
+
+.reward-card__cups-label {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: 16.3px;
+  line-height: 1.1;
+  color: var(--white);
+  white-space: nowrap;
+}
+
+.reward-card__cups-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}

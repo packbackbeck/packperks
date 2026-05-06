@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');
+
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: 60px var(--sp-6) var(--sp-6);
+  min-height: 100dvh;
+  background: var(--bk-cream);
+}
+
+.app__hero {
+  width: 100%;
+}
+
+.app__headline {
+  font-family: var(--font-primary);
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  color: var(--black);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.app__subtext {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-light);
+  line-height: 1.45;
+  margin-top: var(--sp-2);
+  max-width: 280px;
+}
+
+/* Info links row */
+.app__info-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.app__info-link {
+  font-family: var(--font-primary);
+  font-style: italic;
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-xs);
+  line-height: 1.1;
+  color: var(--text-light);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.app__info-link:hover {
+  color: var(--text-muted);
+}
+
+/* Animation for reward change */
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

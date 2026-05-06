@@ -1,0 +1,281 @@
+/* ── Receipt Page ── */
+.receipt-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--bk-cream);
+  padding: var(--sp-5) var(--sp-5) calc(var(--sp-6) * 2);
+  gap: var(--sp-5);
+  animation: page-slide-in 0.28s var(--ease-out-expo) both;
+  position: relative;
+}
+
+@keyframes page-slide-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Stepper ── */
+.receipt-page__stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 330px;
+  padding-top: var(--sp-5);
+  position: relative;
+}
+
+.receipt-page__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  flex: 1;
+}
+
+.receipt-page__step-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-bg);
+  color: var(--text-light);
+  flex-shrink: 0;
+  transition: background var(--duration-normal) ease, color var(--duration-normal) ease;
+}
+
+.receipt-page__step--done .receipt-page__step-icon {
+  background: #1A8737;
+  color: white;
+}
+
+.receipt-page__step--active .receipt-page__step-icon {
+  background: #FFB535;
+  color: var(--bk-brown);
+}
+
+.receipt-page__step-label {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: var(--fw-medium);
+  color: var(--text-light);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.receipt-page__step--done .receipt-page__step-label {
+  color: #1A8737;
+}
+
+.receipt-page__step--active .receipt-page__step-label {
+  color: var(--bk-brown);
+  font-weight: var(--fw-bold);
+}
+
+/* Connector line between steps */
+.receipt-page__step-line {
+  position: absolute;
+  top: 18px;
+  left: 68%;
+  width: 64%;
+  height: 2px;
+  background: var(--gray-bg);
+  z-index: 0;
+}
+
+.receipt-page__step--done .receipt-page__step-line {
+  background: #1A8737;
+}
+
+/* ── Header ── */
+.receipt-page__header {
+  width: 330px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  text-align: center;
+}
+
+.receipt-page__title {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-xl);
+  color: var(--black);
+  line-height: 1.2;
+}
+
+.receipt-page__subtitle {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+/* ── Camera viewfinder ── */
+.receipt-page__viewfinder {
+  width: 330px;
+  height: 380px;
+  border-radius: 24px;
+  overflow: hidden;
+  position: relative;
+  background: #1D1D1D;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.receipt-page__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.receipt-page__camera-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  text-align: center;
+}
+
+.receipt-page__camera-error span {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: rgba(255,255,255,0.7);
+  line-height: 1.4;
+}
+
+.receipt-page__camera-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  background: rgba(0,0,0,0.6);
+}
+
+.receipt-page__camera-loading span {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: rgba(255,255,255,0.8);
+}
+
+.receipt-page__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Corner guide overlays */
+.receipt-page__corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: white;
+  border-style: solid;
+  opacity: 0.8;
+}
+.receipt-page__corner--tl { top: 16px; left: 16px; border-width: 2.5px 0 0 2.5px; border-radius: 4px 0 0 0; }
+.receipt-page__corner--tr { top: 16px; right: 16px; border-width: 2.5px 2.5px 0 0; border-radius: 0 4px 0 0; }
+.receipt-page__corner--bl { bottom: 16px; left: 16px; border-width: 0 0 2.5px 2.5px; border-radius: 0 0 0 4px; }
+.receipt-page__corner--br { bottom: 16px; right: 16px; border-width: 0 2.5px 2.5px 0; border-radius: 0 0 4px 0; }
+
+/* ── Shutter button ── */
+.receipt-page__shutter {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--duration-fast) ease;
+}
+.receipt-page__shutter:active { transform: scale(0.93); }
+.receipt-page__shutter:disabled { opacity: 0.4; cursor: default; }
+
+.receipt-page__shutter-ring {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 3px solid var(--bk-brown);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.receipt-page__shutter-dot {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--bk-brown);
+  transition: background var(--duration-fast) ease;
+}
+.receipt-page__shutter:active .receipt-page__shutter-dot {
+  background: #7a3520;
+}
+
+/* ── Gallery ── */
+.receipt-page__gallery {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.receipt-page__gallery-or {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-light);
+}
+
+.receipt-page__gallery-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--bk-brown);
+  background: rgba(255,255,255,0.8);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity var(--duration-fast) ease;
+}
+.receipt-page__gallery-btn:active { opacity: 0.7; }
+
+.receipt-page__file-input {
+  display: none;
+}
+
+/* ── Exit / Cancel button ── */
+.receipt-page__exit {
+  position: absolute;
+  top: var(--sp-4);
+  left: var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 10;
+}
+.receipt-page__exit:hover { color: var(--black); }

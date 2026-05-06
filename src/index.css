@@ -1,0 +1,131 @@
+/* ─── Design Tokens ─── */
+:root {
+  /* Brand – Burger King palette (from Figma) */
+  --bk-orange: #FEA01E;
+  --bk-red: #E24400;
+  --bk-brown: #502314;
+  --bk-cream: #F4EBDC;
+  --bk-green: #1A8737;
+  --bk-green-light: #D4EDDA;
+
+  /* Neutrals */
+  --white: #FFFFFF;
+  --black: #1D1D1D;
+  --gray-bg: #E9E9E9;
+  --gray-track: #E7ECF0;
+  --text-muted: rgba(0, 0, 0, 0.8);
+  --text-light: rgba(0, 0, 0, 0.5);
+  --text-lighter: rgba(0, 0, 0, 0.4);
+  --text-faint: rgba(0, 0, 0, 0.2);
+  --border-light: rgba(0, 0, 0, 0.1);
+
+  /* Typography — DM Sans from Figma */
+  --font-primary: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 14px;
+  --fs-md: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 24px;
+  --fs-2xl: 28px;
+  --fs-3xl: 40px;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
+
+  /* Spacing */
+  --sp-1: 3px;
+  --sp-2: 5px;
+  --sp-3: 10px;
+  --sp-4: 15px;
+  --sp-5: 20px;
+  --sp-6: 30px;
+
+  /* Radius (from Figma) */
+  --radius-sm: 10px;
+  --radius-md: 13px;
+  --radius-lg: 15px;
+
+  /* Shadows (from Figma) */
+  --shadow-screen: 0px 20px 40px rgba(212, 212, 212, 0.25);
+  --shadow-inner: 0px 20px 40px rgba(212, 212, 212, 0.25);
+
+  /* Transitions */
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 0.15s;
+  --duration-normal: 0.3s;
+  --duration-slow: 0.5s;
+}
+
+/* ─── Reset & Base ─── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-primary);
+  font-size: var(--fs-md);
+  color: var(--black);
+  background-color: var(--bk-cream);
+  line-height: 1.1;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+}
+
+#root {
+  width: 100%;
+  max-width: 375px;
+  min-height: 100dvh;
+  background: var(--bk-cream);
+  position: relative;
+  overflow-x: hidden;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

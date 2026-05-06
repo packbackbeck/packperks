@@ -1,0 +1,257 @@
+/* ── Direct Refund Bottom Sheet ── */
+
+/* Backdrop */
+.drs__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(29, 29, 29, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: drs-fade-in 0.2s ease both;
+}
+
+@keyframes drs-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Sheet */
+.drs__sheet {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 375px;
+  background: var(--white);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  z-index: 901;
+  padding: 0 var(--sp-5) max(var(--sp-6), env(safe-area-inset-bottom, 20px));
+  box-shadow: 0 -4px 40px rgba(80, 35, 20, 0.18);
+  animation: drs-slide-up 0.32s var(--ease-out-expo) both;
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+
+@keyframes drs-slide-up {
+  from { transform: translateX(-50%) translateY(100%); }
+  to   { transform: translateX(-50%) translateY(0); }
+}
+
+.drs__drag-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--gray-bg);
+  border-radius: 99px;
+  margin: 12px auto 20px;
+}
+
+/* Step container */
+.drs__step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* Back button */
+.drs__back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  align-self: flex-start;
+}
+.drs__back:hover { color: var(--black); }
+
+/* Warning badge */
+.drs__warning-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(226, 68, 0, 0.08);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: #E24400;
+  width: fit-content;
+}
+
+/* Title */
+.drs__title {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-2xl);
+  color: var(--black);
+  line-height: 1.1;
+  margin: 0;
+}
+
+/* Desc */
+.drs__desc {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Big number comparison */
+.drs__compare {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: var(--bk-cream);
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+}
+
+.drs__compare-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drs__compare-option--highlight {
+  align-items: flex-end;
+}
+
+.drs__compare-label {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drs__compare-amount {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+
+.drs__compare-amount--base {
+  font-size: 36px;
+  color: var(--text-muted);
+}
+
+.drs__compare-amount--reward {
+  font-size: 44px;
+  color: #1A8737;
+}
+
+.drs__compare-rate {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+.drs__compare-vs {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--text-light);
+  flex-shrink: 0;
+}
+
+/* Difference pill */
+.drs__diff-pill {
+  background: rgba(26, 135, 55, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: #1A8737;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* CTAs */
+.drs__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.drs__btn {
+  width: 100%;
+  height: 50px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  transition: transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
+}
+.drs__btn:active { transform: scale(0.97); }
+
+.drs__btn--primary {
+  background: var(--bk-orange);
+  color: var(--white);
+  border: none;
+}
+
+.drs__btn--ghost {
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+  font-weight: var(--fw-regular);
+}
+.drs__btn--ghost:hover { color: var(--black); }
+
+.drs__btn--confirm {
+  background: var(--black);
+  color: var(--white);
+  border: none;
+}
+
+/* IBAN step */
+.drs__iban-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.drs__iban-label {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+}
+
+.drs__iban-input {
+  height: 48px;
+  padding: 0 var(--sp-4);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-primary);
+  font-size: var(--fs-md);
+  color: var(--black);
+  background: var(--bk-cream);
+  outline: none;
+  transition: border-color var(--duration-fast) ease;
+  letter-spacing: 0.5px;
+}
+.drs__iban-input:focus { border-color: var(--bk-orange); }
+.drs__iban-input--error { border-color: #E24400; }
+
+.drs__iban-error {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: #E24400;
+}

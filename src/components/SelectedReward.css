@@ -1,0 +1,106 @@
+.selected-reward {
+  display: flex;
+  gap: var(--sp-3);
+  background: linear-gradient(145deg, #F5EDE3 0%, #EDE5DB 100%);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-3);
+  margin: var(--sp-3) var(--sp-5);
+  box-shadow: var(--shadow-card);
+  align-items: center;
+  border: 2px solid transparent;
+  /* Fade-slide on reward change (key prop triggers remount) */
+  animation: fade-slide-in 0.35s var(--ease-out-expo) both;
+  transition: border-color var(--duration-normal) ease,
+              box-shadow var(--duration-normal) ease,
+              background var(--duration-normal) ease;
+}
+
+.selected-reward--unlocked {
+  border-color: var(--bk-green);
+  box-shadow: 0 2px 12px rgba(0, 135, 90, 0.1);
+}
+
+.selected-reward--claimed {
+  background: linear-gradient(145deg, #e8f5e9 0%, #c8e6c9 100%);
+}
+
+.selected-reward__image-wrap {
+  width: 120px;
+  height: 95px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.selected-reward__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.selected-reward__badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bk-green);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: var(--fw-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  animation: badge-pop 0.3s var(--ease-out-expo) 0.15s both;
+}
+
+@keyframes badge-pop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+.selected-reward__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.selected-reward__name {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--bk-brown);
+  line-height: 1.25;
+  margin-bottom: var(--sp-1);
+}
+
+.selected-reward__desc {
+  font-size: var(--fs-sm);
+  color: var(--gray-500);
+  line-height: 1.45;
+  margin-bottom: var(--sp-2);
+}
+
+.selected-reward__tags {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.selected-reward__tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--bk-brown);
+  color: var(--white);
+}
+
+.selected-reward__tag--green {
+  background: var(--bk-green);
+}

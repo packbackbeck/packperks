@@ -1,0 +1,192 @@
+/* ── Direct Refund Success Page ── */
+/* Re-uses patterns from SuccessPage.css */
+
+.rsp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--white);
+  padding: var(--sp-5);
+  position: relative;
+  overflow: hidden;
+  animation: rsp-fade-in var(--duration-normal) ease both;
+}
+
+@keyframes rsp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.rsp__glow {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(26,135,55,0.15) 0%, rgba(26,135,55,0) 70%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Checkmark */
+.rsp__check-wrap {
+  width: 80px;
+  height: 80px;
+  margin-bottom: var(--sp-4);
+  z-index: 1;
+}
+.rsp__check-svg {
+  width: 100%;
+  height: 100%;
+  animation: rsp-pop-in 0.5s var(--ease-out-expo) 0.1s both;
+}
+.rsp__check-path {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: rsp-draw-check 0.4s ease 0.3s forwards;
+}
+@keyframes rsp-pop-in {
+  from { transform: scale(0.5); opacity: 0; }
+  50%  { transform: scale(1.1); }
+  to   { transform: scale(1); opacity: 1; }
+}
+@keyframes rsp-draw-check { to { stroke-dashoffset: 0; } }
+
+/* Text */
+.rsp__text {
+  text-align: center;
+  margin-bottom: var(--sp-5);
+  z-index: 1;
+}
+.rsp__title {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-2xl);
+  color: var(--black);
+  margin-bottom: var(--sp-2);
+}
+.rsp__subtitle {
+  font-family: var(--font-primary);
+  font-size: var(--fs-md);
+  color: var(--text-light);
+}
+
+/* Receipt card */
+.rsp__card {
+  width: 300px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  animation: rsp-slide-up 0.4s var(--ease-out-expo) 0.15s both;
+}
+@keyframes rsp-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+/* Amount hero */
+.rsp__amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.rsp__amount {
+  font-family: var(--font-primary);
+  font-size: 42px;
+  font-weight: var(--fw-bold);
+  color: var(--black);
+  line-height: 1;
+}
+.rsp__amount-label {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-light);
+}
+
+/* Dashed divider */
+.rsp__dashed {
+  border: none;
+  border-top: 1.5px dashed var(--border-light);
+  margin: 0 -4px;
+}
+
+/* Rows */
+.rsp__rows { display: flex; flex-direction: column; gap: 6px; }
+.rsp__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.rsp__label {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.rsp__value {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-align: right;
+  word-break: break-all;
+}
+.rsp__value--bold {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--black);
+}
+.rsp__value--green { color: #1A8737; }
+
+/* ETA */
+.rsp__eta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-primary);
+  font-size: 10px;
+  color: #1A8737;
+  background: rgba(26,135,55,0.07);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+
+/* CTA */
+.rsp__btn {
+  width: 300px;
+  height: 48px;
+  background: var(--black);
+  color: var(--white);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
+  border: none;
+  cursor: pointer;
+  margin-bottom: var(--sp-4);
+  transition: transform var(--duration-fast) ease;
+  z-index: 1;
+}
+.rsp__btn:active { transform: scale(0.97); }
+
+/* Note */
+.rsp__note {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  color: var(--text-faint);
+  text-align: center;
+  width: 300px;
+  z-index: 1;
+}

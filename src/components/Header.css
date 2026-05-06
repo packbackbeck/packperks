@@ -1,0 +1,71 @@
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+}
+
+.header__brands {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.header__logo-packback {
+  width: 53px;
+  height: 29px;
+  object-fit: contain;
+}
+
+.header__logo-bk {
+  width: 29px;
+  height: 29px;
+  object-fit: contain;
+}
+
+.header__x {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-lg);
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Badge — Figma: 38px height, rounded 10px, bg #502314 */
+.header__badge {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: var(--sp-3);
+  background: var(--bk-brown);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: transform var(--duration-fast) ease;
+}
+
+@keyframes badge-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.header__badge--bump {
+  animation: badge-bump 0.35s var(--ease-out-expo);
+}
+
+.header__badge-text {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
+  line-height: 1.1;
+  color: var(--white);
+  white-space: nowrap;
+}
+
+.header__badge-icon {
+  width: 22px;
+  height: 23px;
+}

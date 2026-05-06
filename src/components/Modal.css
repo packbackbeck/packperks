@@ -1,0 +1,213 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(29, 29, 29, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: modal-fade-in 0.2s ease;
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.modal-sheet {
+  background: var(--white);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%;
+  max-width: 375px;
+  max-height: 82dvh;
+  overflow-y: auto;
+  animation: modal-slide-up 0.32s var(--ease-out-expo);
+  box-shadow: 0 -4px 24px rgba(80, 35, 20, 0.15);
+  outline: none;
+}
+
+.modal-sheet__drag-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--gray-bg);
+  border-radius: 99px;
+  margin: 12px auto 6px;
+}
+
+.modal-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--sp-5) 12px;
+  position: sticky;
+  top: 0;
+  background: var(--white);
+  border-bottom: 1px solid var(--border-light);
+  z-index: 1;
+}
+
+.modal-sheet__title {
+  font-family: var(--font-primary);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--black);
+}
+
+.modal-sheet__close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--gray-bg);
+  color: var(--text-light);
+  font-size: var(--fs-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--duration-fast) ease;
+}
+
+.modal-sheet__close:hover {
+  background: #ddd;
+}
+
+.modal-sheet__body {
+  padding: var(--sp-5);
+  padding-bottom: max(var(--sp-6), env(safe-area-inset-bottom, 20px));
+}
+
+.modal-sheet__body p {
+  font-family: var(--font-primary);
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.modal-sheet__body p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-sheet__body ul {
+  padding-left: var(--sp-5);
+  list-style: disc;
+  margin-bottom: 16px;
+}
+
+.modal-sheet__body li {
+  font-family: var(--font-primary);
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.modal-sheet__body strong {
+  color: var(--black);
+  font-weight: var(--fw-bold);
+}
+
+.modal-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-3);
+  margin-top: 16px;
+  background: var(--bk-brown);
+  color: var(--white);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-primary);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-regular);
+  line-height: 1.75;
+  transition: transform var(--duration-fast) ease;
+}
+
+.modal-btn:active {
+  transform: scale(0.98);
+}
+
+.modal-btn--outline {
+  background: transparent;
+  color: var(--bk-brown);
+  border: 1px solid var(--bk-brown);
+}
+
+.modal-btn--danger {
+  background: var(--bk-red);
+}
+
+/* ── Direct Refund comparison card ── */
+.modal-compare {
+  display: flex;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.modal-compare__option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 12px;
+  background: var(--bk-cream);
+}
+
+.modal-compare__option--highlight {
+  background: #DFF4E4;
+}
+
+.modal-compare__divider {
+  width: 1px;
+  background: var(--border-light);
+  flex-shrink: 0;
+}
+
+.modal-compare__label {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-compare__value {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  color: var(--black);
+  line-height: 1.1;
+}
+
+.modal-compare__option--highlight .modal-compare__value {
+  color: #1A8737;
+}
+
+.modal-compare__unit {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--text-light);
+}
+
+.modal-compare__desc {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.modal-compare__option--highlight .modal-compare__desc {
+  color: #1A8737;
+}

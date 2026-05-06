@@ -1,0 +1,136 @@
+.cup-progress {
+  width: 330px;
+}
+
+.cup-progress__track {
+  position: relative;
+  background: #E24400;
+  border-radius: 40px;
+  min-height: 70px;
+  transition: background var(--duration-slow) ease;
+}
+
+.cup-progress__track--complete {
+  background: #1A8737;
+}
+
+/* Progress fill — yellow/golden by default, green when complete */
+.cup-progress__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 40px;
+  background: linear-gradient(135deg, var(--bk-orange) 0%, #F5C040 50%, var(--bk-orange) 100%);
+  transition: width var(--duration-slow) var(--ease-out-expo), background var(--duration-slow) ease;
+  z-index: 0;
+}
+
+.cup-progress__fill--complete {
+  background: linear-gradient(135deg, #22A447 0%, #1A8737 50%, #22A447 100%);
+}
+
+/* Cups row floats above the fill */
+.cup-progress__cups-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  padding: 10px 16px;
+  min-height: 70px;
+}
+
+.cup-progress__cup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: cup-pop-in 0.3s var(--ease-out-expo) both;
+}
+
+/* Nudge: pulsing ring around empty cups that need to be collected */
+.cup-progress__cup--nudge .cup-progress__cup-img {
+  filter: brightness(1.4);
+}
+
+.cup-progress__cup-ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: nudge-pulse 1.1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes nudge-pulse {
+  0%   { opacity: 0.9; transform: scale(1); }
+  50%  { opacity: 0.4; transform: scale(1.25); }
+  100% { opacity: 0.9; transform: scale(1); }
+}
+
+@keyframes cup-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Cup icon wrapper */
+.cup-progress__cup-icon-wrap {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cup-progress__cup-img {
+  width: 28px;
+  height: 28px;
+}
+
+/* Filled cups: white icon */
+.cup-progress__cup--filled .cup-progress__cup-img {
+  filter: brightness(0) invert(1);
+}
+
+/* Checkmark overlay on filled cups */
+.cup-progress__cup-check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -40%);
+}
+
+/* Empty cups: faded, semi-transparent */
+.cup-progress__cup--empty .cup-progress__cup-img {
+  filter: brightness(0) invert(1);
+  opacity: 0.35;
+}
+
+.cup-progress__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+
+.cup-progress__dot--active {
+  background: var(--white);
+}
+
+.cup-progress__overflow {
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--bk-orange);
+  font-weight: var(--fw-bold);
+  margin-top: 4px;
+}

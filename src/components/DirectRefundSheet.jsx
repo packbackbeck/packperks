@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import './DirectRefundSheet.css';
+import { validateIban, getSavedIban } from '../utils/iban';
 
-const RATE_DIRECT = 1.00;   // €1.00 per cup
-const RATE_REWARD = 1.25;   // €1.25 per cup (cashback)
-
-function IbanStep({ cupCount, onConfirm, onBack }) {
-  const [iban, setIban] = useState('');
+function IbanStep({ cupCount, refundRate, onConfirm, onBack }) {
+  const [iban, setIban] = useState(() => getSavedIban());
   const [error, setError] = useState('');
-  const total = (cupCount * RATE_DIRECT).toFixed(2);
+  const total = (cupCount * refundRate).toFixed(2);
+
+  const savedIban = getSavedIban();
+  const isPreFilled = !!savedIban && iban === savedIban;
 
   const handleConfirm = () => {
     const trimmed = iban.trim().toUpperCase();
     if (!trimmed) { setError('Please enter your IBAN.'); return; }
-    if (trimmed.replace(/\s/g, '').length < 15) { setError('That IBAN looks too short. Double-check it?'); return; }
+    if (!validateIban(trimmed)) { setError('This IBAN is invalid. Please double-check the number.'); return; }
     setError('');
     onConfirm(trimmed);
   };
@@ -32,18 +33,28 @@ function IbanStep({ cupCount, onConfirm, onBack }) {
       </p>
 
       <div className="drs__iban-wrap">
-        <label className="drs__iban-label" htmlFor="drs-iban">Your IBAN</label>
+        <div className="drs__iban-label-row">
+          <label className="drs__iban-label" htmlFor="drs-iban">Your IBAN</label>
+          {isPreFilled && (
+            <span className="drs__iban-saved">
+              <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 10L8 14L16 6"/>
+              </svg>
+              Saved
+            </span>
+          )}
+        </div>
         <input
           id="drs-iban"
-          className={`drs__iban-input${error ? ' drs__iban-input--error' : ''}`}
+          className={`drs__iban-input${error ? ' drs__iban-input--error' : isPreFilled ? ' drs__iban-input--saved' : ''}`}
           type="text"
           inputMode="text"
           autoComplete="off"
           spellCheck="false"
           placeholder="NL 00 BANK 1020 3012 3456 78"
           value={iban}
-          onChange={(e) => { setIban(e.target.value); if (error) setError(''); }}
-          autoFocus
+          onChange={(e) => { setIban(e.target.value.toUpperCase()); if (error) setError(''); }}
+          autoFocus={!isPreFilled}
         />
         {error && <span className="drs__iban-error" role="alert">{error}</span>}
       </div>
@@ -55,14 +66,14 @@ function IbanStep({ cupCount, onConfirm, onBack }) {
   );
 }
 
-export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm }) {
+export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm, refundRate = 1.00, cashbackRate = 1.25 }) {
   const [step, setStep] = useState(1); // 1 = warning, 2 = iban
 
   if (!open) return null;
 
-  const directTotal  = (cupCount * RATE_DIRECT).toFixed(2);
-  const rewardTotal  = (cupCount * RATE_REWARD).toFixed(2);
-  const difference   = (cupCount * (RATE_REWARD - RATE_DIRECT)).toFixed(2);
+  const directTotal = (cupCount * refundRate).toFixed(2);
+  const rewardTotal = (cupCount * cashbackRate).toFixed(2);
+  const difference  = (cupCount * (cashbackRate - refundRate)).toFixed(2);
 
   const handleClose = () => { setStep(1); onClose(); };
   const handleProceedToIban = () => setStep(2);
@@ -97,13 +108,13 @@ export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm }
               <div className="drs__compare-option">
                 <span className="drs__compare-label">Direct refund</span>
                 <span className="drs__compare-amount drs__compare-amount--base">€{directTotal}</span>
-                <span className="drs__compare-rate">€1.00 per cup</span>
+                <span className="drs__compare-rate">€{refundRate.toFixed(2)} per cup</span>
               </div>
               <div className="drs__compare-vs">vs</div>
               <div className="drs__compare-option drs__compare-option--highlight">
                 <span className="drs__compare-label">Reward cashback</span>
                 <span className="drs__compare-amount drs__compare-amount--reward">€{rewardTotal}</span>
-                <span className="drs__compare-rate">€1.25 per cup</span>
+                <span className="drs__compare-rate">€{cashbackRate.toFixed(2)} per cup</span>
               </div>
             </div>
 
@@ -125,6 +136,7 @@ export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm }
         ) : (
           <IbanStep
             cupCount={cupCount}
+            refundRate={refundRate}
             onConfirm={handleConfirmIban}
             onBack={() => setStep(1)}
           />

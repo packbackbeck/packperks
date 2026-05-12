@@ -1,0 +1,117 @@
+import { useEffect, useRef } from 'react';
+import './ActivityDetailModal.css';
+
+const TYPE_META = {
+  cup_added:       { title: 'Cup returned',      tone: 'green',  icon: 'plus' },
+  reward_claimed:  { title: 'Reward claimed',    tone: 'amber',  icon: 'check' },
+  cups_withdrawn:  { title: 'Direct refund',     tone: 'red',    icon: 'minus' },
+  cups_shared:     { title: 'Cup shared',        tone: 'blue',   icon: 'share' },
+  cups_donated:    { title: 'Cups donated',      tone: 'green',  icon: 'heart' },
+};
+
+function makeRefId(type, time) {
+  const seed = (type + '|' + time).split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
+  const hex = Math.abs(seed).toString(36).toUpperCase().slice(0, 6).padStart(6, '0');
+  return 'PP-' + hex;
+}
+
+function ToneIcon({ icon }) {
+  if (icon === 'plus')  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><line x1="10" y1="4" x2="10" y2="16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="4" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>;
+  if (icon === 'check') return <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M4 10L8 14L16 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  if (icon === 'minus') return <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><line x1="4" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>;
+  if (icon === 'share') return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>;
+  if (icon === 'heart') return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+  return null;
+}
+
+export default function ActivityDetailModal({ item, profile, onClose }) {
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose?.(); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!item) return null;
+  const meta = TYPE_META[item.type] || { title: 'Activity', tone: 'gray', icon: 'plus' };
+  const refId = makeRefId(item.type, item.time);
+
+  function handleDownloadPdf() {
+    const html = cardRef.current?.outerHTML || '';
+    const w = window.open('', '_blank', 'width=420,height=720');
+    if (!w) return;
+    w.document.write(`<!doctype html><html><head><title>PackPerks · ${meta.title}</title>
+      <style>
+        body { margin:0; padding:24px; background:#FFF8F1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        .adm-card { background:#fff; border-radius:18px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.06); max-width:360px; margin:0 auto; }
+        .adm-row { display:flex; justify-content:space-between; padding:8px 0; font-size:13px; }
+        .adm-row__label { color:#7A7166; } .adm-row__val { font-weight:600; color:#1A1A1A; }
+        .adm-title { font-size:18px; font-weight:800; margin:0 0 4px; }
+        .adm-sub { font-size:12px; color:#7A7166; margin:0 0 18px; }
+        .adm-dashed { border-top:1.5px dashed #E0DDD8; margin:14px 0; }
+        @media print { body { background:#fff; } }
+      </style></head><body>${html}</body></html>`);
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 200);
+  }
+
+  async function handleShare() {
+    const text = `${meta.title} — ${item.label} (${item.time}) · Ref ${refId}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'PackPerks Activity', text }); return; } catch {}
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Activity copied to clipboard');
+    } catch {
+      alert(text);
+    }
+  }
+
+  return (
+    <div className="adm-overlay" onClick={onClose}>
+      <div className="adm-modal" onClick={e => e.stopPropagation()}>
+        <button className="adm-close" onClick={onClose} aria-label="Close">×</button>
+
+        <div ref={cardRef} className="adm-card">
+          <div className={`adm-icon adm-icon--${meta.tone}`}>
+            <ToneIcon icon={meta.icon} />
+          </div>
+          <h2 className="adm-title">{meta.title}</h2>
+          <p className="adm-sub">{item.label}</p>
+
+          <div className="adm-dashed" />
+
+          <div className="adm-row"><span className="adm-row__label">Reference</span><span className="adm-row__val">{refId}</span></div>
+          <div className="adm-row"><span className="adm-row__label">When</span><span className="adm-row__val">{item.time}</span></div>
+          <div className="adm-row"><span className="adm-row__label">Type</span><span className="adm-row__val">{item.type.replace(/_/g, ' ')}</span></div>
+          {profile?.displayName && <div className="adm-row"><span className="adm-row__label">Account</span><span className="adm-row__val">{profile.displayName}</span></div>}
+          {profile?.email && <div className="adm-row"><span className="adm-row__label">Email</span><span className="adm-row__val">{profile.email}</span></div>}
+
+          <div className="adm-dashed" />
+
+          <div className="adm-row"><span className="adm-row__label">Status</span><span className="adm-row__val" style={{ color: '#1A8737' }}>Recorded</span></div>
+        </div>
+
+        <div className="adm-actions">
+          <button className="adm-btn adm-btn--ghost" onClick={handleDownloadPdf}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download PDF
+          </button>
+          <button className="adm-btn adm-btn--primary" onClick={handleShare}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/>
+            </svg>
+            Share
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './ClaimPanel.css';
+import { validateIban, getSavedIban } from '../utils/iban';
 
 export default function ClaimPanel({
   isUnlocked,
@@ -14,15 +15,11 @@ export default function ClaimPanel({
   onOpenTerms,
   onOpenRefund,
 }) {
-  function getSavedIban() {
-    try {
-      const p = JSON.parse(localStorage.getItem('packperks_user_profile') || '{}');
-      return p.iban || '';
-    } catch { return ''; }
-  }
-
   const [iban, setIban] = useState(() => getSavedIban());
   const [error, setError] = useState('');
+
+  const savedIban = getSavedIban();
+  const isPreFilled = !!savedIban && iban === savedIban;
 
   const handleClaim = () => {
     onClaimAttempt?.();
@@ -31,8 +28,8 @@ export default function ClaimPanel({
       setError('Please enter your IBAN to continue.');
       return;
     }
-    if (trimmed.length < 15) {
-      setError('That IBAN looks too short. Double-check it?');
+    if (!validateIban(trimmed)) {
+      setError('This IBAN is invalid. Please double-check the number.');
       return;
     }
     setError('');
@@ -112,17 +109,27 @@ export default function ClaimPanel({
         You will receive your cashback after you return enough cups, scan your purchase receipt, and enter your IBAN.
       </p>
 
-      <label className="claim-panel__label" htmlFor="iban-input">Type your IBAN here:</label>
+      <div className="claim-panel__iban-label-row">
+        <label className="claim-panel__label" htmlFor="iban-input">Your IBAN</label>
+        {isPreFilled && (
+          <span className="claim-panel__iban-saved">
+            <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 10L8 14L16 6"/>
+            </svg>
+            Saved
+          </span>
+        )}
+      </div>
       <input
         id="iban-input"
-        className={`claim-panel__input ${error ? 'claim-panel__input--error' : ''}`}
+        className={`claim-panel__input ${error ? 'claim-panel__input--error' : isPreFilled ? 'claim-panel__input--saved' : ''}`}
         type="text"
         inputMode="text"
         autoComplete="off"
         spellCheck="false"
-        placeholder="NL 00 BANK 102030 12345678"
+        placeholder="NL 00 BANK 1020 3012 3456 78"
         value={iban}
-        onChange={(e) => { setIban(e.target.value); if (error) setError(''); }}
+        onChange={(e) => { setIban(e.target.value.toUpperCase()); if (error) setError(''); }}
         aria-describedby={error ? 'iban-error' : undefined}
         aria-invalid={!!error}
       />

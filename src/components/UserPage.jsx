@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import './UserPage.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
+import ActivityDetailModal from './ActivityDetailModal';
+import { validateIban } from '../utils/iban';
 
 /* ── Inline SVG animal avatars ── */
 const ANIMALS = [
@@ -215,6 +217,8 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
   const [ibanInput, setIbanInput] = useState('');
   const [ibanError, setIbanError] = useState('');
 
+  const [activeActivity, setActiveActivity] = useState(null);
+
   // Share sheet: lifted to App.jsx — call prop to open it
 
   const animal = ANIMALS[profile.animalIndex % ANIMALS.length];
@@ -254,8 +258,12 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
 
   const handleSaveIban = () => {
     const trimmed = ibanInput.trim().toUpperCase();
-    if (!trimmed || trimmed.replace(/\s/g, '').length < 15) {
-      setIbanError('That IBAN looks too short. Double-check it?');
+    if (!trimmed) {
+      setIbanError('Please enter your IBAN.');
+      return;
+    }
+    if (!validateIban(trimmed)) {
+      setIbanError('This IBAN is invalid. Please double-check the number.');
       return;
     }
     saveProfile({ iban: trimmed });
@@ -471,13 +479,14 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
       {/* ── Cup actions grid ── */}
       <div className="user-page__actions">
 
-        {/* Row 1 */}
-        <button className="user-page__action-btn" onClick={handleShare}>
-          <svg width="15" height="13" viewBox="0 0 15 13" fill="none">
-            <path d="M7.5 12.5L1.5 6.5C0 5 0 2.5 1.5 1.5C3 0.5 5 0.5 6.5 2L7.5 3L8.5 2C10 0.5 12 0.5 13.5 1.5C15 2.5 15 5 13.5 6.5L7.5 12.5Z" fill="#E24400"/>
-          </svg>
-          Share your Cup
-        </button>
+        {onOpenShare && (
+          <button className="user-page__action-btn" onClick={handleShare}>
+            <svg width="15" height="13" viewBox="0 0 15 13" fill="none">
+              <path d="M7.5 12.5L1.5 6.5C0 5 0 2.5 1.5 1.5C3 0.5 5 0.5 6.5 2L7.5 3L8.5 2C10 0.5 12 0.5 13.5 1.5C15 2.5 15 5 13.5 6.5L7.5 12.5Z" fill="#E24400"/>
+            </svg>
+            Share your Cup
+          </button>
+        )}
 
         <button className="user-page__action-btn" onClick={onAddCup}>
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -487,28 +496,29 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
           Add more cups
         </button>
 
-        {/* Row 2 */}
-        <button className="user-page__action-btn user-page__action-btn--free" onClick={onOpenShare}>
-          {/* Gift icon */}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="8" width="18" height="4" rx="1" />
-            <path d="M12 8v13" />
-            <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
-            <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
-          </svg>
-          Next cup for free
-        </button>
+        {onOpenShare && (
+          <button className="user-page__action-btn user-page__action-btn--free" onClick={onOpenShare}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="8" width="18" height="4" rx="1" />
+              <path d="M12 8v13" />
+              <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+              <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
+            </svg>
+            Next cup for free
+          </button>
+        )}
 
-        <button className="user-page__action-btn user-page__action-btn--donate" onClick={onOpenDonate}>
-          {/* Outline Turtle icon */}
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 10 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a8 8 0 1 0-16 0v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3l2-4h4Z" />
-            <path d="M4.82 7.9 8 10" />
-            <path d="M15.18 7.9 12 10" />
-            <path d="M16.93 10H20a2 2 0 0 1 0 4H2" />
-          </svg>
-          Donate
-        </button>
+        {onOpenDonate && (
+          <button className="user-page__action-btn user-page__action-btn--donate" onClick={onOpenDonate}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 10 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a8 8 0 1 0-16 0v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3l2-4h4Z" />
+              <path d="M4.82 7.9 8 10" />
+              <path d="M15.18 7.9 12 10" />
+              <path d="M16.93 10H20a2 2 0 0 1 0 4H2" />
+            </svg>
+            Donate
+          </button>
+        )}
 
       </div>
 
@@ -518,11 +528,15 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
         {history.length === 0 ? (
           <span className="user-page__history-empty">No activity yet. Start by returning a cup!</span>
         ) : (
-          <div className="user-page__card user-page__card--list">
+          <div className="user-page__card user-page__card--list user-page__history-scroll">
             {[...history].reverse().map((item, idx) => (
               <div key={idx}>
                 {idx > 0 && <div className="user-page__divider" />}
-                <div className="user-page__history-item">
+                <button
+                  className="user-page__history-item user-page__history-item--clickable"
+                  onClick={() => setActiveActivity(item)}
+                  type="button"
+                >
                   <div className={`user-page__history-dot user-page__history-dot--${item.type}`}>
                     {item.type === 'cup_added' && (
                       <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
@@ -545,12 +559,23 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
                     <span className="user-page__history-label">{item.label}</span>
                     <span className="user-page__history-time">{item.time}</span>
                   </div>
-                </div>
+                  <svg className="user-page__history-chevron" width="14" height="14" viewBox="0 0 20 20" fill="none">
+                    <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {activeActivity && (
+        <ActivityDetailModal
+          item={activeActivity}
+          profile={profile}
+          onClose={() => setActiveActivity(null)}
+        />
+      )}
 
       {/* ── Footer ── */}
       <footer className="user-page__footer">
@@ -561,12 +586,14 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
           <span className="user-page__legal-sep">·</span>
           <button className="user-page__legal-link">Cookie Policy</button>
         </nav>
-        <button className="user-page__withdraw-btn" onClick={onWithdraw} disabled={cupCount === 0}>
-          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-            <line x1="4" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          Withdraw all Cups
-        </button>
+        {onWithdraw && (
+          <button className="user-page__withdraw-btn" onClick={onWithdraw} disabled={cupCount === 0}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <line x1="4" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            Withdraw all Cups
+          </button>
+        )}
       </footer>
     </div>
   );

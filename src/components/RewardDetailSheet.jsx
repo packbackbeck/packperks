@@ -61,17 +61,16 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
             <span className="rds-euros">€{reward.euros?.toFixed(2)}</span>
           </div>
 
-          {/* Chips: FREE + cups cost */}
+          {/* Chips: dynamic tags + cups cost */}
           <div className="rds-chips">
-            <span className="rds-chip rds-chip--free">FREE</span>
+            {(reward.tags || []).map(tag => (
+              tag === 'PLANT-BASED'
+                ? <span key={tag} className="rds-chip rds-chip--plant"><LeafIcon /> Plant-based</span>
+                : <span key={tag} className="rds-chip rds-chip--free">{tag}</span>
+            ))}
             <span className="rds-chip rds-chip--cups">
               <CupIcon /> {reward.cupsNeeded} cups
             </span>
-            {reward.tags?.includes('PLANT-BASED') && (
-              <span className="rds-chip rds-chip--plant">
-                <LeafIcon /> Plant-based
-              </span>
-            )}
           </div>
 
           {/* Description */}

@@ -55,13 +55,23 @@ export async function getOrCreateUser() {
     .select()
     .single()
 
+  // React StrictMode mounts twice — second insert hits the unique constraint.
+  // Just re-fetch the row that the first call created.
+  if (error?.code === '23505') {
+    const { data: existing2 } = await supabase
+      .from('users')
+      .select('*')
+      .eq('device_id', deviceId)
+      .single()
+    return existing2
+  }
+
   if (error) throw error
 
-  const { error: balanceError } = await supabase
+  // Ignore duplicate balance row (same race condition safety)
+  await supabase
     .from('cup_balances')
     .insert({ user_id: newUser.id, balance: 0, lifetime_cups: 0 })
-
-  if (balanceError) throw balanceError
 
   return newUser
 }
@@ -112,7 +122,7 @@ export async function logCupScan(userId, { cupsAwarded = 1, photoUrl = null } = 
       user_id: userId,
       cups_awarded: cupsAwarded,
       photo_url: photoUrl,
-      status: 'approved', // switch to 'pending' when OCR is wired
+      status: photoUrl ? 'pending' : 'approved', // pending when photo present so admin reviews it
     })
     .select('id')
     .single()
@@ -145,8 +155,29 @@ export async function addHistoryEntry(userId, type, label) {
   if (error) throw error
 }
 
+// ── Published app config (rewards + settings pushed from admin) ────────────
+export async function getAppConfig() {
+  try {
+    const { data } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'published')
+      .maybeSingle()
+    return data?.value || null
+  } catch {
+    return null
+  }
+}
+
+export async function saveAppConfig(config) {
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key: 'published', value: config, updated_at: new Date().toISOString() })
+  if (error) throw error
+}
+
 // ── Claims ─────────────────────────────────────────────────────────────────
-export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban }) {
+export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl }) {
   const { data, error } = await supabase
     .from('claims')
     .insert({
@@ -156,6 +187,7 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
       cups_redeemed: cupsRedeemed,
       payout_amount: payoutAmount,
       iban,
+      receipt_photo_url: receiptPhotoUrl ?? null,
       status: 'pending',
     })
     .select('id')

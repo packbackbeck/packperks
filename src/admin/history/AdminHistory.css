@@ -1,0 +1,175 @@
+.admin-history { padding: 32px 32px 48px; max-width: 760px; }
+
+.ah-header { margin-bottom: 32px; }
+.ah-header__title { font-size: 22px; font-weight: 800; color: #1A1A1A; margin: 0 0 4px; }
+.ah-header__sub   { color: #7A7166; font-size: 13px; margin: 0; }
+
+.ah-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 0;
+  color: #B8B4AE;
+  font-size: 14px;
+  text-align: center;
+}
+
+.ah-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ah-version {
+  display: flex;
+  gap: 16px;
+}
+
+.ah-version__line-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+.ah-version__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #E8E6E1;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 0 0 2px #E8E6E1;
+  flex-shrink: 0;
+}
+
+.ah-version__dot--latest {
+  background: #D62300;
+  box-shadow: 0 0 0 3px rgba(214,35,0,0.2);
+}
+
+.ah-version__line {
+  width: 2px;
+  flex: 1;
+  background: #F0EDE8;
+  margin: 6px 0;
+  min-height: 20px;
+}
+
+.ah-version__card {
+  flex: 1;
+  background: #FFFFFF;
+  border: 1px solid #E8E6E1;
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: box-shadow 0.15s;
+}
+.ah-version__card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+.ah-version--latest .ah-version__card {
+  border-color: rgba(214,35,0,0.2);
+  background: #FFFAF9;
+}
+
+.ah-version__card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ah-version__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ah-version__number {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A1A1A;
+}
+
+.ah-version__live-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  background: rgba(214,35,0,0.1);
+  color: #D62300;
+  border-radius: 20px;
+}
+
+.ah-version__time {
+  font-size: 12px;
+  color: #9E9A93;
+}
+
+.ah-version__date {
+  font-size: 12px;
+  color: #9E9A93;
+}
+
+.ah-version__note {
+  font-size: 13px;
+  color: #4A4540;
+  font-style: italic;
+  margin-bottom: 12px;
+  padding-left: 4px;
+  border-left: 3px solid #FFC52F;
+  padding: 4px 0 4px 12px;
+}
+
+.ah-version__changes {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ah-version__change-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #4A4540;
+}
+
+.ah-version__change-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #C8C4BC;
+  flex-shrink: 0;
+}
+
+.ah-version__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ah-version__restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #F5F4F0;
+  border: 1px solid #E8E6E1;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4A4540;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.ah-version__restore-btn:hover {
+  background: #1A1A1A;
+  border-color: #1A1A1A;
+  color: #FFFFFF;
+}

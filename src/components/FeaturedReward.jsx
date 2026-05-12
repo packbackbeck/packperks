@@ -86,7 +86,9 @@ export default function FeaturedReward({
             </h2>
             <p className="featured-reward__desc">{reward.description}</p>
             <div className="featured-reward__tags">
-              <span className="featured-reward__tag">FREE</span>
+              {(reward.tags || []).map(tag => (
+                <span key={tag} className="featured-reward__tag">{tag}</span>
+              ))}
               <span className="featured-reward__tag featured-reward__tag--cups">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
@@ -130,8 +132,10 @@ export default function FeaturedReward({
                   ? 'Scan your receipt and enter your IBAN to receive your cashback. '
                   : <>Return your cups to earn cashback. </>}
                 <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the voucher terms</button>
-                <span style={{ margin: '0 4px' }}>or</span>
-                <button className="featured-reward__info-link" onClick={onOpenRefund}>Get the direct refund</button>
+                {onOpenRefund && (
+                  <><span style={{ margin: '0 4px' }}>or</span>
+                  <button className="featured-reward__info-link" onClick={onOpenRefund}>Get the direct refund</button></>
+                )}
               </p>
               {isUnlocked && (
                 <label className="featured-reward__claim-label" htmlFor="iban-input">

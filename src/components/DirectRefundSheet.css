@@ -227,11 +227,30 @@
   gap: var(--sp-2);
 }
 
+.drs__iban-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .drs__iban-label {
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   color: var(--text-muted);
+}
+
+.drs__iban-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1A8737;
+  background: rgba(26, 135, 55, 0.1);
+  padding: 2px 8px;
+  border-radius: 20px;
 }
 
 .drs__iban-input {
@@ -249,6 +268,7 @@
 }
 .drs__iban-input:focus { border-color: var(--bk-orange); }
 .drs__iban-input--error { border-color: #E24400; }
+.drs__iban-input--saved { border-color: #1A8737; background: #F0FBF3; }
 
 .drs__iban-error {
   font-family: var(--font-primary);

@@ -28,8 +28,26 @@ import {
   createClaim,
   updateUserProfile,
   logCupScan,
+  getAppConfig,
 } from './lib/api';
 import './App.css';
+
+/* Resize + compress a data-URL to max 800px wide at 0.65 JPEG quality (~60-120 KB) */
+function compressImage(dataUrl, maxWidth = 800, quality = 0.65) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl); // fallback: store as-is
+    img.src = dataUrl;
+  });
+}
 
 function formatTime(ts) {
   const d = new Date(ts);
@@ -44,6 +62,19 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [initError, setInitError] = useState(null);
+
+  /* ── Live config from admin publish ── */
+  const [liveRewards, setLiveRewards] = useState(rewards);
+  const [liveSettings, setLiveSettings] = useState({
+    cashbackRatePerCup: 1.25,
+    refundRatePerCup: 1.00,
+    heroHeadline: 'Collect Cups & Get Rewards',
+    heroSubtext: 'We pool your cup deposits into one cashback payout — worth more than a standard refund.',
+    featureCupSharing: true,
+    featureDonations: true,
+    featureDirectRefunds: true,
+    maintenanceMode: false,
+  });
 
   /* ── UI preferences ── */
   const [selectedRewardId, setSelectedRewardId] = useState('chicken-sandwich'); // loaded from Supabase in init
@@ -72,8 +103,8 @@ export default function App() {
   const [donatedCups, setDonatedCups] = useState(0);
 
   /* ── Derived values ── */
-  const selectedReward = rewards.find((r) => r.id === selectedRewardId) || rewards[0];
-  const otherRewards = rewards.filter((r) => r.id !== selectedRewardId);
+  const selectedReward = liveRewards.find((r) => r.id === selectedRewardId) || liveRewards[0];
+  const otherRewards = liveRewards.filter((r) => r.id !== selectedRewardId);
   const isUnlocked = cupCount >= selectedReward.cupsNeeded;
   const cupsRemaining = Math.max(0, selectedReward.cupsNeeded - cupCount);
 
@@ -103,10 +134,19 @@ export default function App() {
         });
         if (user.selected_reward_id) setSelectedRewardId(user.selected_reward_id);
 
-        const [balance, hist] = await Promise.all([
+        const [balance, hist, config] = await Promise.all([
           getCupBalance(user.id),
           getHistory(user.id),
+          getAppConfig(),
         ]);
+
+        if (config?.rewards) {
+          const live = config.rewards.filter(r => r.status === 'live');
+          if (live.length > 0) setLiveRewards(live);
+        }
+        if (config?.settings) {
+          setLiveSettings(s => ({ ...s, ...config.settings }));
+        }
         setCupCount(balance);
         setHistory(hist);
       } catch (err) {
@@ -180,8 +220,10 @@ export default function App() {
     setPage('receipt');
   };
 
-  const handleReceiptSubmit = (_photoDataUrl) => {
-    // Photo upload to backend goes here in Phase 2
+  const [receiptPhotoUrl, setReceiptPhotoUrl] = useState(null);
+
+  const handleReceiptSubmit = (photoDataUrl) => {
+    setReceiptPhotoUrl(photoDataUrl || null);
     setPage('success');
   };
 
@@ -208,6 +250,7 @@ export default function App() {
           cupsRedeemed: selectedReward.cupsNeeded,
           payoutAmount: selectedReward.euros,
           iban: claimedIban,
+          receiptPhotoUrl,
         }),
         addHistoryEntry(userId, 'reward_claimed', label)
       );
@@ -230,7 +273,7 @@ export default function App() {
   };
 
   /* ── Cup scan flow ── */
-  const handleCupScanSubmit = (_photoDataUrl) => {
+  const handleCupScanSubmit = async (photoDataUrl) => {
     track(EVENTS.CUP_ADDED);
     const newCount = cupCount + 1;
     const label = 'Cup returned at Burger King';
@@ -239,10 +282,11 @@ export default function App() {
     setPage('cup-scan-success');
 
     if (userId) {
+      const compressed = photoDataUrl ? await compressImage(photoDataUrl) : null;
       persist(
         updateCupBalance(userId, newCount),
         addHistoryEntry(userId, 'cup_added', label),
-        logCupScan(userId, { cupsAwarded: 1 })
+        logCupScan(userId, { cupsAwarded: 1, photoUrl: compressed })
       );
     }
   };
@@ -286,6 +330,19 @@ export default function App() {
           >
             Retry
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Maintenance mode ── */
+  if (liveSettings.maintenanceMode) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center', background: '#FFF8F4' }}>
+        <div>
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔧</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.5rem', color: '#1A1A1A' }}>Down for Maintenance</div>
+          <div style={{ color: '#7A7166', fontSize: '0.875rem' }}>We'll be back shortly. Thanks for your patience.</div>
         </div>
       </div>
     );
@@ -338,47 +395,55 @@ export default function App() {
           cupCount={cupCount}
           history={history}
           onAddCup={handleAddCup}
-          onWithdraw={handleWithdraw}
-          onOpenShare={() => setShareSheetOpen(true)}
-          onOpenDonate={() => setDonateSheetOpen(true)}
+          onWithdraw={liveSettings.featureDirectRefunds ? handleWithdraw : null}
+          onOpenShare={liveSettings.featureCupSharing ? () => setShareSheetOpen(true) : null}
+          onOpenDonate={liveSettings.featureDonations ? () => setDonateSheetOpen(true) : null}
           onClose={() => setPage('home')}
         />
-        <DirectRefundSheet
-          open={directRefundOpen}
-          onClose={() => setDirectRefundOpen(false)}
-          cupCount={cupCount}
-          onConfirm={handleDirectRefundConfirm}
-        />
-        <ShareCupSheet
-          open={shareSheetOpen}
-          onClose={(cupsShared) => {
-            setShareSheetOpen(false);
-            if (cupsShared > 0) {
-              const newCount = Math.max(0, cupCount - cupsShared);
-              const label = `Shared ${cupsShared} cup${cupsShared !== 1 ? 's' : ''} via QR code`;
-              setCupCount(newCount);
-              addHistory('cups_shared', label);
-              if (userId) persist(updateCupBalance(userId, newCount), addHistoryEntry(userId, 'cups_shared', label));
-            }
-          }}
-          cupCount={cupCount}
-        />
-        <DonateSheet
-          open={donateSheetOpen}
-          onClose={(cupsToDonate) => {
-            setDonateSheetOpen(false);
-            if (cupsToDonate > 0) {
-              const newCount = Math.max(0, cupCount - cupsToDonate);
-              const label = `Donated ${cupsToDonate} cup${cupsToDonate !== 1 ? 's' : ''} to Plastic Soup Foundation`;
-              setCupCount(newCount);
-              setDonatedCups(cupsToDonate);
-              addHistory('cups_donated', label);
-              setPage('donate-success');
-              if (userId) persist(updateCupBalance(userId, newCount), addHistoryEntry(userId, 'cups_donated', label));
-            }
-          }}
-          cupCount={cupCount}
-        />
+        {liveSettings.featureDirectRefunds && (
+          <DirectRefundSheet
+            open={directRefundOpen}
+            onClose={() => setDirectRefundOpen(false)}
+            cupCount={cupCount}
+            onConfirm={handleDirectRefundConfirm}
+            refundRate={liveSettings.refundRatePerCup}
+            cashbackRate={liveSettings.cashbackRatePerCup}
+          />
+        )}
+        {liveSettings.featureCupSharing && (
+          <ShareCupSheet
+            open={shareSheetOpen}
+            onClose={(cupsShared) => {
+              setShareSheetOpen(false);
+              if (cupsShared > 0) {
+                const newCount = Math.max(0, cupCount - cupsShared);
+                const label = `Shared ${cupsShared} cup${cupsShared !== 1 ? 's' : ''} via QR code`;
+                setCupCount(newCount);
+                addHistory('cups_shared', label);
+                if (userId) persist(updateCupBalance(userId, newCount), addHistoryEntry(userId, 'cups_shared', label));
+              }
+            }}
+            cupCount={cupCount}
+          />
+        )}
+        {liveSettings.featureDonations && (
+          <DonateSheet
+            open={donateSheetOpen}
+            onClose={(cupsToDonate) => {
+              setDonateSheetOpen(false);
+              if (cupsToDonate > 0) {
+                const newCount = Math.max(0, cupCount - cupsToDonate);
+                const label = `Donated ${cupsToDonate} cup${cupsToDonate !== 1 ? 's' : ''} to Plastic Soup Foundation`;
+                setCupCount(newCount);
+                setDonatedCups(cupsToDonate);
+                addHistory('cups_donated', label);
+                setPage('donate-success');
+                if (userId) persist(updateCupBalance(userId, newCount), addHistoryEntry(userId, 'cups_donated', label));
+              }
+            }}
+            cupCount={cupCount}
+          />
+        )}
       </div>
     );
   }
@@ -388,12 +453,8 @@ export default function App() {
       <Header cupCount={cupCount} onBadgeClick={() => setPage('user')} />
 
       <section className="app__hero">
-        <h1 className="app__headline">
-          Collect Cups &amp;<br />Get Rewards
-        </h1>
-        <p className="app__subtext">
-          We pool your cup deposits into one cashback payout — worth more than a standard refund.
-        </p>
+        <h1 className="app__headline">{liveSettings.heroHeadline}</h1>
+        <p className="app__subtext">{liveSettings.heroSubtext}</p>
       </section>
 
       <CupProgress
@@ -413,7 +474,7 @@ export default function App() {
         onClaimAttempt={handleClaimAttempt}
         onResetClaim={handleResetClaim}
         onOpenTerms={handleOpenTerms}
-        onOpenRefund={handleOpenRefund}
+        onOpenRefund={liveSettings.featureDirectRefunds ? handleOpenRefund : null}
         onViewDetail={() => handleViewDetail(selectedReward)}
         onNudge={handleNudge}
       />
@@ -449,12 +510,16 @@ export default function App() {
         <button className="modal-btn" onClick={() => setTermsOpen(false)}>Got it</button>
       </Modal>
 
-      <DirectRefundSheet
-        open={directRefundOpen}
-        onClose={() => setDirectRefundOpen(false)}
-        cupCount={cupCount}
-        onConfirm={handleDirectRefundConfirm}
-      />
+      {liveSettings.featureDirectRefunds && (
+        <DirectRefundSheet
+          open={directRefundOpen}
+          onClose={() => setDirectRefundOpen(false)}
+          cupCount={cupCount}
+          onConfirm={handleDirectRefundConfirm}
+          refundRate={liveSettings.refundRatePerCup}
+          cashbackRate={liveSettings.cashbackRatePerCup}
+        />
+      )}
     </div>
   );
 }

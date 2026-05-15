@@ -95,7 +95,13 @@
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 24px;
-  align-items: flex-start;
+  /* IMPORTANT: do NOT set `align-items: flex-start` here. With grid
+   * items shrunk to their content height, the TOC column has zero
+   * extra room for `position: sticky` to slide against — so the TOC
+   * appears static even though it declares sticky. Default
+   * `align-items: stretch` makes the TOC column as tall as the right
+   * pane, which gives sticky the scroll room it needs to actually
+   * stick as the user scrolls long settings sections. */
 }
 @media (max-width: 960px) {
   .as-layout { grid-template-columns: 1fr; }
@@ -108,14 +114,27 @@
   flex-direction: column;
   gap: 4px;
   position: sticky;
-  top: 80px;
+  /* 56px topbar + 16px gap = 72px breathing room above the TOC.
+   * The TOC's own grid column is stretched (see .as-layout comment),
+   * and its sticky context is `.admin-app__main` (the only scrollable
+   * ancestor — has overflow-y: auto in AdminApp.css). */
+  top: 72px;
+  /* `align-self: start` keeps the TOC at the top of its grid column
+   * (since the column itself now stretches), instead of vertically
+   * centering inside the stretched column. */
+  align-self: start;
   padding: 8px;
   background: #FFFFFF;
   border: 1px solid #E5DECF;
   border-radius: 14px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  /* Cap TOC height + scroll inside it if the section list ever grows
+   * longer than the viewport — prevents a long TOC from extending past
+   * the bottom of the screen and looking broken when sticky kicks in. */
+  max-height: calc(100vh - 72px - 24px);
+  overflow-y: auto;
 }
-@media (max-width: 960px) { .as-toc { position: static; } }
+@media (max-width: 960px) { .as-toc { position: static; max-height: none; } }
 
 .as-toc__item {
   display: flex;

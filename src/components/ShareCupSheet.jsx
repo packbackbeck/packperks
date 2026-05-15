@@ -87,10 +87,26 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId }) {
   const maxAmount = Math.min(cupCount, 10);
   const canIncrease = amount < maxAmount;
   const canDecrease = amount > 1;
+  // The user-facing entry points ("Share your Cup" and "Next cup for free")
+  // both open this same sheet. If the user lands here with 0 cups we show
+  // an explicit empty state instead of an enabled "Share 1 cup" button
+  // that would only fail server-side with a generic error.
+  const hasNoCups = cupCount < 1;
+  // Caller may have allowed clicking even with insufficient balance for a
+  // requested amount — surface that too instead of leaving the amount=1
+  // default to swallow the problem.
+  const insufficientForAmount = !hasNoCups && amount > cupCount;
 
   async function handleShare() {
     if (!userId) {
       setError('No user session — please reload the app.');
+      return;
+    }
+    if (amount > cupCount) {
+      setError(
+        `You only have ${cupCount} cup${cupCount === 1 ? '' : 's'} in your balance. ` +
+        `Return more cups before sharing, or lower the amount.`
+      );
       return;
     }
     setSharing(true);
@@ -101,7 +117,19 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId }) {
       setPhase('qr');
     } catch (err) {
       console.error('share-cups failed:', err);
-      setError(err?.message || 'Could not generate share QR. Please try again.');
+      // Translate the share-cups edge function's machine errors into
+      // copy a user can act on. `insufficient_balance` is the common
+      // case when the server caught a race the client missed.
+      const code = err?.code || err?.error;
+      const msg = err?.message || '';
+      if (code === 'insufficient_balance' || /insufficient/i.test(msg)) {
+        setError(
+          `You don't have enough cups to share ${amount}. ` +
+          `Your current balance is ${cupCount} — return more cups first.`
+        );
+      } else {
+        setError(msg || 'Could not generate share QR. Please try again.');
+      }
     } finally {
       setSharing(false);
     }
@@ -125,7 +153,32 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId }) {
       <div className="scs__sheet" role="dialog" aria-modal="true" aria-label="Share cups">
         <div className="scs__drag-handle" />
 
-        {phase === 'choose' && (
+        {/* ── Empty-balance state ──
+         * Both "Share your Cup" and "Next cup for free" open this sheet.
+         * If the user lands here with 0 cups, an enabled "Share 1 cup"
+         * button would only fail server-side with a generic error.
+         * Show an explicit explanation instead so they know what to do.
+         */}
+        {phase === 'choose' && hasNoCups && (
+          <>
+            <div className="scs__header">
+              <h2 className="scs__title">You don't have any cups yet</h2>
+              <p className="scs__desc">
+                You need at least 1 cup in your balance before you can share or pass it on as
+                "Next cup for free". Return a reusable cup at any participating Burger King
+                first, then come back here.
+              </p>
+            </div>
+
+            <div className="scs__actions">
+              <button className="scs__btn scs__btn--primary" onClick={handleCancel}>
+                Got it
+              </button>
+            </div>
+          </>
+        )}
+
+        {phase === 'choose' && !hasNoCups && (
           <>
             <div className="scs__header">
               <h2 className="scs__title">Share your cup</h2>
@@ -178,7 +231,7 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId }) {
               <button
                 className="scs__btn scs__btn--primary"
                 onClick={handleShare}
-                disabled={sharing}
+                disabled={sharing || insufficientForAmount}
               >
                 {sharing ? 'Generating QR…' : `Share ${amount} cup${amount !== 1 ? 's' : ''}`}
               </button>

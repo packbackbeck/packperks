@@ -2,10 +2,27 @@ import { supabase } from './supabase'
 
 // ── Device identity ────────────────────────────────────────────────────────
 // The only thing that stays in localStorage: a stable device fingerprint.
+//
+// `crypto.randomUUID()` is only defined in secure contexts (HTTPS or
+// localhost/127.0.0.1). When the dev server is reached via a raw LAN IP
+// (e.g. http://10.43.22.14:5173 from a phone), the browser leaves it
+// undefined and this used to throw — which crashed init before any
+// Supabase calls fired. Fall back to a manual v4 UUID generator when
+// missing so LAN testing works without HTTPS.
+function safeUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
 function getDeviceId() {
   let id = localStorage.getItem('packperks_device_id')
   if (!id) {
-    id = crypto.randomUUID()
+    id = safeUUID()
     localStorage.setItem('packperks_device_id', id)
   }
   return id

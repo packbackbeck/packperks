@@ -221,7 +221,33 @@ export default function App() {
         ]);
 
         if (config?.rewards) {
-          const live = config.rewards.filter(r => r.status === 'live');
+          // The admin "Publish" flow stores reward objects whole — including
+          // the image field. For seeded rewards (Big King, Chicken Sandwich,
+          // Veggie Nuggets) the image is a Vite-imported asset whose URL is
+          // resolved at build time (e.g. /assets/big-king-7Bk2nm.png in prod,
+          // /src/assets/images/big-king.png in dev). That URL gets persisted
+          // into Supabase, but it's *build-specific* — a later production
+          // build with new hashes, or a deploy from a different environment,
+          // will 404 that path even though the same logical reward still
+          // exists in this bundle.
+          //
+          // Fix: if the stored image URL looks like a build-time asset path,
+          // fall back to the matching seed reward's current import (which
+          // resolves to the current build's hashed URL). External URLs
+          // (https://..., supabase storage, sanity CDN, data: URIs) are
+          // left alone because those are stable across builds.
+          const seedById = Object.fromEntries(rewards.map(r => [r.id, r]));
+          const looksLikeBuildAsset = (url) =>
+            typeof url === 'string' &&
+            (url.startsWith('/assets/') || url.startsWith('/src/') || url.startsWith('./') || url.startsWith('../'));
+          const live = config.rewards
+            .filter(r => r.status === 'live')
+            .map(r => {
+              if (looksLikeBuildAsset(r.image) && seedById[r.id]?.image) {
+                return { ...r, image: seedById[r.id].image };
+              }
+              return r;
+            });
           if (live.length > 0) setLiveRewards(live);
         }
         if (config?.settings) {
@@ -752,11 +778,16 @@ export default function App() {
             open={donateSheetOpen}
             onClose={(cupsToDonate) => {
               setDonateSheetOpen(false);
-              if (cupsToDonate > 0) {
-                const newCount = Math.max(0, cupCount - cupsToDonate);
-                const label = `Donated ${cupsToDonate} cup${cupsToDonate !== 1 ? 's' : ''} to Plastic Soup Foundation`;
+              // Donate has no server-side enforcement (vs. share-cups which
+              // does). The sheet itself blocks 0-balance opens, but clamp
+              // here too so a stale `cupsToDonate` from a race condition
+              // can never overdraw the balance or fabricate a history entry.
+              const actual = Math.max(0, Math.min(cupsToDonate, cupCount));
+              if (actual > 0) {
+                const newCount = cupCount - actual;
+                const label = `Donated ${actual} cup${actual !== 1 ? 's' : ''} to Plastic Soup Foundation`;
                 setCupCount(newCount);
-                setDonatedCups(cupsToDonate);
+                setDonatedCups(actual);
                 addHistory('cups_donated', label);
                 setPage('donate-success');
                 if (userId) persist(updateCupBalance(userId, newCount), addHistoryEntry(userId, 'cups_donated', label));

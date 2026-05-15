@@ -17,6 +17,12 @@ export default function DonateSheet({ open, onClose, cupCount }) {
   const maxAmount = cupCount;
   const canIncrease = amount < maxAmount;
   const canDecrease = amount > 1;
+  // Insufficient-balance guard. The donate flow has no server-side
+  // enforcement (unlike share-cups), so this UI block is what stops a
+  // user from "donating" a cup they don't have. Showing an explicit
+  // empty state — rather than a disabled stepper — makes it obvious
+  // *why* the action isn't available and what to do next.
+  const hasNoCups = cupCount < 1;
 
   const handleDone = () => onClose(amount);   // deduct cups and go to success
   const handleCancel = () => onClose(0);       // no deduction
@@ -28,6 +34,31 @@ export default function DonateSheet({ open, onClose, cupCount }) {
       <div className="ds__sheet" role="dialog" aria-modal="true" aria-label="Donate cups">
         <div className="ds__drag-handle" />
 
+        {/* ── Empty-balance state ──
+         * Shown when the user opens the sheet with 0 cups. No stepper,
+         * no Donate CTA — just an explanation and a way out. This is
+         * the only thing blocking a negative-balance "donation" since
+         * the donate flow has no server-side check (unlike share-cups).
+         */}
+        {hasNoCups ? (
+          <>
+            <div className="ds__header">
+              <h2 className="ds__title">You don't have any cups yet</h2>
+              <p className="ds__desc">
+                You need at least 1 cup in your balance before you can donate.
+                Return a reusable cup at any participating Burger King to get started —
+                then come back here to donate.
+              </p>
+            </div>
+
+            <div className="ds__actions">
+              <button className="ds__btn ds__btn--primary" onClick={handleCancel}>
+                Got it
+              </button>
+            </div>
+          </>
+        ) : (
+        <>
         {/* Header */}
         <div className="ds__header">
           <h2 className="ds__title">Donate to Plastic Soup Foundation</h2>
@@ -85,6 +116,8 @@ export default function DonateSheet({ open, onClose, cupCount }) {
             Cancel
           </button>
         </div>
+        </>
+        )}
       </div>
     </>
   );

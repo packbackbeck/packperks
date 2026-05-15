@@ -1,0 +1,134 @@
+import { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import { bootstrapAdmin, signOut } from './authApi';
+
+/* ─────────────────────────────────────────────────────────────────────
+ * AuthContext — single source of truth for the currently signed-in
+ * admin. Exposes:
+ *
+ *   • session   — raw Supabase Auth session (or null)
+ *   • profile   — row from admin_profiles (display name, role, color…)
+ *   • status    — 'loading' | 'unauthenticated' | 'no_profile' | 'authenticated'
+ *   • refresh() — reload the profile (after edit / role change)
+ *   • signOut() — sign out and clear local state
+ *
+ * The status state machine drives AuthGate's routing decisions:
+ *   loading          → splash
+ *   unauthenticated  → login page
+ *   no_profile       → bootstrap call (creates admin_profile, then re-renders)
+ *   authenticated    → render the admin app
+ * ───────────────────────────────────────────────────────────────────── */
+
+const AuthCtx = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [status, setStatus]   = useState('loading');
+  const [error, setError]     = useState(null);
+
+  // Track the initial session + listen for future auth events.
+  useEffect(() => {
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setSession(data.session ?? null);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess ?? null);
+      // Any session change invalidates the cached profile.
+      setProfile(null);
+    });
+    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+  }, []);
+
+  // Whenever we have a session but no profile, call bootstrap-admin.
+  // That function is idempotent — it will create the row on first
+  // sign-in or return the existing row otherwise.
+  useEffect(() => {
+    if (!session) {
+      setStatus('unauthenticated');
+      setProfile(null);
+      return;
+    }
+    if (profile) {
+      setStatus('authenticated');
+      return;
+    }
+    setStatus('loading');
+    bootstrapAdmin()
+      .then(result => {
+        setProfile(result?.profile ?? null);
+        setStatus(result?.profile ? 'authenticated' : 'no_profile');
+      })
+      .catch(err => {
+        console.error('bootstrapAdmin failed:', err);
+        setError(err.message || 'Unknown auth error');
+        setStatus('no_profile');
+      });
+  }, [session, profile]);
+
+  async function refresh() {
+    // Force a re-run of the bootstrap effect.
+    setProfile(null);
+  }
+
+  async function handleSignOut() {
+    try { await signOut(); } catch (e) { console.error('signOut failed:', e); }
+    setProfile(null);
+    setSession(null);
+    setStatus('unauthenticated');
+  }
+
+  const value = {
+    session,
+    profile,
+    status,
+    error,
+    refresh,
+    signOut: handleSignOut,
+    setProfile, // for ProfileSetup to update without a round-trip
+  };
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthCtx);
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
+  return ctx;
+}
+
+/* Convenience hook for permission checks. Maps the role on the current
+ * admin profile to a boolean per-action. Centralising here means a
+ * future change to the permission matrix touches one file. */
+export function usePermission(action) {
+  const { profile } = useAuth();
+  if (!profile) return false;
+  return hasPermission(profile.role, action);
+}
+
+export function hasPermission(role, action) {
+  // Permission matrix mirrors the one we agreed on. New actions can be
+  // added without touching every component.
+  const matrix = {
+    owner:   true, // owner gets everything by default
+    admin:   new Set([
+      'view', 'claim.approve', 'reward.edit', 'reward.publish',
+      'cupqr.generate', 'customer.adjust', 'export',
+      'team.invite', 'team.role', 'team.password', 'team.block',
+      'org.edit', 'audit.read', 'settings.maintenance',
+    ]),
+    manager: new Set([
+      'view', 'claim.approve', 'reward.edit', 'reward.publish',
+      'cupqr.generate', 'export',
+    ]),
+    checker: new Set(['view', 'export']),
+  };
+  const allowed = matrix[role];
+  if (allowed === true) return true;
+  if (!allowed) return false;
+  return allowed.has(action);
+}

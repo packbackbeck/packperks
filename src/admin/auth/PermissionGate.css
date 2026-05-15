@@ -1,0 +1,57 @@
+/* Wraps a disabled element so we can layer a transparent blocker over
+ * the top + render a tooltip on hover. The blocker swallows pointer
+ * events for non-disable-able children (links, divs) and the tooltip
+ * is plain CSS so it doesn't require a portal. */
+.pg-wrap {
+  position: relative;
+  display: inline-flex;
+  cursor: not-allowed;
+}
+
+.pg-wrap > * {
+  opacity: 0.55;
+  filter: grayscale(0.25);
+}
+
+.pg-blocker {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: not-allowed;
+}
+
+/* Tooltip on hover */
+.pg-wrap::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 100;
+}
+.pg-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #1A1A1A;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.pg-wrap:hover::before,
+.pg-wrap:hover::after {
+  opacity: 1;
+}

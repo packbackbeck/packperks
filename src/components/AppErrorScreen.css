@@ -1,0 +1,150 @@
+/* AppErrorScreen — friendly bootstrap-failure screen for the user app.
+ *
+ * Visual treatment matches the rest of the PackBack-themed user UI:
+ *   • warm cream background
+ *   • a card centered on screen with a soft purple-on-orange glyph
+ *   • single primary action (Try again)
+ *   • mailto fallback for "still stuck"
+ *   • collapsed technical details disclosure for engineers
+ *
+ * The decorative concentric rings on the icon match the Support page
+ * hero — small piece of visual continuity between the user app and the
+ * admin dashboard, since both can show this in early-life-cycle states. */
+
+.app-err {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #F8F4EC;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1A1A1A;
+}
+
+.app-err__card {
+  width: 100%;
+  max-width: 420px;
+  background: #FFFFFF;
+  border: 1px solid #E5DECF;
+  border-radius: 22px;
+  padding: 36px 28px 28px;
+  text-align: center;
+  box-shadow: 0 12px 36px rgba(83, 51, 165, 0.08);
+}
+
+/* Decorative icon block, modelled on the support-page hero. */
+.app-err__art {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  margin: 0 auto 22px;
+  display: grid;
+  place-items: center;
+}
+.app-err__art-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(83, 51, 165, 0.18);
+}
+.app-err__art-ring--1 { width: 100%; height: 100%; }
+.app-err__art-ring--2 { width: 72%;  height: 72%;  border-color: rgba(83, 51, 165, 0.28); }
+.app-err__art-glyph {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #FD6F46;
+  color: #FFFFFF;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 24px rgba(253, 111, 70, 0.32);
+}
+
+.app-err__title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.22;
+  color: #1A1A1A;
+}
+
+.app-err__body {
+  margin: 0 0 22px;
+  font-size: 14.5px;
+  color: #6A6058;
+  line-height: 1.5;
+}
+
+.app-err__retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 18px;
+  background: #5333A5;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 0.14s ease, transform 0.08s ease;
+}
+.app-err__retry:hover  { background: #42298B; }
+.app-err__retry:active { transform: translateY(1px); }
+
+.app-err__support {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FD6F46;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+.app-err__support:hover {
+  color: #E55A30;
+  background: rgba(253, 111, 70, 0.08);
+}
+
+/* Hidden technical details — only useful when an engineer is helping. */
+.app-err__details {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed #E5DECF;
+}
+
+.app-err__details-toggle {
+  background: transparent;
+  border: none;
+  color: #9E9A93;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.app-err__details-toggle:hover { color: #4A4540; }
+
+.app-err__details-pre {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  background: #F8F4EC;
+  border-radius: 8px;
+  color: #6C6259;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}

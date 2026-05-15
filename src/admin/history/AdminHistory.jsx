@@ -1,3 +1,4 @@
+import QuickLinks from '../shared/QuickLinks';
 import './AdminHistory.css';
 
 function formatDate(ts) {
@@ -55,7 +56,7 @@ function buildChangeSummary(version, prevSnapshot) {
   return changes.length > 0 ? changes : ['Minor updates'];
 }
 
-export default function AdminHistory({ draftState }) {
+export default function AdminHistory({ draftState, onNavigate }) {
   const { versions, restoreVersion, published } = draftState;
 
   if (versions.length === 0) {
@@ -73,6 +74,8 @@ export default function AdminHistory({ draftState }) {
           </svg>
           <p>Your version history will appear here after your first Publish.</p>
         </div>
+
+        <QuickLinks currentPage="history" onNavigate={onNavigate} />
       </div>
     );
   }
@@ -143,6 +146,8 @@ export default function AdminHistory({ draftState }) {
           );
         })}
       </div>
+
+      <QuickLinks currentPage="history" onNavigate={onNavigate} />
     </div>
   );
 }

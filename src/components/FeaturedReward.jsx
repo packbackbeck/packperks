@@ -9,6 +9,7 @@ export default function FeaturedReward({
   cupsRemaining,
   cupsCollected,
   claimed,
+  savedIban,
   onClaim,
   onClaimAttempt,
   onResetClaim,
@@ -17,7 +18,12 @@ export default function FeaturedReward({
   onViewDetail,
   onNudge,
 }) {
-  const [iban, setIban] = useState('');
+  // If the user has a saved IBAN (from profile), pre-fill the input —
+  // the field UI is identical to "they just typed it", just already
+  // populated. This keeps the unlock screen consistent whether or not
+  // they've claimed before.
+  const normalizedSaved = (savedIban || '').replace(/\s/g, '').toUpperCase();
+  const [iban, setIban] = useState(normalizedSaved);
   const [error, setError] = useState('');
   const [nudgeVisible, setNudgeVisible] = useState(false);
   const isComplete = cupsCollected >= reward.cupsNeeded;
@@ -31,18 +37,18 @@ export default function FeaturedReward({
       return;
     }
     onClaimAttempt?.();
-    const trimmed = iban.trim().toUpperCase();
-    if (!trimmed) {
+    const toUse = iban.trim().toUpperCase();
+    if (!toUse) {
       setError('Please enter your IBAN to continue.');
       return;
     }
-    if (trimmed.length < 15) {
+    if (toUse.length < 15) {
       setError('That IBAN looks too short. Double-check it?');
       return;
     }
     setError('');
     setNudgeVisible(false);
-    onClaim(trimmed);
+    onClaim(toUse);
   };
 
   return (
@@ -139,7 +145,7 @@ export default function FeaturedReward({
               </p>
               {isUnlocked && (
                 <label className="featured-reward__claim-label" htmlFor="iban-input">
-                  Type your IBAN here:
+                  Your IBAN:
                 </label>
               )}
             </div>

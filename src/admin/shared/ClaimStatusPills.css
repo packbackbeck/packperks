@@ -1,0 +1,58 @@
+/* ClaimStatusPills — three-pill claim lifecycle display.
+ *
+ * Same tonal scale used by .ac-receipt-chip elsewhere:
+ *   pass  — green (claim moved forward successfully at this stage)
+ *   warn  — amber (waiting on a decision / queued)
+ *   fail  — red   (this stage failed and blocked progression)
+ *   muted — neutral (not applicable to this claim type) */
+
+.csp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.csp--verbose {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.csp__col {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.csp--verbose .csp__col {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.csp__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6B645B;
+}
+
+.csp__pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: -0.005em;
+}
+
+.csp__pill--pass  { background: rgba(74, 222, 128, 0.12); color: #16A34A; }
+.csp__pill--warn  { background: rgba(214, 149, 0, 0.14);  color: #7C5A00; }
+.csp__pill--fail  { background: rgba(220, 38, 38, 0.10);  color: #C73E1D; }
+.csp__pill--muted { background: #F4EFE5;                  color: #8A857F; }

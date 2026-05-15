@@ -1,13 +1,55 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import './ActivityDetailModal.css';
 
 const TYPE_META = {
-  cup_added:       { title: 'Cup returned',      tone: 'green',  icon: 'plus' },
-  reward_claimed:  { title: 'Reward claimed',    tone: 'amber',  icon: 'check' },
-  cups_withdrawn:  { title: 'Direct refund',     tone: 'red',    icon: 'minus' },
-  cups_shared:     { title: 'Cup shared',        tone: 'blue',   icon: 'share' },
-  cups_donated:    { title: 'Cups donated',      tone: 'green',  icon: 'heart' },
+  cup_added:       { title: 'Cup returned',      tone: 'green',  icon: 'plus',  statusLabel: 'Added to balance',   statusColor: '#1A8737' },
+  reward_claimed:  { title: 'Reward claimed',    tone: 'amber',  icon: 'check', statusLabel: 'Submitted',          statusColor: '#B8922A' },
+  cups_withdrawn:  { title: 'Direct refund',     tone: 'red',    icon: 'minus', statusLabel: 'Refund issued',      statusColor: '#1A8737' },
+  cups_shared:     { title: 'Cup shared',        tone: 'blue',   icon: 'share', statusLabel: 'Sent via QR code',   statusColor: '#1E5BB8' },
+  cups_donated:    { title: 'Cups donated',      tone: 'green',  icon: 'heart', statusLabel: 'Donated',            statusColor: '#1A8737' },
 };
+
+/* For a reward_claimed activity, look up the matching claim row and
+ * translate its status into user-facing copy.
+ *
+ * Matching is keyed on TIMESTAMP PROXIMITY, not reward name, because the
+ * user may have multiple claims for the same reward (one completed, one
+ * pending). Activity history and the claim row are written nearly
+ * simultaneously in the same Promise.all batch, so the closest claim in
+ * time is the right one. We require <60s proximity to count as a match. */
+function liveStatusForClaim(item, userClaims) {
+  if (item.type !== 'reward_claimed' || !Array.isArray(userClaims) || userClaims.length === 0) return null;
+  if (!item.createdAt) return null;
+
+  const activityTime = new Date(item.createdAt).getTime();
+  const candidates = userClaims.filter(c => c.type === 'cashback');
+  if (candidates.length === 0) return null;
+
+  // Pick the cashback claim whose created_at is closest to this activity entry,
+  // within a 60-second window. Anything outside that window is not really
+  // "this claim" — better to show nothing than a misleading status.
+  let bestMatch = null;
+  let bestDelta = Infinity;
+  for (const c of candidates) {
+    const delta = Math.abs(new Date(c.created_at).getTime() - activityTime);
+    if (delta < bestDelta && delta < 60_000) {
+      bestDelta = delta;
+      bestMatch = c;
+    }
+  }
+  if (!bestMatch) return null;
+
+  switch (bestMatch.status) {
+    case 'completed':
+      return { label: 'Cashback paid', color: '#1A8737' };
+    case 'failed':
+      return { label: 'Rejected by review', color: '#C73E1D' };
+    case 'pending':
+    default:
+      return { label: 'Awaiting review', color: '#B8922A' };
+  }
+}
 
 function makeRefId(type, time) {
   const seed = (type + '|' + time).split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
@@ -24,7 +66,7 @@ function ToneIcon({ icon }) {
   return null;
 }
 
-export default function ActivityDetailModal({ item, profile, onClose }) {
+export default function ActivityDetailModal({ item, profile, userClaims, onClose }) {
   const cardRef = useRef(null);
 
   useEffect(() => {
@@ -34,8 +76,14 @@ export default function ActivityDetailModal({ item, profile, onClose }) {
   }, [onClose]);
 
   if (!item) return null;
-  const meta = TYPE_META[item.type] || { title: 'Activity', tone: 'gray', icon: 'plus' };
+  const meta = TYPE_META[item.type] || { title: 'Activity', tone: 'gray', icon: 'plus', statusLabel: 'Recorded', statusColor: '#1A8737' };
   const refId = makeRefId(item.type, item.time);
+
+  // For reward_claimed, the live claim status overrides the default
+  // "Submitted" label so the user sees real updates from admin review.
+  const liveStatus = liveStatusForClaim(item, userClaims);
+  const statusLabel = liveStatus?.label || meta.statusLabel;
+  const statusColor = liveStatus?.color || meta.statusColor;
 
   function handleDownloadPdf() {
     const html = cardRef.current?.outerHTML || '';
@@ -69,7 +117,7 @@ export default function ActivityDetailModal({ item, profile, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="adm-overlay" onClick={onClose}>
       <div className="adm-modal" onClick={e => e.stopPropagation()}>
         <button className="adm-close" onClick={onClose} aria-label="Close">×</button>
@@ -91,7 +139,7 @@ export default function ActivityDetailModal({ item, profile, onClose }) {
 
           <div className="adm-dashed" />
 
-          <div className="adm-row"><span className="adm-row__label">Status</span><span className="adm-row__val" style={{ color: '#1A8737' }}>Recorded</span></div>
+          <div className="adm-row"><span className="adm-row__label">Status</span><span className="adm-row__val" style={{ color: statusColor }}>{statusLabel}</span></div>
         </div>
 
         <div className="adm-actions">
@@ -112,6 +160,7 @@ export default function ActivityDetailModal({ item, profile, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

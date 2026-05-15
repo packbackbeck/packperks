@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser } from '../lib/adminApi';
+import { logAction } from '../auth/actionLog';
+import PiiMask from '../shared/PiiMask';
+import EmptyState from '../shared/EmptyState';
+import QuickLinks from '../shared/QuickLinks';
 import './AdminUsers.css';
 
 function formatDate(ts) {
@@ -14,6 +18,51 @@ function timeAgo(ts) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+/* Classify the device string from the customer's user agent into a
+ * displayable category + colour. Robust to nulls (legacy rows have no
+ * device captured) — those render as a "Unknown" pill. */
+function classifyDevice(device) {
+  if (!device) return { kind: 'unknown', label: '—', tone: 'gray' };
+  const d = device.toLowerCase();
+  if (d.includes('ipad'))      return { kind: 'tablet',  label: device, tone: 'blue' };
+  if (d.includes('iphone'))    return { kind: 'iphone',  label: device, tone: 'blue' };
+  if (d.includes('android'))   return { kind: 'android', label: device, tone: 'green' };
+  if (d.includes('mac'))       return { kind: 'mac',     label: device, tone: 'gray' };
+  if (d.includes('windows'))   return { kind: 'windows', label: device, tone: 'gray' };
+  if (d.includes('linux'))     return { kind: 'linux',   label: device, tone: 'gray' };
+  if (d.includes('web'))       return { kind: 'web',     label: device, tone: 'gray' };
+  return { kind: 'other', label: device, tone: 'gray' };
+}
+
+function DeviceBadge({ device }) {
+  const meta = classifyDevice(device);
+  return (
+    <span className={`au-device au-device--${meta.tone}`} title={device || ''}>
+      {meta.kind === 'iphone' && (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="7" y="2" width="10" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      )}
+      {meta.kind === 'tablet' && (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="3" width="16" height="18" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      )}
+      {meta.kind === 'android' && (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="7" y="2" width="10" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      )}
+      {(meta.kind === 'mac' || meta.kind === 'windows' || meta.kind === 'linux' || meta.kind === 'web' || meta.kind === 'unknown' || meta.kind === 'other') && (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      )}
+      <span className="au-device__label">{meta.label}</span>
+    </span>
+  );
 }
 
 function SortIcon({ active, dir }) {
@@ -62,8 +111,26 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
     if (!adjustReason.trim()) return;
     setSaving(true);
     try {
+      const beforeBalance = user.cupBalance;
       await adjustUserBalance(user.id, adjustVal);
       onAdjustBalance(user.id, adjustVal);
+      // Audit log — balance edits are money movement, so an immutable
+      // trail of who/what/why is the difference between an honest tool
+      // and an opaque one. logAction is fire-and-forget; failures don't
+      // block the UI update because the adjust itself already landed.
+      logAction({
+        action: 'user.balance_adjust',
+        targetType: 'user',
+        targetId: user.id,
+        before: { cupBalance: beforeBalance },
+        after:  { cupBalance: adjustVal },
+        metadata: {
+          delta: adjustVal - beforeBalance,
+          reason: adjustReason.trim(),
+          user_display_name: user.display_name,
+          user_email: user.email,
+        },
+      });
       setAdjustOpen(false);
       setAdjustReason('');
     } finally {
@@ -99,7 +166,11 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
         <div className="udp__avatar">{(user.display_name || '?')[0].toUpperCase()}</div>
         <div className="udp__info">
           <div className="udp__name">{user.display_name || 'Unknown'}</div>
-          <div className="udp__email">{user.email || 'No email'}</div>
+          <div className="udp__email">
+            {user.email
+              ? <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
+              : 'No email'}
+          </div>
         </div>
         <button className="udp__close" onClick={onClose}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -128,11 +199,15 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
           </div>
           <div className="udp__meta-item udp__meta-item--wide">
             <span className="udp__meta-label">IBAN</span>
-            <span className="udp__meta-val udp__meta-val--mono">{user.iban || '—'}</span>
+            <span className="udp__meta-val udp__meta-val--mono">
+              {user.iban
+                ? <PiiMask type="iban" value={user.iban} targetType="user" targetId={user.id} />
+                : <span style={{ color: '#B8B2A8' }}>—</span>}
+            </span>
           </div>
           <div className="udp__meta-item udp__meta-item--wide">
             <span className="udp__meta-label">Device / Browser</span>
-            <span className="udp__meta-val udp__meta-val--muted">Not collected</span>
+            <span className="udp__meta-val udp__meta-val--muted">{user.device || 'Not detected'}</span>
           </div>
         </div>
 
@@ -241,13 +316,14 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
 const SORT_KEYS = {
   name:    (u) => (u.display_name || '').toLowerCase(),
   email:   (u) => (u.email || '').toLowerCase(),
+  device:  (u) => (u.device || '').toLowerCase(),
   cups:    (u) => u.cupBalance,
   lifetime:(u) => u.lifetimeCups,
   joined:  (u) => new Date(u.created_at).getTime(),
   active:  (u) => new Date(u.updated_at).getTime(),
 };
 
-export default function AdminUsers() {
+export default function AdminUsers({ onNavigate }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -321,7 +397,7 @@ export default function AdminUsers() {
             </svg>
             <input
               className="au-search-input"
-              placeholder="Search by name, email or ID…"
+              placeholder="Search by name, email, or short ID (first 8 chars)…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -336,6 +412,7 @@ export default function AdminUsers() {
                   <tr>
                     <ThCol label="User" sortKey="name" />
                     <ThCol label="Email" sortKey="email" />
+                    <ThCol label="Device" sortKey="device" style={{ width: 160 }} />
                     <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />
                     <ThCol label="Lifetime" sortKey="lifetime" style={{ width: 90 }} />
                     <ThCol label="Joined" sortKey="joined" style={{ width: 120 }} />
@@ -344,7 +421,35 @@ export default function AdminUsers() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={6} className="au-table__empty">No users found</td></tr>
+                    <tr><td colSpan={7} className="au-table__empty">
+                      {users.length === 0 ? (
+                        <EmptyState
+                          icon={
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                              <circle cx="9" cy="7" r="4" />
+                              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                              <path d="M16 3.13a4 4 0 010 7.75" />
+                            </svg>
+                          }
+                          title="No customers yet"
+                          body="Once someone opens the user app and scans their first cup, they'll appear here. Try the customer flow yourself to seed test data."
+                          primaryAction={{ label: 'Open user app', onClick: () => window.open('/', '_blank') }}
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="11" cy="11" r="8" />
+                              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                          }
+                          title="No customers match your filters"
+                          body={`${users.length} customer${users.length === 1 ? '' : 's'} on file — try a shorter search or clear the filter.`}
+                          secondaryAction={{ label: 'Clear search', onClick: () => setSearch('') }}
+                        />
+                      )}
+                    </td></tr>
                   ) : filtered.map(user => (
                     <tr
                       key={user.id}
@@ -354,10 +459,23 @@ export default function AdminUsers() {
                       <td>
                         <div className="au-user-cell">
                           <div className="au-user-avatar">{(user.display_name || '?')[0].toUpperCase()}</div>
-                          <span className="au-user-name">{user.display_name || 'Unknown'}</span>
+                          <div className="au-user-info">
+                            <span className="au-user-name">{user.display_name || 'Unknown'}</span>
+                            <span
+                              className="au-user-id"
+                              title={`Full ID: ${user.id}`}
+                            >
+                              ID: <span className="au-mono">{user.id.slice(0, 8)}</span>
+                            </span>
+                          </div>
                         </div>
                       </td>
-                      <td className="au-muted">{user.email || '—'}</td>
+                      <td className="au-muted" onClick={e => e.stopPropagation()}>
+                        <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
+                      </td>
+                      <td className="au-device-cell">
+                        <DeviceBadge device={user.device} />
+                      </td>
                       <td><span className="au-cup-badge">{user.cupBalance}</span></td>
                       <td className="au-muted">{user.lifetimeCups || 0}</td>
                       <td className="au-muted">{formatDate(user.created_at)}</td>
@@ -379,6 +497,8 @@ export default function AdminUsers() {
           />
         )}
       </div>
+
+      <QuickLinks currentPage="users" onNavigate={onNavigate} />
     </div>
   );
 }

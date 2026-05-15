@@ -1,0 +1,130 @@
+.ws-page {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(closest-side at 30% 25%, rgba(253, 111, 70, 0.20), transparent 60%),
+    radial-gradient(closest-side at 75% 75%, rgba(255, 122, 46, 0.18), transparent 60%),
+    #FFF8F4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+  animation: ws-fade 0.3s ease both;
+}
+@keyframes ws-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.ws-card {
+  background: white;
+  width: 100%;
+  max-width: 460px;
+  border-radius: 24px;
+  padding: 36px 36px 32px;
+  box-shadow: 0 14px 44px rgba(20, 16, 12, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+  animation: ws-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes ws-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ws-brands {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ws-brands__pp { height: 30px; }
+.ws-brands__bk { height: 28px; }
+.ws-brands__x {
+  font-size: 16px;
+  color: rgba(0,0,0,0.35);
+  font-weight: 500;
+}
+
+.ws-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 40px;
+  font-weight: 800;
+  overflow: hidden;
+  margin-top: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.10);
+}
+.ws-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.ws-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.ws-sub {
+  font-size: 14px;
+  color: #4A4540;
+  margin: 0;
+  line-height: 1.45;
+  max-width: 320px;
+}
+
+.ws-role {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  background: #FFF6EE;
+  border: 1px solid #FFE0CC;
+  border-radius: 12px;
+  width: 100%;
+}
+.ws-role__pill {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #FD6F46;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.ws-role__copy {
+  font-size: 12px;
+  color: #6B3F1F;
+  line-height: 1.45;
+}
+
+.ws-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 22px;
+  background: #1A1A1A;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+.ws-btn:hover { background: #2F2A26; }

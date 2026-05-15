@@ -1,0 +1,207 @@
+.al-page {
+  padding: 32px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.al-header__title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0 0 4px;
+}
+.al-header__sub {
+  font-size: 13px;
+  color: #7A7166;
+  margin: 0;
+}
+
+.al-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.al-filter {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #E0DDD8;
+  border-radius: 8px;
+  background: white;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1A1A1A;
+  cursor: pointer;
+}
+
+.al-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E8E6E1;
+  border-radius: 8px;
+  padding: 6px 12px;
+  flex: 1;
+  min-width: 220px;
+  max-width: 360px;
+}
+.al-search {
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1A1A1A;
+  background: transparent;
+  width: 100%;
+}
+.al-search::placeholder { color: #9E9A93; }
+
+.al-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: white;
+  border: 1px solid #E8E6E1;
+  border-radius: 16px;
+  padding: 8px;
+}
+
+.al-empty {
+  padding: 32px;
+  text-align: center;
+  color: #6C6259;
+  font-size: 13px;
+}
+
+.al-row {
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.al-row:hover { background: #FAFAF8; }
+.al-row--expanded { background: #FFF8F1; }
+
+.al-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.al-actor {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.al-actor img { width: 100%; height: 100%; object-fit: cover; }
+
+.al-row__text { flex: 1; min-width: 0; }
+.al-row__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.al-row__actor-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+.al-row__action {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.al-row__target {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F0EDE8;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.al-row__target-type { color: #7A7166; }
+.al-row__target-id   { color: #1A1A1A; font-family: ui-monospace, monospace; }
+
+.al-row__when {
+  font-size: 11px;
+  color: #6C6259;
+  margin-top: 2px;
+}
+
+.al-chevron {
+  color: #9E9A93;
+  transition: transform 0.15s;
+}
+.al-chevron--up { transform: rotate(180deg); }
+
+.al-row__diff {
+  padding: 8px 12px 12px;
+  border-top: 1px dashed #E8E2D9;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.al-block {
+  background: white;
+  border: 1px solid #E8E2D9;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.al-block__title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6C6259;
+  margin-bottom: 4px;
+}
+.al-block__body {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 11.5px;
+  color: #1A1A1A;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.al-meta-row {
+  display: flex;
+  gap: 10px;
+  font-size: 11.5px;
+  color: #7A7166;
+}
+.al-meta-label {
+  font-weight: 700;
+  color: #6C6259;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  min-width: 80px;
+}
+.al-meta-val { color: #1A1A1A; word-break: break-all; font-family: ui-monospace, monospace; }
+
+/* Embedded mode — when the activity log lives inside another card
+ * (Organisation tab), we drop the page padding and let the parent
+ * surface provide it. */
+.al-page--embedded {
+  padding: 24px;
+}
+
+.org-card--no-padding { padding: 0; }
+.org-card--no-padding .al-page { padding: 24px; }

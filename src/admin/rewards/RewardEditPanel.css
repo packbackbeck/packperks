@@ -45,7 +45,7 @@
 
 .rep__reward-meta {
   font-size: 12px;
-  color: #9E9A93;
+  color: #6C6259;
 }
 
 .rep__header-actions {
@@ -81,7 +81,7 @@
 }
 
 .rep__btn--ghost {
-  background: #F5F4F0;
+  background: #F8F4EC;
   color: #4A4540;
   border: 1px solid #E8E6E1;
 }
@@ -89,7 +89,7 @@
 
 .rep__btn--danger {
   background: rgba(214,35,0,0.08);
-  color: #D62300;
+  color: #FD6F46;
   border: 1px solid rgba(214,35,0,0.2);
 }
 .rep__btn--danger:hover { background: rgba(214,35,0,0.14); }
@@ -119,7 +119,7 @@
 .rep__section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #9E9A93;
+  color: #6C6259;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   margin-bottom: 14px;
@@ -148,7 +148,7 @@
   align-items: flex-start;
   gap: 2px;
   padding: 10px 12px;
-  background: #F5F4F0;
+  background: #F8F4EC;
   border: 1.5px solid #E8E6E1;
   border-radius: 10px;
   cursor: pointer;
@@ -164,7 +164,7 @@
 }
 .rep__status-desc {
   font-size: 10px;
-  color: #9E9A93;
+  color: #6C6259;
 }
 
 /* Form fields */
@@ -204,7 +204,7 @@
   box-sizing: border-box;
 }
 .rep__input:focus {
-  border-color: #D62300;
+  border-color: #FD6F46;
   background: #FFFFFF;
 }
 .rep__input--mono { font-family: monospace; font-size: 12px; }
@@ -226,7 +226,7 @@
   line-height: 1.5;
 }
 .rep__textarea:focus {
-  border-color: #D62300;
+  border-color: #FD6F46;
   background: #FFFFFF;
 }
 
@@ -261,7 +261,7 @@
   height: 100px;
   border-radius: 10px;
   overflow: hidden;
-  background: #F5F4F0;
+  background: #F8F4EC;
   border: 1px solid #E8E6E1;
 }
 .rep__image-preview img {
@@ -280,7 +280,7 @@
   padding: 6px 12px;
   border-radius: 20px;
   border: 1.5px solid #E8E6E1;
-  background: #F5F4F0;
+  background: #F8F4EC;
   color: #7A7166;
   font-size: 11px;
   font-weight: 700;
@@ -312,7 +312,7 @@
   gap: 8px;
   font-size: 10px;
   font-weight: 700;
-  color: #9E9A93;
+  color: #6C6259;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   padding: 0 2px;
@@ -342,13 +342,13 @@
 }
 .rep__rm-row:hover {
   background: rgba(214,35,0,0.1);
-  color: #D62300;
+  color: #FD6F46;
 }
 
 .rep__add-row {
   font-size: 11px;
   font-weight: 600;
-  color: #D62300;
+  color: #FD6F46;
   background: none;
   border: none;
   padding: 0;
@@ -356,14 +356,14 @@
   font-family: inherit;
   transition: color 0.15s;
 }
-.rep__add-row:hover { color: #B81E00; }
+.rep__add-row:hover { color: #E55A30; }
 
 /* Feature toggle (on/off pill) */
 .rep__feature-toggle {
   padding: 4px 12px;
   border-radius: 20px;
   border: 1.5px solid #E8E6E1;
-  background: #F5F4F0;
+  background: #F8F4EC;
   color: #7A7166;
   font-size: 11px;
   font-weight: 700;
@@ -379,7 +379,7 @@
 
 .rep__field-hint {
   font-size: 11px;
-  color: #9E9A93;
+  color: #6C6259;
   margin: 0 0 10px;
 }
 
@@ -392,4 +392,240 @@
 .rep__discount-label {
   font-size: 12px;
   color: #4A4540;
+}
+
+/* ── Reward economics panel ─────────────────────────────────────────
+ * Sits below the Price / Cups / Subsidy row in the edit form.
+ * Three visual tones:
+ *   ok    — green (cups + subsidy fully cover the product price)
+ *   under — orange (customer is being short-changed)
+ *   over  — purple (partner is overpaying — usually intentional for
+ *           campaign launches; we surface it as a soft accent, not a
+ *           warning)
+ *   unset — grey (no price entered yet, panel is informational only)
+ */
+.rep-econ {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #E5DECF;
+  border-radius: 12px;
+  background: #FAFAF8;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.rep-econ--ok    { background: rgba(74, 222, 128, 0.06);  border-color: rgba(22, 163, 74, 0.30); }
+.rep-econ--under { background: rgba(253, 111, 70, 0.06); border-color: rgba(253, 111, 70, 0.40); }
+.rep-econ--over  { background: rgba(83, 51, 165, 0.06);  border-color: rgba(83, 51, 165, 0.28); }
+
+.rep-econ__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+.rep-econ__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6B645B;
+}
+.rep-econ__badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.rep-econ__badge--ok    { background: rgba(74, 222, 128, 0.18); color: #16A34A; }
+.rep-econ__badge--under { background: rgba(253, 111, 70, 0.18); color: #C84A26; }
+.rep-econ__badge--over  { background: rgba(83, 51, 165, 0.12);  color: #5333A5; }
+.rep-econ__badge--unset { background: #F4EFE5;                   color: #8A857F; }
+
+.rep-econ__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 720px) { .rep-econ__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.rep-econ__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border-radius: 8px;
+}
+.rep-econ__cell-label { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #8A857F; }
+.rep-econ__cell-val   { font-size: 16px; font-weight: 800; color: #1A1A1A; letter-spacing: -0.012em; }
+.rep-econ__cell-sub   { font-size: 10px; color: #6C6259; }
+
+.rep-econ__cell--gap-under { background: #FD6F46; }
+.rep-econ__cell--gap-under .rep-econ__cell-label { color: rgba(255, 255, 255, 0.85); }
+.rep-econ__cell--gap-under .rep-econ__cell-val   { color: #FFFFFF; }
+.rep-econ__cell--gap-under .rep-econ__cell-sub   { color: rgba(255, 255, 255, 0.85); }
+.rep-econ__cell--gap-ok    { background: rgba(22, 163, 74, 0.10); }
+.rep-econ__cell--gap-over  { background: rgba(83, 51, 165, 0.10); }
+
+.rep-econ__hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: #7C5A00;
+  line-height: 1.5;
+}
+
+/* P-44: tab strip in the reward editor. Sits between header and body
+ * so the active surface is obvious without scrolling. Tabs are flush-
+ * bottom-aligned with a 2px purple indicator on the active item, and
+ * carry the standard cream-on-hover treatment used elsewhere. */
+.rep__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 22px;
+  margin-top: 4px;
+  border-bottom: 1px solid #E5DECF;
+}
+
+.rep__tab {
+  padding: 10px 14px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6C6259;
+  cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+}
+.rep__tab:hover:not(.rep__tab--active) {
+  color: #2A2724;
+  background: #F8F4EC;
+}
+.rep__tab--active {
+  color: #5333A5;
+  border-bottom-color: #5333A5;
+  font-weight: 800;
+}
+
+/* ── Save bar (replaces the previous live-save behaviour) ─────────── */
+.rep__save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 22px;
+  background: #FBF8F1;
+  border-bottom: 1px solid #F0EDE8;
+  font-size: 12.5px;
+  color: #6C6259;
+}
+.rep__save-bar--dirty {
+  background: rgba(83, 51, 165, 0.06);
+  border-bottom-color: rgba(83, 51, 165, 0.20);
+  color: #2A2724;
+}
+
+.rep__save-bar__msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.rep__save-bar__msg--clean { color: #7A7166; }
+
+.rep__save-bar__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5333A5;
+  box-shadow: 0 0 0 3px rgba(83, 51, 165, 0.16);
+  animation: rep-pulse 1.8s ease-out infinite;
+}
+@keyframes rep-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(83, 51, 165, 0.45); }
+  70%  { box-shadow: 0 0 0 8px rgba(83, 51, 165, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(83, 51, 165, 0); }
+}
+
+.rep__save-bar__actions { display: inline-flex; gap: 8px; }
+
+.rep__btn--primary {
+  background: #5333A5;
+  color: #FFFFFF;
+  border: none;
+}
+.rep__btn--primary:hover { background: #42298B; }
+
+/* Image upload row — URL input + "Upload from device" button on the
+ * same line. Falls back to vertical stacking on narrow viewports. */
+.rep__image-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.rep__image-row .rep__input { flex: 1; min-width: 0; }
+.rep__image-upload { white-space: nowrap; }
+.rep__image-err {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #C73E1D;
+}
+@media (max-width: 540px) {
+  .rep__image-row { flex-direction: column; }
+}
+
+/* Release + expiry window block inside the Status section. */
+.rep__schedule {
+  margin-top: 14px;
+  padding: 14px;
+  background: #FBF8F1;
+  border: 1px dashed #E5DECF;
+  border-radius: 12px;
+}
+
+.rep__schedule-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.rep__schedule-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5333A5;
+}
+.rep__schedule-sub {
+  font-size: 12px;
+  color: #7A7166;
+  line-height: 1.5;
+}
+.rep__schedule-sub strong { color: #2A2724; font-weight: 700; }
+
+.rep__schedule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 540px) { .rep__schedule-row { grid-template-columns: 1fr; } }
+
+.rep__field--inline { margin-bottom: 0; }
+
+.rep__schedule-hint {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  background: rgba(83, 51, 165, 0.06);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #5333A5;
+}
+.rep__schedule-hint strong { font-weight: 700; }
+.rep__schedule-hint--warn {
+  background: rgba(253, 111, 70, 0.10);
+  color: #C84A26;
 }

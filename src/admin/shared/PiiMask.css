@@ -1,0 +1,60 @@
+/* PiiMask — visually muted by default, revealed via click.
+ *
+ * The masked state should read as "value present but hidden", not as
+ * a UI error. We use the same warm cream chip background as other
+ * "metadata" elements in the dashboard, with a tiny eye icon to hint
+ * at interactivity. Revealed state drops the icon and styles like
+ * regular text so it doesn't compete for attention once the admin
+ * has chosen to see it.
+ */
+
+.pii-mask {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: -0.005em;
+}
+
+.pii-mask--empty {
+  color: #9E9A93;
+  font-style: italic;
+  font-family: inherit;
+}
+
+/* Inline variant — used inside table cells where a button would
+ * disturb the row hover state. */
+.pii-mask--inline {
+  cursor: pointer;
+  color: #6C6259;
+  transition: color 0.14s ease;
+}
+.pii-mask--inline:hover { color: #2A2724; }
+.pii-mask--inline.pii-mask--revealed { color: #2A2724; }
+
+/* Chip variant — used in detail panels where we have room for an
+ * obvious interactive affordance. */
+.pii-mask--chip {
+  border: 1px solid #E5DECF;
+  background: #FAFAF8;
+  color: #6C6259;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.pii-mask--chip:hover {
+  background: #FFFFFF;
+  border-color: #DCD3C1;
+  color: #2A2724;
+}
+.pii-mask--chip.pii-mask--revealed {
+  background: rgba(83, 51, 165, 0.06);
+  border-color: rgba(83, 51, 165, 0.20);
+  color: #2A2724;
+}
+
+.pii-mask__icon { color: #9E9A93; flex-shrink: 0; }
+.pii-mask--chip:hover .pii-mask__icon { color: #5333A5; }

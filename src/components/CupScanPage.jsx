@@ -1,6 +1,30 @@
-import { useRef, useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import jsQR from 'jsqr';
 import './ReceiptPage.css'; /* reuse same base styles */
 import './CupScanPage.css';
+import { parseCupQr } from '../lib/api';
+
+/* Compress a (possibly large) canvas down to a manageable JPEG data-URL.
+ *
+ * Returns null if the export fails — most commonly when a gallery image
+ * tainted the canvas (iOS Safari + HEIC source can do that even though
+ * the file came from a local FileReader). The caller is expected to
+ * handle null by continuing the scan without a photo, rather than
+ * silently dropping the entire claim attempt. */
+function compressToJpeg(canvas, maxWidth = 800, quality = 0.65) {
+  try {
+    if (canvas.width <= maxWidth) return canvas.toDataURL('image/jpeg', quality);
+    const scale = maxWidth / canvas.width;
+    const out = document.createElement('canvas');
+    out.width = maxWidth;
+    out.height = Math.round(canvas.height * scale);
+    out.getContext('2d').drawImage(canvas, 0, 0, out.width, out.height);
+    return out.toDataURL('image/jpeg', quality);
+  } catch (err) {
+    console.error('compressToJpeg failed (returning null):', err);
+    return null;
+  }
+}
 
 const CupIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -12,78 +36,182 @@ const CupIcon = () => (
   </svg>
 );
 
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 10L8 14L16 6"/>
-  </svg>
-);
-
-/* Simple 1.5s loading overlay */
-function LoadingOverlay() {
+function ProcessingOverlay({ count }) {
   return (
     <div className="cup-scan__loading-overlay">
       <div className="cup-scan__loading-spinner" />
-      <span className="cup-scan__loading-text">Verifying your cup…</span>
+      <span className="cup-scan__loading-text">
+        Adding {count} cup{count !== 1 ? 's' : ''} to your balance…
+      </span>
     </div>
   );
 }
 
-export default function CupScanPage({ onSubmit, onBack }) {
+/* QR-driven cup return page. Reads the rear camera, decodes any QR in
+ * frame via jsQR every ~150ms, and as soon as a parsed cups payload comes
+ * out it hands the UUID list off to onScan() which calls the claim-cups
+ * edge function. Errors (already-claimed, invalid) bubble up via onError. */
+export default function CupScanPage({ onScan, onBack, onError }) {
   const videoRef = useRef(null);
-  const fileRef = useRef(null);
+  const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const fileRef = useRef(null);
+  const rafRef = useRef(null);
+  const lastTickRef = useRef(0);
+  const handledRef = useRef(false);
+
   const [cameraError, setCameraError] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [hint, setHint] = useState(null);
 
+  /* Decode a QR from a still image picked by the user — covers the case
+   * where they snapped the bin receipt instead of standing in front of
+   * it, or scanned the smart-bin print earlier. Mirrors the live-camera
+   * decode path: image → canvas → jsQR → claim flow. */
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setHint(null);
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = ev => resolve(ev.target.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = dataUrl;
+      });
+      // Cap the working size — 1600px is plenty for QR decoding and keeps
+      // jsQR fast on large camera photos.
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      let canvas = canvasRef.current;
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvasRef.current = canvas;
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const imgData = ctx.getImageData(0, 0, w, h);
+      // Some gallery photos have inverted contrast — try both modes.
+      const code =
+        jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' });
+      if (!code?.data) {
+        setHint("Couldn't find a QR code in that image.");
+        e.target.value = ''; // allow re-selecting the same file
+        return;
+      }
+      const parsed = parseCupQr(code.data);
+      if (!parsed) {
+        setHint("That QR isn't a valid PackPerks cup code.");
+        e.target.value = '';
+        return;
+      }
+      handledRef.current = true;
+      const photoDataUrl = compressToJpeg(canvas);
+      setPendingCount(
+        parsed.batchId ? 1 : parsed.cupIds.length,
+      );
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      onScan?.(parsed, { scanType: 'gallery', photoDataUrl });
+    } catch (err) {
+      console.error('Image QR decode failed:', err);
+      setHint("Couldn't read that image. Try another photo.");
+      e.target.value = '';
+    }
+  }
+
+  // ── Start camera + decode loop ─────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
-    navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    navigator.mediaDevices
+      ?.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
       .then(stream => {
         if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
-        setCameraActive(true);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => setCameraActive(true);
+        }
+        scheduleScan();
       })
       .catch(() => {
-        if (mounted) setCameraError('Camera access denied. You can upload from your gallery instead.');
+        if (mounted) setCameraError('Camera access denied. Open the bin receipt URL on your phone instead.');
       });
     return () => {
       mounted = false;
+      cancelAnimationFrame(rafRef.current);
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const submit = (dataUrl) => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    setLoading(true);
-    setTimeout(() => onSubmit(dataUrl), 1500);
-  };
+  function scheduleScan() {
+    rafRef.current = requestAnimationFrame(tickScan);
+  }
 
-  const handleCapture = () => {
+  function tickScan(ts) {
+    if (handledRef.current) return;
+
+    // Throttle jsQR to ~6Hz — every frame is wasteful and burns battery.
+    if (ts - lastTickRef.current < 150) {
+      scheduleScan();
+      return;
+    }
+    lastTickRef.current = ts;
+
     const video = videoRef.current;
-    if (!video) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    submit(canvas.toDataURL('image/jpeg', 0.85));
-  };
+    if (!video || video.readyState < 2) {
+      scheduleScan();
+      return;
+    }
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => submit(ev.target.result);
-    reader.readAsDataURL(file);
-  };
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) { scheduleScan(); return; }
 
-  if (loading) return <LoadingOverlay />;
+    let canvas = canvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvasRef.current = canvas;
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, w, h);
+    const image = ctx.getImageData(0, 0, w, h);
+
+    const code = jsQR(image.data, w, h, { inversionAttempts: 'dontInvert' });
+    if (code?.data) {
+      const parsed = parseCupQr(code.data);
+      if (parsed) {
+        handledRef.current = true;
+        // Capture the same frame the decode succeeded on as the scan photo.
+        const photoDataUrl = compressToJpeg(canvas);
+        setPendingCount(
+          parsed.batchId ? 1 /* count unknown until server resolves */ : parsed.cupIds.length,
+        );
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        onScan?.(parsed, { scanType: 'camera', photoDataUrl });
+        return;
+      }
+      setHint("That QR isn't a valid PackPerks cup code.");
+    }
+    scheduleScan();
+  }
+
+  if (pendingCount > 0) return <ProcessingOverlay count={pendingCount} />;
 
   return (
     <div className="receipt-page cup-scan-page">
-
-      {/* ── Back button ── */}
       <button className="cup-scan__back" onClick={onBack} aria-label="Go back">
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
           <path d="M13 4L7 10L13 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -91,21 +219,19 @@ export default function CupScanPage({ onSubmit, onBack }) {
         Back
       </button>
 
-      {/* ── Step pill (single step) ── */}
       <div className="cup-scan__step-pill">
         <div className="cup-scan__step-icon"><CupIcon /></div>
-        <span>Scan your returned cup receipt</span>
+        <span>Scan the QR on your bin receipt</span>
       </div>
 
-      {/* ── Title ── */}
       <div className="receipt-page__header">
-        <h1 className="receipt-page__title">Scan your cup receipt</h1>
+        <h1 className="receipt-page__title">Scan your cup QR</h1>
         <p className="receipt-page__subtitle">
-          Point the camera at the receipt you received when returning your cup. We'll add it to your balance right away.
+          Point the camera at the QR code on the receipt the smart bin printed.
+          We'll add all your returned cups to your balance.
         </p>
       </div>
 
-      {/* ── Camera viewfinder ── */}
       <div className="receipt-page__viewfinder">
         {cameraError ? (
           <div className="receipt-page__camera-error">
@@ -124,37 +250,46 @@ export default function CupScanPage({ onSubmit, onBack }) {
                 <span>Starting camera…</span>
               </div>
             )}
-            <div className="receipt-page__corner receipt-page__corner--tl" />
-            <div className="receipt-page__corner receipt-page__corner--tr" />
-            <div className="receipt-page__corner receipt-page__corner--bl" />
-            <div className="receipt-page__corner receipt-page__corner--br" />
+            {/* Square QR-finder target */}
+            <div className="cup-scan__qr-target">
+              <span className="cup-scan__qr-corner cup-scan__qr-corner--tl" />
+              <span className="cup-scan__qr-corner cup-scan__qr-corner--tr" />
+              <span className="cup-scan__qr-corner cup-scan__qr-corner--bl" />
+              <span className="cup-scan__qr-corner cup-scan__qr-corner--br" />
+              <span className="cup-scan__qr-laser" />
+            </div>
           </>
         )}
       </div>
 
-      {/* ── Shutter button ── */}
-      {!cameraError && (
-        <button className="receipt-page__shutter" onClick={handleCapture} disabled={!cameraActive} aria-label="Take photo">
-          <div className="receipt-page__shutter-ring">
-            <div className="receipt-page__shutter-dot" />
-          </div>
-        </button>
-      )}
+      {hint && <p className="cup-scan__hint">{hint}</p>}
 
-      {/* ── Gallery option ── */}
-      <div className="receipt-page__gallery">
-        <span className="receipt-page__gallery-or">or</span>
-        <button className="receipt-page__gallery-btn" onClick={() => fileRef.current?.click()}>
+      <div className="cup-scan__gallery">
+        <span className="cup-scan__gallery-or">or</span>
+        <button
+          className="cup-scan__gallery-btn"
+          type="button"
+          onClick={() => fileRef.current?.click()}
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
             <circle cx="8.5" cy="8.5" r="1.5"/>
             <polyline points="21 15 16 10 5 21"/>
           </svg>
-          Upload from gallery
+          Upload QR from gallery
         </button>
-        <input ref={fileRef} type="file" accept="image/*" className="receipt-page__file-input" onChange={handleFileChange} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="cup-scan__file-input"
+          onChange={handleFileChange}
+        />
       </div>
 
+      <p className="cup-scan__caption">
+        Hold the receipt in good light, or upload the photo if you already snapped it.
+      </p>
     </div>
   );
 }

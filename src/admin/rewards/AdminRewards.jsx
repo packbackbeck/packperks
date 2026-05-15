@@ -1,12 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import RewardEditPanel from './RewardEditPanel';
+import QuickLinks from '../shared/QuickLinks';
 import './AdminRewards.css';
 
+/* P-43: full status palette, with 'hidden' aliased to the paused
+ * orange so legacy rows render coherently until edited. */
 const STATUS_COLORS = {
-  live:   { bg: 'rgba(74,222,128,0.12)',  text: '#16A34A' },
-  hidden: { bg: 'rgba(156,163,175,0.15)', text: '#6B7280' },
-  draft:  { bg: 'rgba(255,197,47,0.12)',  text: '#B8922A' },
+  draft:     { bg: 'rgba(255,197,47,0.12)', text: '#B8922A' },
+  scheduled: { bg: 'rgba(83, 51, 165, 0.12)', text: '#5333A5' },
+  live:      { bg: 'rgba(74,222,128,0.12)',  text: '#16A34A' },
+  paused:    { bg: 'rgba(253,111,70,0.12)',  text: '#C84A26' },
+  expired:   { bg: '#F0EDE8',                text: '#6C6259' },
+  archived:  { bg: 'rgba(156,163,175,0.15)', text: '#6B7280' },
+  hidden:    { bg: 'rgba(253,111,70,0.12)',  text: '#C84A26' },
 };
 
 function RewardListCard({ reward, isSelected, onSelect, claimCount }) {
@@ -16,7 +23,7 @@ function RewardListCard({ reward, isSelected, onSelect, claimCount }) {
       className={`rew-card ${isSelected ? 'rew-card--active' : ''} ${reward.status === 'hidden' ? 'rew-card--hidden' : ''}`}
       onClick={onSelect}
     >
-      <div className="rew-card__thumb" style={{ background: reward.bgColor || '#F5F4F0' }}>
+      <div className="rew-card__thumb" style={{ background: reward.bgColor || '#F8F4EC' }}>
         {reward.image && <img src={typeof reward.image === 'string' ? reward.image : ''} alt={reward.name} />}
       </div>
       <div className="rew-card__body">
@@ -65,7 +72,7 @@ function parseCSV(text) {
 
 let nextTempId = Date.now();
 
-export default function AdminRewards({ draftState }) {
+export default function AdminRewards({ draftState, onNavigate }) {
   const { draft, updateDraft } = draftState;
   const rewards = draft.rewards;
 
@@ -86,6 +93,47 @@ export default function AdminRewards({ draftState }) {
         setClaimCounts(counts);
       }).catch(() => {});
   }, []);
+
+  /* Scheduled-status auto-transitions.
+   *
+   * On every mount + whenever the rewards array changes, scan for
+   * rewards whose release date has arrived (draft / scheduled → live)
+   * or whose expiry date has passed (live → expired). Saves the next
+   * snapshot through updateDraft so the change shows up in the
+   * publish diff and the admin sees what happened.
+   *
+   * The transition is also re-checked when the admin clicks Save in
+   * the editor — see the RewardEditPanel's onChange flow — so an
+   * admin who tweaks dates and saves immediately sees the resulting
+   * status flip. */
+  useEffect(() => {
+    const now = Date.now();
+    const transitions = [];
+    for (const r of rewards) {
+      const release = r.releaseAt ? new Date(r.releaseAt).getTime() : null;
+      const expires = r.expiresAt ? new Date(r.expiresAt).getTime() : null;
+      // Schedule → live once release has passed (and we haven't already expired)
+      if ((r.status === 'scheduled' || r.status === 'draft') && release && now >= release && (!expires || now < expires)) {
+        transitions.push({ id: r.id, status: 'live', reason: 'release_passed' });
+      }
+      // Live → expired once expiry has passed
+      if (r.status === 'live' && expires && now >= expires) {
+        transitions.push({ id: r.id, status: 'expired', reason: 'expiry_passed' });
+      }
+    }
+    if (transitions.length === 0) return;
+    updateDraft(prev => ({
+      ...prev,
+      rewards: prev.rewards.map(r => {
+        const t = transitions.find(x => x.id === r.id);
+        return t ? { ...r, status: t.status } : r;
+      }),
+    }));
+  // We intentionally only re-run when the rewards array reference
+  // changes, which is on every save. That's enough: timed transitions
+  // happen the next time anything in the dashboard ticks the array.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rewards.length, rewards.map(r => `${r.id}:${r.status}:${r.releaseAt}:${r.expiresAt}`).join('|')]);
 
   const displayRewards = useMemo(() => {
     let list = rewards;
@@ -239,9 +287,12 @@ export default function AdminRewards({ draftState }) {
             <div className="rew-list__filter-row">
               <select className="rew-list__select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                 <option value="all">All status</option>
-                <option value="live">Live</option>
                 <option value="draft">Draft</option>
-                <option value="hidden">Hidden</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="live">Live</option>
+                <option value="paused">Paused</option>
+                <option value="expired">Expired</option>
+                <option value="archived">Archived</option>
               </select>
               <select className="rew-list__select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
                 <option value="order">Default order</option>
@@ -282,6 +333,7 @@ export default function AdminRewards({ draftState }) {
               onChange={handleUpdate}
               onSetFeatured={() => handleSetFeatured(selectedReward.id)}
               onArchive={() => handleArchive(selectedReward.id)}
+              cashbackRate={draftState?.draft?.settings?.cashbackRatePerCup || 1.25}
             />
           ) : (
             <div className="rew-editor__empty">
@@ -296,6 +348,8 @@ export default function AdminRewards({ draftState }) {
           )}
         </div>
       </div>
+
+      <QuickLinks currentPage="rewards" onNavigate={onNavigate} />
     </div>
   );
 }

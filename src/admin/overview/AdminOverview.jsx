@@ -4,6 +4,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { getAdminStats } from '../lib/adminApi';
+import PiiMask from '../shared/PiiMask';
+import QuickLinks from '../shared/QuickLinks';
 import './AdminOverview.css';
 
 /* ── Data helpers ── */
@@ -40,14 +42,132 @@ function buildDailySumSeries(items, days, field, defaultVal = 0) {
   });
 }
 
+/* For each day in the window, compute the % of users who, as of that
+ * day, had returned cups on ≥2 distinct calendar days. The denominator
+ * is "users who have returned at least one cup by this day", the
+ * numerator is "users who have returned on at least two distinct days
+ * by this day" — i.e. genuine come-backs. The series shows the
+ * retention rate trending over time. */
+function buildRetentionTimeSeries(cupEvents, days) {
+  const series = [];
+  const today = new Date();
+  // First pass: bucket each event by user_id → sorted unique days.
+  const byUser = new Map();
+  for (const ev of cupEvents) {
+    if (ev.type !== 'cup_added' || !ev.user_id) continue;
+    const day = ev.created_at.slice(0, 10);
+    let set = byUser.get(ev.user_id);
+    if (!set) { set = new Set(); byUser.set(ev.user_id, set); }
+    set.add(day);
+  }
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const cutoff = d.toISOString().slice(0, 10);
+    let withAny = 0;
+    let withReturn = 0;
+    for (const set of byUser.values()) {
+      const onOrBefore = Array.from(set).filter(day => day <= cutoff);
+      if (onOrBefore.length === 0) continue;
+      withAny++;
+      if (onOrBefore.length >= 2) withReturn++;
+    }
+    const rate = withAny > 0 ? Math.round((withReturn / withAny) * 100) : 0;
+    series.push({ date: d.toLocaleDateString('en', { month: 'short', day: 'numeric' }), value: rate });
+  }
+  return series;
+}
+
+/* ── Customer insights helpers ────────────────────────────────────
+ * These power the "User Insights" panel at the bottom of Overview. */
+
+/* Group customers by device type from users.device, returning a pie-
+ * chart-ready array with counts + brand colours. We bucket the raw
+ * UA-derived label into rough families so the chart stays readable. */
+function buildDeviceBreakdown(rawUsers) {
+  if (!rawUsers?.length) return [];
+  const buckets = { iPhone: 0, Android: 0, iPad: 0, Mac: 0, Windows: 0, Other: 0, Unknown: 0 };
+  for (const u of rawUsers) {
+    const d = (u.device || '').toLowerCase();
+    if (!d)                       buckets.Unknown += 1;
+    else if (d.includes('ipad'))  buckets.iPad    += 1;
+    else if (d.includes('iphone'))buckets.iPhone  += 1;
+    else if (d.includes('android'))buckets.Android += 1;
+    else if (d.includes('mac'))   buckets.Mac     += 1;
+    else if (d.includes('windows'))buckets.Windows += 1;
+    else                          buckets.Other   += 1;
+  }
+  const palette = {
+    iPhone: '#60A5FA', Android: '#4ADE80', iPad: '#A78BFA',
+    Mac: '#FFC52F', Windows: '#FF7A2E', Other: '#9E9A93', Unknown: '#D1CDC4',
+  };
+  return Object.entries(buckets)
+    .filter(([, v]) => v > 0)
+    .map(([name, value]) => ({ name, value, color: palette[name] }));
+}
+
+/* Histogram of cup_added events by local hour-of-day, so an admin can
+ * spot the lunch/dinner peaks. */
+function buildHourlyActivity(cupEvents) {
+  const buckets = Array.from({ length: 24 }, (_, h) => ({ hour: h, label: `${h}:00`, value: 0 }));
+  for (const ev of cupEvents || []) {
+    if (ev.type !== 'cup_added') continue;
+    const h = new Date(ev.created_at).getHours();
+    if (h >= 0 && h < 24) buckets[h].value += 1;
+  }
+  return buckets;
+}
+
+/* Top N customers by cups returned ever, with display name (resolved
+ * from rawUsers). Used as a small leaderboard panel — useful to spot
+ * power users or sharers worth thanking. */
+function buildTopReturners(cupEvents, rawUsers, n = 6) {
+  const counts = {};
+  for (const ev of cupEvents || []) {
+    if (ev.type !== 'cup_added' || !ev.user_id) continue;
+    counts[ev.user_id] = (counts[ev.user_id] || 0) + 1;
+  }
+  const byId = Object.fromEntries((rawUsers || []).map(u => [u.id, u]));
+  return Object.entries(counts)
+    .map(([id, value]) => ({
+      id,
+      value,
+      name: byId[id]?.display_name || 'Anonymous',
+      email: byId[id]?.email || '',
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n);
+}
+
+/* Reward Popularity chart helper.
+ *
+ * Counts every non-rejected claim that has a reward_id attached, then
+ * resolves the id to the published reward name (falling back to the
+ * short id if the reward has since been archived). The chart shows
+ * the top 5.
+ *
+ * Previous version filtered to `type === 'cashback'` only, which is
+ * correct in theory but meant the chart looked broken whenever the
+ * only completed claims were direct refunds on a specific reward
+ * (the user picks a reward, then bails to cash-out — that still
+ * counts as "this reward was popular enough to be chosen"). */
 function buildRewardPopularity(rawClaims, draftRewards) {
   const counts = {};
-  rawClaims.filter(c => c.type === 'cashback' && c.reward_id).forEach(c => {
+  (rawClaims || []).forEach(c => {
+    if (!c.reward_id) return;
+    if (c.status === 'failed') return; // rejected claims don't count
     counts[c.reward_id] = (counts[c.reward_id] || 0) + 1;
   });
   return Object.entries(counts)
-    .map(([id, value]) => ({ name: draftRewards?.find(r => r.id === id)?.name || id, value }))
-    .sort((a, b) => b.value - a.value).slice(0, 5);
+    .map(([id, value]) => ({
+      // Try the live draft first (so an admin editing a name sees the
+      // new name in the chart immediately); fall back to a short id
+      // for archived rewards that no longer appear in the catalogue.
+      name: draftRewards?.find(r => r.id === id)?.name || `Archived (${String(id).slice(0, 6)}…)`,
+      value,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
 }
 
 function buildCupDistribution(rawClaims, rawBalances) {
@@ -58,7 +178,7 @@ function buildCupDistribution(rawClaims, rawBalances) {
   const donated  = Math.max(0, total - redeemed - refunded - active);
   return [
     { name: 'Active Balances', value: active,   color: '#FFC52F' },
-    { name: 'Redeemed',        value: redeemed, color: '#D62300' },
+    { name: 'Redeemed',        value: redeemed, color: '#FD6F46' },
     { name: 'Refunded',        value: refunded, color: '#60A5FA' },
     { name: 'Donated',         value: donated,  color: '#4ADE80' },
   ].filter(d => d.value > 0);
@@ -81,14 +201,14 @@ const SPOTLIGHT = {
     ),
   },
   'stat-cups-collected': {
-    title: 'Cups Collected Per Day',
+    title: 'Cups Added Per Day',
     color: '#FFC52F',
     type: 'area',
     getData: (stats, period) => buildDailyTimeSeries(stats?.rawCupActivity || [], period),
   },
   'stat-cups-redeemed': {
-    title: 'Cups Redeemed Per Day',
-    color: '#D62300',
+    title: 'Cups Spent Per Day',
+    color: '#FD6F46',
     type: 'bar',
     getData: (stats, period) => buildDailyTimeSeries(
       (stats?.rawClaims || []).filter(c => c.type === 'cashback'), period
@@ -101,6 +221,16 @@ const SPOTLIGHT = {
     getData: (stats, period) => buildDailySumSeries(
       (stats?.rawClaims || []).filter(c => c.status === 'completed'), period, 'payout_amount'
     ),
+  },
+  'stat-retention': {
+    // Retention rate computed daily: for each day, the % of users active
+    // on or before that day who have already returned a cup on a later
+    // day. Captures the cumulative "fraction of one-time users who came
+    // back" trend over the selected period.
+    title: 'Retention Rate Per Day (%)',
+    color: '#A78BFA',
+    type: 'area',
+    getData: (stats, period) => buildRetentionTimeSeries(stats?.rawCupActivity || [], period),
   },
 };
 
@@ -138,8 +268,16 @@ function EyeToggle({ id, visible, onToggle }) {
   );
 }
 
-/* ── Stat card ── */
-function StatCard({ id, label, value, sub, color, icon, editMode, visible, onToggle, focused, onFocus }) {
+/* ── Stat card ──
+ * A card is clickable when either:
+ *   • SPOTLIGHT[id] is set — clicking spotlights its time series in
+ *     the main chart, or
+ *   • the id is an explicit page-navigator like `stat-pending` —
+ *     handleStatFocus jumps straight to the Claims page.
+ *
+ * The visual affordance (cursor, arrow chevron) follows the same rule. */
+function StatCard({ id, label, value, sub, color, icon, tooltip, editMode, visible, onToggle, focused, onFocus }) {
+  const isClickable = !editMode && (SPOTLIGHT[id] || id === 'stat-pending');
   return (
     <div
       className={[
@@ -147,9 +285,9 @@ function StatCard({ id, label, value, sub, color, icon, editMode, visible, onTog
         !visible && editMode ? 'ov-stat--hidden' : '',
         !visible && !editMode ? 'ov-hidden' : '',
         focused ? 'ov-stat--focused' : '',
-        !editMode && SPOTLIGHT[id] ? 'ov-stat--clickable' : '',
+        isClickable ? 'ov-stat--clickable' : '',
       ].filter(Boolean).join(' ')}
-      onClick={() => !editMode && SPOTLIGHT[id] && onFocus(id)}
+      onClick={() => isClickable && onFocus(id)}
     >
       {editMode && <EyeToggle id={id} visible={visible} onToggle={onToggle} />}
       {focused && !editMode && (
@@ -159,13 +297,28 @@ function StatCard({ id, label, value, sub, color, icon, editMode, visible, onTog
         {icon}
       </div>
       <div className="ov-stat__body">
-        <div className="ov-stat__label">{label}</div>
+        <div className="ov-stat__label">
+          {label}
+          {tooltip && (
+            <span className="ov-stat__info" title={tooltip}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </span>
+          )}
+        </div>
         <div className="ov-stat__value">{value}</div>
         {sub && <div className="ov-stat__sub">{sub}</div>}
       </div>
-      {!editMode && SPOTLIGHT[id] && (
+      {isClickable && (
         <svg className="ov-stat__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="6 9 12 15 18 9" />
+          {/* stat-pending jumps to a different page → show a right
+           *  arrow; SPOTLIGHT cards expand a chart below → down. */}
+          {id === 'stat-pending'
+            ? <polyline points="9 6 15 12 9 18" />
+            : <polyline points="6 9 12 15 18 9" />}
         </svg>
       )}
     </div>
@@ -206,9 +359,20 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-const PERIOD_OPTIONS = [{ label: '7d', days: 7 }, { label: '14d', days: 14 }, { label: '30d', days: 30 }];
+const PERIOD_OPTIONS = [
+  { label: '7d',  days: 7 },
+  { label: '14d', days: 14 },
+  { label: '30d', days: 30 },
+  { label: '90d', days: 90 },
+];
 
 const AXIS_TICK = { fill: '#9E9A93', fontSize: 10 };
+
+/* Date-only "today" helper for the custom range picker — gives the
+ * date input a sensible max so admins can't pick a future end date. */
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function AdminOverview({ draftState, onNavigate }) {
   const { draft, updateDraft } = draftState;
@@ -219,6 +383,33 @@ export default function AdminOverview({ draftState, onNavigate }) {
   const [editMode, setEditMode] = useState(false);
   const [period, setPeriod]     = useState(30);
   const [focusedStat, setFocusedStat] = useState(null);
+
+  /* Custom date-range support.
+   *
+   * When the admin picks "Custom" we open a small popover with two
+   * <input type="date"> fields. We translate the chosen range into
+   * `period` = number of days for the chart helpers, because all of
+   * those expect a day count rooted at "today". The "endIso" knob is
+   * preserved for a future enhancement where charts can be anchored
+   * to a non-today endpoint; for now the range simply controls the
+   * window length. */
+  const [showCustomRange, setShowCustomRange] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState(todayIso());
+  const customRangeDays = (() => {
+    if (!customStart || !customEnd) return null;
+    const ms = new Date(customEnd).getTime() - new Date(customStart).getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    return Math.min(365, Math.ceil(ms / 86_400_000) + 1);
+  })();
+  const isCustomActive = customRangeDays != null && period === customRangeDays;
+
+  function applyCustomRange() {
+    if (customRangeDays) {
+      setPeriod(customRangeDays);
+      setShowCustomRange(false);
+    }
+  }
 
   function loadStats() {
     setLoading(true);
@@ -260,6 +451,11 @@ export default function AdminOverview({ draftState, onNavigate }) {
     () => buildCupDistribution(stats?.rawClaims || [], stats?.rawBalances || []),
     [stats]
   );
+
+  /* Triage memo removed — the previous "Needs your attention" panel
+   *  was double-counting cup-scan transient states alongside real
+   *  claim work. Pending Claims is now a single dedicated stat card
+   *  below. */
   const spotlightData = useMemo(() => {
     if (!focusedStat || !SPOTLIGHT[focusedStat]) return [];
     return SPOTLIGHT[focusedStat].getData(stats, period);
@@ -269,6 +465,18 @@ export default function AdminOverview({ draftState, onNavigate }) {
   const pendingTotal = (s.pendingClaims || 0) + (s.pendingScans || 0);
   const settings = draft.settings;
 
+  /* Each card carries a `tooltip` string explaining what's counted +
+   * the denominator, so admins know whether two numbers should be
+   * reconcilable. The cup lifecycle:
+   *
+   *   scanned at bin → validated (server) → balance → spent on reward
+   *     → claim created → AI verified → admin approved → cashback paid
+   *
+   * "Cups Added" counts everything that ever entered a balance.
+   * "Cups Spent" counts everything spent on a cashback claim.
+   * "Total Cashback" sums payout_amount on completed cashback claims —
+   * it does not equal collected×rate because each reward has its own
+   * price and the cup→cash mapping isn't a flat per-cup rate. */
   const STAT_CARDS = [
     {
       id: 'stat-total-users',
@@ -276,31 +484,42 @@ export default function AdminOverview({ draftState, onNavigate }) {
       value: loading ? '—' : (s.totalUsers || 0).toLocaleString(),
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
       color: '#60A5FA',
-      sub: `${s.activeUsers || 0} active last 30d`,
+      sub: s.totalUsers ? `${s.activeUsers || 0} active last 30d` : '—',
+      tooltip: 'Every users row, including anonymous device-only signups. "Active" = updated_at within last 30 days.',
     },
     {
-      id: 'stat-active-users',
-      label: 'Active (30d)',
-      value: loading ? '—' : (s.activeUsers || 0).toLocaleString(),
-      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+      id: 'stat-retention',
+      label: 'Retention',
+      // % of users who came back to return a cup on another day — i.e.
+      // not just a one-time tryer. (Counted in adminApi.getAdminStats.)
+      value: loading ? '—' : `${s.retentionRate || 0}%`,
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12a9 9 0 1 0 3-6.7"/>
+        <polyline points="3 4 3 10 9 10"/>
+      </svg>,
       color: '#A78BFA',
-      sub: s.totalUsers ? `${Math.round((s.activeUsers / s.totalUsers) * 100)}% of users` : '—',
+      sub: s.usersWithAnyCup
+        ? `${s.returningUsers}/${s.usersWithAnyCup} returners`
+        : 'No returns yet',
+      tooltip: 'Of users who have ever returned a cup, the percentage that did so on at least two different calendar days. Denominator is "users with ≥1 cup return", not total signups, so it isn\'t diluted by accounts that browsed but never participated.',
     },
     {
       id: 'stat-cups-collected',
-      label: 'Cups Collected',
+      label: 'Cups Added',
       value: loading ? '—' : (s.totalCupsCollected || 0).toLocaleString(),
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
       color: '#FFC52F',
       sub: 'Lifetime total',
+      tooltip: 'Every cup that ever made it into a customer balance, ever. Computed as (current balances across all users) + (cups already redeemed via claims). Cups stuck in pending or failed scans are NOT counted.',
     },
     {
       id: 'stat-cups-redeemed',
-      label: 'Cups Redeemed',
+      label: 'Cups Spent',
       value: loading ? '—' : (s.totalCupsRedeemed || 0).toLocaleString(),
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>,
-      color: '#D62300',
+      color: '#FD6F46',
       sub: s.totalCupsCollected ? `${Math.round((s.totalCupsRedeemed / s.totalCupsCollected) * 100)}% redemption` : '—',
+      tooltip: 'Sum of cups_redeemed on claims of type=cashback. Includes pending + approved + rejected. Direct refunds and donations are tracked separately and not included here.',
     },
     {
       id: 'stat-cashback',
@@ -308,15 +527,24 @@ export default function AdminOverview({ draftState, onNavigate }) {
       value: loading ? '—' : `€${(s.totalCashback || 0).toFixed(2)}`,
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
       color: '#4ADE80',
-      sub: `@ €${settings.cashbackRatePerCup}/cup`,
+      // Previously this card read "@ €1.25/cup" which implied a flat
+      // per-cup rate. In reality each reward has its own price and the
+      // cashback amount comes from the reward, not from cups×rate.
+      // Honest copy: payouts approved so far.
+      sub: 'Approved & paid out',
+      tooltip: 'Sum of payout_amount on completed claims (cashback + direct refund). This is the actual cash that left the programme, not an estimate based on cup rate. Each reward sets its own price, so total / total cups returned will NOT match €1.25/cup.',
     },
     {
       id: 'stat-pending',
-      label: 'Pending Actions',
-      value: loading ? '—' : pendingTotal.toLocaleString(),
-      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
-      color: pendingTotal > 0 ? '#F97316' : '#6B6860',
-      sub: `${s.pendingClaims || 0} claims · ${s.pendingScans || 0} scans`,
+      // Scoped down to claims only — cup-scan pending is a transient
+      // state (auto-resolved by the edge function in seconds) and was
+      // double-counting against the operational queue.
+      label: 'Pending Claims',
+      value: loading ? '—' : (s.pendingClaims || 0).toLocaleString(),
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>,
+      color: (s.pendingClaims || 0) > 0 ? '#F97316' : '#6B6860',
+      sub: (s.pendingClaims || 0) > 0 ? 'Awaiting your approval' : 'All caught up',
+      tooltip: 'Cashback / direct-refund claims that still need a manual decision. Click to jump to the Claims page filtered to pending only.',
     },
   ];
 
@@ -336,10 +564,72 @@ export default function AdminOverview({ draftState, onNavigate }) {
             {PERIOD_OPTIONS.map(opt => (
               <button
                 key={opt.days}
-                className={`ov-period-btn${period === opt.days ? ' ov-period-btn--active' : ''}`}
-                onClick={() => setPeriod(opt.days)}
+                className={`ov-period-btn${period === opt.days && !isCustomActive ? ' ov-period-btn--active' : ''}`}
+                onClick={() => { setPeriod(opt.days); setShowCustomRange(false); }}
               >{opt.label}</button>
             ))}
+            {/* Custom range button — opens an inline popover with two
+             *  date pickers. Once both are valid we translate the
+             *  picked span into a day count and feed it through the
+             *  same `period` knob the chart helpers already understand. */}
+            <button
+              type="button"
+              className={`ov-period-btn ov-period-btn--custom${isCustomActive ? ' ov-period-btn--active' : ''}`}
+              onClick={() => setShowCustomRange(v => !v)}
+              aria-expanded={showCustomRange}
+              title="Pick a custom date range"
+            >
+              {isCustomActive && customStart
+                ? `${new Date(customStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(customEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                : 'Custom…'}
+            </button>
+            {showCustomRange && (
+              <div className="ov-range-pop" role="dialog" aria-label="Pick custom date range">
+                <div className="ov-range-pop__row">
+                  <label className="ov-range-pop__field">
+                    <span>From</span>
+                    <input
+                      type="date"
+                      value={customStart}
+                      max={customEnd || todayIso()}
+                      onChange={e => setCustomStart(e.target.value)}
+                    />
+                  </label>
+                  <label className="ov-range-pop__field">
+                    <span>To</span>
+                    <input
+                      type="date"
+                      value={customEnd}
+                      min={customStart || undefined}
+                      max={todayIso()}
+                      onChange={e => setCustomEnd(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="ov-range-pop__hint">
+                  {customRangeDays
+                    ? `${customRangeDays} day${customRangeDays === 1 ? '' : 's'} of activity`
+                    : 'Pick a start + end date'}
+                </div>
+                <div className="ov-range-pop__actions">
+                  <button
+                    type="button"
+                    className="ov-range-pop__btn ov-range-pop__btn--ghost"
+                    onClick={() => setShowCustomRange(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="ov-range-pop__btn ov-range-pop__btn--primary"
+                    onClick={applyCustomRange}
+                    disabled={!customRangeDays}
+                  >
+                    Apply range
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <button className="ov-header__refresh" onClick={loadStats} disabled={loading} title="Refresh stats">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
@@ -349,14 +639,10 @@ export default function AdminOverview({ draftState, onNavigate }) {
             </svg>
           </button>
 
-          {pendingTotal > 0 && (
-            <button className="ov-header__alert" onClick={() => onNavigate('claims')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              {pendingTotal} pending
-            </button>
-          )}
+          {/* "N pending" alert chip used to live here — removed. The
+           *  Pending Claims stat card below + the sidebar badge on the
+           *  Claims nav row cover the same signal without duplicating
+           *  it in the page header. */}
           <button
             className={`ov-header__edit-btn${editMode ? ' ov-header__edit-btn--active' : ''}`}
             onClick={() => setEditMode(v => !v)}
@@ -376,6 +662,10 @@ export default function AdminOverview({ draftState, onNavigate }) {
           Edit mode — click the eye icon on any block to show or hide it.
         </div>
       )}
+
+      {/* Triage queue block was removed — pending work is now surfaced
+       *  by the leaner "Pending Claims" stat card below + the per-page
+       *  badges on the sidebar (claims count, scans count). */}
 
       {/* Stat cards */}
       <div className="ov-stats-grid">
@@ -399,17 +689,16 @@ export default function AdminOverview({ draftState, onNavigate }) {
         {(() => {
           const def = focusedStat ? SPOTLIGHT[focusedStat] : null;
           const primData  = def ? spotlightData : cupsData;
-          const primTitle = def ? `${def.title} — Last ${period} Days` : `Cups Collected — Last ${period} Days`;
+          const primTitle = def ? `${def.title} — Last ${period} Days` : `Cups Added — Last ${period} Days`;
           const primColor = def?.color || '#FFC52F';
           const primType  = def?.type || 'area';
           return (
             <ChartBlock id="chart-cups-per-day" label={primTitle}
               fullWidth editMode={editMode} visible={isVisible('chart-cups-per-day')} onToggle={toggleBlock}>
-              {focusedStat && !editMode && (
-                <button className="ov-primary-back" onClick={() => setFocusedStat(null)}>
-                  ← Back to Cups Collected
-                </button>
-              )}
+              {/* The old "← Back to Cups Added" button was removed.
+               *  Clicking the focused stat card again (or any other
+               *  spotlight card) already toggles focus off — the
+               *  button was redundant. */}
               <ResponsiveContainer width="100%" height={200}>
                 {primType === 'area' ? (
                   <AreaChart data={primData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -449,7 +738,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
               <XAxis dataKey="date" tick={AXIS_TICK} tickLine={false} axisLine={false} interval={xInterval} />
               <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="value" fill="#D62300" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" fill="#FD6F46" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartBlock>
@@ -498,7 +787,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
                     </div>
                     <div className="ov-pop-item__bar">
                       <div className="ov-pop-item__fill"
-                        style={{ width: `${pct}%`, background: i === 0 ? '#D62300' : i === 1 ? '#FFC52F' : '#E8E6E1' }} />
+                        style={{ width: `${pct}%`, background: i === 0 ? '#FD6F46' : i === 1 ? '#FFC52F' : '#E8E6E1' }} />
                     </div>
                   </div>
                 );
@@ -528,6 +817,138 @@ export default function AdminOverview({ draftState, onNavigate }) {
         </ChartBlock>
 
       </div>
+
+      {/* ── User Insights ────────────────────────────────────────────
+       * Bottom slab of the Overview page. Three charts in a single row
+       * (collapses to stacked on narrow viewports) — device split,
+       * hourly activity, and a top-returners leaderboard. All driven
+       * by the same stats blob the cards above use so there's no extra
+       * round-trip. */}
+      <div className="ov-insights">
+        <header className="ov-insights__header">
+          <h2 className="ov-insights__title">User insights</h2>
+          <p className="ov-insights__sub">Who's using the app, when, and how.</p>
+        </header>
+
+        <div className="ov-insights__grid">
+          <InsightDevice stats={stats} />
+          <InsightHourly stats={stats} />
+          <InsightTopReturners stats={stats} />
+        </div>
+      </div>
+
+      <QuickLinks currentPage="overview" onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+/* ── User Insight panels ─────────────────────────────────────────── */
+function InsightDevice({ stats }) {
+  const data = useMemo(() => buildDeviceBreakdown(stats?.rawUsers), [stats?.rawUsers]);
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) {
+    return (
+      <div className="ov-insight">
+        <div className="ov-insight__header">
+          <h3>Device breakdown</h3>
+          <span className="ov-insight__sub">No data yet</span>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="ov-insight">
+      <div className="ov-insight__header">
+        <h3>Device breakdown</h3>
+        <span className="ov-insight__sub">{total.toLocaleString()} customers</span>
+      </div>
+      <div className="ov-insight__body ov-insight__body--row">
+        <ResponsiveContainer width="55%" height={180}>
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" outerRadius={70} innerRadius={42} strokeWidth={0}>
+              {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+            </Pie>
+            <Tooltip content={<ChartTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+        <ul className="ov-insight__legend">
+          {data.map(d => (
+            <li key={d.name}>
+              <span className="ov-insight__legend-dot" style={{ background: d.color }} />
+              <span className="ov-insight__legend-name">{d.name}</span>
+              <span className="ov-insight__legend-val">
+                {d.value} <span>· {Math.round((d.value / total) * 100)}%</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function InsightHourly({ stats }) {
+  const data = useMemo(() => buildHourlyActivity(stats?.rawCupActivity), [stats?.rawCupActivity]);
+  const peak = data.reduce((p, d) => d.value > p.value ? d : p, data[0] || { value: 0, hour: 0 });
+  return (
+    <div className="ov-insight">
+      <div className="ov-insight__header">
+        <h3>Cup returns by hour</h3>
+        <span className="ov-insight__sub">
+          {peak.value > 0 ? `Peak at ${peak.hour}:00` : 'No data yet'}
+        </span>
+      </div>
+      <div className="ov-insight__body">
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={data} margin={{ top: 6, right: 4, left: -20, bottom: 0 }} barSize={10}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F0EDE8" vertical={false} />
+            <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#9E9A93' }} tickLine={false} axisLine={false} interval={2} />
+            <YAxis tick={{ fontSize: 10, fill: '#9E9A93' }} tickLine={false} axisLine={false} />
+            <Tooltip content={<ChartTooltip />} />
+            <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#FD6F46" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function InsightTopReturners({ stats }) {
+  const data = useMemo(
+    () => buildTopReturners(stats?.rawCupActivity, stats?.rawUsers),
+    [stats?.rawCupActivity, stats?.rawUsers],
+  );
+  const max = data[0]?.value || 1;
+  return (
+    <div className="ov-insight">
+      <div className="ov-insight__header">
+        <h3>Top returners</h3>
+        <span className="ov-insight__sub">
+          {data.length > 0 ? 'All-time leaders' : 'No data yet'}
+        </span>
+      </div>
+      <ul className="ov-insight__leaderboard">
+        {data.map((u, i) => (
+          <li key={u.id}>
+            <span className="ov-insight__rank">{i + 1}</span>
+            <span className="ov-insight__leader-name">
+              {u.name}
+              {u.email && (
+                <span className="ov-insight__leader-email">
+                  <PiiMask type="email" value={u.email} targetType="user" targetId={u.id} inline />
+                </span>
+              )}
+            </span>
+            <span className="ov-insight__leader-bar">
+              <span className="ov-insight__leader-bar-fill" style={{ width: `${Math.round((u.value / max) * 100)}%` }} />
+            </span>
+            <span className="ov-insight__leader-val">{u.value}</span>
+          </li>
+        ))}
+        {data.length === 0 && (
+          <li className="ov-insight__empty">No cup returns yet.</li>
+        )}
+      </ul>
     </div>
   );
 }

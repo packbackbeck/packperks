@@ -1,33 +1,36 @@
-import { useState } from 'react';
+import FeatureSearch from './auth/FeatureSearch';
+import WorkflowDock from './auth/WorkflowDock';
+import packperksLogoDark from '../assets/images/packperks-logo-dark.svg';
+import burgerKingLogo from '../assets/images/burger-king-logo.png';
 import './AdminTopBar.css';
 
-function timeAgo(ts) {
-  if (!ts) return '';
-  const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ago`;
-}
-
-export default function AdminTopBar({ draftState, onPreview }) {
-  const { isDirty, lastSaved, published, statusLabel, saveDraft, publishDraft, publishNote, setPublishNote, publishError, clearPublishError } = draftState;
-  const [publishModalOpen, setPublishModalOpen] = useState(false);
-  const [localNote, setLocalNote] = useState('');
-
-  function handlePublish() {
-    publishDraft(localNote);
-    setLocalNote('');
-    setPublishModalOpen(false);
-  }
-
-  const statusClass = isDirty ? 'dirty' : published ? 'published' : 'saved';
+/* Stripped-down admin top bar.
+ *
+ * The Preview / Save / Publish / Version History controls and the
+ * publish-status pill all used to live up here. They're now in the
+ * floating WorkflowDock (bottom-right) which feels less crowded and
+ * keeps the most-pressing action visible without occupying chrome
+ * the user has to scan past every time.
+ *
+ * The org badge + profile menu also moved out — to the sidebar footer
+ * (bottom-left), the canonical place for "me + my workspace" in modern
+ * dashboards (Linear, Vercel, Notion all do this).
+ *
+ * What's left in the top bar:
+ *   • brand block on the left (PackPerks × Burger King)
+ *   • free-text feature search in the middle
+ *   • publish-error bar at the very top when a publish fails (rare) */
+export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenSupport }) {
+  const { publishError, clearPublishError } = draftState || {};
 
   return (
     <>
       {publishError && (
         <div className="admin-publish-error-bar">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
           <span><strong>Publish failed:</strong> {publishError}</span>
           <span className="admin-publish-error-bar__sql" onClick={() => {
@@ -36,96 +39,78 @@ export default function AdminTopBar({ draftState, onPreview }) {
           <button className="admin-publish-error-bar__close" onClick={clearPublishError}>×</button>
         </div>
       )}
+
       <header className="admin-topbar">
         <div className="admin-topbar__left">
-          <div className="admin-topbar__logo">
-            <span className="admin-topbar__logo-bk">BK</span>
-            <div className="admin-topbar__logo-text">
-              <span className="admin-topbar__logo-title">PackPerks</span>
-              <span className="admin-topbar__logo-sub">Admin Console</span>
-            </div>
+          <div className="admin-topbar__brand">
+            <img src={packperksLogoDark} alt="PackPerks" className="admin-topbar__brand-pp" />
+            <span className="admin-topbar__brand-x">×</span>
+            <img src={burgerKingLogo} alt="Burger King" className="admin-topbar__brand-bk" />
           </div>
         </div>
 
         <div className="admin-topbar__center">
-          <div className={`admin-topbar__status admin-topbar__status--${statusClass}`}>
-            <span className="admin-topbar__status-dot" />
-            <span className="admin-topbar__status-label">{statusLabel}</span>
-            {lastSaved && (
-              <span className="admin-topbar__status-time">· {timeAgo(lastSaved)}</span>
-            )}
-          </div>
+          <FeatureSearch onNavigate={onNavigate} />
         </div>
 
+        {/* Top-right hosts the WorkflowDock — Framer-style contextual
+         *  Save/Publish/Preview/History cluster. Compact in the default
+         *  state, expands on hover. */}
         <div className="admin-topbar__right">
-          <button className="admin-topbar__btn admin-topbar__btn--ghost" onClick={onPreview}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-            Preview
-          </button>
-          <button
-            className="admin-topbar__btn admin-topbar__btn--secondary"
-            onClick={saveDraft}
-            disabled={!isDirty}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-            Save
-          </button>
-          <button
-            className="admin-topbar__btn admin-topbar__btn--primary"
-            onClick={() => setPublishModalOpen(true)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="22 2 11 13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-            Publish
-          </button>
+          <TimezoneHint />
+          <WorkflowDock
+            draftState={draftState}
+            onPreview={onPreview}
+            onOpenHistory={() => onNavigate?.('history')}
+            onOpenSettings={() => onNavigate?.('settings')}
+            onOpenSupport={onOpenSupport}
+          />
         </div>
       </header>
-
-      {publishModalOpen && (
-        <div className="admin-publish-overlay" onClick={() => setPublishModalOpen(false)}>
-          <div className="admin-publish-modal" onClick={e => e.stopPropagation()}>
-            <div className="admin-publish-modal__header">
-              <div className="admin-publish-modal__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="22 2 11 13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="admin-publish-modal__title">Publish to live</h3>
-                <p className="admin-publish-modal__sub">This pushes all changes to the user-facing app immediately.</p>
-              </div>
-            </div>
-            <label className="admin-publish-modal__label">Change summary (optional)</label>
-            <input
-              className="admin-publish-modal__input"
-              placeholder="e.g. Added new reward, updated cashback rate…"
-              value={localNote}
-              onChange={e => setLocalNote(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handlePublish()}
-              autoFocus
-            />
-            <div className="admin-publish-modal__actions">
-              <button className="admin-publish-modal__cancel" onClick={() => setPublishModalOpen(false)}>
-                Cancel
-              </button>
-              <button className="admin-publish-modal__confirm" onClick={handlePublish}>
-                Publish now →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * TimezoneHint — small pill in the top-bar right slot showing the
+ * browser's current timezone abbreviation.
+ *
+ * P-37: the dashboard renders 55+ timestamps across pages with no
+ * indication of which timezone "14:32" refers to. Renaming each
+ * formatter call site to append the tz would be invasive; this pill
+ * surfaces the global answer in one persistent place. Tooltip on
+ * hover spells out the long IANA name + UTC offset for unambiguous
+ * reading.
+ *
+ * Localised once on mount. Doesn't react to OS-level tz changes mid-
+ * session — that's vanishingly rare and a page reload covers it. */
+function TimezoneHint() {
+  const tz = (() => {
+    try {
+      const long = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const offset = -new Date().getTimezoneOffset();
+      const sign = offset >= 0 ? '+' : '-';
+      const h = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+      const m = String(Math.abs(offset) % 60).padStart(2, '0');
+      // Cheap abbreviation: use the last segment of the IANA name
+      // (Europe/Amsterdam → Amsterdam) so it fits in the chip.
+      const shortName = (long || '').split('/').slice(-1)[0]?.replace(/_/g, ' ') || 'local';
+      return { shortName, long, offsetLabel: `UTC${sign}${h}:${m}` };
+    } catch {
+      return { shortName: 'local', long: 'local', offsetLabel: '' };
+    }
+  })();
+  return (
+    <span
+      className="admin-topbar__tz"
+      title={`All timestamps in the dashboard are displayed in your browser's local timezone (${tz.long || tz.shortName}, ${tz.offsetLabel}). Hover any time cell to see the underlying UTC value where available.`}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+      <span className="admin-topbar__tz-label">{tz.shortName}</span>
+      {tz.offsetLabel && <span className="admin-topbar__tz-offset">· {tz.offsetLabel}</span>}
+    </span>
   );
 }

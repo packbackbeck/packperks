@@ -8,7 +8,7 @@
 
 body:has(.admin-app) {
   justify-content: flex-start !important;
-  background-color: #F5F4F0 !important;
+  background-color: #F8F4EC !important;
 }
 
 #root:has(.admin-app) {
@@ -18,16 +18,39 @@ body:has(.admin-app) {
 }
 
 .admin-app {
-  --bk-red:      #D62300;
+  /* PackBack brand palette
+   *   --pb-purple    #5333A5  Primary brand (Publish, links, accents)
+   *   --pb-orange    #FD6F46  Action / CTA (Approve, badges, BK-aligned)
+   *   --pb-cream     #ECE5D8  Soft background, hover surfaces, dividers
+   * Plus pragmatic derivatives (hover, soft, on-color) so components
+   * don't have to compute their own tints. */
+  --pb-purple:        #5333A5;
+  --pb-purple-hover:  #42298B;
+  --pb-purple-soft:   rgba(83, 51, 165, 0.10);
+  --pb-orange:        #FD6F46;
+  --pb-orange-hover:  #E55A30;
+  --pb-orange-soft:   rgba(253, 111, 70, 0.12);
+  --pb-cream:         #ECE5D8;
+  --pb-cream-soft:    #F4EFE5;
+  --pb-cream-deep:    #DCD3C1;
+
+  /* Legacy --bk-* aliases kept so existing rules still resolve, but
+   * they now point at the PackBack palette. Treat --bk-* as deprecated;
+   * use --pb-* in new styles. */
+  --bk-red:      var(--pb-orange);
   --bk-yellow:   #FFC52F;
   --bk-dark:     #1A1A1A;
-  --bk-bg:       #F5F4F0;
+  --bk-bg:       #F8F4EC;
   --bk-surface:  #FFFFFF;
-  --bk-border:   #E8E6E1;
+  --bk-border:   #E5DECF;
   --bk-text:     #1A1A1A;
   --bk-muted:    #7A7166;
   --bk-success:  #16A34A;
-  --sidebar-w:   220px;
+  /* P-40: bumped from 220 → 240 so org names like "Burger King
+   * Netherlands" don't truncate to "Burger King Netherlan…" in the
+   * sidebar footer. Costs us 20px of content width per page, which is
+   * trivial given the tables already responsive-collapse below 1100px. */
+  --sidebar-w:   240px;
   --topbar-h:    56px;
 
   min-height: 100vh;
@@ -48,4 +71,36 @@ body:has(.admin-app) {
   min-width: 0;
   min-height: calc(100vh - var(--topbar-h));
   overflow-y: auto;
+}
+
+/* ── P-38: custom :focus-visible ring ──────────────────────────────
+ * Suppress the browser-default blue outline on every focusable element
+ * inside the admin shell and replace it with a brand-aligned purple
+ * ring. Scoped to :focus-visible so mouse clicks don't paint a ring
+ * (keyboard-only focus), matching modern accessibility-friendly
+ * expectations. We deliberately keep the ring offset so it sits
+ * outside rounded corners without clipping. */
+.admin-app *:focus { outline: none; }
+
+.admin-app a:focus-visible,
+.admin-app button:focus-visible,
+.admin-app input:focus-visible,
+.admin-app select:focus-visible,
+.admin-app textarea:focus-visible,
+.admin-app [role="button"]:focus-visible,
+.admin-app [tabindex]:focus-visible {
+  outline: 2px solid var(--pb-purple);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Inputs already have their own focus styling (purple border + soft
+ * shadow) — opt those out of the outline so we don't double-paint. */
+.admin-app .as-input:focus-visible,
+.admin-app .au-search-input:focus-visible,
+.admin-app .cs-search:focus-visible,
+.admin-app .acq-input:focus-visible,
+.admin-app .admin-publish-modal__input:focus-visible,
+.admin-app .sup-input:focus-visible {
+  outline: none;
 }

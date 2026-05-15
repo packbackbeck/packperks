@@ -1,0 +1,99 @@
+.rv-page {
+  /* Fixed-position so we cover the full viewport (escapes the 375px #root
+   * max-width on desktop and the .user-page transform stacking context). */
+  position: fixed;
+  inset: 0;
+  background: #FFF8F4;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;  /* Vertically centre the ring instead of top-aligning. */
+  text-align: center;
+  z-index: 10;
+}
+
+.rv-page__glow {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(closest-side, rgba(226, 68, 0, 0.18), transparent);
+  pointer-events: none;
+}
+
+.rv-page__title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0 0 0.5rem;
+  z-index: 1;
+}
+
+.rv-page__subtitle {
+  font-size: 0.875rem;
+  color: #7A7166;
+  line-height: 1.4;
+  max-width: 320px;
+  margin: 0 0 2.25rem;
+  z-index: 1;
+}
+
+/* ── Circular progress ring ────────────────────────────────────────────
+ * The stroke-dashoffset is driven by React state — initial value is the
+ * full circumference (empty ring), then on mount we flip it to ~4% of
+ * the circumference and this CSS transition does the easing over 4.5s.
+ * Held at 96% until App.jsx unmounts the page based on the real result. */
+.rv-ring-wrap {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1.25rem;
+}
+
+.rv-ring {
+  display: block;
+  /* Start at 12 o'clock instead of 3. */
+  transform: rotate(-90deg);
+}
+
+.rv-ring__fg {
+  /* The transition is what actually animates the fill. */
+  transition: stroke-dashoffset 4.5s cubic-bezier(0.05, 0.7, 0.1, 0.95);
+}
+
+.rv-ring__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  pointer-events: none;
+}
+
+.rv-step-icon {
+  width: 44px;
+  height: 44px;
+  color: #E24400;
+  animation: rv-step-in 0.4s ease;
+}
+
+.rv-step-icon svg { width: 100%; height: 100%; }
+
+.rv-step-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1A1A1A;
+  letter-spacing: -0.01em;
+  max-width: 140px;
+  line-height: 1.25;
+  animation: rv-step-in 0.4s ease;
+}
+
+@keyframes rv-step-in {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}

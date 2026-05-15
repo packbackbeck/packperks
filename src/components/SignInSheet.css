@@ -1,0 +1,189 @@
+/* SignInSheet — bottom-sheet on mobile, centered modal on desktop.
+ *
+ * Matches the visual style of the user app's other modal sheets
+ * (ShareCupSheet, DonateSheet) but slightly more ceremonial since
+ * this is a security-adjacent action (binding cups to an email). */
+
+.signin-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 14, 38, 0.50);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  animation: signin-fade-in 0.22s ease-out;
+}
+
+@keyframes signin-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.signin-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: #FFFFFF;
+  border-radius: 22px 22px 0 0;
+  padding: 28px 24px 32px;
+  box-shadow: 0 -8px 30px rgba(83, 51, 165, 0.18);
+  animation: signin-slide-up 0.28s cubic-bezier(0.32, 1.12, 0.55, 1);
+}
+
+@keyframes signin-slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@media (min-width: 640px) {
+  .signin-overlay { align-items: center; }
+  .signin-sheet   { border-radius: 22px; max-width: 420px; }
+}
+
+.signin-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: #F8F4EC;
+  border: none;
+  border-radius: 50%;
+  font-size: 20px;
+  color: #6C6259;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.signin-close:hover { background: #ECE5D8; color: #2A2724; }
+
+.signin-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Decorative icon block — purple ring, orange (or green/blue) fill */
+.signin-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FD6F46, #FF8B6A);
+  color: #FFFFFF;
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+  box-shadow: 0 10px 24px rgba(253, 111, 70, 0.30);
+}
+.signin-art--sent {
+  background: linear-gradient(135deg, #5333A5, #7251C8);
+  box-shadow: 0 10px 24px rgba(83, 51, 165, 0.32);
+}
+.signin-art--ok {
+  background: linear-gradient(135deg, #16A34A, #4ADE80);
+  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.30);
+}
+
+.signin-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #1A1A1A;
+}
+
+.signin-sub {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #6A6058;
+  line-height: 1.5;
+  max-width: 340px;
+}
+.signin-sub strong { color: #2A2724; font-weight: 700; }
+
+.signin-label {
+  align-self: flex-start;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4A4540;
+  letter-spacing: 0.02em;
+}
+
+.signin-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  background: #FAFAF8;
+  border: 1px solid #E5DECF;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  color: #1A1A1A;
+  outline: none;
+  margin-bottom: 14px;
+  transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.signin-input::placeholder { color: #B8B2A8; }
+.signin-input:hover { background: #FFFFFF; }
+.signin-input:focus {
+  background: #FFFFFF;
+  border-color: #5333A5;
+  box-shadow: 0 0 0 3px rgba(83, 51, 165, 0.14);
+}
+
+.signin-error {
+  margin: -6px 0 12px;
+  padding: 9px 12px;
+  background: rgba(220, 38, 38, 0.08);
+  color: #B91C1C;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  align-self: stretch;
+  text-align: left;
+}
+
+.signin-btn {
+  width: 100%;
+  padding: 13px 18px;
+  border-radius: 12px;
+  border: none;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, transform 0.08s ease;
+}
+.signin-btn:active { transform: translateY(1px); }
+.signin-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.signin-btn--primary {
+  background: #5333A5;
+  color: #FFFFFF;
+}
+.signin-btn--primary:hover:not(:disabled) { background: #42298B; }
+
+.signin-btn--ghost {
+  background: #F8F4EC;
+  color: #4A4540;
+  border: 1px solid #E5DECF;
+  margin-top: 4px;
+}
+.signin-btn--ghost:hover:not(:disabled) {
+  background: #ECE5D8;
+  color: #2A2724;
+}
+
+.signin-fine {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  color: #9E9A93;
+  line-height: 1.45;
+  max-width: 320px;
+}

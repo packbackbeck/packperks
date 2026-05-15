@@ -1,0 +1,34 @@
+/* ── Admin table loading state ─────────────────────────────────────────
+ * Centered circular spinner that takes up the whole table area while
+ * the initial data fetch is in flight. Sized large enough to read at a
+ * glance — much more visible than the tiny "Loading…" text it replaces. */
+.admin-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 320px;
+  width: 100%;
+  padding: 40px 0;
+  color: #7A7166;
+}
+
+.admin-spinner__ring {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 6px solid rgba(253, 111, 70, 0.15);
+  border-top-color: #FD6F46;
+  animation: admin-spinner-rot 0.9s linear infinite;
+}
+
+@keyframes admin-spinner-rot {
+  to { transform: rotate(360deg); }
+}
+
+.admin-spinner__label {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}

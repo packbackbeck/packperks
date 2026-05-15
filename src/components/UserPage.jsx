@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import './UserPage.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
@@ -202,7 +202,17 @@ function getBrowserInfo() {
   return 'Unknown Browser';
 }
 
-export default function UserPage({ profile, onSaveProfile, cupCount, history, onAddCup, onWithdraw, onShareCup, onOpenShare, onOpenDonate, onClose }) {
+export default function UserPage({ profile, onSaveProfile, cupCount, history, userClaims = [], rewards = [], authEmail = null, onOpenSignIn, onAddCup, onWithdraw, onShareCup, onOpenShare, onOpenDonate, onRefreshClaims, onClose }) {
+  // Refresh claim status when the user enters this page — admin approvals
+  // that happened while the user wasn't looking get pulled in automatically.
+  useEffect(() => { onRefreshClaims?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  // Enrich claims with a human-readable reward name so the modal can match
+  // them against the activity_history label ("Claimed: Chicken Sandwich").
+  const enrichedClaims = userClaims.map(c => {
+    const reward = rewards.find(r => r.id === c.reward_id);
+    return { ...c, rewardName: reward?.name || c.reward_id };
+  });
   const [email, setEmail] = useState(profile.email || '');
   const [emailSaved, setEmailSaved] = useState(!!profile.email);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -416,36 +426,11 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
         </div>
       </div>
 
-      {/* ── Secure progress (email) ── */}
-      {(!emailSaved || isEditingEmail) && (
-        <div className="user-page__card">
-          <span className="user-page__card-title">
-            {isEditingEmail ? 'Update your email' : 'Secure your progress'}
-          </span>
-          <span className="user-page__card-desc">Add your email so we can restore your cups if you switch devices.</span>
-          <div className="user-page__email-row">
-            <input
-              type="email"
-              className={`user-page__email-input${emailError ? ' user-page__email-input--error' : ''}`}
-              placeholder="your@email.com"
-              value={email}
-              onChange={e => { setEmail(e.target.value); setEmailError(''); }}
-              aria-label="Your email address"
-              autoFocus={isEditingEmail}
-            />
-            <button className="user-page__email-btn" onClick={handleSaveEmail}>Save</button>
-          </div>
-          {isEditingEmail && (
-            <button
-              className="user-page__email-cancel"
-              onClick={() => { setIsEditingEmail(false); setEmail(profile.email || ''); setEmailError(''); }}
-            >
-              Cancel
-            </button>
-          )}
-          {emailError && <span className="user-page__email-error" role="alert">{emailError}</span>}
-        </div>
-      )}
+      {/* "Save your progress" card has moved to the bottom of the page,
+       *  after the Activity block — the customer first reads their
+       *  recent actions, then sees the settings card. Restyled to match
+       *  the surrounding white cards rather than the cream-tinted
+       *  variant that used to live up here. */}
 
       {/* ── IBAN edit card ── */}
       {isEditingIban && (
@@ -551,7 +536,23 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
                     )}
                     {item.type === 'cups_withdrawn' && (
                       <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-                        <line x1="4" y1="10" x2="16" y2="10" stroke="#E24400" strokeWidth="2.5" strokeLinecap="round"/>
+                        <line x1="4" y1="10" x2="16" y2="10" stroke="#FD6F46" strokeWidth="2.5" strokeLinecap="round"/>
+                      </svg>
+                    )}
+                    {/* Cup shared with a friend — paper-plane glyph,
+                     *  PackBack purple to differentiate from the green
+                     *  "earned" / orange "spent" axes. */}
+                    {item.type === 'cups_shared' && (
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                        <path d="M18 2L9 11" stroke="#5333A5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M18 2L13 18L9 11L2 7L18 2Z" stroke="#5333A5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    {/* Cups donated — heart glyph in BK yellow to
+                     *  read as "warm act, not money out". */}
+                    {item.type === 'cups_donated' && (
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 17s-6-4-6-9a3.5 3.5 0 0 1 6-2.5A3.5 3.5 0 0 1 16 8c0 5-6 9-6 9z" stroke="#B8922A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     )}
                   </div>
@@ -569,10 +570,90 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, on
         )}
       </div>
 
+      {/* ── Save your progress / account ──
+       * Re-skinned to match the rest of the user-page cards: a section
+       * title above + a regular white card body, instead of the cream
+       * pill it used to be at the top of the page. Lives at the bottom
+       * so the customer scans their cup count + activity first and
+       * meets the "set up your account" prompt only after they've
+       * earned context to care. */}
+      {(!emailSaved || isEditingEmail || authEmail) && (
+        <div className="user-page__history user-page__progress-section">
+          <span className="user-page__section-title">
+            {authEmail ? 'Account' : 'Save your progress'}
+          </span>
+          <div className="user-page__card">
+            <span className="user-page__card-title">
+              {authEmail
+                ? 'Synced across devices'
+                : (isEditingEmail ? 'Update your email' : 'Add your email')}
+            </span>
+            <span className="user-page__card-desc">
+              {authEmail
+                ? <>Your cups are linked to <strong>{authEmail}</strong>. Sign in with this email on any device to pick up where you left off.</>
+                : 'Add your email so we can restore your cups if you switch phones or clear your browser.'}
+            </span>
+
+            {authEmail && onOpenSignIn ? (
+              <button
+                type="button"
+                className="user-page__email-btn user-page__progress-manage"
+                onClick={onOpenSignIn}
+              >
+                Manage account
+              </button>
+            ) : (
+              <>
+                <div className="user-page__email-row">
+                  <input
+                    type="email"
+                    className={`user-page__email-input${emailError ? ' user-page__email-input--error' : ''}`}
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setEmailError(''); }}
+                    aria-label="Your email address"
+                    autoFocus={isEditingEmail}
+                  />
+                  <button className="user-page__email-btn" onClick={handleSaveEmail}>Save</button>
+                </div>
+                {isEditingEmail && (
+                  <button
+                    className="user-page__email-cancel"
+                    onClick={() => { setIsEditingEmail(false); setEmail(profile.email || ''); setEmailError(''); }}
+                  >
+                    Cancel
+                  </button>
+                )}
+                {emailError && <span className="user-page__email-error" role="alert">{emailError}</span>}
+
+                {/* Upgrade CTA — only shown once the email looks valid
+                 *  (or has already been saved), so we don't tease the
+                 *  cross-device sign-in until the user has something
+                 *  to sign in with. */}
+                {onOpenSignIn && (emailSaved || (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) && (
+                  <button
+                    type="button"
+                    className="user-page__progress-upgrade"
+                    onClick={onOpenSignIn}
+                  >
+                    <span>Use this email to sign in on other devices</span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeActivity && (
         <ActivityDetailModal
           item={activeActivity}
           profile={profile}
+          userClaims={enrichedClaims}
           onClose={() => setActiveActivity(null)}
         />
       )}

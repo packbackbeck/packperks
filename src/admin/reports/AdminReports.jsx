@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../auth/AuthContext';
+import { logAction } from '../auth/actionLog';
+import QuickLinks from '../shared/QuickLinks';
 import './AdminReports.css';
 
 /* ── Dataset definitions ── */
@@ -71,11 +74,24 @@ const PERIODS = [
   { id: 'custom', label: 'Custom',     days: null },
 ];
 
+/* Export formats. The "Excel" entry is a UTF-8-BOM CSV with a
+ * semicolon separator — Excel for Windows / Mac autodetects this as a
+ * proper spreadsheet and respects European decimal commas, whereas a
+ * plain comma-separated CSV often opens as a single column or with
+ * the decimal point gone sideways. PDF is added via the existing jsPDF
+ * dependency (already in the bundle for receipt exports). */
 const FORMATS = [
-  { id: 'csv',  label: 'CSV',  ext: 'csv',  mime: 'text/csv' },
-  { id: 'json', label: 'JSON', ext: 'json', mime: 'application/json' },
-  { id: 'tsv',  label: 'TSV (Excel)', ext: 'tsv', mime: 'text/tab-separated-values' },
+  { id: 'xlsx-csv', label: 'Excel (.csv)', ext: 'csv',  mime: 'text/csv' },
+  { id: 'csv',      label: 'CSV (plain)',  ext: 'csv',  mime: 'text/csv' },
+  { id: 'json',     label: 'JSON',         ext: 'json', mime: 'application/json' },
+  { id: 'pdf',      label: 'PDF',          ext: 'pdf',  mime: 'application/pdf' },
 ];
+
+/* Which datasets contain PII (email + IBAN columns). Only roles with
+ * the `data.export_pii` permission can export these — others see the
+ * non-PII reports only. Activity is borderline (it joins user names)
+ * but the column shape is shallow so we treat it as safe. */
+const PII_DATASETS = new Set(['users', 'claims']);
 
 /* ── Helpers ── */
 function formatValue(val, type) {
@@ -105,14 +121,87 @@ function buildExport(rows, columns, format) {
       return out;
     }), null, 2);
   }
-  const sep = format === 'tsv' ? '\t' : ',';
+  // `xlsx-csv` uses ; as separator + a BOM prefix so Excel auto-recognises
+  // it. Plain `csv` keeps a comma separator for non-Excel tooling.
+  const isExcel = format === 'xlsx-csv';
+  const sep = isExcel ? ';' : ',';
   const header = columns.map(c => c.label).join(sep);
   const body = rows.map(r => columns.map(c => {
     const v = r[c.key];
     if (c.type === 'date' && v) return new Date(v).toISOString();
-    return format === 'tsv' ? String(v ?? '').replace(/\t|\n/g, ' ') : escapeCsv(v);
+    if (c.type === 'currency' && isExcel && v != null && v !== '') {
+      // European decimal — Excel will display this as €X,YZ in NL locale.
+      return String(Number(v).toFixed(2)).replace('.', ',');
+    }
+    return escapeCsv(v);
   }).join(sep)).join('\n');
-  return header + '\n' + body;
+  // BOM tells Excel to treat the file as UTF-8 instead of Windows-1252.
+  const bom = isExcel ? '﻿' : '';
+  return bom + header + '\n' + body;
+}
+
+/* PDF export — uses jsPDF (already in the bundle). Keeps things simple:
+ * landscape A4, header bar, autoTable-style rows with alternating zebra,
+ * footer with row count + generated-on timestamp. For very wide reports
+ * (claims) we let columns wrap rather than truncating. */
+async function buildPdf(rows, columns, datasetLabel, period) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 28;
+  const usableW = pageW - margin * 2;
+  // Header
+  doc.setFillColor(83, 51, 165); // PackBack purple
+  doc.rect(0, 0, pageW, 42, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(`PackPerks — ${datasetLabel} report`, margin, 26);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`${period} · generated ${new Date().toLocaleString('en-GB')}`, pageW - margin, 26, { align: 'right' });
+
+  // Body table
+  const colW = usableW / columns.length;
+  const startY = 58;
+  const rowH = 18;
+  let y = startY;
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(60, 60, 60);
+  doc.setFillColor(236, 229, 216); // cream
+  doc.rect(margin, y - 12, usableW, rowH, 'F');
+  columns.forEach((c, i) => doc.text(String(c.label).slice(0, 28), margin + 6 + i * colW, y, { maxWidth: colW - 8 }));
+  y += rowH;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(30, 30, 30);
+  rows.forEach((r, idx) => {
+    if (y > pageH - 40) { doc.addPage(); y = 40; }
+    if (idx % 2 === 0) {
+      doc.setFillColor(250, 248, 244);
+      doc.rect(margin, y - 12, usableW, rowH, 'F');
+    }
+    columns.forEach((c, i) => {
+      const raw = r[c.key];
+      const txt = c.type === 'date' && raw
+        ? new Date(raw).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
+        : c.type === 'currency' && raw != null
+          ? `€${Number(raw).toFixed(2)}`
+          : String(raw ?? '');
+      doc.text(txt.slice(0, 40), margin + 6 + i * colW, y, { maxWidth: colW - 8 });
+    });
+    y += rowH;
+  });
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(140, 140, 140);
+  doc.text(`${rows.length} rows`, margin, pageH - 14);
+
+  return doc.output('blob');
 }
 
 function downloadFile(content, filename, mime) {
@@ -168,8 +257,16 @@ async function loadDataset(dataset, fromIso, toIso) {
 }
 
 /* ── Component ── */
-export default function AdminReports() {
-  const [dataset, setDataset] = useState('users');
+export default function AdminReports({ onNavigate }) {
+  // Role-gated PII export: Owners + Admins can export the full Users
+  // and Claims reports including email + IBAN columns. Everyone else
+  // sees the safe datasets (cup_scans, activity) only. We resolve the
+  // role once here and reuse it through the rest of the page.
+  const { profile } = useAuth();
+  const role = profile?.role || 'checker';
+  const canExportPii = role === 'owner' || role === 'admin';
+
+  const [dataset, setDataset] = useState(canExportPii ? 'users' : 'cup_scans');
   const cfg = DATASETS[dataset];
 
   const [selectedCols, setSelectedCols] = useState(() =>
@@ -278,12 +375,47 @@ export default function AdminReports() {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function handleExport() {
+  async function handleExport() {
     const fmt = FORMATS.find(f => f.id === format);
     if (!fmt) return;
-    const content = buildExport(filtered, visibleColumns, format);
+    // Block PII-bearing exports for roles without `data.export_pii`.
+    // The UI already disables the dataset selector for those roles, but
+    // this is a defence-in-depth check in case the state slipped through.
+    if (PII_DATASETS.has(dataset) && !canExportPii) {
+      alert("Your role can't export reports that include emails or IBANs. Ask an Owner or Admin for help.");
+      return;
+    }
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadFile(content, `packperks_${dataset}_${stamp}.${fmt.ext}`, fmt.mime);
+    if (format === 'pdf') {
+      const periodLabel = PERIODS.find(p => p.id === period)?.label || '';
+      const blob = await buildPdf(filtered, visibleColumns, cfg.label, periodLabel);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `packperks_${dataset}_${stamp}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } else {
+      const content = buildExport(filtered, visibleColumns, format);
+      downloadFile(content, `packperks_${dataset}_${stamp}.${fmt.ext}`, fmt.mime);
+    }
+    // Audit every export — what dataset, how many rows, by whom, in
+    // which format. PII exports especially are useful to be able to
+    // trace later if a leak is suspected.
+    logAction({
+      action: 'report.export',
+      targetType: 'report',
+      targetId: dataset,
+      metadata: {
+        dataset,
+        format,
+        rows: filtered.length,
+        columns: visibleColumns.map(c => c.key),
+        contains_pii: PII_DATASETS.has(dataset),
+      },
+    });
   }
 
   function handleCopy() {
@@ -311,7 +443,7 @@ export default function AdminReports() {
         .meta { color: #6B6860; font-size: 12px; margin-bottom: 16px; }
         table { width: 100%; border-collapse: collapse; font-size: 11px; }
         th, td { padding: 6px 8px; border-bottom: 1px solid #E8E6E1; text-align: left; }
-        th { background: #F5F4F0; font-weight: 700; }
+        th { background: #F8F4EC; font-weight: 700; }
         tr:nth-child(even) td { background: #FAFAF8; }
         @media print { body { padding: 12px; } }
       </style></head><body>
@@ -362,14 +494,35 @@ export default function AdminReports() {
           <div className="rep-config__section">
             <div className="rep-config__label">Dataset</div>
             <div className="rep-config__datasets">
-              {Object.entries(DATASETS).map(([id, d]) => (
-                <button key={id}
-                  className={`rep-dataset-btn${dataset === id ? ' rep-dataset-btn--active' : ''}`}
-                  onClick={() => setDataset(id)}>
-                  <span className="rep-dataset-btn__name">{d.label}</span>
-                  <span className="rep-dataset-btn__desc">{d.description}</span>
-                </button>
-              ))}
+              {Object.entries(DATASETS).map(([id, d]) => {
+                const isPii = PII_DATASETS.has(id);
+                const locked = isPii && !canExportPii;
+                return (
+                  <button key={id}
+                    className={`rep-dataset-btn${dataset === id ? ' rep-dataset-btn--active' : ''}${locked ? ' rep-dataset-btn--locked' : ''}`}
+                    onClick={() => !locked && setDataset(id)}
+                    disabled={locked}
+                    title={locked ? 'This dataset contains email + IBAN. Only Owners and Admins can export it.' : undefined}
+                  >
+                    <span className="rep-dataset-btn__name">
+                      {d.label}
+                      {isPii && (
+                        <span className="rep-dataset-btn__pii" title="Contains personal data">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                          PII
+                        </span>
+                      )}
+                    </span>
+                    <span className="rep-dataset-btn__desc">{d.description}</span>
+                    {locked && (
+                      <span className="rep-dataset-btn__lockmsg">Owner/Admin only</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -514,6 +667,8 @@ export default function AdminReports() {
           </div>
         </section>
       </div>
+
+      <QuickLinks currentPage="reports" onNavigate={onNavigate} />
     </div>
   );
 }

@@ -64,7 +64,7 @@
 }
 
 .admin-sidebar__badge {
-  background: #D62300;
+  background: #FD6F46;
   color: #FFFFFF;
   font-size: 10px;
   font-weight: 700;
@@ -91,6 +91,41 @@
   letter-spacing: 0.8px;
   padding: 0 4px;
   margin-bottom: 6px;
+}
+
+/* Clickable variant of the section label — links to the full Settings
+ * page. Right-arrow icon mirrors the standard "go to" affordance used
+ * elsewhere in the dashboard. */
+.admin-sidebar__toggles-label--link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  color: #7A7166;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.admin-sidebar__toggles-label--link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #FFFFFF;
+}
+.admin-sidebar__toggles-label--link svg {
+  opacity: 0.5;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+.admin-sidebar__toggles-label--link:hover svg {
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 .admin-sidebar__rates {
@@ -146,7 +181,7 @@
 
 .admin-sidebar__toggle-name {
   font-size: 12px;
-  color: #9E9A93;
+  color: #6C6259;
   font-weight: 500;
 }
 
@@ -167,8 +202,33 @@
 .admin-sidebar__toggle-pill--warn { background: rgba(249,115,22,0.2); color: #F97316; }
 
 .admin-sidebar__footer {
-  padding: 8px 10px 16px;
+  padding: 12px 10px 16px;
   border-top: 1px solid #222;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* OrgBadge + ProfileMenu (which were designed for the dark top bar)
+ * drop in here directly because the sidebar uses the same dark palette.
+ * We just make them stretch to full width so they read as a stacked
+ * me + workspace card. */
+.admin-sidebar__footer .ob,
+.admin-sidebar__footer .pm__trigger {
+  width: 100%;
+  justify-content: flex-start;
+}
+.admin-sidebar__footer .ob__name,
+.admin-sidebar__footer .pm__name {
+  flex: 1;
+}
+/* Profile dropdown opens upward inside the sidebar so it doesn't get
+ * clipped by the viewport bottom. */
+.admin-sidebar__footer .pm__dropdown {
+  top: auto;
+  bottom: calc(100% + 6px);
+  right: auto;
+  left: 0;
+  min-width: 260px;
 }
 
 .admin-sidebar__footer-btn {
@@ -190,6 +250,6 @@
 
 .admin-sidebar__footer-btn:hover {
   background: #1E1E1E;
-  color: #9E9A93;
+  color: #6C6259;
   border-color: #333;
 }

@@ -1,0 +1,278 @@
+.pm { position: relative; display: inline-block; }
+
+/* Dark, squarer trigger that sits in the top bar without screaming
+ * "look at me" — matches the rest of the admin chrome instead of the
+ * earlier white pill. */
+.pm__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 4px 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  color: #FFFFFF;
+}
+.pm__trigger:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.pm__avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pm__avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.pm__name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  text-align: left;
+}
+.pm__name-display { font-size: 13px; font-weight: 700; line-height: 1.2; color: #FFFFFF; }
+.pm__name-role    { font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.05em; }
+.pm__trigger > svg { color: rgba(255, 255, 255, 0.55); margin-left: 2px; }
+
+/* Dropdown */
+.pm__dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 280px;
+  background: white;
+  border: 1px solid #E8E2D9;
+  border-radius: 14px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.10);
+  padding: 8px 0;
+  z-index: 1000;
+  animation: pm-pop 0.16s ease-out;
+}
+
+/* Portaled variant — rendered into document.body so the sidebar's
+ * overflow + stacking context can't clip or cover it. Fixed-position
+ * with coordinates calculated from the trigger's rect in JS. */
+.pm__dropdown--portal {
+  position: fixed;
+  z-index: 10000;
+  width: 280px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+@keyframes pm-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.pm__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 12px;
+}
+.pm__h-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pm__h-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pm__h-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pm__h-name { font-size: 13px; font-weight: 700; color: #1A1A1A; }
+.pm__h-email { font-size: 11px; color: #7A7166; overflow: hidden; text-overflow: ellipsis; }
+.pm__h-role {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #FD6F46;
+  margin-top: 3px;
+  align-self: flex-start;
+}
+
+.pm__divider {
+  height: 1px;
+  background: #F0EDE8;
+  margin: 4px 0;
+}
+
+.pm__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1A1A;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.pm__item:hover { background: #F4EFE5; }
+.pm__item-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7A7166;
+  flex-shrink: 0;
+}
+.pm__item--danger .pm__item-icon { color: #C73E1D; }
+.pm__item--danger { color: #C73E1D; }
+.pm__item--danger:hover { background: rgba(220, 38, 38, 0.06); }
+
+/* Sub-views */
+.pm__subheader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 10px;
+  border-bottom: 1px solid #F0EDE8;
+}
+.pm__back {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #F4EFE5;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4A4540;
+}
+.pm__back:hover { background: #ECE6DD; }
+.pm__subtitle { font-size: 13px; font-weight: 700; color: #1A1A1A; }
+
+.pm__form {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pm__hint { margin: 0; font-size: 12px; color: #7A7166; line-height: 1.45; }
+
+.pm__form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pm__form-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 22px;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pm__form-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pm__form-btn {
+  height: 32px;
+  padding: 0 12px;
+  background: white;
+  border: 1px solid #E0DDD8;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4A4540;
+  cursor: pointer;
+}
+.pm__form-btn:hover { background: #F4EFE5; }
+.pm__form-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.pm__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.pm__field > span { font-size: 11px; font-weight: 700; color: #4A4540; }
+.pm__field input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #E0DDD8;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  background: white;
+}
+.pm__field input:focus { border-color: #FD6F46; box-shadow: 0 0 0 3px rgba(253,111,70,0.15); }
+
+.pm__colors {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+.pm__color {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.pm__color--active { border-color: white; box-shadow: 0 0 0 2px #1A1A1A; }
+
+.pm__primary {
+  height: 38px;
+  background: #FD6F46;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pm__primary:hover { background: #E55A30; }
+.pm__primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.pm__err {
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: 8px;
+  color: #C73E1D;
+  font-size: 12px;
+}
+.pm__info {
+  margin: 0;
+  padding: 8px 10px;
+  background: #DFF5E3;
+  border: 1px solid #BDE5C6;
+  border-radius: 8px;
+  color: #1A6B2A;
+  font-size: 12px;
+}

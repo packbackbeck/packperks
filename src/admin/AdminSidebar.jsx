@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import ProfileMenu from './auth/ProfileMenu';
+import OrgBadge from './auth/OrgBadge';
+import { logAction } from './auth/actionLog';
 import './AdminSidebar.css';
 
 const NAV_ITEMS = [
@@ -49,36 +53,65 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  // (Former "Receipt Check" tab merged into Claims as a "Review" view
+  //  mode toggle in the Claims page header.)
   {
     id: 'cupscans',
     label: 'Cup Scans',
+    /* Camera/scan-frame glyph: each scan is a photo of the bin scanning
+     *  a cup, distinct from the QR-codes tab below which is about
+     *  minting the printed batches. */
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
         <circle cx="12" cy="13" r="4" />
       </svg>
     ),
   },
   {
-    id: 'receipts',
-    label: 'Receipt Check',
+    id: 'transactions',
+    // P-27: "Transactions" was too vague — it currently only contains
+    // peer-to-peer cup shares (no money). Renamed to make the scope
+    // obvious. If the page later grows to include payouts, rename to
+    // "Payouts & Ledger".
+    label: 'Cup Transfers',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-        <line x1="9" y1="13" x2="15" y2="13"/>
-        <line x1="9" y1="17" x2="15" y2="17"/>
-        <polyline points="9 9 10 9 11 9"/>
+        <polyline points="17 1 21 5 17 9" />
+        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+        <polyline points="7 23 3 19 7 15" />
+        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
       </svg>
     ),
   },
   {
-    id: 'settings',
-    label: 'Settings',
+    id: 'cupqr',
+    // P-27: "Cup QR Codes" implied QR codes printed on cups themselves.
+    // The receipts are the QR carriers; cups are the tokens those QR
+    // codes mint. "QR Receipt Batches" is what admins actually generate.
+    label: 'QR Receipt Batches',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <line x1="14" y1="14" x2="14" y2="21" />
+        <line x1="18" y1="14" x2="18" y2="18" />
+        <line x1="14" y1="18" x2="18" y2="18" />
+        <line x1="21" y1="14" x2="21" y2="21" />
+        <line x1="14" y1="21" x2="21" y2="21" />
+      </svg>
+    ),
+  },
+  // (Settings + Version History moved out of the sidebar — they now
+  //  live as icon buttons in the top-right WorkflowDock, matching how
+  //  Framer/Webflow/Linear arrange "meta" workspace actions.)
+  {
+    id: 'donations',
+    label: 'Donations',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
       </svg>
     ),
   },
@@ -94,39 +127,96 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
-  {
-    id: 'history',
-    label: 'Version History',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 3v5h5" />
-        <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="12" x2="15" y2="15" />
-      </svg>
-    ),
-  },
+  // (Org is reachable via the OrgBadge in the sidebar footer, so we
+  //  don't duplicate it as a nav row.)
+  // (Help & Support is reachable via the ? icon in the top-right
+  //  WorkflowDock — same reasoning.)
 ];
 
+/* Maintenance toggle deliberately lives only on the Settings page now —
+ * having it one click away in the always-visible sidebar was a footgun
+ * (the confirm modal helped, but customers shouldn't be one stray
+ * click from being locked out). */
 const TOGGLES = [
   { key: 'featureCupSharing',    label: 'Cup Sharing' },
   { key: 'featureDonations',     label: 'Donations' },
   { key: 'featureDirectRefunds', label: 'Direct Refunds' },
-  { key: 'maintenanceMode',      label: 'Maintenance', warn: true },
 ];
 
-export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState }) {
+/* Which tabs each role can SEE. Matches the permission matrix in
+ * AuthContext — the sidebar is the visual mirror of those rules. */
+const ROLE_VISIBLE_TABS = {
+  owner:   null, // null = all
+  admin:   null, // all
+  // Manager + Checker also see the Org tab (read-only) so they know
+  // where they work; the editing controls inside are gated by
+  // PermissionGate so they're disabled.
+  manager: new Set(['overview', 'rewards', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'reports']),
+  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'reports']),
+};
+
+export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState, role }) {
   const totalPending = pendingClaims + pendingScans;
   const settings = draftState?.draft?.settings || {};
   const toggleFeature = draftState?.toggleFeature;
 
+  // Maintenance is destructive (takes the customer app offline) so it
+  // routes through a confirm step. Other toggles fire immediately.
+  const [maintenanceConfirm, setMaintenanceConfirm] = useState(null);
+  // null when closed; { nextValue: true|false } when open.
+
+  function handleToggleClick(t) {
+    if (t.key === 'maintenanceMode') {
+      // Maintenance toggle was removed from the sidebar — kept this
+      // branch as a no-op for safety in case a stray entry creeps back
+      // into TOGGLES. Maintenance now lives only on the Settings page.
+      return;
+    }
+    // Quick toggles actually toggle. Auto-save still kicks in via
+    // draftState (every updateDraft persists to localStorage + pushes
+    // to Supabase), so this matches the Publish-driven workflow the
+    // Settings page uses, just with a faster keyboard.
+    toggleFeature?.(t.key);
+    logAction({
+      action: 'settings.feature_toggle',
+      targetType: 'settings',
+      targetId: t.key,
+      before: { [t.key]: !!settings[t.key] },
+      after:  { [t.key]: !settings[t.key] },
+      metadata: { surface: 'sidebar_quick_toggle' },
+    });
+  }
+
+  function confirmMaintenance() {
+    if (!maintenanceConfirm) return;
+    const next = maintenanceConfirm.nextValue;
+    toggleFeature?.('maintenanceMode');
+    // Audit trail — important for any future "why did the app go down at 14:32"
+    // investigation. logAction is fire-and-forget; failures don't block.
+    logAction({
+      action: 'settings.maintenance_toggle',
+      targetType: 'settings',
+      targetId: 'maintenanceMode',
+      before: { maintenanceMode: !next },
+      after:  { maintenanceMode:  next },
+    });
+    setMaintenanceConfirm(null);
+  }
+
   return (
     <aside className="admin-sidebar">
       <nav className="admin-sidebar__nav">
-        {NAV_ITEMS.map(item => {
+        {NAV_ITEMS.filter(item => {
+          // Hide tabs the current role can't access. Always show Org +
+          // Activity to owner/admin (we'll add those tabs in P7/P8).
+          const visible = ROLE_VISIBLE_TABS[role];
+          return visible === null || !visible || visible.has(item.id);
+        }).map(item => {
           const isActive = activePage === item.id;
           const badge =
             item.id === 'claims'   ? pendingClaims :
+            // 'receipts' merged into 'claims' — kept here as a noop in
+            // case some old saved nav state lands.
             item.id === 'receipts' ? pendingClaims :
             item.id === 'cupscans' ? pendingScans :
             item.id === 'overview' && totalPending > 0 ? totalPending : 0;
@@ -148,7 +238,18 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
       </nav>
 
       <div className="admin-sidebar__toggles">
-        <div className="admin-sidebar__toggles-label">Quick Settings</div>
+        <button
+          type="button"
+          className="admin-sidebar__toggles-label admin-sidebar__toggles-label--link"
+          onClick={() => onNavigate('settings')}
+          title="Open the full Settings page"
+        >
+          Quick Settings
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" />
+            <polyline points="12 5 19 12 12 19" />
+          </svg>
+        </button>
 
         <div className="admin-sidebar__rates" onClick={() => onNavigate('settings')}>
           <div className="admin-sidebar__rate-item">
@@ -162,7 +263,16 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
         </div>
 
         {TOGGLES.map(t => (
-          <div key={t.key} className="admin-sidebar__toggle-row" onClick={() => toggleFeature?.(t.key)}>
+          <div
+            key={t.key}
+            className="admin-sidebar__toggle-row"
+            onClick={() => handleToggleClick(t)}
+            title={
+              t.key === 'maintenanceMode'
+                ? 'Click to confirm + flip — maintenance affects customers immediately.'
+                : `${t.label} is ${settings[t.key] ? 'on' : 'off'}. Click to flip — auto-saved to draft. Hit Publish to push live.`
+            }
+          >
             <span className={`admin-sidebar__toggle-name${t.warn && settings[t.key] ? ' admin-sidebar__toggle-name--warn' : ''}`}>
               {t.label}
             </span>
@@ -173,16 +283,109 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
         ))}
       </div>
 
+      {maintenanceConfirm && (
+        <MaintenanceConfirmModal
+          turningOn={maintenanceConfirm.nextValue}
+          onConfirm={confirmMaintenance}
+          onCancel={() => setMaintenanceConfirm(null)}
+        />
+      )}
+
+      {/* Sidebar footer: org badge + profile menu.
+       * "View Live App" used to live here — it moved to the floating
+       * WorkflowDock (bottom-right) as the "Preview" action so we have
+       * one canonical place for workflow controls. */}
       <div className="admin-sidebar__footer">
-        <button className="admin-sidebar__footer-btn" onClick={() => window.open('/', '_blank')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-            <polyline points="15 3 21 3 21 9" />
-            <line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
-          View Live App
-        </button>
+        <OrgBadge onNavigate={onNavigate} />
+        <ProfileMenu />
       </div>
     </aside>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * MaintenanceConfirmModal — gates the maintenance toggle.
+ *
+ * The maintenance switch in the sidebar is one click away from taking
+ * the customer-facing app offline (or bringing it back). That's far
+ * too high-stakes for a hover-target in a permanently-visible sidebar,
+ * so we route both directions through a confirm modal that:
+ *
+ *   • States plainly what will happen in customer-facing terms.
+ *   • Requires the admin to type a reason for the action (audit trail).
+ *   • Shows visibly different copy + colour for ON vs OFF transitions.
+ *   • Logs the change via actionLog so we can answer "who flipped this
+ *     at 14:32 last Tuesday".
+ *
+ * The reason input is required for ON (lockout) but optional for OFF
+ * (re-opening) — the asymmetry mirrors which direction is genuinely
+ * customer-impacting. We still log either way. */
+function MaintenanceConfirmModal({ turningOn, onConfirm, onCancel }) {
+  const [reason, setReason] = useState('');
+  const canSubmit = turningOn ? reason.trim().length >= 3 : true;
+
+  return (
+    <div className="admin-publish-overlay" onClick={onCancel}>
+      <div className="admin-publish-modal" onClick={e => e.stopPropagation()}>
+        <div className="admin-publish-modal__header">
+          <div
+            className="admin-publish-modal__icon"
+            style={turningOn
+              ? { background: 'rgba(253, 111, 70, 0.14)', color: '#FD6F46' }
+              : { background: 'rgba(22, 163, 74, 0.12)',  color: '#16A34A' }}
+          >
+            {turningOn ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 002 3h16.94a2 2 0 002-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            )}
+          </div>
+          <div>
+            <h3 className="admin-publish-modal__title">
+              {turningOn ? 'Take customer app offline?' : 'Bring customer app back online?'}
+            </h3>
+            <p className="admin-publish-modal__sub">
+              {turningOn
+                ? 'Every customer will see a maintenance banner and can\'t scan cups, claim cashback, or share QR codes until you turn this off again.'
+                : 'Customers will be able to scan, claim, and share again immediately.'}
+            </p>
+          </div>
+        </div>
+
+        <label className="admin-publish-modal__label">
+          {turningOn ? 'Reason (required)' : 'Reason (optional)'}
+        </label>
+        <input
+          className="admin-publish-modal__input"
+          placeholder={turningOn
+            ? 'e.g. Deploying new payout integration, expected back in 15 min'
+            : 'e.g. Maintenance complete'}
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          autoFocus
+        />
+
+        <div className="admin-publish-modal__actions">
+          <button className="admin-publish-modal__cancel" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            className="admin-publish-modal__confirm"
+            onClick={onConfirm}
+            disabled={!canSubmit}
+            style={turningOn ? { background: '#FD6F46' } : { background: '#16A34A' }}
+            title={!canSubmit ? 'Please describe why you\'re taking the app offline' : ''}
+          >
+            {turningOn ? 'Take app offline →' : 'Bring app back online →'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

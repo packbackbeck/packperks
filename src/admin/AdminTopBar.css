@@ -59,7 +59,7 @@
 .admin-topbar__logo-bk {
   width: 32px;
   height: 32px;
-  background: #D62300;
+  background: #FD6F46;
   color: #FFC52F;
   font-weight: 900;
   font-size: 13px;
@@ -85,7 +85,7 @@
 }
 
 .admin-topbar__logo-sub {
-  color: #9E9A93;
+  color: #6C6259;
   font-size: 10px;
   line-height: 1;
   text-transform: uppercase;
@@ -95,7 +95,9 @@
 .admin-topbar__center {
   flex: 1;
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 12px;
 }
 
 .admin-topbar__status {
@@ -124,7 +126,7 @@
 .admin-topbar__status--saved {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.1);
-  color: #9E9A93;
+  color: #6C6259;
 }
 
 .admin-topbar__status-dot {
@@ -165,7 +167,7 @@
 
 .admin-topbar__btn--ghost {
   background: transparent;
-  color: #9E9A93;
+  color: #6C6259;
   border: 1px solid #333;
 }
 .admin-topbar__btn--ghost:hover {
@@ -188,11 +190,11 @@
 }
 
 .admin-topbar__btn--primary {
-  background: #D62300;
+  background: #FD6F46;
   color: #FFFFFF;
 }
 .admin-topbar__btn--primary:hover {
-  background: #B81E00;
+  background: #E55A30;
 }
 
 /* Publish modal */
@@ -232,7 +234,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #D62300;
+  color: #FD6F46;
   flex-shrink: 0;
 }
 
@@ -251,7 +253,7 @@
 
 .admin-publish-modal__label {
   display: block;
-  color: #9E9A93;
+  color: #6C6259;
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
@@ -274,7 +276,7 @@
   transition: border-color 0.15s;
 }
 .admin-publish-modal__input:focus {
-  border-color: #D62300;
+  border-color: #FD6F46;
 }
 .admin-publish-modal__input::placeholder {
   color: #555;
@@ -291,7 +293,7 @@
   background: transparent;
   border: 1px solid #3A3A3A;
   border-radius: 8px;
-  color: #9E9A93;
+  color: #6C6259;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -305,7 +307,7 @@
 
 .admin-publish-modal__confirm {
   padding: 9px 20px;
-  background: #D62300;
+  background: #FD6F46;
   border: none;
   border-radius: 8px;
   color: #FFFFFF;
@@ -316,5 +318,64 @@
   transition: background 0.15s;
 }
 .admin-publish-modal__confirm:hover {
-  background: #B81E00;
+  background: #E55A30;
+}
+
+/* ── Brand block (PackPerks × Burger King) ──────────────────────────────
+ * Replaces the old "BK" pill + text. The PackPerks SVG is wide
+ * (icon + wordmark); height-based sizing keeps it crisp at this scale. */
+.admin-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-topbar__brand-pp {
+  height: 28px;
+  width: auto;
+  display: block;
+  /* New dark-mode SVG is already light-on-dark — render it as-is. */
+}
+.admin-topbar__brand-x {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+  font-weight: 500;
+}
+.admin-topbar__brand-bk {
+  height: 28px;
+  width: 28px;
+  object-fit: contain;
+}
+
+/* P-37: timezone pill in the top-bar right slot. Tiny enough that it
+ * fades into the chrome but always visible so admins know which tz
+ * the dashboard's clocks are speaking. */
+.admin-topbar__tz {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  margin-right: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: help;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  white-space: nowrap;
+}
+.admin-topbar__tz:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+}
+.admin-topbar__tz-label { letter-spacing: -0.005em; }
+.admin-topbar__tz-offset { opacity: 0.65; }
+
+@media (max-width: 900px) {
+  .admin-topbar__tz-offset { display: none; }
+}
+@media (max-width: 720px) {
+  .admin-topbar__tz { display: none; }
 }

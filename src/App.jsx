@@ -15,6 +15,12 @@ import RefundSuccessPage from './components/RefundSuccessPage';
 import ShareCupSheet from './components/ShareCupSheet';
 import DonateSheet from './components/DonateSheet';
 import DonateSuccessPage from './components/DonateSuccessPage';
+import ReceiptVerifyingPage from './components/ReceiptVerifyingPage';
+import ReceiptRejectedPage from './components/ReceiptRejectedPage';
+import CupClaimErrorPage from './components/CupClaimErrorPage';
+import AppErrorScreen from './components/AppErrorScreen';
+import SignInSheet from './components/SignInSheet';
+import HomeSkeleton from './components/HomeSkeleton';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
 import { track, EVENTS } from './utils/analytics';
@@ -29,8 +35,43 @@ import {
   updateUserProfile,
   logCupScan,
   getAppConfig,
+  uploadReceiptPhoto,
+  verifyReceipt,
+  getMyClaims,
+  claimCups,
+  uploadCupScanPhoto,
+  parseCupQr,
+  onAuthStateChange,
+  getCurrentAuthEmail,
 } from './lib/api';
 import './App.css';
+
+/* Best-effort device fingerprint from the user agent. Falls back to a
+ * generic string when no platform-specific token is found. Used in the
+ * user profile so the activity / claim "Device" field is honest instead
+ * of the old hardcoded "iPhone 15 Pro" placeholder. */
+function detectDevice() {
+  if (typeof navigator === 'undefined') return 'Unknown device';
+  const ua = navigator.userAgent || '';
+  // iPad first (modern iPads identify as Mac with touch)
+  if (/iPad/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua))) {
+    const m = ua.match(/(?:iPad|CPU)(?: OS)? (\d+)[_.](\d+)/);
+    return m ? `iPad (iPadOS ${m[1]}.${m[2]})` : 'iPad';
+  }
+  if (/iPhone/.test(ua)) {
+    const m = ua.match(/iPhone OS (\d+)[_.](\d+)/);
+    return m ? `iPhone (iOS ${m[1]}.${m[2]})` : 'iPhone';
+  }
+  if (/Android/.test(ua)) {
+    const m = ua.match(/Android (\d+(?:\.\d+)?)/);
+    const model = (ua.match(/;\s*([^;)]+?)\s+Build/) || [])[1];
+    return model ? `${model} (Android ${m?.[1] || '?'})` : `Android ${m?.[1] || ''}`.trim();
+  }
+  if (/Macintosh/.test(ua))    return /Safari/.test(ua) && !/Chrome/.test(ua) ? 'Mac (Safari)' : 'Mac';
+  if (/Windows NT/.test(ua))   return 'Windows PC';
+  if (/Linux/.test(ua))        return 'Linux';
+  return 'Web browser';
+}
 
 /* Resize + compress a data-URL to max 800px wide at 0.65 JPEG quality (~60-120 KB) */
 function compressImage(dataUrl, maxWidth = 800, quality = 0.65) {
@@ -54,14 +95,43 @@ function formatTime(ts) {
   return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+/* P-48: tiny haptic helper for the user app. The Vibration API is
+ * supported on Android Chrome / Edge and a few mobile browsers; iOS
+ * Safari silently no-ops which is fine. Three patterns:
+ *
+ *   success — short single pulse (50ms)
+ *   error   — quick double pulse (50-30-50)
+ *   tap     — even shorter pulse (15ms) for primary CTA confirmations
+ *
+ * Wrapped in try/catch because some environments (CI, embed iframes)
+ * throw rather than no-op. */
+function haptic(kind = 'tap') {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+    if (kind === 'success') navigator.vibrate(50);
+    else if (kind === 'error') navigator.vibrate([50, 30, 50]);
+    else                       navigator.vibrate(15);
+  } catch { /* ignore */ }
+}
+
 export default function App() {
   /* ── Supabase-backed state ── */
   const [userId, setUserId] = useState(null);
   const [profile, setProfile] = useState(null);
   const [cupCount, setCupCount] = useState(0);
   const [history, setHistory] = useState([]);
+  // User's own claims, used by the activity modal to display live status
+  // (admin approvals reflect here after the user reopens the activity).
+  const [userClaims, setUserClaims] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [initError, setInitError] = useState(null);
+
+  /* ── Email magic-link auth (optional account binding) ── */
+  // `authEmail` is null when the user is in anonymous device-only mode
+  // and set once they've verified an email via the magic-link flow.
+  // We surface it in the UserPage as "Signed in as …".
+  const [authEmail, setAuthEmail] = useState(null);
+  const [showSignIn, setShowSignIn] = useState(false);
 
   /* ── Live config from admin publish ── */
   const [liveRewards, setLiveRewards] = useState(rewards);
@@ -85,7 +155,8 @@ export default function App() {
 
   /* ── Transient claim state ── */
   const [claimedIban, setClaimedIban] = useState('');
-  const [lastCupsAdded] = useState(1);
+  // (was previously the placeholder for the +1 photo-scan flow; now driven
+  // by lastCupsScanned which comes from the QR claim response.)
 
   /* ── Detail sheet ── */
   const [detailReward, setDetailReward] = useState(null);
@@ -125,19 +196,28 @@ export default function App() {
         }
 
         setUserId(user.id);
+        // Detect the device once per session and push it to Supabase so
+        // the admin Users tab can show what kind of phone is using the
+        // app. We only re-push if it changed (e.g. user switched
+        // devices), since this is best-effort metadata.
+        const device = detectDevice();
+        if (device && device !== user.device) {
+          persist(updateUserProfile(user.id, { device }));
+        }
         setProfile({
           displayName,
           animalIndex,
           email: user.email || '',
           iban: user.iban || '',
-          phone: 'iPhone 15 Pro',
+          phone: device,
         });
         if (user.selected_reward_id) setSelectedRewardId(user.selected_reward_id);
 
-        const [balance, hist, config] = await Promise.all([
+        const [balance, hist, config, claims] = await Promise.all([
           getCupBalance(user.id),
           getHistory(user.id),
           getAppConfig(),
+          getMyClaims(user.id),
         ]);
 
         if (config?.rewards) {
@@ -149,6 +229,24 @@ export default function App() {
         }
         setCupCount(balance);
         setHistory(hist);
+        setUserClaims(claims);
+
+        // Deep-link: phone camera scans the bin's QR which opens this URL
+        // with ?batch=<uuid> or ?cups=<uuid,uuid>. Auto-trigger the claim
+        // flow so the user doesn't need to open the in-app scanner.
+        const sp = new URLSearchParams(window.location.search);
+        const urlBatch = sp.get('batch');
+        const urlCups = sp.get('cups');
+        if (urlBatch || urlCups) {
+          const parsed = parseCupQr(window.location.href);
+          if (parsed) {
+            // Clear the param so a refresh doesn't re-trigger.
+            window.history.replaceState({}, '', window.location.pathname);
+            // Small delay so the home screen renders first, then the
+            // claim result lands on top instead of flashing.
+            setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }), 100);
+          }
+        }
       } catch (err) {
         console.error('PackPerks init failed:', err);
         setInitError(err.message || 'Unknown error');
@@ -157,6 +255,37 @@ export default function App() {
       }
     }
     init();
+  }, []);
+
+  /* ── Auth-state listener (email magic link flow) ──
+   * Fires when:
+   *   • the page loads with a pending magic-link code in the URL —
+   *     supabase-js auto-exchanges it and emits SIGNED_IN
+   *   • the user signs out from the SignInSheet
+   *
+   * Either way we read the latest auth email + refresh the local user
+   * row so any newly-linked auth_user_id surfaces in subsequent reads. */
+  useEffect(() => {
+    let cancelled = false;
+    // Pre-populate from any session that already existed on load.
+    getCurrentAuthEmail().then(e => { if (!cancelled) setAuthEmail(e); });
+    const unsubscribe = onAuthStateChange(async (event, session) => {
+      if (cancelled) return;
+      const nextEmail = session?.user?.email || null;
+      setAuthEmail(nextEmail);
+      // On SIGNED_IN, refresh our local user row so the new auth_user_id
+      // link takes effect and `signed in as …` appears in the UserPage.
+      if (event === 'SIGNED_IN') {
+        try {
+          const refreshed = await getOrCreateUser();
+          setUserId(refreshed.id);
+          setProfile(p => p ? { ...p, email: refreshed.email || nextEmail || p.email } : p);
+        } catch (err) {
+          console.error('post-signin user refresh failed:', err);
+        }
+      }
+    });
+    return () => { cancelled = true; unsubscribe?.(); };
   }, []);
 
   /* ── Helpers ── */
@@ -220,41 +349,120 @@ export default function App() {
     setPage('receipt');
   };
 
-  const [receiptPhotoUrl, setReceiptPhotoUrl] = useState(null);
+  /* ── Receipt submission → AI verification ─────────────────────────────
+   *
+   * Flow:
+   *   1. Compress photo to keep upload small.
+   *   2. Create the claim row server-side (gets a UUID).
+   *   3. Upload the photo to Storage under `receipts/{claim_id}.jpg`.
+   *   4. Call the verify-receipt edge function — Claude Haiku decides.
+   *   5. Branch on verdict:
+   *       • status='completed' → success page, deduct cups
+   *       • status='pending'   → success page with "under review" hint
+   *       • status='failed'    → rejected page with which check failed
+   *
+   * We keep an in-flight `pendingClaim` object so each screen has the data
+   * it needs without prop-drilling. The user CANNOT advance past verifying
+   * until the function returns. */
+  const [aiVerdict, setAiVerdict] = useState(null);
+  const [aiRequiredItem, setAiRequiredItem] = useState(null);
 
-  const handleReceiptSubmit = (photoDataUrl) => {
-    setReceiptPhotoUrl(photoDataUrl || null);
-    setPage('success');
+  const handleReceiptSubmit = async (photoDataUrl) => {
+    if (!photoDataUrl || !userId) {
+      // No photo / no auth — fall back to old direct-success flow
+      setPage('success');
+      return;
+    }
+
+    setPage('verifying');
+    try {
+      const compressed = await compressImage(photoDataUrl);
+
+      // 1. Create the claim row first (status='pending', no photo yet)
+      const claimId = await createClaim(userId, {
+        type: 'cashback',
+        rewardId: selectedRewardId,
+        cupsRedeemed: selectedReward.cupsNeeded,
+        payoutAmount: selectedReward.euros,
+        iban: claimedIban,
+      });
+
+      // 2. Upload photo to storage, attach path to the claim
+      await uploadReceiptPhoto(claimId, compressed);
+
+      // 3. Call the verify-receipt edge function (Claude Haiku)
+      const result = await verifyReceipt(claimId);
+      setAiVerdict(result);
+      setAiRequiredItem(result?.requiredItem || selectedReward.name);
+
+      if (result?.status === 'failed') {
+        // AI rejected → don't deduct cups, show the rejection screen
+        track(EVENTS.REWARD_CLAIM_ATTEMPTED, {
+          reward_id: selectedRewardId,
+          ai_status: 'failed',
+          failure_checks: result?.failureChecks || [],
+        });
+        haptic('error');
+        setPage('rejected');
+        return;
+      }
+
+      // AI approved (status='completed') OR sent to human review (status='pending')
+      // — both deduct cups now. If review later rejects, admin reverses manually.
+      track(EVENTS.REWARD_CLAIM_SUCCESS, {
+        reward_id: selectedRewardId,
+        reward_name: selectedReward.name,
+        cup_count: cupCount,
+        ai_status: result?.status,
+      });
+      const newCount = Math.max(0, cupCount - selectedReward.cupsNeeded);
+      const label = `Claimed: ${selectedReward.name}`;
+      addHistory('reward_claimed', label);
+      setCupCount(newCount);
+
+      persist(
+        updateCupBalance(userId, newCount),
+        addHistoryEntry(userId, 'reward_claimed', label)
+      );
+
+      haptic('success');
+      setPage('success');
+    } catch (err) {
+      console.error('Receipt verification failed:', err);
+      // Real failure (network, function down, RLS). Show an explicit
+      // system-error state on the rejected page (no fake check ticks)
+      // and DO NOT deduct cups — the claim row still exists for admin
+      // to handle manually.
+      setAiVerdict({
+        status: 'failed',
+        failureChecks: [],
+        skippedChecks: [],
+        isSystemError: true,
+        summary:
+          err?.message ||
+          "We couldn't reach the verification service. Your cups have not been used — please try again in a moment.",
+      });
+      haptic('error');
+      setPage('rejected');
+    }
   };
 
   const handleSuccessDone = () => {
-    track(EVENTS.REWARD_CLAIM_SUCCESS, {
-      reward_id: selectedRewardId,
-      reward_name: selectedReward.name,
-      cup_count: cupCount,
-    });
-    const newCount = Math.max(0, cupCount - selectedReward.cupsNeeded);
-    const label = `Claimed: ${selectedReward.name}`;
-    addHistory('reward_claimed', label);
-    setCupCount(newCount);
     setClaimed(false);
     setPage('home');
+    setAiVerdict(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-    if (userId) {
-      persist(
-        updateCupBalance(userId, newCount),
-        createClaim(userId, {
-          type: 'cashback',
-          rewardId: selectedRewardId,
-          cupsRedeemed: selectedReward.cupsNeeded,
-          payoutAmount: selectedReward.euros,
-          iban: claimedIban,
-          receiptPhotoUrl,
-        }),
-        addHistoryEntry(userId, 'reward_claimed', label)
-      );
-    }
+  const handleRejectedTryAgain = () => {
+    setAiVerdict(null);
+    setPage('receipt');
+  };
+
+  const handleRejectedClose = () => {
+    setAiVerdict(null);
+    setPage('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleClaimAttempt = () => {
@@ -272,22 +480,73 @@ export default function App() {
     setPage('receipt');
   };
 
-  /* ── Cup scan flow ── */
-  const handleCupScanSubmit = async (photoDataUrl) => {
-    track(EVENTS.CUP_ADDED);
-    const newCount = cupCount + 1;
-    const label = 'Cup returned at Burger King';
-    setCupCount(newCount);
-    addHistory('cup_added', label);
-    setPage('cup-scan-success');
+  /* ── Cup scan flow (QR-based) ────────────────────────────────────────
+   * User scans a QR printed by the smart bin → CupScanPage decodes the
+   * payload to a list of cup UUIDs → we call the claim-cups edge function
+   * which atomically activates them server-side and increments the user's
+   * balance. The function is the source of truth, so we re-read the
+   * returned newBalance instead of optimistically guessing. */
+  const [lastCupsScanned, setLastCupsScanned] = useState(1);
+  const [cupScanError, setCupScanError] = useState(null);
 
-    if (userId) {
-      const compressed = photoDataUrl ? await compressImage(photoDataUrl) : null;
-      persist(
-        updateCupBalance(userId, newCount),
-        addHistoryEntry(userId, 'cup_added', label),
-        logCupScan(userId, { cupsAwarded: 1, photoUrl: compressed })
-      );
+  /* New signature: receives the parsed QR ({batchId} | {cupIds}) plus
+   * optional scan-event metadata from CupScanPage so we can audit-log
+   * every attempt admin-side. The photo upload is fire-and-forget — if
+   * it fails the claim still goes through, the photo just won't appear
+   * in the admin cup-scans table. */
+  const handleCupScan = async (parsed, meta = {}) => {
+    track(EVENTS.CUP_ADDED);
+    if (!userId) return;
+
+    // Mint a scan_id up front so the upload + claim call share a key.
+    const scanId =
+      (typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID()) ||
+      // Fallback for old browsers — random hex string of UUID shape
+      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
+
+    // Upload photo (if any) before calling the function, in parallel
+    // with reading scan_id — both are cheap and uploadCupScanPhoto
+    // resolves to null on failure so we keep going either way.
+    let photoPath = null;
+    if (meta.photoDataUrl) {
+      try { photoPath = await uploadCupScanPhoto(scanId, meta.photoDataUrl); }
+      catch (e) { console.error('photo upload failed (continuing):', e); }
+    }
+
+    try {
+      const result = await claimCups(userId, parsed, {
+        scanId,
+        scanType: meta.scanType || 'deeplink',
+        photoPath,
+      });
+      setCupCount(result.newBalance ?? cupCount + (result.activatedCount || 0));
+      setLastCupsScanned(result.activatedCount || 1);
+      const label =
+        (result.activatedCount || 1) === 1
+          ? 'Cup returned at Burger King'
+          : `${result.activatedCount} cups returned at Burger King`;
+      addHistory('cup_added', label);
+      haptic('success');
+      setPage('cup-scan-success');
+    } catch (err) {
+      console.error('Cup claim failed:', err);
+      // Capture the structured error from claim-cups: edge function emits
+      // `error` (machine code) + `reason` (human text). We send both
+      // forward so CupClaimErrorPage can branch by code rather than
+      // pattern-matching the human string.
+      setCupScanError({
+        code: err?.detail?.error || 'unknown',
+        reason:
+          err?.detail?.reason ||
+          err?.message ||
+          "Couldn't activate this cup QR. It may already have been used.",
+        alreadyClaimed: err?.detail?.alreadyClaimed || [],
+      });
+      haptic('error');
+      setPage('cup-scan-error');
     }
   };
 
@@ -300,39 +559,15 @@ export default function App() {
     setTimeout(() => setNudgeCount(0), 3000);
   };
 
-  /* ── Loading / error screens ── */
+  /* ── Loading / error screens ──
+   * P-47: skeleton shimmer instead of the bare "🥤 Loading…" spinner.
+   * Feels less like a wait and more like the page composing itself. */
   if (isLoading) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#FFF8F4' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🥤</div>
-          <div style={{ color: '#E24400', fontSize: '0.875rem', fontWeight: 600 }}>Loading your cups…</div>
-        </div>
-      </div>
-    );
+    return <HomeSkeleton />;
   }
 
   if (initError) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center', background: '#FFF8F4' }}>
-        <div>
-          <div style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>⚠️</div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Database not set up yet</div>
-          <div style={{ color: '#666', fontSize: '0.8rem', marginBottom: '1rem' }}>
-            Run the SQL migration in your Supabase project, then reload.
-          </div>
-          <div style={{ background: '#f5f5f5', borderRadius: 8, padding: '0.75rem', fontSize: '0.7rem', color: '#999', wordBreak: 'break-all' }}>
-            {initError}
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: '#E24400', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
+    return <AppErrorScreen error={initError} />;
   }
 
   /* ── Maintenance mode ── */
@@ -350,7 +585,7 @@ export default function App() {
 
   /* ── Pages ── */
   if (page === 'cup-scan') {
-    return <CupScanPage onSubmit={handleCupScanSubmit} onBack={() => setPage('home')} />;
+    return <CupScanPage onScan={handleCupScan} onBack={() => setPage('home')} />;
   }
 
   if (page === 'donate-success') {
@@ -360,10 +595,22 @@ export default function App() {
   if (page === 'cup-scan-success') {
     return (
       <CupScanSuccess
-        cupsAdded={lastCupsAdded}
+        cupsAdded={lastCupsScanned}
         newTotal={cupCount}
         onAddMore={handleCupScanAgain}
         onHome={handleCupScanHome}
+      />
+    );
+  }
+
+  if (page === 'cup-scan-error') {
+    return (
+      <CupClaimErrorPage
+        code={cupScanError?.code}
+        reason={cupScanError?.reason}
+        alreadyClaimed={cupScanError?.alreadyClaimed}
+        onTryAgain={() => { setCupScanError(null); setPage('cup-scan'); }}
+        onClose={() => { setCupScanError(null); setPage('home'); }}
       />
     );
   }
@@ -372,8 +619,49 @@ export default function App() {
     return <ReceiptPage reward={selectedReward} onSubmit={handleReceiptSubmit} onBack={() => setPage('home')} />;
   }
 
+  if (page === 'verifying') {
+    return <ReceiptVerifyingPage />;
+  }
+
+  if (page === 'rejected') {
+    /* Pull the most-relevant per-check `reason` from the AI verdict.
+     * Previously we only fell back to `check_is_receipt.reason`, which
+     * meant a rejection on (say) "not really BK" never surfaced its
+     * actual reason — the user just saw the generic check label. */
+    const checkReason = (() => {
+      const v = aiVerdict?.verdict;
+      if (!v) return null;
+      const checks = ['check_is_receipt', 'check_is_authentic_burger_king', 'check_contains_required_item'];
+      for (const k of checks) {
+        const node = v[k];
+        if (node && node.passed === false && node.reason) return node.reason;
+      }
+      return null;
+    })();
+    return (
+      <ReceiptRejectedPage
+        failureChecks={aiVerdict?.failureChecks || []}
+        skippedChecks={aiVerdict?.skippedChecks || []}
+        isSystemError={aiVerdict?.isSystemError === true}
+        reason={aiVerdict?.summary || checkReason}
+        requiredItem={aiRequiredItem}
+        onTryAgain={handleRejectedTryAgain}
+        onClose={handleRejectedClose}
+      />
+    );
+  }
+
   if (page === 'success') {
-    return <SuccessPage reward={selectedReward} claimedIban={claimedIban} onDone={handleSuccessDone} />;
+    return (
+      <SuccessPage
+        reward={selectedReward}
+        claimedIban={claimedIban}
+        onDone={handleSuccessDone}
+        aiStatus={aiVerdict?.status}
+        userName={profile?.displayName}
+        userEmail={profile?.email}
+      />
+    );
   }
 
   if (page === 'refund-success') {
@@ -394,11 +682,34 @@ export default function App() {
           onSaveProfile={handleSaveProfile}
           cupCount={cupCount}
           history={history}
+          userClaims={userClaims}
+          rewards={liveRewards}
+          authEmail={authEmail}
+          onOpenSignIn={() => setShowSignIn(true)}
           onAddCup={handleAddCup}
           onWithdraw={liveSettings.featureDirectRefunds ? handleWithdraw : null}
           onOpenShare={liveSettings.featureCupSharing ? () => setShareSheetOpen(true) : null}
           onOpenDonate={liveSettings.featureDonations ? () => setDonateSheetOpen(true) : null}
+          onRefreshClaims={async () => {
+            // Re-pull claims when user lands on the activity tab — that's when
+            // they'd notice an admin status change. Cheap enough to do eagerly.
+            if (userId) {
+              try { setUserClaims(await getMyClaims(userId)); } catch (e) { console.error(e); }
+            }
+          }}
           onClose={() => setPage('home')}
+        />
+        <SignInSheet
+          open={showSignIn}
+          onClose={() => setShowSignIn(false)}
+          onLinked={async () => {
+            // After a sign-out, refresh the local user back to anonymous
+            // device mode so the in-memory state matches reality.
+            try {
+              const refreshed = await getOrCreateUser();
+              setUserId(refreshed.id);
+            } catch (e) { console.error(e); }
+          }}
         />
         {liveSettings.featureDirectRefunds && (
           <DirectRefundSheet
@@ -413,14 +724,24 @@ export default function App() {
         {liveSettings.featureCupSharing && (
           <ShareCupSheet
             open={shareSheetOpen}
-            onClose={(cupsShared) => {
+            userId={userId}
+            onClose={(result) => {
               setShareSheetOpen(false);
+              // share-cups edge function already decremented the balance
+              // and wrote the activity row server-side. We just need to
+              // mirror that locally so the UI updates without another
+              // round-trip.
+              const cupsShared = result?.cupsShared || 0;
               if (cupsShared > 0) {
-                const newCount = Math.max(0, cupCount - cupsShared);
-                const label = `Shared ${cupsShared} cup${cupsShared !== 1 ? 's' : ''} via QR code`;
+                const newCount =
+                  typeof result?.newBalance === 'number'
+                    ? result.newBalance
+                    : Math.max(0, cupCount - cupsShared);
                 setCupCount(newCount);
-                addHistory('cups_shared', label);
-                if (userId) persist(updateCupBalance(userId, newCount), addHistoryEntry(userId, 'cups_shared', label));
+                addHistory(
+                  'cups_shared',
+                  `Shared ${cupsShared} cup${cupsShared !== 1 ? 's' : ''} via QR code`,
+                );
               }
             }}
             cupCount={cupCount}
@@ -470,6 +791,7 @@ export default function App() {
         cupsRemaining={cupsRemaining}
         cupsCollected={cupCount}
         claimed={claimed}
+        savedIban={profile?.iban}
         onClaim={handleClaim}
         onClaimAttempt={handleClaimAttempt}
         onResetClaim={handleResetClaim}

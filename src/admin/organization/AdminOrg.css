@@ -1,0 +1,702 @@
+.org-page {
+  padding: 32px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.org-header {
+  margin-bottom: 4px;
+}
+.org-header__title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0 0 6px;
+}
+.org-header__sub {
+  font-size: 13px;
+  color: #7A7166;
+  margin: 0;
+  max-width: 640px;
+  line-height: 1.45;
+}
+
+/* ── Card shell ─────────────────────────────────────────────────────── */
+.org-card {
+  background: #FFFFFF;
+  border: 1px solid #E8E6E1;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.org-card__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.org-card__row--header {
+  justify-content: space-between;
+}
+
+.org-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.org-card__logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.org-card__title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0;
+}
+.org-card__sub {
+  font-size: 12px;
+  color: #7A7166;
+  margin: 2px 0 0;
+}
+.org-card__count {
+  display: inline-block;
+  background: #F0EDE8;
+  color: #4A4540;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+
+.org-card__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px 24px;
+}
+@media (max-width: 900px) {
+  .org-card__grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Field display */
+.org-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.org-field__label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6C6259;
+}
+.org-field__val {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1A1A;
+  word-break: break-word;
+}
+.org-field__val--mono {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+/* Inputs */
+.org-input {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #E0DDD8;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #1A1A1A;
+  outline: none;
+  background: white;
+  width: 100%;
+}
+.org-input:focus { border-color: #FD6F46; box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
+.org-input--mono { font-family: ui-monospace, monospace; font-size: 12px; }
+.org-color-input {
+  width: 56px;
+  height: 36px;
+  border: 1px solid #E0DDD8;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 2px;
+  background: white;
+}
+
+/* Buttons */
+.org-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.org-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.org-btn--xs { height: 28px; padding: 0 10px; font-size: 11.5px; margin-left: 4px; }
+
+.org-btn--ghost {
+  background: white;
+  color: #4A4540;
+  border: 1px solid #E0DDD8;
+}
+.org-btn--ghost:hover:not(:disabled) { background: #F4EFE5; }
+
+.org-btn--primary {
+  background: #FD6F46;
+  color: white;
+}
+.org-btn--primary:hover:not(:disabled) { background: #E55A30; }
+
+/* Tables */
+.org-loc-table,
+.org-team-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.org-loc-table th,
+.org-team-table th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6C6259;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #F0EDE8;
+}
+.org-loc-table td,
+.org-team-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #F8F6F3;
+  vertical-align: middle;
+}
+.org-loc-table tr:last-child td,
+.org-team-table tr:last-child td { border-bottom: none; }
+.org-loc-row--editing td { padding: 6px 10px; background: #FFF8F1; }
+.org-mono { font-family: ui-monospace, monospace; font-size: 11.5px; }
+.org-muted { color: #7A7166; font-size: 12.5px; }
+
+.org-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.org-status--active   { background: rgba(74,222,128,0.14); color: #16A34A; }
+.org-status--inactive { background: #F0EDE8;              color: #7A7166; }
+.org-status--blocked  { background: rgba(220,38,38,0.10); color: #C73E1D; }
+.org-status--deleted  { background: #F0EDE8;              color: #9E9A93; }
+
+.org-link {
+  background: none;
+  border: none;
+  color: #FD6F46;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.org-link:hover { background: #FFF1E8; }
+.org-link--danger { color: #C73E1D; }
+.org-link--danger:hover { background: rgba(220,38,38,0.06); }
+
+.org-err {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: rgba(220,38,38,0.08);
+  border: 1px solid rgba(220,38,38,0.18);
+  border-radius: 10px;
+  color: #C73E1D;
+  font-size: 12px;
+}
+
+/* Team member cell */
+.org-member { display: flex; align-items: center; gap: 10px; }
+.org-member__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.org-member__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.org-member__name { font-weight: 600; color: #1A1A1A; }
+.org-you-pill {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #6B645B;
+  background: #F0EDE8;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Role */
+.org-role-badge {
+  display: inline-block;
+  color: white;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+.org-role-select {
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #E0DDD8;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: white;
+}
+
+/* Pending invitations */
+.org-pending {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed #E8E2D9;
+}
+.org-pending__title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #4A4540;
+  margin: 0 0 10px;
+}
+
+/* Invite modal */
+.org-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 12, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+  animation: org-fade 0.18s ease;
+}
+@keyframes org-fade { from { opacity: 0; } to { opacity: 1; } }
+.org-modal {
+  background: white;
+  width: 100%;
+  max-width: 460px;
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+  animation: org-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes org-pop { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+.org-modal__title { font-size: 16px; font-weight: 800; color: #1A1A1A; margin: 0 0 4px; }
+.org-modal__sub { font-size: 12.5px; color: #7A7166; margin: 0 0 16px; line-height: 1.45; }
+.org-modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+.org-role-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.org-role-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: white;
+  border: 1.5px solid #E8E2D9;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.org-role-card:hover:not(:disabled) { border-color: #C8C2B5; background: #FAFAF8; }
+.org-role-card--active { border-color: #FD6F46; background: #FFF8F1; }
+.org-role-card:disabled { opacity: 0.5; cursor: not-allowed; }
+.org-role-card__name { font-size: 13px; font-weight: 800; color: #1A1A1A; }
+.org-role-card__desc { font-size: 11px; color: #7A7166; line-height: 1.35; }
+
+/* ── Invite modal (redesigned) ──────────────────────────────────────────
+ * Wider modal with role-icon cards across the top + a feature-matrix
+ * underneath so the inviter sees the trade-offs without leaving the
+ * dialog. Selected role lights up the matrix column for emphasis. */
+.invite-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 12, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+  animation: org-fade 0.18s ease;
+}
+
+.invite-modal {
+  background: white;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  animation: org-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.invite-modal__header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #F0EDE8;
+}
+.invite-modal__header-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #FFF6EE;
+  color: #FD6F46;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.invite-modal__title { font-size: 18px; font-weight: 800; color: #1A1A1A; margin: 0 0 4px; }
+.invite-modal__sub { font-size: 13px; color: #7A7166; margin: 0; line-height: 1.5; }
+.invite-modal__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #F4EFE5;
+  border: none;
+  color: #4A4540;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.invite-modal__close:hover { background: #ECE6DD; }
+
+.invite-modal__body {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.invite-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.invite-field__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4A4540;
+}
+.invite-input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid #E0DDD8;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1A1A1A;
+  outline: none;
+  background: white;
+}
+.invite-input:focus { border-color: #FD6F46; box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
+
+/* Role cards */
+.invite-role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 600px) { .invite-role-grid { grid-template-columns: 1fr; } }
+
+.invite-role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 14px 16px;
+  background: white;
+  border: 1.5px solid #E8E2D9;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all 0.15s;
+  position: relative;
+}
+.invite-role-card:hover:not(:disabled) {
+  border-color: #C8C2B5;
+  background: #FAFAF8;
+  transform: translateY(-1px);
+}
+.invite-role-card--active {
+  border-color: var(--role-color, #FD6F46);
+  background: #FFF8F1;
+  box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.10);
+}
+.invite-role-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.invite-role-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+.invite-role-card__name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A1A1A;
+}
+.invite-role-card__desc {
+  font-size: 11.5px;
+  color: #7A7166;
+  line-height: 1.45;
+}
+
+/* Feature matrix */
+.invite-matrix {
+  background: #FAFAF8;
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  border: 1px solid #F0EDE8;
+}
+.invite-matrix__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4A4540;
+  margin-bottom: 8px;
+}
+.invite-matrix__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.invite-matrix__table th,
+.invite-matrix__table td {
+  padding: 7px 8px;
+  text-align: center;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.invite-matrix__table thead th {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6C6259;
+  padding-bottom: 8px;
+}
+.invite-matrix__th--active {
+  color: #FD6F46 !important;
+}
+.invite-matrix__table tbody tr:last-child td { border-bottom: none; }
+.invite-matrix__feature {
+  text-align: left !important;
+  color: #1A1A1A;
+  font-weight: 500;
+}
+.invite-matrix__cell {
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+}
+.invite-matrix__cell--yes { color: #16A34A; }
+.invite-matrix__cell--no  { color: #C8C2B5; }
+.invite-matrix__cell--active {
+  background: rgba(253, 111, 70, 0.08);
+}
+
+.invite-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 22px;
+  border-top: 1px solid #F0EDE8;
+}
+
+/* ── Invite method tabs ─────────────────────────────────────────────
+ * Email vs Shareable Link picker at the top of the invite modal.
+ * Purple underline on the active tab — matches the reward editor
+ * tabs style. */
+.invite-method {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: #F4EFE5;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.invite-method__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6C6259;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.invite-method__tab:hover:not(:disabled):not(.invite-method__tab--active) {
+  color: #2A2724;
+}
+.invite-method__tab--active {
+  background: #FFFFFF;
+  color: #5333A5;
+  box-shadow: 0 1px 3px rgba(83, 51, 165, 0.12);
+}
+.invite-method__tab:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── One-time link toggle (link-mode only) ─────────────────────── */
+.invite-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 12px;
+  background: rgba(83, 51, 165, 0.04);
+  border: 1px solid rgba(83, 51, 165, 0.18);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.invite-toggle:hover { background: rgba(83, 51, 165, 0.08); }
+.invite-toggle input[type="checkbox"] {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: #5333A5;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.invite-toggle__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.invite-toggle__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2A2724;
+}
+.invite-toggle__desc {
+  font-size: 12px;
+  color: #6C6259;
+  line-height: 1.45;
+}
+
+/* ── Link result block (shown after "Generate link") ───────────── */
+.invite-link-result {
+  margin-top: 14px;
+  padding: 14px;
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.30);
+  border-radius: 12px;
+}
+
+.invite-link-result__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #16A34A;
+}
+.invite-link-result__title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #15803D;
+}
+.invite-link-result__sub {
+  font-size: 11.5px;
+  color: #4A4540;
+  margin-top: 1px;
+}
+
+.invite-link-result__row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.invite-link-result__row .invite-input {
+  flex: 1;
+  min-width: 0;
+  background: #FFFFFF;
+  border-color: rgba(22, 163, 74, 0.30);
+}
+.invite-input--mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+}
+
+.invite-link-result__hint {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: #4A4540;
+  line-height: 1.5;
+}
+
+/* Success variant of the org primary button — used by the "Copied"
+ * affirmation on the link result row. */
+.org-btn--success {
+  background: #16A34A;
+  color: #FFFFFF;
+  border: none;
+}
+.org-btn--success:hover { background: #15803D; }

@@ -16,7 +16,7 @@
   font-size: 12px; font-weight: 600; color: #4A4540; cursor: pointer; font-family: inherit; transition: all 0.15s;
   margin-top: 2px; flex-shrink: 0;
 }
-.rc-header__link:hover { background: #F5F4F0; border-color: #C8C4BC; }
+.rc-header__link:hover { background: #F8F4EC; border-color: #C8C4BC; }
 
 .rc-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
 .rc-chip--pending   { background: rgba(249,115,22,0.12); color: #EA580C; }
@@ -38,14 +38,14 @@
   font-size: 12px; font-weight: 600; color: #7A7166; cursor: pointer; font-family: inherit; transition: all 0.15s;
 }
 .rc-filter-btn--active { background: #1A1A1A; border-color: #1A1A1A; color: #FFFFFF; }
-.rc-filter-btn:hover:not(.rc-filter-btn--active) { background: #F5F4F0; }
+.rc-filter-btn:hover:not(.rc-filter-btn--active) { background: #F8F4EC; }
 
 .rc-search-wrap {
   display: flex; align-items: center; gap: 7px; background: #FFFFFF; border: 1px solid #E8E6E1;
   border-radius: 20px; padding: 5px 12px; flex: 1; max-width: 280px;
 }
 .rc-search { flex: 1; border: none; outline: none; font-size: 12px; font-family: inherit; color: #1A1A1A; background: transparent; }
-.rc-search::placeholder { color: #B8B4AE; }
+.rc-search::placeholder { color: #9E9A93; }
 
 .rc-layout { display: grid; grid-template-columns: 1fr 360px; gap: 14px; flex: 1; min-height: 0; }
 
@@ -54,31 +54,31 @@
   overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   scrollbar-width: thin; scrollbar-color: #E0DDD8 transparent;
 }
-.rc-loading { display: flex; align-items: center; justify-content: center; height: 200px; color: #9E9A93; font-size: 13px; }
+.rc-loading { display: flex; align-items: center; justify-content: center; height: 200px; color: #6C6259; font-size: 13px; }
 
 .rc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .rc-table thead tr { border-bottom: 1px solid #F0EDE8; position: sticky; top: 0; background: #FAFAF8; z-index: 1; }
-.rc-table th { padding: 10px 12px; font-size: 10px; font-weight: 700; color: #9E9A93; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; white-space: nowrap; }
+.rc-table th { padding: 10px 12px; font-size: 10px; font-weight: 700; color: #6C6259; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; white-space: nowrap; }
 .rc-th--sortable { cursor: pointer; user-select: none; }
 .rc-th--sortable:hover { color: #4A4540; }
 .rc-sort-icon { margin-left: 3px; color: #C8C4BC; font-size: 10px; }
-.rc-sort-icon--active { color: #D62300; }
+.rc-sort-icon--active { color: #FD6F46; }
 
 .rc-table__row { border-bottom: 1px solid #F8F6F3; transition: background 0.1s; cursor: pointer; }
 .rc-table__row:hover { background: #FAFAF8; }
 .rc-table__row--active { background: #FFF8F6 !important; }
 .rc-table td { padding: 10px 12px; vertical-align: middle; }
-.rc-table__empty { text-align: center; color: #B8B4AE; padding: 40px 0 !important; font-size: 13px; }
+.rc-table__empty { text-align: center; color: #9E9A93; padding: 40px 0 !important; font-size: 13px; }
 
 .rc-thumb { width: 44px; height: 44px; border-radius: 7px; overflow: hidden; background: #F0EDE8; flex-shrink: 0; }
 .rc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.rc-thumb--empty { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 7px; background: #F5F4F0; border: 1.5px dashed #D5D1CB; }
+.rc-thumb--empty { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 7px; background: #F8F4EC; border: 1.5px dashed #D5D1CB; }
 
 .rc-user-cell { display: flex; align-items: center; gap: 8px; }
 .rc-user-avatar { width: 28px; height: 28px; border-radius: 50%; background: #F0EDE8; color: #4A4540; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .rc-user-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .rc-user-name { font-size: 12px; font-weight: 600; color: #1A1A1A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rc-user-email { font-size: 10px; color: #9E9A93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-user-email { font-size: 10px; color: #6C6259; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .rc-status { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; text-transform: capitalize; white-space: nowrap; }
 .rc-status--pending   { background: rgba(249,115,22,0.12); color: #EA580C; }
@@ -97,14 +97,14 @@
   display: flex; flex-direction: column; overflow-y: auto;
   scrollbar-width: thin; scrollbar-color: #E0DDD8 transparent;
 }
-.rc-detail--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #B8B4AE; font-size: 13px; }
+.rc-detail--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #9E9A93; font-size: 13px; }
 
 .rc-detail__header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #F0EDE8; flex-shrink: 0; }
 .rc-detail__title { font-size: 14px; font-weight: 700; color: #1A1A1A; }
-.rc-detail__id { font-size: 10px; color: #9E9A93; font-family: monospace; margin-top: 2px; }
+.rc-detail__id { font-size: 10px; color: #6C6259; font-family: monospace; margin-top: 2px; }
 .rc-detail__claims-link {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 9px; background: #F5F4F0; border: 1px solid #E8E6E1; border-radius: 6px;
+  padding: 4px 9px; background: #F8F4EC; border: 1px solid #E8E6E1; border-radius: 6px;
   font-size: 10px; font-weight: 700; color: #4A4540; cursor: pointer; font-family: inherit; transition: all 0.15s;
 }
 .rc-detail__claims-link:hover { background: #ECEAE5; }
@@ -118,15 +118,15 @@
 }
 .rc-detail__photo-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; padding: 32px 16px; color: #B8B4AE; font-size: 12px; background: #FAFAF8;
+  gap: 6px; padding: 32px 16px; color: #9E9A93; font-size: 12px; background: #FAFAF8;
 }
 .rc-detail__photo-sub { font-size: 10px; color: #C8C4BC; }
 
 .rc-detail__rows { padding: 12px 16px; display: flex; flex-direction: column; gap: 0; border-bottom: 1px solid #F0EDE8; }
-.rc-detail__section-label { font-size: 9px; font-weight: 700; color: #B8B4AE; text-transform: uppercase; letter-spacing: 0.8px; padding: 4px 0 2px; }
+.rc-detail__section-label { font-size: 9px; font-weight: 700; color: #9E9A93; text-transform: uppercase; letter-spacing: 0.8px; padding: 4px 0 2px; }
 .rc-detail__row { display: flex; align-items: flex-start; justify-content: space-between; padding: 5px 0; font-size: 12px; gap: 12px; border-bottom: 1px solid #F8F6F3; }
 .rc-detail__row:last-child { border-bottom: none; }
-.rc-detail__row-label { color: #9E9A93; flex-shrink: 0; }
+.rc-detail__row-label { color: #6C6259; flex-shrink: 0; }
 .rc-detail__row-val { color: #1A1A1A; text-align: right; word-break: break-all; }
 .rc-detail__row-val--bold { font-weight: 700; }
 .rc-detail__row-val--muted { color: #7A7166; }
@@ -134,7 +134,46 @@
 .rc-detail__row-val--green { color: #1A8737; font-weight: 700; }
 
 .rc-detail__actions { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-.rc-detail__actions-hint { font-size: 11px; color: #9E9A93; margin: 0; line-height: 1.4; }
+.rc-detail__actions-hint { font-size: 11px; color: #6C6259; margin: 0; line-height: 1.4; }
+
+/* Amber "approve is gated" warning shown above the action buttons when
+ * the receipt photo can't be viewed. Same tone as the AI-uncertain
+ * verdict callout so the two surfaces feel consistent. */
+.rc-detail__actions-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 11px;
+  margin: 0 0 8px;
+  background: #FFF1CC;
+  border: 1px solid #F2D38B;
+  border-radius: 8px;
+  color: #7C5A00;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.rc-detail__actions-warn svg { flex-shrink: 0; margin-top: 1px; color: #D69500; }
+
+/* "Retry image" button surfaced when sign-URL fetch failed. Same
+ * neutral chip style as our ghost buttons so it doesn't compete with
+ * the primary action below. */
+.rc-detail__photo-retry {
+  margin-top: 8px;
+  padding: 6px 14px;
+  background: #FFFFFF;
+  border: 1px solid #E5DECF;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4A4540;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.rc-detail__photo-retry:hover {
+  background: #F8F4EC;
+  border-color: #DCD3C1;
+}
 .rc-detail__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .rc-detail__btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border: none; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
 .rc-detail__btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -147,3 +186,139 @@
 .rc-lightbox__close { position: absolute; top: 16px; right: 20px; width: 36px; height: 36px; background: rgba(255,255,255,0.15); border: none; border-radius: 50%; color: #FFFFFF; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .rc-lightbox__close:hover { background: rgba(255,255,255,0.25); }
 .rc-lightbox__img { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; border-radius: 8px; cursor: default; box-shadow: 0 8px 40px rgba(0,0,0,0.6); }
+
+/* ── AI verdict panel ───────────────────────────────────────────────────── */
+.rc-ai-panel {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #E8E2D9;
+  background: #FFFDF9;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rc-ai-panel--pass      { border-color: #BDE5C6; background: #F1FAF3; }
+.rc-ai-panel--fail      { border-color: #F4C4BC; background: #FFF5F2; }
+.rc-ai-panel--uncertain { border-color: #F2D38B; background: #FFF8E7; }
+.rc-ai-panel--empty     { border-style: dashed; background: #FAF8F4; }
+
+/* Amber "needs manual review" callout shown when all three boolean
+ * checks came back true but the model's own confidence is below the
+ * pass threshold. Prevents the "0% confident + all green" trust bug. */
+.rc-ai-panel__override {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: #FFF1CC;
+  border: 1px solid #F2D38B;
+  border-radius: 8px;
+  color: #7C5A00;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.rc-ai-panel__override svg { flex-shrink: 0; margin-top: 1px; color: #D69500; }
+.rc-ai-panel__override strong { font-weight: 700; }
+
+.rc-ai-panel__confidence--low {
+  background: #F2D38B !important;
+  color: #7C5A00 !important;
+}
+
+.rc-ai-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rc-ai-panel__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6B645B;
+}
+.rc-ai-panel__empty { font-size: 12px; color: #6C6259; font-style: italic; }
+.rc-ai-panel__confidence {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #3B3833;
+}
+.rc-ai-panel--pass      .rc-ai-panel__confidence { background: #1A8737; color: white; }
+.rc-ai-panel--fail      .rc-ai-panel__confidence { background: #C73E1D; color: white; }
+.rc-ai-panel--uncertain .rc-ai-panel__confidence { background: #D69500; color: white; }
+
+.rc-ai-panel__checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.rc-ai-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.rc-ai-check__dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rc-ai-check--pass { color: #1A1A1A; }
+.rc-ai-check--pass .rc-ai-check__dot { background: #DFF5E3; color: #1A8737; }
+.rc-ai-check--fail { color: #C73E1D; }
+.rc-ai-check--fail .rc-ai-check__dot { background: #FFE0DC; color: #C73E1D; }
+
+.rc-ai-panel__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 2px 0;
+}
+.rc-ai-panel__row-label { color: #7A7166; }
+.rc-ai-panel__row-val { color: #1A1A1A; font-weight: 600; }
+.rc-ai-panel__row-val--mono { font-family: ui-monospace, monospace; font-size: 11px; }
+
+.rc-ai-panel__reason {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+}
+.rc-ai-panel__reason-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6B645B;
+}
+.rc-ai-panel__reason-text { font-size: 12.5px; color: #3B3833; line-height: 1.4; }
+
+.rc-ai-panel__items {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.rc-ai-panel__items summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #6B645B;
+  padding: 4px 0;
+}
+.rc-ai-panel__items ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: #3B3833;
+  line-height: 1.45;
+}

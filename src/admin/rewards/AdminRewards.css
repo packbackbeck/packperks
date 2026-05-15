@@ -2,8 +2,7 @@
   padding: 32px 32px 48px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 56px);
-  overflow: hidden;
+  min-height: calc(100vh - 56px);
 }
 
 .rew-header {
@@ -58,14 +57,14 @@
   font-family: inherit;
   transition: all 0.15s;
 }
-.rew-header__import:hover { background: #F5F4F0; border-color: #C8C4BC; }
+.rew-header__import:hover { background: #F8F4EC; border-color: #C8C4BC; }
 
 .rew-header__add {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 9px 18px;
-  background: #D62300;
+  background: #FD6F46;
   border: none;
   border-radius: 8px;
   color: #FFFFFF;
@@ -75,7 +74,7 @@
   font-family: inherit;
   transition: background 0.15s;
 }
-.rew-header__add:hover { background: #B81E00; }
+.rew-header__add:hover { background: #E55A30; }
 
 /* List controls */
 .rew-list__controls {
@@ -106,7 +105,7 @@
   background: transparent;
   min-width: 0;
 }
-.rew-list__search::placeholder { color: #B8B4AE; }
+.rew-list__search::placeholder { color: #9E9A93; }
 
 .rew-list__filter-row {
   display: flex;
@@ -126,12 +125,12 @@
   cursor: pointer;
   outline: none;
 }
-.rew-list__select:focus { border-color: #D62300; }
+.rew-list__select:focus { border-color: #FD6F46; }
 
 .rew-list__label {
   font-size: 10px;
   font-weight: 700;
-  color: #9E9A93;
+  color: #6C6259;
   letter-spacing: 0.8px;
   text-transform: uppercase;
   padding: 0 2px;
@@ -146,17 +145,17 @@
   border: none;
   font-size: 10px;
   font-weight: 600;
-  color: #B8B4AE;
+  color: #9E9A93;
   cursor: pointer;
   font-family: inherit;
   padding: 0;
   text-transform: none;
   letter-spacing: 0;
 }
-.rew-list__template-btn:hover { color: #D62300; }
+.rew-list__template-btn:hover { color: #FD6F46; }
 
 .rew-card__claims {
-  color: #D62300;
+  color: #FD6F46;
   font-weight: 700;
 }
 
@@ -203,7 +202,7 @@
 }
 
 .rew-card--active {
-  border-color: #D62300;
+  border-color: #FD6F46;
   background: #FFF8F6;
 }
 
@@ -244,7 +243,7 @@
 
 .rew-card__meta {
   font-size: 11px;
-  color: #9E9A93;
+  color: #6C6259;
   display: flex;
   gap: 4px;
 }
@@ -273,7 +272,7 @@
 .rew-list__empty {
   padding: 24px 0;
   text-align: center;
-  color: #B8B4AE;
+  color: #9E9A93;
   font-size: 13px;
 }
 
@@ -295,6 +294,6 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #B8B4AE;
+  color: #9E9A93;
   font-size: 13px;
 }

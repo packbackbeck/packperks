@@ -1,0 +1,77 @@
+/* EmptyState — first-run friendly placeholder for empty tables.
+ *
+ * Two tones:
+ *   neutral — generic "you have nothing here yet" (cream + purple icon)
+ *   action  — "and here's what to do" (orange CTA stands out)
+ *
+ * Designed to live INSIDE a table cell (via colSpan) OR as a stand-
+ * alone block — the wrapping table picks its own padding. */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.empty-state__art {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #ECE5D8;
+  color: #5333A5;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+}
+.empty-state--action .empty-state__art {
+  background: rgba(253, 111, 70, 0.12);
+  color: #FD6F46;
+}
+
+.empty-state__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #2A2724;
+  letter-spacing: -0.005em;
+}
+
+.empty-state__body {
+  margin: 0;
+  font-size: 13px;
+  color: #7A7166;
+  line-height: 1.5;
+  max-width: 420px;
+}
+
+.empty-state__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.empty-state__btn {
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.empty-state__btn--primary {
+  background: #5333A5;
+  color: #FFFFFF;
+}
+.empty-state__btn--primary:hover { background: #42298B; }
+.empty-state__btn--ghost {
+  background: #FFFFFF;
+  border-color: #E5DECF;
+  color: #4A4540;
+}
+.empty-state__btn--ghost:hover { background: #F8F4EC; border-color: #DCD3C1; }

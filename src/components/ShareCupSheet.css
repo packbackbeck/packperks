@@ -209,3 +209,42 @@
   border: 1px solid var(--border-light);
   font-weight: var(--fw-regular);
 }
+
+.scs__error {
+  margin: 10px 16px 0;
+  padding: 8px 12px;
+  background: rgba(220,38,38,0.08);
+  border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 8px;
+  color: #DC2626;
+  font-size: 12px;
+  text-align: center;
+}
+
+.scs__notice--success {
+  background: #DFF5E3;
+  border-color: #BDE5C6;
+  color: #1A6B2A;
+}
+.scs__notice--success svg { color: #1A8737; }
+
+/* P-46: countdown pill under the share QR. Calm purple by default,
+ * red when the time runs out — at which point the QR is dead and
+ * the user needs to mint a fresh one. */
+.scs__expiry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 4px 10px;
+  background: rgba(83, 51, 165, 0.08);
+  color: #5333A5;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+.scs__expiry--past {
+  background: rgba(220, 38, 38, 0.10);
+  color: #C73E1D;
+}

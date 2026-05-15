@@ -1,0 +1,193 @@
+/* Top-right workflow dock — Framer-style static row.
+ *
+ * The earlier design expanded on hover, which jostled the search bar
+ * next to it every time the cursor brushed past. The new dock is a
+ * fixed row of icon buttons + a labelled Preview + a highlighted
+ * Publish. No width animation, no contextual cycling — just the same
+ * five actions in the same place at all times. Predictable beats
+ * clever in chrome that's always on screen.
+ *
+ * Layout (left-to-right):
+ *   [ ⚙ ] [ ? ] [ ⟲ ] [ Preview ] [ Publish ]
+ *
+ *   .wd          — the row container
+ *   .wd-icon     — icon-only ghost button (settings, support, history)
+ *   .wd-preview  — labelled ghost button (Preview)
+ *   .wd-publish  — highlighted primary button (Publish)
+ */
+
+.wd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Shared button shape ─────────────────────────────────────────── */
+.wd-icon,
+.wd-preview,
+.wd-publish {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.08s ease;
+}
+
+.wd-icon:active,
+.wd-preview:active,
+.wd-publish:active { transform: translateY(1px); }
+
+/* ── Icon-only ghost buttons ─────────────────────────────────────── */
+.wd-icon {
+  width: 32px;
+  padding: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.68);
+}
+.wd-icon:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+}
+
+/* ── Preview (labelled ghost) ────────────────────────────────────── */
+.wd-preview {
+  padding: 0 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+}
+.wd-preview:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+}
+
+/* ── Publish (highlighted primary) ───────────────────────────────── */
+.wd-publish {
+  padding: 0 14px;
+  background: #5333A5; /* PackBack purple */
+  color: #FFFFFF;
+  position: relative;
+}
+.wd-publish:hover { background: #42298B; }
+
+/* Tiny pending-pulse dot when there are auto-saved-but-not-yet-published
+ * changes. Sits at the top-right corner of the Publish button. */
+.wd-publish__dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.65);
+  animation: wd-pulse 1.8s ease-out infinite;
+}
+@keyframes wd-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.65); }
+  70%  { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* ── Compact mode ────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .wd-preview { display: none; }
+}
+
+/* P-34: publish-diff block inside the publish modal. Goes between the
+ * modal header and the change-summary input so the admin reads
+ * "what's about to ship" before they type their commit message. */
+.admin-publish-modal--wide { max-width: 580px; }
+
+.wd-diff {
+  margin: 14px 0 8px;
+  padding: 12px 14px;
+  background: #F8F4EC;
+  border: 1px solid #E5DECF;
+  border-radius: 10px;
+}
+
+.wd-diff__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6B645B;
+  margin-bottom: 8px;
+}
+
+.wd-diff__empty {
+  font-size: 12.5px;
+  color: #8A857F;
+  font-style: italic;
+}
+
+.wd-diff__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.wd-diff__row {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: #FFFFFF;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.wd-diff__kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.wd-diff__kind--settings { background: rgba(83, 51, 165, 0.10);  color: #5333A5; }
+.wd-diff__kind--added    { background: rgba(74, 222, 128, 0.14); color: #16A34A; }
+.wd-diff__kind--changed  { background: rgba(214, 149, 0, 0.14);  color: #7C5A00; }
+.wd-diff__kind--removed  { background: rgba(220, 38, 38, 0.10);  color: #C73E1D; }
+
+.wd-diff__label { font-weight: 700; color: #1A1A1A; }
+
+.wd-diff__values {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  color: #4A4540;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.wd-diff__from  { color: #C73E1D; text-decoration: line-through; }
+.wd-diff__to    { color: #16A34A; font-weight: 700; }
+.wd-diff__arrow { color: #6C6259; }
+.wd-diff__detail { color: #6C6259; font-size: 11px; }
+
+.wd-diff__more {
+  text-align: center;
+  font-size: 11px;
+  color: #8A857F;
+  padding-top: 4px;
+}

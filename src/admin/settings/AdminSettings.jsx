@@ -1,11 +1,111 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import QuickLinks from '../shared/QuickLinks';
 import './AdminSettings.css';
 
-function ToggleSwitch({ checked, onChange }) {
+/* ─────────────────────────────────────────────────────────────────────
+ * AdminSettings — platform configuration page.
+ *
+ * Layout (left → right):
+ *
+ *   ┌──────────────┐  ┌──────────────────────────────────────────────┐
+ *   │  TOC nav     │  │  Sectioned card stack                         │
+ *   │  (sticky)    │  │  · Payout rates                               │
+ *   │  · Rates     │  │  · App copy                                   │
+ *   │  · Copy      │  │  · Cup rules                                  │
+ *   │  · Rules     │  │  · Feature flags                              │
+ *   │  · Flags     │  │  · Legal links                                │
+ *   │  · Legal     │  │                                               │
+ *   └──────────────┘  └──────────────────────────────────────────────┘
+ *
+ * The TOC nav is anchor-based — clicking scrolls to the matching card
+ * with smooth behaviour. Each section is a fully visible card with an
+ * icon swatch, title, description, and a list of fields. This pattern
+ * mirrors AdminOrg and AdminSupport so the dashboard feels consistent.
+ *
+ * Every edit auto-saves to the local draft via the parent's updateDraft;
+ * a small status pill near the header confirms that with "Auto-saved".
+ */
+
+const SECTIONS = [
+  {
+    id: 'rates',
+    title: 'Payout rates',
+    desc: 'How many euros each returned cup is worth to your customers.',
+    tone: 'orange',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23" />
+        <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'copy',
+    title: 'App copy',
+    desc: 'Text shown to customers across the user-facing app.',
+    tone: 'purple',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'rules',
+    title: 'Cup rules',
+    desc: 'Limits around scans, shares, and IBAN validation.',
+    tone: 'cream',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8h1a4 4 0 010 8h-1" />
+        <path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" />
+        <line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'flags',
+    title: 'Feature flags',
+    desc: 'Switch optional features and maintenance mode on or off.',
+    tone: 'orange',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+        <line x1="4" y1="22" x2="4" y2="15" />
+      </svg>
+    ),
+  },
+  {
+    id: 'legal',
+    title: 'Legal links',
+    desc: 'External URLs surfaced in the app footer.',
+    tone: 'slate',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+      </svg>
+    ),
+  },
+];
+
+const FEATURE_FLAGS = [
+  { key: 'featureCupSharing',    label: 'Cup sharing',     desc: 'Customers can share cups with friends via QR.' },
+  { key: 'featureDonations',     label: 'Donations',       desc: 'Customers can donate cups to a charity partner.' },
+  { key: 'featureDirectRefunds', label: 'Direct refunds',  desc: 'Customers can withdraw cups as cash at the lower rate.' },
+];
+
+/* ── Reusable form atoms ─────────────────────────────────────────── */
+
+function ToggleSwitch({ checked, onChange, ariaLabel }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       className={`toggle-switch ${checked ? 'toggle-switch--on' : ''}`}
       onClick={() => onChange(!checked)}
     >
@@ -14,11 +114,23 @@ function ToggleSwitch({ checked, onChange }) {
   );
 }
 
-function Field({ label, hint, children }) {
+/* Convert a settings key (camelCase) into a human label for the
+ * auto-save toast. We could thread an explicit label through every
+ * updateSetting call, and we do for the ones whose key isn't already
+ * legible, but the fallback handles most cases automatically. */
+function prettifyKey(key) {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, c => c.toUpperCase())
+    .replace(/\bRate Per Cup\b/, 'rate')
+    .trim();
+}
+
+function Field({ label, hint, htmlFor, children }) {
   return (
     <div className="as-field">
       <div className="as-field__label-wrap">
-        <label className="as-field__label">{label}</label>
+        <label className="as-field__label" htmlFor={htmlFor}>{label}</label>
         {hint && <span className="as-field__hint">{hint}</span>}
       </div>
       {children}
@@ -26,256 +138,383 @@ function Field({ label, hint, children }) {
   );
 }
 
-export default function AdminSettings({ draftState }) {
-  const { draft, updateDraft } = draftState;
+function SectionCard({ section, children }) {
+  return (
+    <section id={`s-${section.id}`} className="as-card">
+      <header className="as-card__head">
+        <span className={`as-card__icon as-card__icon--${section.tone}`}>{section.icon}</span>
+        <div>
+          <h2 className="as-card__title">{section.title}</h2>
+          <p className="as-card__desc">{section.desc}</p>
+        </div>
+      </header>
+      <div className="as-card__body">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/* ── Page ────────────────────────────────────────────────────────── */
+
+export default function AdminSettings({ draftState, onNavigate }) {
+  const { draft, updateDraft, statusLabel, published } = draftState;
   const settings = draft.settings;
 
-  function updateSetting(key, value) {
+  /* Rate-change warning (P-19).
+   *
+   * Editing cashback / refund rates retroactively affects every claim
+   * that hasn't been approved yet — those claims sit at status=pending
+   * and pull their payout amount from the rate at approval time, not
+   * the rate at submission time.
+   *
+   * To make that impact visible we:
+   *   1. Compare the draft rate vs the last-published rate.
+   *   2. Count pending cashback claims via a lightweight COUNT query.
+   *   3. When the rate has drifted, render a banner explaining what
+   *      will happen if Publish is hit right now.
+   *
+   * We don't actually implement effective-dating — that's a bigger
+   * schema change — but the banner alone prevents the silent-money-
+   * movement footgun the external review called out. */
+  const publishedSettings = published?.settings;
+  const pubCashback = publishedSettings?.cashbackRatePerCup ?? settings.cashbackRatePerCup;
+  const pubRefund   = publishedSettings?.refundRatePerCup   ?? settings.refundRatePerCup;
+  const cashbackChanged = Math.abs(settings.cashbackRatePerCup - pubCashback) > 0.001;
+  const refundChanged   = Math.abs(settings.refundRatePerCup   - pubRefund)   > 0.001;
+  const ratesChanged = cashbackChanged || refundChanged;
+
+  const [pendingCounts, setPendingCounts] = useState({ cashback: null, refund: null });
+  useEffect(() => {
+    // Pull pending counts once per page mount. Cheap (COUNT only), no
+    // realtime needed — when the admin returns to Settings later, the
+    // figure refreshes.
+    let cancelled = false;
+    Promise.all([
+      supabase.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('type', 'cashback'),
+      supabase.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('type', 'direct_refund'),
+    ]).then(([cb, rf]) => {
+      if (cancelled) return;
+      setPendingCounts({ cashback: cb.count ?? 0, refund: rf.count ?? 0 });
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  /* Auto-save feedback (P-18).
+   *
+   * The previous behaviour was: type a new value, click elsewhere, see
+   * nothing. The status pill at the top read "Auto-saved" but it was
+   * too subtle to function as a confirmation. The toast adds an
+   * unmissable inline ping after every edit:
+   *
+   *   "Saved · Cashback rate"
+   *
+   * It fades 2.4s after the most-recent edit so quick successive
+   * changes still leave only the last one visible. */
+  const [savedToast, setSavedToast] = useState(null); // { label, ts } | null
+
+  function updateSetting(key, value, label) {
     updateDraft(prev => ({
       ...prev,
       settings: { ...prev.settings, [key]: value },
     }));
+    setSavedToast({ label: label || prettifyKey(key), ts: Date.now() });
   }
 
-  const sections = [
-    {
-      id: 'rates',
-      title: 'Payout Rates',
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="12" y1="1" x2="12" y2="23"/>
-          <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-        </svg>
-      ),
-    },
-    {
-      id: 'copy',
-      title: 'App Copy',
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-      ),
-    },
-    {
-      id: 'rules',
-      title: 'Cup Rules',
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M18 8h1a4 4 0 010 8h-1"/>
-          <path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/>
-          <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
-        </svg>
-      ),
-    },
-    {
-      id: 'features',
-      title: 'Feature Flags',
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-          <line x1="4" y1="22" x2="4" y2="15"/>
-        </svg>
-      ),
-    },
-    {
-      id: 'legal',
-      title: 'Legal Links',
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-        </svg>
-      ),
-    },
-  ];
+  useEffect(() => {
+    if (!savedToast) return;
+    const t = setTimeout(() => setSavedToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [savedToast]);
 
-  const [activeSection, setActiveSection] = useState('rates');
+  // Highlight whichever section is closest to the top of the viewport,
+  // so the TOC stays in sync as the admin scrolls. We listen with
+  // IntersectionObserver — cheaper than scroll-position math and only
+  // fires when a section's threshold crosses.
+  const [activeId, setActiveId] = useState('rates');
+  useEffect(() => {
+    const els = SECTIONS.map(s => document.getElementById(`s-${s.id}`)).filter(Boolean);
+    if (els.length === 0) return;
+    const io = new IntersectionObserver(
+      entries => {
+        // Pick the topmost intersecting section.
+        const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActiveId(visible[0].target.id.replace('s-', ''));
+      },
+      { rootMargin: '-80px 0px -60% 0px', threshold: 0 },
+    );
+    els.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  function jumpTo(id) {
+    const el = document.getElementById(`s-${id}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   return (
     <div className="admin-settings">
-      <div className="as-header">
-        <h1 className="as-header__title">Settings</h1>
-        <p className="as-header__sub">Platform configuration — changes require a Publish to go live</p>
-      </div>
+      {/* Page header */}
+      <header className="as-header">
+        <div className="as-header__text">
+          <span className="as-header__eyebrow">Configuration</span>
+          <h1 className="as-header__title">Settings</h1>
+          <p className="as-header__sub">
+            Tune payout rates, app copy, feature flags, and legal links.
+            Every change auto-saves to your draft — hit <strong>Publish</strong> in
+            the top bar to push it live to customers.
+          </p>
+        </div>
+        <div className="as-header__status">
+          <span className={`as-status-pill${statusLabel?.toLowerCase().includes('published') ? ' as-status-pill--live' : ''}`}>
+            <span className="as-status-pill__dot" />
+            {statusLabel || 'Up to date'}
+          </span>
+        </div>
+      </header>
 
       <div className="as-layout">
-        {/* Section nav */}
-        <nav className="as-nav">
-          {sections.map(s => (
+        {/* Sticky TOC */}
+        <nav className="as-toc" aria-label="Settings sections">
+          {SECTIONS.map(s => (
             <button
               key={s.id}
-              className={`as-nav-btn ${activeSection === s.id ? 'as-nav-btn--active' : ''}`}
-              onClick={() => setActiveSection(s.id)}
+              type="button"
+              className={`as-toc__item${activeId === s.id ? ' as-toc__item--active' : ''}`}
+              onClick={() => jumpTo(s.id)}
             >
-              <span className="as-nav-btn__icon">{s.icon}</span>
-              {s.title}
+              <span className={`as-toc__icon as-toc__icon--${s.tone}`}>{s.icon}</span>
+              <span className="as-toc__label">{s.title}</span>
             </button>
           ))}
         </nav>
 
-        {/* Section content */}
+        {/* Section stack */}
         <div className="as-content">
-
-          {activeSection === 'rates' && (
-            <div className="as-section">
-              <div className="as-section__title">Payout Rates</div>
-              <div className="as-section__desc">These rates determine how much users earn per cup returned.</div>
-
-              <Field label="Cashback rate (€ per cup)" hint="Applied when user claims a food reward">
-                <div className="as-input-prefix-wrap">
-                  <span className="as-input-prefix">€</span>
-                  <input
-                    className="as-input as-input--prefix"
-                    type="number"
-                    step="0.05"
-                    min="0"
-                    max="5"
-                    value={settings.cashbackRatePerCup}
-                    onChange={e => updateSetting('cashbackRatePerCup', parseFloat(e.target.value) || 0)}
-                  />
-                  <span className="as-input-suffix">per cup</span>
+          {/* ── Payout rates ── */}
+          <SectionCard section={SECTIONS[0]}>
+            {ratesChanged && (
+              <div className="as-rate-warn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <div>
+                  <strong>Rate change will affect pending claims.</strong>
+                  <p>
+                    {cashbackChanged && (
+                      <>Cashback: €{pubCashback.toFixed(2)} → <strong>€{settings.cashbackRatePerCup.toFixed(2)}</strong>/cup. </>
+                    )}
+                    {refundChanged && (
+                      <>Refund: €{pubRefund.toFixed(2)} → <strong>€{settings.refundRatePerCup.toFixed(2)}</strong>/cup. </>
+                    )}
+                    When you hit <strong>Publish</strong>, every claim still pending at that moment
+                    will be approved at the new rate — not the rate that was live when the customer
+                    submitted it.{' '}
+                    {pendingCounts.cashback != null && (
+                      <>
+                        Right now there {pendingCounts.cashback === 1 ? 'is' : 'are'}{' '}
+                        <strong>{pendingCounts.cashback}</strong> pending cashback claim
+                        {pendingCounts.cashback === 1 ? '' : 's'}
+                        {pendingCounts.refund > 0 && <> and <strong>{pendingCounts.refund}</strong> pending refund{pendingCounts.refund === 1 ? '' : 's'}</>}
+                        .
+                      </>
+                    )}
+                  </p>
                 </div>
-              </Field>
+              </div>
+            )}
 
-              <Field label="Direct refund rate (€ per cup)" hint="Applied when user requests cash refund instead of a reward">
-                <div className="as-input-prefix-wrap">
-                  <span className="as-input-prefix">€</span>
-                  <input
-                    className="as-input as-input--prefix"
-                    type="number"
-                    step="0.05"
-                    min="0"
-                    max="5"
-                    value={settings.refundRatePerCup}
-                    onChange={e => updateSetting('refundRatePerCup', parseFloat(e.target.value) || 0)}
-                  />
-                  <span className="as-input-suffix">per cup</span>
-                </div>
-              </Field>
+            <Field label="Cashback rate" hint="Paid when a customer redeems for a food reward.">
+              <div className="as-input-prefix-wrap">
+                <span className="as-input-prefix">€</span>
+                <input
+                  className="as-input as-input--prefix"
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="5"
+                  value={settings.cashbackRatePerCup}
+                  onChange={e => updateSetting('cashbackRatePerCup', parseFloat(e.target.value) || 0)}
+                />
+                <span className="as-input-suffix">per cup</span>
+              </div>
+            </Field>
 
-              <div className="as-rate-preview">
-                <div className="as-rate-preview__title">Rate preview</div>
-                <div className="as-rate-preview__row">
-                  <span>3 cups cashback</span>
-                  <span className="as-rate-preview__val">€{(settings.cashbackRatePerCup * 3).toFixed(2)}</span>
+            <Field label="Direct refund rate" hint="Paid when a customer cashes out instead of choosing a reward.">
+              <div className="as-input-prefix-wrap">
+                <span className="as-input-prefix">€</span>
+                <input
+                  className="as-input as-input--prefix"
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="5"
+                  value={settings.refundRatePerCup}
+                  onChange={e => updateSetting('refundRatePerCup', parseFloat(e.target.value) || 0)}
+                />
+                <span className="as-input-suffix">per cup</span>
+              </div>
+            </Field>
+
+            <div className="as-rate-preview">
+              <div className="as-rate-preview__head">
+                <span className="as-rate-preview__title">What customers will see</span>
+                <span className="as-rate-preview__hint">Auto-updates as you edit above.</span>
+              </div>
+              <div className="as-rate-preview__grid">
+                <div className="as-rate-preview__cell">
+                  <span className="as-rate-preview__cell-label">3 cups · cashback</span>
+                  <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 3).toFixed(2)}</span>
                 </div>
-                <div className="as-rate-preview__row">
-                  <span>6 cups cashback</span>
-                  <span className="as-rate-preview__val">€{(settings.cashbackRatePerCup * 6).toFixed(2)}</span>
+                <div className="as-rate-preview__cell">
+                  <span className="as-rate-preview__cell-label">6 cups · cashback</span>
+                  <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 6).toFixed(2)}</span>
                 </div>
-                <div className="as-rate-preview__row as-rate-preview__row--muted">
-                  <span>3 cups direct refund</span>
-                  <span>€{(settings.refundRatePerCup * 3).toFixed(2)}</span>
+                <div className="as-rate-preview__cell as-rate-preview__cell--muted">
+                  <span className="as-rate-preview__cell-label">3 cups · direct refund</span>
+                  <span className="as-rate-preview__cell-val">€{(settings.refundRatePerCup * 3).toFixed(2)}</span>
+                </div>
+                <div className="as-rate-preview__cell as-rate-preview__cell--accent">
+                  <span className="as-rate-preview__cell-label">Cashback uplift</span>
+                  <span className="as-rate-preview__cell-val">
+                    +€{((settings.cashbackRatePerCup - settings.refundRatePerCup)).toFixed(2)}/cup
+                  </span>
                 </div>
               </div>
             </div>
-          )}
+          </SectionCard>
 
-          {activeSection === 'copy' && (
-            <div className="as-section">
-              <div className="as-section__title">App Copy</div>
-              <div className="as-section__desc">Text displayed to users in the app. Changes go live on next Publish.</div>
+          {/* ── App copy ── */}
+          <SectionCard section={SECTIONS[1]}>
+            <Field label="Hero headline" hint="Top of the user app homepage.">
+              <input className="as-input" value={settings.heroHeadline} onChange={e => updateSetting('heroHeadline', e.target.value)} placeholder="Collect Cups & Get Rewards" />
+            </Field>
 
-              <Field label="Hero headline">
-                <input className="as-input" value={settings.heroHeadline} onChange={e => updateSetting('heroHeadline', e.target.value)} placeholder="Collect Cups & Get Rewards" />
+            <Field label="Hero subtext" hint="One or two short sentences under the headline.">
+              <textarea className="as-input as-input--textarea" rows={3} value={settings.heroSubtext} onChange={e => updateSetting('heroSubtext', e.target.value)} />
+            </Field>
+
+            <Field label="Donation recipient">
+              <input className="as-input" value={settings.donationRecipient} onChange={e => updateSetting('donationRecipient', e.target.value)} placeholder="Plastic Soup Foundation" />
+            </Field>
+
+            <Field label="Donation description" hint="Shown on the donate confirmation screen.">
+              <textarea className="as-input as-input--textarea" rows={3} value={settings.donationDescription} onChange={e => updateSetting('donationDescription', e.target.value)} />
+            </Field>
+          </SectionCard>
+
+          {/* ── Cup rules ── */}
+          <SectionCard section={SECTIONS[2]}>
+            <div className="as-field-row">
+              <Field label="Cups awarded per scan" hint="Most bins emit one cup per scan.">
+                <input
+                  className="as-input as-input--short"
+                  type="number" min="1" max="10"
+                  value={settings.maxCupsPerScan}
+                  onChange={e => updateSetting('maxCupsPerScan', parseInt(e.target.value) || 1)}
+                />
               </Field>
 
-              <Field label="Hero subtext">
-                <textarea className="as-textarea" rows={2} value={settings.heroSubtext} onChange={e => updateSetting('heroSubtext', e.target.value)} />
+              <Field label="Max cups per share" hint="Upper bound on a peer-to-peer transfer.">
+                <input
+                  className="as-input as-input--short"
+                  type="number" min="1" max="50"
+                  value={settings.maxCupsToShare}
+                  onChange={e => updateSetting('maxCupsToShare', parseInt(e.target.value) || 1)}
+                />
               </Field>
 
-              <Field label="Donation recipient name">
-                <input className="as-input" value={settings.donationRecipient} onChange={e => updateSetting('donationRecipient', e.target.value)} placeholder="Plastic Soup Foundation" />
-              </Field>
-
-              <Field label="Donation description">
-                <textarea className="as-textarea" rows={2} value={settings.donationDescription} onChange={e => updateSetting('donationDescription', e.target.value)} />
+              <Field label="Min IBAN length" hint="Validates the IBAN on profile setup.">
+                <input
+                  className="as-input as-input--short"
+                  type="number" min="10" max="34"
+                  value={settings.minIbanLength}
+                  onChange={e => updateSetting('minIbanLength', parseInt(e.target.value) || 15)}
+                />
               </Field>
             </div>
-          )}
+          </SectionCard>
 
-          {activeSection === 'rules' && (
-            <div className="as-section">
-              <div className="as-section__title">Cup Rules</div>
-              <div className="as-section__desc">Controls around how cups are earned and shared.</div>
-
-              <Field label="Cups awarded per scan" hint="How many cups a successful scan adds">
-                <input className="as-input as-input--short" type="number" min="1" max="10" value={settings.maxCupsPerScan} onChange={e => updateSetting('maxCupsPerScan', parseInt(e.target.value) || 1)} />
-              </Field>
-
-              <Field label="Max cups shareable via QR">
-                <input className="as-input as-input--short" type="number" min="1" max="50" value={settings.maxCupsToShare} onChange={e => updateSetting('maxCupsToShare', parseInt(e.target.value) || 1)} />
-              </Field>
-
-              <Field label="Minimum IBAN length (characters)">
-                <input className="as-input as-input--short" type="number" min="10" max="34" value={settings.minIbanLength} onChange={e => updateSetting('minIbanLength', parseInt(e.target.value) || 15)} />
-              </Field>
-            </div>
-          )}
-
-          {activeSection === 'features' && (
-            <div className="as-section">
-              <div className="as-section__title">Feature Flags</div>
-              <div className="as-section__desc">Toggle features on or off for all users.</div>
-
-              {[
-                { key: 'featureCupSharing',    label: 'Cup Sharing',    desc: 'Allow users to share cups via QR code' },
-                { key: 'featureDonations',     label: 'Donations',      desc: 'Allow users to donate cups to charity' },
-                { key: 'featureDirectRefunds', label: 'Direct Refunds', desc: 'Allow users to withdraw cups as cash at the lower rate' },
-              ].map(f => (
-                <div key={f.key} className="as-feature-row">
-                  <div className="as-feature-row__info">
-                    <div className="as-feature-row__label">{f.label}</div>
-                    <div className="as-feature-row__desc">{f.desc}</div>
+          {/* ── Feature flags ── */}
+          <SectionCard section={SECTIONS[3]}>
+            <div className="as-flag-list">
+              {FEATURE_FLAGS.map(f => (
+                <label key={f.key} className="as-flag-row">
+                  <div className="as-flag-row__info">
+                    <div className="as-flag-row__label">{f.label}</div>
+                    <div className="as-flag-row__desc">{f.desc}</div>
                   </div>
-                  <ToggleSwitch checked={settings[f.key]} onChange={v => updateSetting(f.key, v)} />
-                </div>
+                  <ToggleSwitch
+                    checked={!!settings[f.key]}
+                    onChange={v => updateSetting(f.key, v)}
+                    ariaLabel={`${f.label} toggle`}
+                  />
+                </label>
               ))}
+            </div>
 
-              <div className="as-maintenance-block">
-                <div className="as-maintenance-block__header">
-                  <div>
-                    <div className="as-maintenance-block__label">Maintenance Mode</div>
-                    <div className="as-maintenance-block__desc">Shows a banner to all users that the app is temporarily unavailable.</div>
-                  </div>
-                  <ToggleSwitch checked={settings.maintenanceMode} onChange={v => updateSetting('maintenanceMode', v)} />
-                </div>
-                {settings.maintenanceMode && (
-                  <div className="as-maintenance-block__warning">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            {/* Maintenance mode lives in its own block — disruptive switch. */}
+            <div className={`as-maintenance${settings.maintenanceMode ? ' as-maintenance--on' : ''}`}>
+              <div className="as-maintenance__row">
+                <div className="as-maintenance__info">
+                  <div className="as-maintenance__label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
                     </svg>
-                    Maintenance mode is ON — users cannot currently access the rewards app.
+                    Maintenance mode
                   </div>
-                )}
+                  <div className="as-maintenance__desc">
+                    Shows a banner across the user app and blocks new scans / claims.
+                  </div>
+                </div>
+                <ToggleSwitch
+                  checked={!!settings.maintenanceMode}
+                  onChange={v => updateSetting('maintenanceMode', v)}
+                  ariaLabel="Maintenance mode toggle"
+                />
               </div>
+              {settings.maintenanceMode && (
+                <div className="as-maintenance__warn">
+                  Customers currently can't claim or scan. Toggle off when you're ready.
+                </div>
+              )}
             </div>
-          )}
+          </SectionCard>
 
-          {activeSection === 'legal' && (
-            <div className="as-section">
-              <div className="as-section__title">Legal Links</div>
-              <div className="as-section__desc">URLs shown in the app footer.</div>
+          {/* ── Legal links ── */}
+          <SectionCard section={SECTIONS[4]}>
+            <Field label="Privacy policy URL">
+              <input className="as-input as-input--mono" value={settings.privacyUrl} onChange={e => updateSetting('privacyUrl', e.target.value)} placeholder="https://packperks.nl/privacy" />
+            </Field>
 
-              <Field label="Privacy Policy URL">
-                <input className="as-input as-input--mono" value={settings.privacyUrl} onChange={e => updateSetting('privacyUrl', e.target.value)} placeholder="https://packperks.nl/privacy" />
-              </Field>
+            <Field label="Terms of service URL">
+              <input className="as-input as-input--mono" value={settings.termsUrl} onChange={e => updateSetting('termsUrl', e.target.value)} placeholder="https://packperks.nl/terms" />
+            </Field>
 
-              <Field label="Terms of Service URL">
-                <input className="as-input as-input--mono" value={settings.termsUrl} onChange={e => updateSetting('termsUrl', e.target.value)} placeholder="https://packperks.nl/terms" />
-              </Field>
-
-              <Field label="Cookie Policy URL">
-                <input className="as-input as-input--mono" value={settings.cookieUrl} onChange={e => updateSetting('cookieUrl', e.target.value)} placeholder="https://packperks.nl/cookies" />
-              </Field>
-            </div>
-          )}
-
+            <Field label="Cookie policy URL">
+              <input className="as-input as-input--mono" value={settings.cookieUrl} onChange={e => updateSetting('cookieUrl', e.target.value)} placeholder="https://packperks.nl/cookies" />
+            </Field>
+          </SectionCard>
         </div>
       </div>
+
+      <QuickLinks currentPage="settings" onNavigate={onNavigate} />
+
+      {/* Auto-save confirmation toast — fades after the most-recent
+       *  edit, keyed on `ts` so quick successive saves re-trigger the
+       *  animation instead of stacking. */}
+      {savedToast && (
+        <div className="as-toast" key={savedToast.ts} role="status" aria-live="polite">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+          <span><strong>Saved</strong> · {savedToast.label}</span>
+        </div>
+      )}
     </div>
   );
 }

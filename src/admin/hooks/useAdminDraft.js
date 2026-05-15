@@ -71,14 +71,32 @@ export function useAdminDraft() {
   const [publishNote, setPublishNote] = useState('');
   const [publishError, setPublishError] = useState(null);
 
+  /* Auto-save: every call to updateDraft immediately persists to
+   * localStorage. There's no more manual "Save" button — the workflow
+   * is just edit → (autosaved) → Publish.
+   *
+   * `isDirty` no longer means "needs a click to save"; it means "has
+   * un-published changes" (i.e. the local draft has moved ahead of the
+   * last published snapshot). That's still useful for the Publish-pulse
+   * indicator. */
   const updateDraft = useCallback((updater) => {
     setDraft(prev => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      const ts = Date.now();
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...next, _savedAt: ts }));
+      } catch {
+        /* quota / private-mode failure — fall through, state still updates */
+      }
+      setLastSaved(ts);
       return next;
     });
     setIsDirty(true);
   }, []);
 
+  /* Kept for backwards compatibility (⌘S, legacy callers). Updates are
+   * already persisted on every change, so this is effectively a no-op
+   * touch of the timestamp. */
   const saveDraft = useCallback(() => {
     const ts = Date.now();
     const toSave = { ...draft, _savedAt: ts };
@@ -138,11 +156,13 @@ export function useAdminDraft() {
     });
   }, []);
 
+  /* statusLabel is now informational only — there's no Save button to
+   * mirror. "Unsaved changes" never appears since every edit auto-saves. */
   const statusLabel = (() => {
-    if (isDirty) return 'Unsaved changes';
+    if (isDirty) return 'Auto-saved';
     if (lastSaved && !published) return 'Draft saved';
     if (published) return 'Published';
-    return 'No changes';
+    return 'Up to date';
   })();
 
   return {

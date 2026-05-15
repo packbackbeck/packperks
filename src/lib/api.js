@@ -38,9 +38,86 @@ function formatTime(ts) {
 }
 
 // ── User ───────────────────────────────────────────────────────────────────
+// Hybrid identity model:
+//
+//   1. **Anonymous (default)** — keyed by localStorage `device_id`. Works
+//      with zero friction on first run; clearing the browser data loses
+//      the balance.
+//   2. **Linked to Supabase Auth** — once the user verifies an email via
+//      magic link, we set `users.auth_user_id` and from then on they can
+//      sign in from any device and re-bind the row to a new device_id.
+//
+// `getOrCreateUser()` prefers the auth path when a Supabase session is
+// present (i.e. the user has signed in with their email at least once),
+// and falls back to the device path otherwise. Returning an existing
+// row by either lookup is always preferred over inserting a duplicate.
 export async function getOrCreateUser() {
   const deviceId = getDeviceId()
 
+  // 1. Auth path — if a Supabase session is in scope, look the user up
+  //    by auth_user_id. This is the only path that survives a fresh
+  //    browser / new device.
+  const { data: sessionData } = await supabase.auth.getSession()
+  const authUid = sessionData?.session?.user?.id
+  const authEmail = sessionData?.session?.user?.email
+
+  if (authUid) {
+    const { data: byAuth } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_user_id', authUid)
+      .maybeSingle()
+
+    if (byAuth) {
+      // Refresh the device_id binding so subsequent anonymous-path
+      // visits on this device find the same row even without a session.
+      if (byAuth.device_id !== deviceId) {
+        await supabase.from('users').update({ device_id: deviceId }).eq('id', byAuth.id)
+      }
+      return byAuth
+    }
+
+    // Session exists but no users row — check whether the current
+    // device_id row is unlinked, and adopt it under this auth uid.
+    const { data: byDevice } = await supabase
+      .from('users')
+      .select('*')
+      .eq('device_id', deviceId)
+      .maybeSingle()
+
+    if (byDevice && !byDevice.auth_user_id) {
+      const { data: linked } = await supabase
+        .from('users')
+        .update({
+          auth_user_id: authUid,
+          email: byDevice.email || authEmail || null,
+          email_verified_at: new Date().toISOString(),
+        })
+        .eq('id', byDevice.id)
+        .select()
+        .single()
+      return linked || byDevice
+    }
+    // No row yet — fall through and create one bound to both keys.
+    const { data: created, error: createErr } = await supabase
+      .from('users')
+      .insert({
+        device_id: deviceId,
+        auth_user_id: authUid,
+        email: authEmail || null,
+        email_verified_at: new Date().toISOString(),
+        animal_index: 0,
+      })
+      .select()
+      .single()
+    if (createErr) throw createErr
+    await supabase
+      .from('cup_balances')
+      .insert({ user_id: created.id, balance: 0, lifetime_cups: 0 })
+    return created
+  }
+
+  // 2. Anonymous device path — original behaviour, unchanged.
   const { data: existing } = await supabase
     .from('users')
     .select('*')
@@ -76,6 +153,59 @@ export async function getOrCreateUser() {
   return newUser
 }
 
+// ── Email magic link auth ──────────────────────────────────────────────────
+//
+// Two-step flow:
+//   1. `sendMagicLink(email)` — Supabase emails the user a one-tap link.
+//      Returns immediately so the UI can render a "check your inbox" state.
+//   2. User clicks the link → comes back to the app with a session
+//      cookie in place. App.jsx subscribes to onAuthStateChange and
+//      re-runs getOrCreateUser, which links the existing anonymous row
+//      to the new auth.users id (see step 1 of getOrCreateUser).
+//
+// The redirect target defaults to the current origin so the user lands
+// back inside the app instead of on a generic Supabase confirmation page.
+export async function sendMagicLink(email) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    throw new Error('invalid_email')
+  }
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      // Land them back at the user app — Supabase exchanges the code
+      // for a session automatically when this URL is hit.
+      emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      // Allow creating new auth.users rows on first signin. Existing
+      // PackPerks customers who never had an email will get a fresh
+      // auth row that we link to their device-side user row.
+      shouldCreateUser: true,
+    },
+  })
+  if (error) throw error
+}
+
+export async function signOutUser() {
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
+}
+
+// Read-only helper for components that want to show the current email
+// in a "signed in as …" affordance.
+export async function getCurrentAuthEmail() {
+  const { data } = await supabase.auth.getSession()
+  return data?.session?.user?.email || null
+}
+
+// Subscribe to auth state changes. Returns the unsubscribe function.
+// App.jsx uses this to refresh the local user object when the magic
+// link click lands a brand-new session.
+export function onAuthStateChange(callback) {
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session)
+  })
+  return () => data?.subscription?.unsubscribe?.()
+}
+
 export async function updateUserProfile(userId, updates) {
   const dbUpdates = { updated_at: new Date().toISOString() }
   if ('displayName' in updates) dbUpdates.display_name = updates.displayName
@@ -83,6 +213,7 @@ export async function updateUserProfile(userId, updates) {
   if ('email' in updates) dbUpdates.email = updates.email
   if ('iban' in updates) dbUpdates.iban = updates.iban
   if ('selectedRewardId' in updates) dbUpdates.selected_reward_id = updates.selectedRewardId
+  if ('device' in updates) dbUpdates.device = updates.device
 
   const { error } = await supabase
     .from('users')
@@ -113,7 +244,140 @@ export async function updateCupBalance(userId, newBalance) {
   if (error) throw error
 }
 
-// ── Cup scans ──────────────────────────────────────────────────────────────
+// ── Cup claim via QR scan (new flow) ───────────────────────────────────────
+//
+// Parses a scanned QR payload into an array of cup UUIDs, then invokes the
+// claim-cups edge function which atomically activates them and increments
+// the user's balance. The payload format is either:
+//   • A URL: `https://…/?cups=<uuid>,<uuid>,...`
+//   • Or a raw list: `<uuid>,<uuid>,...`
+// Anything else is rejected client-side.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/* Parse the QR payload into a claim spec. Recognises three forms:
+ *   • URL ?batch=<uuid>     → { batchId }      ← preferred (tiny QR)
+ *   • URL ?cups=<uuid,uuid> → { cupIds: [..] } ← legacy / multi-cup
+ *   • Raw uuid CSV          → { cupIds: [..] } ← bare payload
+ * Returns null if the payload doesn't look like a PackPerks cup code. */
+export function parseCupQr(payload) {
+  if (!payload || typeof payload !== 'string') return null
+  let batch = null
+  let cupsParam = null
+  try {
+    const url = new URL(payload)
+    batch = url.searchParams.get('batch')
+    cupsParam = url.searchParams.get('cups')
+  } catch {
+    cupsParam = payload
+  }
+  if (batch && UUID_RE.test(batch)) return { batchId: batch }
+  if (cupsParam) {
+    const ids = cupsParam.split(',').map(s => s.trim()).filter(Boolean)
+    if (ids.length > 0 && ids.every(id => UUID_RE.test(id))) return { cupIds: ids }
+  }
+  return null
+}
+
+// Upload a cup-scan snapshot to the private cup-scans bucket. The
+// scanId is generated client-side so the upload and the subsequent
+// claim-cups call can share a key — admin UI reads this back via a
+// signed URL.
+//
+// The gallery flow on iOS Safari has, historically, been the most
+// fragile path here:
+//   • Compressed JPEG data-URLs can still weigh in at 1–2 MB on a
+//     1600px source if the JPEG has heavy texture.
+//   • Some HEIC originals decode oddly on Safari and produce data-URLs
+//     with mime "image/png" or no mime at all — we used to honour that
+//     and write `.png` files that nothing else expected.
+//
+// Both bite us silently because the upload returns 200 with garbage,
+// or 413 with a CORS-stripped error body. So now:
+//   1. We always upload as `image/jpeg` with a `.jpg` extension.
+//   2. We bail early (and log loudly) on data-URLs that are obviously
+//      empty / malformed.
+//   3. We surface storage errors in the console with the source URL
+//      length, so a future investigator can see "ah, it was 4.2 MB
+//      hitting the bucket limit".
+export async function uploadCupScanPhoto(scanId, photoDataUrl) {
+  if (!scanId) return null
+  if (!photoDataUrl || typeof photoDataUrl !== 'string' || !photoDataUrl.startsWith('data:')) {
+    if (photoDataUrl) console.warn('uploadCupScanPhoto: ignoring non-dataURL photo (len=' + (photoDataUrl?.length ?? 0) + ')')
+    return null
+  }
+  const blob = dataUrlToBlob(photoDataUrl)
+  if (!blob || blob.size === 0) {
+    console.warn('uploadCupScanPhoto: empty blob, skipping (raw len=' + photoDataUrl.length + ')')
+    return null
+  }
+  // Always normalise to JPEG. compressToJpeg in the user app already
+  // emits image/jpeg, but iOS Safari occasionally tags a re-encoded
+  // gallery image as image/png. Forcing the content type + extension
+  // keeps the admin table thumbnail and the bucket key in sync.
+  const path = `${scanId}.jpg`
+  const { error } = await supabase.storage
+    .from('cup-scans')
+    .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+  if (error) {
+    console.error('cup-scan upload failed (path=' + path + ', size=' + blob.size + ' bytes):', error)
+    return null
+  }
+  return path
+}
+
+export async function getCupScanSignedUrl(photoPath, ttlSec = 600) {
+  if (!photoPath) return null
+  const { data, error } = await supabase.storage
+    .from('cup-scans')
+    .createSignedUrl(photoPath, ttlSec)
+  if (error) {
+    console.error('cup-scan sign url failed:', error)
+    return null
+  }
+  return data?.signedUrl ?? null
+}
+
+export async function shareCups(userId, count) {
+  const { data, error } = await supabase.functions.invoke('share-cups', {
+    body: { user_id: userId, count },
+  })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.detail || payload?.error || error.message), { detail: payload })
+  }
+  return data // { cup_ids, count, newBalance, batch_id }
+}
+
+// `parsed` is what parseCupQr returns (or a bare array for back-compat).
+// Optional opts: { scanId, scanType, photoPath } pass-through to server
+// so admins can review the photo and audit every attempt.
+export async function claimCups(userId, parsed, opts = {}) {
+  const body = { user_id: userId }
+  if (Array.isArray(parsed)) {
+    body.cup_ids = parsed
+  } else if (parsed?.batchId) {
+    body.batch_id = parsed.batchId
+  } else if (parsed?.cupIds) {
+    body.cup_ids = parsed.cupIds
+  } else {
+    throw new Error('claimCups: invalid scan payload')
+  }
+  if (opts.scanId)    body.scan_id   = opts.scanId
+  if (opts.scanType)  body.scan_type = opts.scanType
+  if (opts.photoPath) body.photo_path = opts.photoPath
+
+  const { data, error } = await supabase.functions.invoke('claim-cups', { body })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.reason || error.message), { detail: payload })
+  }
+  return data
+}
+
+// ── Cup scans (legacy: photo-based, kept for backwards compat) ─────────────
 // Logs each scan event. Phase 2: set status='pending' and populate photo_url.
 export async function logCupScan(userId, { cupsAwarded = 1, photoUrl = null } = {}) {
   const { data, error } = await supabase
@@ -144,6 +408,11 @@ export async function getHistory(userId) {
     type: row.type,
     label: row.label,
     time: formatTime(row.created_at),
+    // Raw timestamp is needed by the activity modal to find the exact
+    // matching claim row (claim and activity are written ~simultaneously
+    // in a Promise.all, so matching on time proximity gives the right one
+    // even when the user has multiple claims for the same reward).
+    createdAt: row.created_at,
   }))
 }
 
@@ -177,7 +446,21 @@ export async function saveAppConfig(config) {
 }
 
 // ── Claims ─────────────────────────────────────────────────────────────────
-export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl }) {
+
+// Fetch the claims belonging to this device's user. Used by the user-side
+// activity feed to surface live status (pending / completed / failed) from
+// admin actions, since activity_history is append-only and doesn't update.
+export async function getMyClaims(userId) {
+  const { data, error } = await supabase
+    .from('claims')
+    .select('id, type, reward_id, cups_redeemed, payout_amount, status, created_at, verified_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath }) {
   const { data, error } = await supabase
     .from('claims')
     .insert({
@@ -188,6 +471,7 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
       payout_amount: payoutAmount,
       iban,
       receipt_photo_url: receiptPhotoUrl ?? null,
+      receipt_photo_path: receiptPhotoPath ?? null,
       status: 'pending',
     })
     .select('id')
@@ -195,4 +479,68 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
 
   if (error) throw error
   return data.id
+}
+
+// ── Receipt upload + AI verification ───────────────────────────────────────
+//
+// Two-step flow that matches the verify-receipt edge function contract:
+//   1. uploadReceiptPhoto(claimId, blob)  → puts photo at receipts/{claim_id}.{ext}
+//   2. verifyReceipt(claimId)             → triggers Claude Haiku, writes verdict
+//
+// Both are anon-keyed; the edge function uses service_role internally.
+
+// Turn a data-URL like "data:image/jpeg;base64,xxx" into a Blob.
+function dataUrlToBlob(dataUrl) {
+  const [meta, b64] = dataUrl.split(',')
+  const mime = (meta.match(/data:(.*?);base64/) || [])[1] || 'image/jpeg'
+  const bin = atob(b64)
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
+export async function uploadReceiptPhoto(claimId, photoDataUrl) {
+  if (!photoDataUrl) throw new Error('no_photo')
+  const blob = dataUrlToBlob(photoDataUrl)
+  const ext = blob.type === 'image/png' ? 'png' : 'jpg'
+  const path = `${claimId}.${ext}`
+
+  const { error } = await supabase.storage
+    .from('receipts')
+    .upload(path, blob, {
+      contentType: blob.type,
+      upsert: true, // tolerate retries on the same claim
+    })
+  if (error) throw error
+
+  // Update the claim row with the path so the edge function can find it
+  const { error: updErr } = await supabase
+    .from('claims')
+    .update({ receipt_photo_path: path })
+    .eq('id', claimId)
+  if (updErr) throw updErr
+
+  return path
+}
+
+export async function verifyReceipt(claimId) {
+  const { data, error } = await supabase.functions.invoke('verify-receipt', {
+    body: { claim_id: claimId },
+  })
+  if (error) throw error
+  return data // { status, failureChecks, verdict, summary, requiredItem }
+}
+
+// Helper: get a temporary signed URL for displaying a private receipt photo.
+// Used by admin UI; ttl defaults to 10 minutes.
+export async function getReceiptSignedUrl(photoPath, ttlSec = 600) {
+  if (!photoPath) return null
+  const { data, error } = await supabase.storage
+    .from('receipts')
+    .createSignedUrl(photoPath, ttlSec)
+  if (error) {
+    console.error('Sign URL failed:', error)
+    return null
+  }
+  return data?.signedUrl ?? null
 }

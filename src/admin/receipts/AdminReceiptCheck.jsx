@@ -1,6 +1,128 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getAdminReceiptChecks, updateClaimStatus } from '../lib/adminApi';
+import { getAdminReceiptChecks, updateClaimStatus, getReceiptSignedUrl } from '../lib/adminApi';
+import Spinner from '../lib/Spinner';
+import PermissionGate from '../auth/PermissionGate';
+import { logAction } from '../auth/actionLog';
 import './AdminReceiptCheck.css';
+
+// Map of the three checks the LLM runs, keyed by the slug stored in
+// claims.ai_failure_checks. Used to render the verdict panel below.
+const AI_CHECK_LABELS = {
+  is_receipt: 'Is a receipt',
+  is_authentic_burger_king: 'Authentic Burger King',
+  contains_required_item: 'Contains reward item',
+  duplicate_receipt: 'Not a duplicate',
+};
+
+function AiVerdictPanel({ claim }) {
+  // Only render once the AI has actually verified the claim. We key on
+  // verified_at because the model sometimes omits ai_confidence even when
+  // all 3 checks passed — verified_at is set unconditionally on every run.
+  if (!claim || !claim.verified_at) {
+    return (
+      <div className="rc-ai-panel rc-ai-panel--empty">
+        <span className="rc-ai-panel__title">AI check</span>
+        <span className="rc-ai-panel__empty">Not verified yet</span>
+      </div>
+    );
+  }
+
+  const checks = [
+    { key: 'is_receipt',                 passed: claim.ai_is_receipt },
+    { key: 'is_authentic_burger_king',   passed: claim.ai_is_burger_king },
+    { key: 'contains_required_item',     passed: claim.ai_contains_required_item },
+  ];
+  const failedChecks = claim.ai_failure_checks || [];
+  const isDuplicate = failedChecks.includes('duplicate_receipt');
+  const confidence = claim.ai_confidence ?? 0;
+  const allPassed = checks.every(c => c.passed) && !isDuplicate;
+
+  return (
+    <div className={`rc-ai-panel rc-ai-panel--${allPassed ? 'pass' : 'fail'}`}>
+      <div className="rc-ai-panel__header">
+        <span className="rc-ai-panel__title">AI check</span>
+        <span className="rc-ai-panel__confidence">
+          {(confidence * 100).toFixed(0)}% confident
+        </span>
+      </div>
+
+      <div className="rc-ai-panel__checks">
+        {checks.map(c => (
+          <div key={c.key} className={`rc-ai-check rc-ai-check--${c.passed ? 'pass' : 'fail'}`}>
+            <span className="rc-ai-check__dot">
+              {c.passed ? (
+                <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 10L8 14L16 6"/>
+                </svg>
+              ) : (
+                <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="5" x2="15" y2="15"/>
+                  <line x1="15" y1="5" x2="5" y2="15"/>
+                </svg>
+              )}
+            </span>
+            <span className="rc-ai-check__label">{AI_CHECK_LABELS[c.key]}</span>
+          </div>
+        ))}
+        {isDuplicate && (
+          <div className="rc-ai-check rc-ai-check--fail">
+            <span className="rc-ai-check__dot">
+              <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="5" x2="15" y2="15"/>
+                <line x1="15" y1="5" x2="5" y2="15"/>
+              </svg>
+            </span>
+            <span className="rc-ai-check__label">Not a duplicate</span>
+          </div>
+        )}
+      </div>
+
+      {claim.ai_required_item && (
+        <div className="rc-ai-panel__row">
+          <span className="rc-ai-panel__row-label">Required item</span>
+          <span className="rc-ai-panel__row-val">{claim.ai_required_item}</span>
+        </div>
+      )}
+      {claim.extracted_total_eur != null && (
+        <div className="rc-ai-panel__row">
+          <span className="rc-ai-panel__row-label">Receipt total</span>
+          <span className="rc-ai-panel__row-val">€{Number(claim.extracted_total_eur).toFixed(2)}</span>
+        </div>
+      )}
+      {claim.extracted_receipt_id && (
+        <div className="rc-ai-panel__row">
+          <span className="rc-ai-panel__row-label">Receipt #</span>
+          <span className="rc-ai-panel__row-val rc-ai-panel__row-val--mono">{claim.extracted_receipt_id}</span>
+        </div>
+      )}
+      {claim.extracted_datetime && (
+        <div className="rc-ai-panel__row">
+          <span className="rc-ai-panel__row-label">Receipt date</span>
+          <span className="rc-ai-panel__row-val">{new Date(claim.extracted_datetime).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+      )}
+      {claim.ai_reason && (
+        <div className="rc-ai-panel__reason">
+          <span className="rc-ai-panel__reason-label">Why</span>
+          <span className="rc-ai-panel__reason-text">{claim.ai_reason}</span>
+        </div>
+      )}
+      {claim.ai_verdict?.items?.length > 0 && (
+        <details className="rc-ai-panel__items">
+          <summary>Extracted line items ({claim.ai_verdict.items.length})</summary>
+          <ul>
+            {claim.ai_verdict.items.map((it, i) => (
+              <li key={i}>
+                {it.qty}× {it.name}
+                {it.price_eur != null && ` — €${Number(it.price_eur).toFixed(2)}`}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
 
 function formatDate(ts) {
   if (!ts) return '—';
@@ -22,8 +144,20 @@ function SortIcon({ active, dir }) {
   );
 }
 
-function ReceiptThumb({ url }) {
-  if (!url) return (
+function ReceiptThumb({ url, path }) {
+  // Resolve a signed URL on-demand for thumbnails in the table. Cheap because
+  // each row only fetches once.
+  const [signed, setSigned] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!url && path) {
+      getReceiptSignedUrl(path, 600).then(u => { if (!cancelled) setSigned(u); });
+    }
+    return () => { cancelled = true; };
+  }, [url, path]);
+  const src = url || signed;
+
+  if (!src) return (
     <div className="rc-thumb rc-thumb--empty">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -31,11 +165,28 @@ function ReceiptThumb({ url }) {
       </svg>
     </div>
   );
-  return <div className="rc-thumb"><img src={url} alt="Receipt" /></div>;
+  return <div className="rc-thumb"><img src={src} alt="Receipt" /></div>;
 }
 
 function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
   const [lightbox, setLightbox] = useState(false);
+  const [signedUrl, setSignedUrl] = useState(null);
+
+  // For new claims the photo is in private storage — sign a URL for display.
+  // Legacy claims still have receipt_photo_url (inline data URL) so we fall
+  // back to that.
+  useEffect(() => {
+    let cancelled = false;
+    setSignedUrl(null);
+    if (claim?.receipt_photo_path) {
+      getReceiptSignedUrl(claim.receipt_photo_path).then(url => {
+        if (!cancelled) setSignedUrl(url);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [claim?.id, claim?.receipt_photo_path]);
+
+  const photoSrc = signedUrl || claim?.receipt_photo_url || null;
 
   if (!claim) {
     return (
@@ -78,10 +229,10 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
 
       {/* Receipt photo */}
       <div className="rc-detail__photo-wrap">
-        {claim.receipt_photo_url ? (
+        {photoSrc ? (
           <>
             <img
-              src={claim.receipt_photo_url}
+              src={photoSrc}
               alt="Receipt"
               className="rc-detail__photo"
               onClick={() => setLightbox(true)}
@@ -100,11 +251,16 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
             </svg>
-            <span>No receipt photo</span>
-            <span className="rc-detail__photo-sub">Submitted before photo capture was enabled</span>
+            <span>{claim.receipt_photo_path ? 'Loading photo…' : 'No receipt photo'}</span>
+            {!claim.receipt_photo_path && (
+              <span className="rc-detail__photo-sub">Submitted before photo capture was enabled</span>
+            )}
           </div>
         )}
       </div>
+
+      {/* AI check from Claude */}
+      <AiVerdictPanel claim={claim} />
 
       {/* Claim details */}
       <div className="rc-detail__rows">
@@ -130,7 +286,7 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
           <span className="rc-detail__row-val" style={{ textTransform: 'capitalize' }}>{claim.type?.replace('_', ' ')}</span>
         </div>
         <div className="rc-detail__row">
-          <span className="rc-detail__row-label">Cups redeemed</span>
+          <span className="rc-detail__row-label">Cups spent</span>
           <span className="rc-detail__row-val rc-detail__row-val--bold">{claim.cups_redeemed ?? '—'}</span>
         </div>
         <div className="rc-detail__row">
@@ -145,6 +301,21 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
           <span className="rc-detail__row-label">Claim ID</span>
           <span className="rc-detail__row-val rc-detail__row-val--mono">{claim.id}</span>
         </div>
+        {claim.approver && (
+          <div className="rc-detail__row">
+            <span className="rc-detail__row-label">
+              {claim.status === 'completed' ? 'Approved by' : 'Decided by'}
+            </span>
+            <span className="rc-detail__row-val">
+              {claim.approver.display_name || claim.approver.email.split('@')[0]}
+              {claim.approved_at && (
+                <span style={{ color: '#9E9A93', fontWeight: 400, marginLeft: 6 }}>
+                  · {new Date(claim.approved_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -152,22 +323,26 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
         <div className="rc-detail__actions">
           <p className="rc-detail__actions-hint">Verify the receipt matches the claim before approving.</p>
           <div className="rc-detail__btns">
-            <button className="rc-detail__btn rc-detail__btn--approve" disabled={updating} onClick={() => onApprove(claim.id)}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              Approve & Pay
-            </button>
-            <button className="rc-detail__btn rc-detail__btn--fail" disabled={updating} onClick={() => onFail(claim.id)}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Reject
-            </button>
+            <PermissionGate action="claim.approve">
+              <button className="rc-detail__btn rc-detail__btn--approve" disabled={updating} onClick={() => onApprove(claim.id)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Approve & Pay
+              </button>
+            </PermissionGate>
+            <PermissionGate action="claim.approve">
+              <button className="rc-detail__btn rc-detail__btn--fail" disabled={updating} onClick={() => onFail(claim.id)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Reject
+              </button>
+            </PermissionGate>
           </div>
         </div>
       )}
 
-      {lightbox && claim.receipt_photo_url && (
+      {lightbox && photoSrc && (
         <div className="rc-lightbox" onClick={() => setLightbox(false)}>
           <button className="rc-lightbox__close" onClick={e => { e.stopPropagation(); setLightbox(false); }}>×</button>
-          <img src={claim.receipt_photo_url} alt="Receipt enlarged" className="rc-lightbox__img" onClick={e => e.stopPropagation()} />
+          <img src={photoSrc} alt="Receipt enlarged" className="rc-lightbox__img" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>
@@ -201,11 +376,23 @@ export default function AdminReceiptCheck({ onNavigate }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  async function handleApprove(claimId) {
+  async function handleDecide(claimId, newStatus) {
     setUpdating(true); setError(null);
     try {
-      await updateClaimStatus(claimId, 'completed');
-      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: 'completed' } : c));
+      const before = claims.find(c => c.id === claimId);
+      const updated = await updateClaimStatus(claimId, newStatus);
+      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, ...updated } : c));
+      logAction({
+        action: newStatus === 'completed' ? 'claim.approve' : 'claim.reject',
+        targetType: 'claim',
+        targetId: claimId,
+        before: { status: before?.status },
+        after:  { status: newStatus },
+        metadata: {
+          surface: 'receipt_check',
+          payout_amount: before?.payout_amount,
+        },
+      });
     } catch (e) {
       const msg = e?.message || '';
       setError(msg.includes('claims_status_check')
@@ -213,19 +400,8 @@ export default function AdminReceiptCheck({ onNavigate }) {
         : msg || 'Update failed.');
     } finally { setUpdating(false); }
   }
-
-  async function handleFail(claimId) {
-    setUpdating(true); setError(null);
-    try {
-      await updateClaimStatus(claimId, 'failed');
-      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: 'failed' } : c));
-    } catch (e) {
-      const msg = e?.message || '';
-      setError(msg.includes('claims_status_check')
-        ? 'DB constraint error — run the fix SQL from the Publish error bar.'
-        : msg || 'Update failed.');
-    } finally { setUpdating(false); }
-  }
+  const handleApprove = id => handleDecide(id, 'completed');
+  const handleFail    = id => handleDecide(id, 'failed');
 
   const filtered = useMemo(() => {
     let list = claims;
@@ -252,7 +428,7 @@ export default function AdminReceiptCheck({ onNavigate }) {
     completed: claims.filter(c => c.status === 'completed').length,
     failed:    claims.filter(c => c.status === 'failed').length,
   };
-  const withPhoto = claims.filter(c => c.receipt_photo_url).length;
+  const withPhoto = claims.filter(c => c.receipt_photo_url || c.receipt_photo_path).length;
   const totalPayout = claims.filter(c => c.status === 'completed').reduce((s, c) => s + (c.payout_amount || 0), 0);
 
   const selectedClaim = claims.find(c => c.id === selectedId) || null;
@@ -317,7 +493,7 @@ export default function AdminReceiptCheck({ onNavigate }) {
       <div className="rc-layout">
         <div className="rc-table-wrap">
           {loading ? (
-            <div className="rc-loading">Loading receipts…</div>
+            <Spinner label="Loading receipts…" />
           ) : (
             <table className="rc-table">
               <thead>
@@ -339,7 +515,7 @@ export default function AdminReceiptCheck({ onNavigate }) {
                     onClick={() => setSelectedId(claim.id)}
                   >
                     <td style={{ padding: '6px 8px 6px 14px' }}>
-                      <ReceiptThumb url={claim.receipt_photo_url} />
+                      <ReceiptThumb url={claim.receipt_photo_url} path={claim.receipt_photo_path} />
                     </td>
                     <td>
                       <div className="rc-user-cell">

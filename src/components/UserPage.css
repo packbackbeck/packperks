@@ -438,9 +438,11 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.user-page__history-dot--cup_added    { background: #D4EDDA; }
-.user-page__history-dot--reward_claimed { background: #FFF3D6; }
-.user-page__history-dot--cups_withdrawn { background: #FFE0D6; }
+.user-page__history-dot--cup_added       { background: #D4EDDA; }
+.user-page__history-dot--reward_claimed  { background: #FFF3D6; }
+.user-page__history-dot--cups_withdrawn  { background: #FFE0D6; }
+.user-page__history-dot--cups_shared     { background: rgba(83, 51, 165, 0.14); }
+.user-page__history-dot--cups_donated    { background: rgba(184, 146, 42, 0.16); }
 
 .user-page__history-text {
   display: flex;
@@ -517,3 +519,137 @@
 }
 .user-page__withdraw-btn:active:not(:disabled) { transform: scale(0.98); }
 .user-page__withdraw-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Cross-device sign-in card ──────────────────────────────────────
+ * Distinct treatment from the regular profile cards: a soft cream
+ * background with a purple icon swatch + orange Link/Manage button.
+ * This is the one place in the user app where customers can bind
+ * their balance to a real auth account, so we give it a touch more
+ * presence than the surrounding "secure your progress" card. */
+.user-page__card--signin {
+  background: #ECE5D8;
+  border-color: transparent;
+}
+
+.user-page__signin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-page__signin-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(83, 51, 165, 0.14);
+  color: #5333A5;
+  display: grid;
+  place-items: center;
+}
+
+.user-page__signin-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-page__signin-btn {
+  flex-shrink: 0;
+  padding: 9px 14px;
+  background: #5333A5;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 0.14s ease, transform 0.08s ease;
+}
+.user-page__signin-btn:hover { background: #42298B; }
+.user-page__signin-btn:active { transform: translateY(1px); }
+
+/* ── Save your progress (merged email + cross-device card) ─────────
+ * Replaces the previous pair of cards ("Secure your progress" + the
+ * separate auth signin card). One unified card with three states:
+ *   • empty / editing  → email input + Save + optional cross-device upgrade CTA
+ *   • email saved      → input persists + upgrade CTA visible
+ *   • authEmail set    → confirmation row + Manage button (no input)
+ *
+ * The active (auth-linked) state gets the soft cream background that
+ * used to live on the standalone signin card, so the most-secured
+ * state visually stands out.
+ */
+.user-page__card--progress { }
+.user-page__card--progress-active {
+  background: #ECE5D8;
+  border-color: transparent;
+}
+
+.user-page__progress-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.user-page__progress-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(83, 51, 165, 0.14);
+  color: #5333A5;
+  display: grid;
+  place-items: center;
+}
+
+.user-page__progress-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* "Use this email to sign in on other devices" upgrade pill. Subtle by
+ * design — the primary action is Save above. */
+.user-page__progress-upgrade {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed #5333A5;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5333A5;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-style 0.14s ease;
+}
+.user-page__progress-upgrade:hover {
+  background: rgba(83, 51, 165, 0.08);
+  border-style: solid;
+}
+.user-page__progress-upgrade:active { transform: translateY(1px); }
+
+/* "Save your progress" / "Account" section that now lives at the
+ * bottom of the user page. Visually identical to the Activity section
+ * above it — same section-title + white card — but with a touch
+ * more breathing room and a full-width Manage button when the user
+ * is already signed in. */
+.user-page__progress-section {
+  margin-top: 4px;
+}
+
+.user-page__progress-manage {
+  width: 100%;
+  margin-top: 6px;
+}

@@ -2,8 +2,12 @@
   padding: 32px 32px 48px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 56px);
-  overflow: hidden;
+  min-height: calc(100vh - 56px);
+}
+
+.au-content {
+  display: flex;
+  flex-direction: column;
 }
 
 .au-header {
@@ -49,14 +53,14 @@
   font-family: inherit;
   background: transparent;
 }
-.au-search-input::placeholder { color: #B8B4AE; }
+.au-search-input::placeholder { color: #9E9A93; }
 
 .au-loading {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9E9A93;
+  color: #6C6259;
   font-size: 13px;
 }
 
@@ -83,7 +87,7 @@
   padding: 10px 16px;
   font-size: 10px;
   font-weight: 700;
-  color: #9E9A93;
+  color: #6C6259;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-align: left;
@@ -95,7 +99,7 @@
 .au-th--sortable:hover { color: #4A4540; }
 
 .au-sort-icon { margin-left: 3px; opacity: 0.4; font-size: 9px; }
-.au-sort-icon--active { opacity: 1; color: #D62300; }
+.au-sort-icon--active { opacity: 1; color: #FD6F46; }
 .au-table__row {
   border-bottom: 1px solid #F8F6F3;
   cursor: pointer;
@@ -114,7 +118,7 @@
 }
 .au-table__empty {
   text-align: center;
-  color: #B8B4AE;
+  color: #9E9A93;
   padding: 40px 0 !important;
 }
 
@@ -179,7 +183,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #D62300, #FFC52F);
+  background: linear-gradient(135deg, #FD6F46, #FFC52F);
   color: #FFFFFF;
   font-size: 16px;
   font-weight: 800;
@@ -191,11 +195,11 @@
 
 .udp__info { flex: 1; min-width: 0; }
 .udp__name { font-size: 14px; font-weight: 700; color: #1A1A1A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.udp__email { font-size: 11px; color: #9E9A93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.udp__email { font-size: 11px; color: #6C6259; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .udp__close {
   width: 28px; height: 28px;
-  border: none; background: #F5F4F0; border-radius: 6px;
+  border: none; background: #F8F4EC; border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
   color: #7A7166; cursor: pointer; flex-shrink: 0;
   transition: all 0.15s;
@@ -222,16 +226,16 @@
   gap: 3px;
 }
 .udp__meta-item--wide { grid-column: span 2; }
-.udp__meta-label { font-size: 10px; font-weight: 700; color: #9E9A93; text-transform: uppercase; letter-spacing: 0.4px; }
+.udp__meta-label { font-size: 10px; font-weight: 700; color: #6C6259; text-transform: uppercase; letter-spacing: 0.4px; }
 .udp__meta-val { font-size: 13px; font-weight: 600; color: #1A1A1A; }
-.udp__meta-val--big { font-size: 22px; font-weight: 800; color: #D62300; }
+.udp__meta-val--big { font-size: 22px; font-weight: 800; color: #FD6F46; }
 .udp__meta-val--mono { font-family: monospace; font-size: 11px; }
 
 .udp__section { margin-bottom: 16px; }
 .udp__section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.udp__section-title { font-size: 11px; font-weight: 700; color: #9E9A93; text-transform: uppercase; letter-spacing: 0.5px; }
-.udp__section-btn { font-size: 11px; font-weight: 600; color: #D62300; background: none; border: none; cursor: pointer; font-family: inherit; }
-.udp__section-btn:hover { color: #B81E00; }
+.udp__section-title { font-size: 11px; font-weight: 700; color: #6C6259; text-transform: uppercase; letter-spacing: 0.5px; }
+.udp__section-btn { font-size: 11px; font-weight: 600; color: #FD6F46; background: none; border: none; cursor: pointer; font-family: inherit; }
+.udp__section-btn:hover { color: #E55A30; }
 
 .udp__adjust {
   background: #F8F7F5;
@@ -270,17 +274,17 @@
 }
 .udp__adjust-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .udp__adjust-cancel { padding: 6px 12px; background: transparent; border: 1px solid #E8E6E1; border-radius: 6px; font-size: 12px; color: #7A7166; cursor: pointer; font-family: inherit; }
-.udp__adjust-confirm { padding: 6px 12px; background: #D62300; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; color: #FFFFFF; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+.udp__adjust-confirm { padding: 6px 12px; background: #FD6F46; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; color: #FFFFFF; cursor: pointer; font-family: inherit; transition: background 0.15s; }
 .udp__adjust-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
-.udp__adjust-confirm:not(:disabled):hover { background: #B81E00; }
+.udp__adjust-confirm:not(:disabled):hover { background: #E55A30; }
 
-.udp__empty { font-size: 12px; color: #B8B4AE; padding: 8px 0; }
+.udp__empty { font-size: 12px; color: #9E9A93; padding: 8px 0; }
 
 .udp__claim-list, .udp__activity-list { display: flex; flex-direction: column; gap: 4px; }
 .udp__claim-item {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 0;
-  border-bottom: 1px solid #F5F4F0;
+  border-bottom: 1px solid #F8F4EC;
   font-size: 12px;
 }
 .udp__claim-item:last-child { border-bottom: none; }
@@ -292,12 +296,12 @@
 .udp__claim-badge--failed   { background: rgba(248,113,113,0.12); color: #DC2626; }
 .udp__claim-type { flex: 1; color: #4A4540; }
 .udp__claim-amount { font-weight: 700; color: #1A1A1A; }
-.udp__claim-date { color: #B8B4AE; font-size: 11px; }
+.udp__claim-date { color: #9E9A93; font-size: 11px; }
 
 .udp__activity-item {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid #F5F4F0;
+  border-bottom: 1px solid #F8F4EC;
 }
 .udp__activity-item:last-child { border-bottom: none; }
 .udp__activity-dot {
@@ -306,9 +310,9 @@
   font-size: 10px; font-weight: 700; flex-shrink: 0;
 }
 .udp__activity-label { flex: 1; font-size: 11px; color: #4A4540; }
-.udp__activity-time { font-size: 10px; color: #B8B4AE; white-space: nowrap; }
+.udp__activity-time { font-size: 10px; color: #9E9A93; white-space: nowrap; }
 
-.udp__meta-val--muted { color: #B8B4AE; font-style: italic; }
+.udp__meta-val--muted { color: #9E9A93; font-style: italic; }
 
 .udp__section-btn--cancel { color: #7A7166; }
 
@@ -324,7 +328,7 @@
 .udp__edit-label {
   font-size: 10px;
   font-weight: 700;
-  color: #9E9A93;
+  color: #6C6259;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   margin-bottom: -2px;
@@ -343,7 +347,7 @@
   box-sizing: border-box;
   transition: border-color 0.15s;
 }
-.udp__edit-input:focus { border-color: #D62300; }
+.udp__edit-input:focus { border-color: #FD6F46; }
 
 .udp__edit-error {
   font-size: 11px;
@@ -352,3 +356,61 @@
   border-radius: 6px;
   padding: 6px 8px;
 }
+
+/* ── Device column ─────────────────────────────────────────────────── */
+.au-device-cell {
+  max-width: 180px;
+}
+.au-device {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.au-device__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.au-device--blue  { background: rgba(124,92,215,0.14); color: #5333A5; }
+.au-device--green { background: rgba(74,222,128,0.16); color: #16A34A; }
+.au-device--gray  { background: #F0EDE8; color: #4A4540; }
+
+/* P-29: short user ID under the display name. Lets admins scan a
+ * customer support email's "I'm user a1b2c3d4" and recognise it in
+ * the table without adding a full-width ID column. */
+.au-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.au-user-id {
+  font-size: 10.5px;
+  color: #6C6259;
+  letter-spacing: 0.01em;
+  cursor: help;
+}
+.au-mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  color: #6C6259;
+}
+
+/* P-41: stronger selected-row state. The previous "barely-tinted
+ * background" got lost on long scrolling sessions. A 3px purple left
+ * inset gives the eye an anchor for "this is the row I clicked on". */
+.au-table__row--active {
+  background: rgba(83, 51, 165, 0.04) !important;
+}
+.au-table__row--active td:first-child {
+  box-shadow: inset 3px 0 0 #5333A5;
+}
+
+/* Keep the hover state distinct from selected — slightly cooler grey
+ * so the eye can tell "I'm pointing here" from "I clicked here". */
+.au-table__row:hover { background: #F5F2EE; }

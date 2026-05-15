@@ -1,0 +1,108 @@
+/* HomeSkeleton — shimmering placeholders that mirror the real home
+ * layout. Looks like the page is composing rather than empty.
+ *
+ * The shimmer effect is a CSS gradient slid across each placeholder
+ * via a single keyframe — no JS animation cost.
+ *
+ * Important: never overshadow the real UI. Once the actual home page
+ * mounts, the skeleton disappears entirely (App.jsx swaps it out). */
+
+.hsk {
+  min-height: 100vh;
+  padding: 20px 18px 32px;
+  background: #F8F4EC;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hsk__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 8px;
+}
+
+.hsk__card {
+  background: #FFFFFF;
+  border-radius: 18px;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.hsk__card--short { gap: 8px; padding: 18px 20px; }
+
+.hsk__cup-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.hsk__reward {
+  background: #FFFFFF;
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.hsk__reward-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hsk__hint {
+  margin: auto auto 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5333A5;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+/* ── Shimmer primitives ────────────────────────────────────────────
+ * Single keyframe slides a soft highlight across a cream base. We use
+ * background-size 200% so the gradient covers twice the element width;
+ * animating background-position from -200% to 200% produces a smooth
+ * left-to-right pass. */
+.hsk__shimmer {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    #ECE5D8 0%,
+    #F8F4EC 50%,
+    #ECE5D8 100%
+  );
+  background-size: 200% 100%;
+  animation: hsk-shimmer 1.4s linear infinite;
+  border-radius: 8px;
+}
+@keyframes hsk-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.hsk__shimmer--logo   { width: 120px; height: 24px; border-radius: 8px; }
+.hsk__shimmer--avatar { width: 32px;  height: 32px; border-radius: 50%; }
+.hsk__shimmer--title  { width: 60%;   height: 14px; }
+.hsk__shimmer--big    { width: 50%;   height: 48px; border-radius: 12px; }
+.hsk__shimmer--cup    { width: 36px;  height: 44px; border-radius: 10px; }
+.hsk__shimmer--reward-img {
+  width: 84px;
+  height: 84px;
+  border-radius: 16px;
+  flex-shrink: 0;
+}
+.hsk__shimmer--line   { width: 80%;   height: 12px; }
+.hsk__shimmer--line-short { width: 55%; }
+.hsk__shimmer--btn    { width: 120px; height: 32px; border-radius: 999px; margin-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hsk__shimmer { animation: none; }
+}

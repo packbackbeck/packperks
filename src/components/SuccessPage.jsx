@@ -38,41 +38,64 @@ const ReceiptRow = ({ label, value, bold, green }) => (
   </div>
 );
 
-export default function SuccessPage({ reward, claimedIban, onDone }) {
+export default function SuccessPage({ reward, claimedIban, onDone, aiStatus, userName: userNameProp, userEmail: userEmailProp }) {
   const now = new Date();
   const claimId = makeClaimId();
-  const userName = getUserName();
-  const userEmail = getUserEmail();
+  // Prefer the live profile passed from App.jsx; only fall back to legacy
+  // localStorage profile if the prop is missing (kept for backwards compat).
+  const userName = userNameProp || getUserName();
+  const userEmail = userEmailProp || getUserEmail();
   const cashback = reward.euros?.toFixed(2) ?? (reward.cupsNeeded * 1.25).toFixed(2);
   const ibanDisplay = claimedIban
     ? claimedIban.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, -8) + '•••• ••••'
     : '•••• •••• •••• ••••';
 
+  // ── Pending vs approved variants ───────────────────────────────────────
+  // Approved: green check, "Reward claimed!" — cashback is guaranteed.
+  // Pending:  amber clock, "Submitted for review" — a real person looks
+  //           at the receipt before the cashback is released. Same receipt
+  //           card below, but the ETA copy differs to set expectations.
+  const isPending = aiStatus === 'pending';
+
   return (
-    <div className="success-page">
-      {/* Green glow backdrop */}
+    <div className={`success-page${isPending ? ' success-page--pending' : ''}`}>
       <div className="success-page__glow" />
 
-      {/* Animated checkmark */}
+      {/* Status icon — green check for approved, amber clock for pending */}
       <div className="success-page__check-wrap">
-        <svg className="success-page__check-svg" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="40" r="38" fill="#1A8737" opacity="0.15" />
-          <circle cx="40" cy="40" r="30" fill="#1A8737" />
-          <path
-            className="success-page__check-path"
-            d="M24 40L35 51L56 29"
-            stroke="white"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        {isPending ? (
+          <svg className="success-page__check-svg" viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="40" r="38" fill="#E89E2C" opacity="0.15" />
+            <circle cx="40" cy="40" r="30" fill="#E89E2C" />
+            {/* Hourglass-y clock face */}
+            <circle cx="40" cy="40" r="18" stroke="white" strokeWidth="3.5" fill="none" />
+            <path d="M40 28 L40 40 L48 46" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg className="success-page__check-svg" viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="40" r="38" fill="#1A8737" opacity="0.15" />
+            <circle cx="40" cy="40" r="30" fill="#1A8737" />
+            <path
+              className="success-page__check-path"
+              d="M24 40L35 51L56 29"
+              stroke="white"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
       </div>
 
-      {/* Congrats text */}
       <div className="success-page__text">
-        <h1 className="success-page__title">Reward claimed!</h1>
-        <p className="success-page__subtitle">Your cashback is on its way 🎉</p>
+        <h1 className="success-page__title">
+          {isPending ? 'Submitted for review' : 'Reward claimed!'}
+        </h1>
+        <p className="success-page__subtitle">
+          {isPending
+            ? "We'll take a quick look at your receipt and send your cashback once it's approved."
+            : 'Your cashback is on its way.'}
+        </p>
       </div>
 
       {/* ── Receipt card ── */}
@@ -115,13 +138,15 @@ export default function SuccessPage({ reward, claimedIban, onDone }) {
         {/* Total */}
         <ReceiptRow label="Total cashback" value={`€${cashback}`} bold green />
 
-        {/* ETA */}
-        <div className="sp-receipt__eta">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A8737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* ETA — switches copy + colour for pending review */}
+        <div className={`sp-receipt__eta${isPending ? ' sp-receipt__eta--pending' : ''}`}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isPending ? "#A85320" : "#1A8737"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
           </svg>
-          Deposited to your IBAN within <strong>24 hours</strong>
+          {isPending
+            ? <span>Under review — usually approved within <strong>a few hours</strong></span>
+            : <span>Deposited to your IBAN within <strong>24 hours</strong></span>}
         </div>
       </div>
 

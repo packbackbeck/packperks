@@ -1,0 +1,172 @@
+.rj-page {
+  position: fixed;
+  inset: 0;
+  background: #FFF8F4;
+  padding: 3.5rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.rj-page__icon-wrap {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #FFE5DA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  font-size: 2.25rem;
+}
+
+.rj-page__title {
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0 0 0.5rem;
+  max-width: 320px;
+  line-height: 1.25;
+}
+
+.rj-page__hint {
+  font-size: 0.875rem;
+  color: #7A7166;
+  margin: 0 0 1.5rem;
+  max-width: 320px;
+  line-height: 1.45;
+}
+
+.rj-checks {
+  width: 100%;
+  max-width: 340px;
+  background: white;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.rj-checks__title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9E9A93;
+  text-align: left;
+  margin-bottom: 0.625rem;
+}
+
+.rj-check {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem 0;
+  text-align: left;
+}
+
+.rj-check__dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rj-check--pass .rj-check__dot {
+  background: #DFF5E3;
+  color: #1A8737;
+}
+
+.rj-check--fail .rj-check__dot {
+  background: #FFE0DC;
+  color: #C73E1D;
+}
+
+.rj-check__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.rj-check--fail .rj-check__label {
+  color: #C73E1D;
+}
+
+.rj-reason {
+  width: 100%;
+  max-width: 340px;
+  background: #FFF1E8;
+  border: 1px solid #FFE0CC;
+  border-radius: 12px;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.rj-reason__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #A85320;
+}
+
+.rj-reason__text {
+  font-size: 0.85rem;
+  color: #6B3F1F;
+  line-height: 1.4;
+}
+
+.rj-actions {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.rj-actions__primary {
+  height: 52px;
+  border: none;
+  border-radius: 26px;
+  background: #E24400;
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.rj-actions__primary:hover { filter: brightness(0.95); }
+
+.rj-actions__secondary {
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: #7A7166;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rj-actions__secondary:hover { color: #1A1A1A; }
+/* Append these to src/components/ReceiptRejectedPage.css */
+
+.rj-checks__skipped {
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px dashed #E8E2D9;
+  font-size: 0.75rem;
+  color: #9E9A93;
+  font-style: italic;
+  text-align: left;
+  line-height: 1.4;
+}

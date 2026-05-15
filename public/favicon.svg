@@ -1,15 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <!-- PackPerks favicon: filled orange disc + white cup glyph.
-       Designed to read at 16×16 (browser tab) and 32×32 (bookmarks).
-       Orange #FD6F46 matches the user-app accent + the empty-state cup. -->
-  <circle cx="16" cy="16" r="16" fill="#FD6F46"/>
-  <!-- Cup body: trapezoid with rounded corners -->
-  <path d="M10.5 11h11a1 1 0 0 1 .99 1.15l-1.45 9.4a2 2 0 0 1-1.98 1.7h-5.12a2 2 0 0 1-1.98-1.7l-1.45-9.4A1 1 0 0 1 10.5 11Z"
-        fill="#FFFFFF"/>
-  <!-- Rim cap on top -->
-  <rect x="9" y="9" width="14" height="2.6" rx="1.3" fill="#FFFFFF"/>
-  <!-- Steam wisps -->
-  <path d="M13.6 6.4c.6.7.6 1.5 0 2.4" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" fill="none"/>
-  <path d="M16 5.6c.7.8.7 1.7 0 2.7" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" fill="none"/>
-  <path d="M18.4 6.4c.6.7.6 1.5 0 2.4" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+<svg width="97" height="95" viewBox="0 0 97 95" fill="none" xmlns="http://www.w3.org/2000/svg">
+<mask id="mask0_438_25" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="97" height="95">
+<path d="M74.0615 0H22.3077C9.98749 0 0 9.98749 0 22.3077V71.8308C0 84.151 9.98749 94.1385 22.3077 94.1385H74.0615C86.3817 94.1385 96.3692 84.151 96.3692 71.8308V22.3077C96.3692 9.98749 86.3817 0 74.0615 0Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_438_25)">
+<path d="M74.0615 1.52588e-05H22.3077C9.98749 1.52588e-05 0 9.98751 0 22.3077V71.8308C0 84.151 9.98749 94.1385 22.3077 94.1385H74.0615C86.3817 94.1385 96.3692 84.151 96.3692 71.8308V22.3077C96.3692 9.98751 86.3817 1.52588e-05 74.0615 1.52588e-05Z" fill="url(#paint0_radial_438_25)"/>
+<path d="M105.739 42.05H67.0348C60.1355 42.05 54.5425 36.457 54.5425 29.5577V25.296C54.5425 20.7504 58.2273 17.0654 62.7731 17.0654C67.3185 17.0654 71.0038 20.7504 71.0038 25.296V26.9299C71.0038 30.4725 69.104 33.7429 66.0269 35.4983L58.785 39.6297" stroke="#ECE5D8" stroke-width="6.69231"/>
+<path d="M42.9421 -10.2615V28.4423C42.9421 35.3416 37.3492 40.9346 30.4498 40.9346H26.1881C21.6425 40.9346 17.9575 37.2497 17.9575 32.704C17.9575 28.1584 21.6425 24.4735 26.1881 24.4735H27.8221C31.3646 24.4735 34.6351 26.373 36.3905 29.45L40.5218 36.6921" stroke="#ECE5D8" stroke-width="6.69231"/>
+<path d="M-8.92285 51.6423H29.781C36.6803 51.6423 42.2733 57.2353 42.2733 64.1346V68.3963C42.2733 72.9422 38.5883 76.6269 34.0427 76.6269C29.4971 76.6269 25.8121 72.9422 25.8121 68.3963V66.7625C25.8121 63.22 27.7116 59.9493 30.7887 58.1941L38.0307 54.0627" stroke="#ECE5D8" stroke-width="6.69231"/>
+<path d="M53.4268 103.954V65.25C53.4268 58.3507 59.0197 52.7577 65.9191 52.7577H70.1807C74.7266 52.7577 78.4114 56.4425 78.4114 60.9884C78.4114 65.5338 74.7266 69.219 70.1807 69.219H68.5469C65.0044 69.219 61.7337 67.3193 59.9785 64.2422L55.8471 57.0002" stroke="#ECE5D8" stroke-width="6.69231"/>
+</g>
+<defs>
+<radialGradient id="paint0_radial_438_25" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(48.1846 47.0692) rotate(90) scale(47.0692 48.1846)">
+<stop stop-color="#FFB688"/>
+<stop offset="1" stop-color="#672BFF"/>
+</radialGradient>
+</defs>
 </svg>

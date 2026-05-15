@@ -49,10 +49,12 @@ export default function LoginPage() {
     try {
       await signUpWithEmail(email.trim(), password);
       setMode('verify');
-      // The code can be 6 digits (if Supabase Email OTP is enabled in the
-      // dashboard) or a longer alphanumeric token (default Supabase signup
-      // confirmation). We accept either — see the verify-step input below.
-      setInfo(`We sent a verification code to ${email.trim()}. Check your inbox and paste the code below.`);
+      // Supabase project is configured with Email OTP length = 6 digits,
+      // so {{ .Token }} in the signup-confirmation email is a clean
+      // 6-digit numeric code. (If that setting is ever flipped back to
+      // the default alphanumeric token, also relax the verify input
+      // below — see the comment there.)
+      setInfo(`We sent a 6-digit code to ${email.trim()}. Enter it below to confirm your email.`);
     } catch (e) {
       setErr(friendlyError(e));
     } finally { setBusy(false); }
@@ -181,28 +183,29 @@ export default function LoginPage() {
             <p className="auth-info auth-info--block">{info}</p>
             <label className="auth-field">
               <span>Verification code</span>
-              {/* Supabase's default signup confirmation token is an
-               * alphanumeric hash (typically 6–10 chars). It only becomes
-               * a strict 6-digit numeric OTP when the dashboard's Email
-               * OTP feature is explicitly enabled. We accept either:
-               * any non-empty trimmed string with length ≥ 4 — the
-               * server-side verifyOtp call does the real validation. */}
+              {/* Supabase project has "Email OTP" enabled with length=6,
+               * so {{ .Token }} emits a 6-digit numeric code. We strip
+               * any non-digit characters on paste — that way users
+               * pasting from formatted emails (e.g. "123 456" or
+               * "123-456") still land on a clean numeric value. If the
+               * Supabase OTP setting is ever flipped back to the default
+               * alphanumeric token, swap inputMode to "text", drop the
+               * digit-only filter, and relax the length check below. */}
               <input
-                inputMode="text"
-                maxLength={10}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
                 value={otp}
-                onChange={e => setOtp(e.target.value.replace(/\s/g, ''))}
-                placeholder="Paste your code"
+                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="123456"
                 autoComplete="one-time-code"
-                spellCheck="false"
-                autoCapitalize="off"
                 required
                 disabled={busy}
                 className="auth-otp"
               />
             </label>
             {err && <p className="auth-err">{err}</p>}
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy || otp.length < 4}>
+            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy || otp.length !== 6}>
               {busy ? 'Verifying…' : 'Verify & sign in'}
             </button>
             <div className="auth-resend">

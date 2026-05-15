@@ -4,13 +4,13 @@
   Paste this into:
     Supabase Dashboard → Authentication → Email Templates → "Confirm signup"
 
-  The {{ .Token }} variable is the verification code. By default Supabase
-  sends a longer alphanumeric token (typically 6–10 chars). For a strict
-  6-digit numeric OTP, enable "Email OTP" in:
-    Authentication → Providers → Email → "Email OTP"
-  Either form is fine — the LoginPage's verify input accepts any
-  non-empty code of length ≥ 4 and delegates real validation to
-  supabase.auth.verifyOtp().
+  The {{ .Token }} variable is the verification code. This project has
+  "Email OTP" enabled with length = 6 (see Supabase Dashboard →
+  Authentication → Providers → Email → "Email OTP"), so {{ .Token }}
+  emits a 6-digit numeric code. The LoginPage verify input is wired
+  for exactly that shape; if anyone disables the OTP setting (Supabase
+  reverts to a longer alphanumeric token), the input must be relaxed
+  in src/admin/auth/LoginPage.jsx (see the inline comment there).
 
   Email clients aggressively strip <style> blocks, so all styling is
   inline. Tested against Gmail, Apple Mail, and Outlook web.

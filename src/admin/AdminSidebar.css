@@ -9,15 +9,27 @@
   display: flex;
   flex-direction: column;
   z-index: 100;
-  overflow-y: auto;
+  /* No scrollbar: the sidebar fills exactly the viewport height (under
+   * the 56px top bar) and the nav + toggles section together pack
+   * densely enough to fit. If the viewport is unusually short, content
+   * clips silently instead of showing a scrollbar — per spec. */
+  overflow: hidden;
+  /* Make the column itself the height authority, so children that
+   * declare `min-height: 0` can actually shrink to fit. */
+  height: calc(100vh - 56px);
 }
 
 .admin-sidebar__nav {
-  flex: 1;
-  padding: 12px 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+  /* Hide rather than scroll if the nav itself runs long. The items
+   * below are already tight; this is a safety net for very short
+   * laptop screens. */
+  overflow: hidden;
 }
 
 .admin-sidebar__item {
@@ -25,18 +37,19 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 9px 12px;
+  padding: 6px 11px;
   border-radius: 8px;
   border: none;
   background: transparent;
   color: #A8A49D;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
   transition: all 0.15s ease;
   font-family: inherit;
   position: relative;
+  flex-shrink: 0;
 }
 
 .admin-sidebar__item:hover {
@@ -77,9 +90,12 @@
   padding: 0 5px;
 }
 
-/* Quick Settings Toggles */
+/* Quick Settings Toggles — pinned to bottom of sidebar, does not
+ * scroll. Padding tightened from the original so the whole sidebar
+ * fits inside the viewport on standard 13" laptops without a scrollbar. */
 .admin-sidebar__toggles {
-  padding: 12px 10px 8px;
+  flex: 0 0 auto;
+  padding: 8px 10px 6px;
   border-top: 1px solid #222;
 }
 

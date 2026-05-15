@@ -49,7 +49,10 @@ export default function LoginPage() {
     try {
       await signUpWithEmail(email.trim(), password);
       setMode('verify');
-      setInfo(`We sent a 6-digit code to ${email.trim()}. Enter it below to confirm your email.`);
+      // The code can be 6 digits (if Supabase Email OTP is enabled in the
+      // dashboard) or a longer alphanumeric token (default Supabase signup
+      // confirmation). We accept either — see the verify-step input below.
+      setInfo(`We sent a verification code to ${email.trim()}. Check your inbox and paste the code below.`);
     } catch (e) {
       setErr(friendlyError(e));
     } finally { setBusy(false); }
@@ -178,21 +181,28 @@ export default function LoginPage() {
             <p className="auth-info auth-info--block">{info}</p>
             <label className="auth-field">
               <span>Verification code</span>
+              {/* Supabase's default signup confirmation token is an
+               * alphanumeric hash (typically 6–10 chars). It only becomes
+               * a strict 6-digit numeric OTP when the dashboard's Email
+               * OTP feature is explicitly enabled. We accept either:
+               * any non-empty trimmed string with length ≥ 4 — the
+               * server-side verifyOtp call does the real validation. */}
               <input
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
+                inputMode="text"
+                maxLength={10}
                 value={otp}
-                onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="123456"
+                onChange={e => setOtp(e.target.value.replace(/\s/g, ''))}
+                placeholder="Paste your code"
                 autoComplete="one-time-code"
+                spellCheck="false"
+                autoCapitalize="off"
                 required
                 disabled={busy}
                 className="auth-otp"
               />
             </label>
             {err && <p className="auth-err">{err}</p>}
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy || otp.length !== 6}>
+            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy || otp.length < 4}>
               {busy ? 'Verifying…' : 'Verify & sign in'}
             </button>
             <div className="auth-resend">

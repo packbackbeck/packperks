@@ -700,3 +700,50 @@
   border: none;
 }
 .org-btn--success:hover { background: #15803D; }
+
+/* Pending-invitations: link-mode row renders the shareable URL inline
+ * with a small copy button (replaces the synthetic placeholder email). */
+.org-invite-link-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.org-invite-link-cell__input {
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 1px solid #E8E2D6;
+  border-radius: 6px;
+  background: #FBF8F2;
+  color: #1A1A1A;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+}
+.org-invite-link-cell__input:focus {
+  outline: none;
+  border-color: #C8C2B5;
+  background: #FFFFFF;
+}
+.org-invite-link-cell__copy {
+  padding: 4px 10px;
+  border: 1px solid #E8E2D6;
+  border-radius: 6px;
+  background: #FFFFFF;
+  color: #4A4540;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.org-invite-link-cell__copy:hover { background: #F5F0E8; color: #1A1A1A; }
+.org-invite-link-cell__copy--ok {
+  background: #16A34A;
+  border-color: #16A34A;
+  color: #FFFFFF;
+}
+.org-invite-link-cell__copy--ok:hover { background: #15803D; }

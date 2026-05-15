@@ -373,11 +373,15 @@ function TeamSection({ org, team, invitations, canManage, currentRole, currentUs
     } catch (e) { alert(e.message); }
   }
   async function handleRevoke(inv) {
-    if (!confirm(`Revoke pending invitation for ${inv.email}?`)) return;
+    // Friendly label: for link-mode invites the stored email is a
+    // synthetic "link-invite+...@invites.local" placeholder which would
+    // make the confirm dialog look broken. Show "shareable link" instead.
+    const label = inv.method === 'link' ? 'this shareable link' : inv.email;
+    if (!confirm(`Revoke pending invitation for ${label}?`)) return;
     try {
       await revokeInvitation(inv.id);
       onInvitationsChange(invitations.filter(i => i.id !== inv.id));
-      logAction({ action: 'team.invite_revoke', targetType: 'admin_invitation', targetId: inv.id, metadata: { email: inv.email } });
+      logAction({ action: 'team.invite_revoke', targetType: 'admin_invitation', targetId: inv.id, metadata: { email: inv.email, method: inv.method } });
     } catch (e) { alert(e.message); }
   }
 
@@ -466,7 +470,18 @@ function TeamSection({ org, team, invitations, canManage, currentRole, currentUs
             <tbody>
               {invitations.map(inv => (
                 <tr key={inv.id}>
-                  <td className="org-muted">{inv.email}</td>
+                  <td className="org-muted">
+                    {/* Link-mode invites have no real recipient email — the
+                     * server stores a synthetic placeholder like
+                     * "link-invite+abc12345@invites.local" so the row has a
+                     * NOT NULL email value. Showing that placeholder to the
+                     * admin is confusing; render the actual shareable URL
+                     * (with a one-click copy) instead, so it matches what
+                     * was offered in the invite modal. */}
+                    {inv.method === 'link'
+                      ? <InvitationLinkCell token={inv.token} />
+                      : inv.email}
+                  </td>
                   <td><RoleBadge role={inv.role} /></td>
                   <td className="org-muted">{new Date(inv.invited_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
                   <td className="org-muted">{new Date(inv.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
@@ -486,8 +501,15 @@ function TeamSection({ org, team, invitations, canManage, currentRole, currentUs
         <InviteModal
           onClose={() => setInviteOpen(false)}
           onInvited={(inv) => {
+            // Always push the new invitation into the pending list so
+            // the parent's UI reflects it immediately. Closing behaviour
+            // depends on the method: email invites are fire-and-forget
+            // and close the modal, but link invites need to STAY OPEN so
+            // the admin can actually see + copy the generated URL — the
+            // whole point of link mode. The modal's own "Done" button
+            // (or the X) closes it after they're done copying.
             onInvitationsChange([inv, ...invitations]);
-            setInviteOpen(false);
+            if (inv?.method !== 'link') setInviteOpen(false);
           }}
           allowAdmin={currentRole === 'owner' || currentRole === 'admin'}
         />
@@ -844,6 +866,48 @@ function RoleBadge({ role }) {
   const meta = ROLE_LABELS[role] || { label: role, color: '#7A7166' };
   return <span className="org-role-badge" style={{ background: meta.color }}>{meta.label}</span>;
 }
+
+/* Inline display for link-mode invitations in the pending list.
+ * Shows the full shareable URL (truncated visually but selectable in
+ * full on focus) plus a one-click Copy. Falls back to a plain label
+ * if the token is missing for some reason — old rows from before
+ * migration 010 won't have one. */
+function InvitationLinkCell({ token }) {
+  const [copied, setCopied] = useState(false);
+  if (!token) return <span className="org-muted">Shareable link (legacy)</span>;
+  const url = typeof window === 'undefined'
+    ? `/admin?invite=${token}`
+    : `${window.location.origin}/admin?invite=${token}`;
+  async function handleCopy(e) {
+    e.preventDefault(); e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {/* best-effort */}
+  }
+  return (
+    <div className="org-invite-link-cell">
+      <input
+        type="text"
+        className="org-invite-link-cell__input"
+        value={url}
+        readOnly
+        onFocus={e => e.target.select()}
+        aria-label="Invitation URL"
+      />
+      <button
+        type="button"
+        className={`org-invite-link-cell__copy${copied ? ' org-invite-link-cell__copy--ok' : ''}`}
+        onClick={handleCopy}
+        title="Copy invitation link"
+      >
+        {copied ? '✓' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
 function fullAddress(o) {
   return [o.address, o.postal_code, o.city].filter(Boolean).join(', ');
 }

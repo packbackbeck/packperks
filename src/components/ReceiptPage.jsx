@@ -45,6 +45,11 @@ export default function ReceiptPage({ reward, onSubmit, onBack }) {
   const [cameraActive, setCameraActive] = useState(false);
   const streamRef = useRef(null);
 
+  /* Scroll to top so the stepper + header are visible first */
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   /* Start camera on mount */
   useEffect(() => {
     let mounted = true;
@@ -124,19 +129,19 @@ export default function ReceiptPage({ reward, onSubmit, onBack }) {
         <ul className="receipt-page__req-list">
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            Showing the <strong>correct menu item</strong> you're claiming
+            <span>Shows the <strong>correct menu item</strong> you're claiming</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <strong>Fully readable</strong> — no blur, glare, or cropped edges
+            <span><strong>Fully readable</strong> — no blur, glare, or cropped edges</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            From a <strong>Burger King</strong> location
+            <span>From a <strong>Burger King</strong> location</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <strong>Dated after</strong> your SmartBin cup return ticket
+            <span><strong>Dated after</strong> your SmartBin cup return ticket</span>
           </li>
         </ul>
       </div>
@@ -208,7 +213,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack }) {
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12 6 12 12 16 14"/>
         </svg>
-        Cashback is deposited to your IBAN <strong>within 24 hours</strong> after your receipt is approved.
+        <span>Cashback is deposited to your IBAN <strong>within 24 hours</strong> after your receipt is approved.</span>
       </div>
 
     </div>

@@ -32,6 +32,7 @@ import {
   getHistory,
   addHistoryEntry,
   createClaim,
+  addDonationClaim,
   updateUserProfile,
   logCupScan,
   getAppConfig,
@@ -790,7 +791,15 @@ export default function App() {
                 setDonatedCups(actual);
                 addHistory('cups_donated', label);
                 setPage('donate-success');
-                if (userId) persist(updateCupBalance(userId, newCount), addHistoryEntry(userId, 'cups_donated', label));
+                if (userId) persist(
+                  updateCupBalance(userId, newCount),
+                  addHistoryEntry(userId, 'cups_donated', label),
+                  // Write a completed donation claim so the admin Donations
+                  // page can aggregate real cup + euro totals. Uses the refund
+                  // rate (€/cup) as the per-cup value — same basis used for
+                  // direct-refund claims.
+                  addDonationClaim(userId, actual, actual * (liveSettings.refundRatePerCup || 1.00)),
+                );
               }
             }}
             cupCount={cupCount}

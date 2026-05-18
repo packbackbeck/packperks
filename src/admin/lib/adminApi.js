@@ -432,21 +432,39 @@ export async function getDonationReceiptSignedUrl(path, ttlSec = 600) {
  * column exists, falling back to direct_refund + reward_id is null
  * (the donation flow stores no reward_id). */
 export async function getDonationCollectedTotal() {
-  // We try the cleaner `type = 'donation'` first; if no rows, fall
-  // back to the legacy pattern (direct_refund + null reward_id +
-  // payout_amount > 0 — the donate flow doesn't set an IBAN so the
-  // amount-only filter narrows it down).
+  // Primary: claims with type='donation' (written by the client since
+  // the fix that added addDonationClaim). Include any status — donations
+  // are auto-completed but we don't want to miss rows if status ever
+  // diverges.
   const { data: byType } = await supabase
     .from('claims')
     .select('payout_amount, cups_redeemed')
-    .eq('status', 'completed')
     .eq('type', 'donation');
   if ((byType || []).length > 0) {
     return {
       amount: byType.reduce((s, c) => s + (c.payout_amount || 0), 0),
-      cups: byType.reduce((s, c) => s + (c.cups_redeemed || 0), 0),
+      cups:   byType.reduce((s, c) => s + (c.cups_redeemed || 0), 0),
     };
   }
+
+  // Fallback A: activity_history rows with type='cups_donated'. These
+  // exist for every donation ever made (pre- and post-fix). Parse the
+  // cup count out of the label ("Donated N cups to …") and estimate the
+  // euro value at €1.00/cup — the same default refund rate.
+  const { data: hist } = await supabase
+    .from('activity_history')
+    .select('label')
+    .eq('type', 'cups_donated');
+  const histCups = (hist || []).reduce((sum, row) => {
+    const m = row.label?.match(/Donated (\d+) cup/);
+    return sum + (m ? parseInt(m[1], 10) : 0);
+  }, 0);
+  if (histCups > 0) {
+    return { amount: histCups * 1.00, cups: histCups };
+  }
+
+  // Fallback B (legacy): direct_refund + no reward_id — kept for any
+  // data that predates both of the above fixes.
   const { data: fallback } = await supabase
     .from('claims')
     .select('payout_amount, cups_redeemed')
@@ -455,7 +473,7 @@ export async function getDonationCollectedTotal() {
     .is('reward_id', null);
   return {
     amount: (fallback || []).reduce((s, c) => s + (c.payout_amount || 0), 0),
-    cups: (fallback || []).reduce((s, c) => s + (c.cups_redeemed || 0), 0),
+    cups:   (fallback || []).reduce((s, c) => s + (c.cups_redeemed || 0), 0),
   };
 }
 

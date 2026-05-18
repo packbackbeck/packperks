@@ -477,6 +477,23 @@ export async function getMyClaims(userId) {
   return data || []
 }
 
+// Record a completed donation claim so the admin Donations page can
+// aggregate real cup and euro totals. Unlike other claims, donations
+// are auto-completed (no admin review / receipt needed) — the user is
+// voluntarily giving up their cup value, so there's nothing to approve.
+export async function addDonationClaim(userId, cupsCount, payoutAmount) {
+  const { error } = await supabase
+    .from('claims')
+    .insert({
+      user_id: userId,
+      type: 'donation',
+      cups_redeemed: cupsCount,
+      payout_amount: payoutAmount ?? 0,
+      status: 'completed',
+    })
+  if (error) throw error
+}
+
 export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath }) {
   const { data, error } = await supabase
     .from('claims')

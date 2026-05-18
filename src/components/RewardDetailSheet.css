@@ -145,6 +145,74 @@
   line-height: 1.55;
 }
 
+/* ── How to claim ── */
+.rds-how-to-claim {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.rds-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.rds-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.rds-step__num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bk-brown);
+  color: var(--white);
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.rds-step__text {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.rds-step__text strong { color: var(--black); }
+.rds-step__text em    { color: var(--text-light); font-style: normal; }
+
+.rds-receipt-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #EEF6FF;
+  border-radius: var(--radius-sm);
+  border: 1px solid #BDD8F7;
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: #1A4F8A;
+  line-height: 1.5;
+}
+
+.rds-receipt-tip svg {
+  flex-shrink: 0;
+  color: #2F7FDB;
+  margin-top: 1px;
+}
+
 /* ── Section ── */
 .rds-section {
   display: flex;

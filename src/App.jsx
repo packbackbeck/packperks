@@ -271,7 +271,10 @@ export default function App() {
             window.history.replaceState({}, '', window.location.pathname);
             // Small delay so the home screen renders first, then the
             // claim result lands on top instead of flashing.
-            setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }), 100);
+            // Pass user.id directly — handleCupScan closes over the
+            // *initial* render's userId state (null) and would silently
+            // return early without this override.
+            setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }, user.id), 100);
           }
         }
       } catch (err) {
@@ -521,9 +524,16 @@ export default function App() {
    * every attempt admin-side. The photo upload is fire-and-forget — if
    * it fails the claim still goes through, the photo just won't appear
    * in the admin cup-scans table. */
-  const handleCupScan = async (parsed, meta = {}) => {
+  // `_overrideUserId` is passed by the deep-link init path to avoid a
+  // stale-closure bug: when the app loads with ?batch= in the URL the
+  // init useEffect calls this via setTimeout. At that point the React
+  // state `userId` is still null in the initial render's closure even
+  // though setUserId() was called moments earlier — the re-render
+  // hasn't happened yet. Passing user.id directly sidesteps the race.
+  const handleCupScan = async (parsed, meta = {}, _overrideUserId) => {
     track(EVENTS.CUP_ADDED);
-    if (!userId) return;
+    const uid = _overrideUserId || userId;
+    if (!uid) return;
 
     // Mint a scan_id up front so the upload + claim call share a key.
     const scanId =
@@ -544,7 +554,7 @@ export default function App() {
     }
 
     try {
-      const result = await claimCups(userId, parsed, {
+      const result = await claimCups(uid, parsed, {
         scanId,
         scanType: meta.scanType || 'deeplink',
         photoPath,

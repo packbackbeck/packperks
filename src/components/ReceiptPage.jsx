@@ -118,6 +118,29 @@ export default function ReceiptPage({ reward, onSubmit, onBack }) {
         </p>
       </div>
 
+      {/* ── Receipt requirements ── */}
+      <div className="receipt-page__requirements">
+        <p className="receipt-page__req-label">Your receipt must be:</p>
+        <ul className="receipt-page__req-list">
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
+            Showing the <strong>correct menu item</strong> you're claiming
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
+            <strong>Fully readable</strong> — no blur, glare, or cropped edges
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
+            From a <strong>Burger King</strong> location
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
+            <strong>Dated after</strong> your SmartBin cup return ticket
+          </li>
+        </ul>
+      </div>
+
       {/* ── Camera viewfinder ── */}
       <div className="receipt-page__viewfinder">
         {cameraError ? (
@@ -177,6 +200,15 @@ export default function ReceiptPage({ reward, onSubmit, onBack }) {
           Upload from gallery
         </button>
         <input ref={fileRef} type="file" accept="image/*" className="receipt-page__file-input" onChange={handleFileChange} />
+      </div>
+
+      {/* ── Delivery timing ── */}
+      <div className="receipt-page__eta">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Cashback is deposited to your IBAN <strong>within 24 hours</strong> after your receipt is approved.
       </div>
 
     </div>

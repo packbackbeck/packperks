@@ -116,6 +116,54 @@
   line-height: 1.5;
 }
 
+/* ── Receipt requirements ── */
+.receipt-page__requirements {
+  width: 330px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.receipt-page__req-label {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.receipt-page__req-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receipt-page__req-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.receipt-page__req-item strong { color: var(--black); }
+
+.receipt-page__req-icon {
+  flex-shrink: 0;
+  color: #1A8737;
+  margin-top: 1px;
+}
+
 /* ── Camera viewfinder ── */
 .receipt-page__viewfinder {
   width: 330px;
@@ -260,6 +308,30 @@
 .receipt-page__file-input {
   display: none;
 }
+
+/* ── Delivery ETA ── */
+.receipt-page__eta {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  width: 330px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: var(--text-light);
+  line-height: 1.5;
+  padding: 10px 14px;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 10px;
+}
+
+.receipt-page__eta svg {
+  flex-shrink: 0;
+  color: #1A8737;
+  margin-top: 1px;
+}
+
+.receipt-page__eta strong { color: #14532D; }
 
 /* ── Exit / Cancel button ── */
 .receipt-page__exit {

@@ -442,23 +442,70 @@ export async function addHistoryEntry(userId, type, label) {
 }
 
 // ── Published app config (rewards + settings pushed from admin) ────────────
-export async function getAppConfig() {
+//
+// Multi-org transition: `app_config` was a single-tenant key-value row
+// keyed 'published'. After migration 011, every org gets its own row
+// keyed 'published:<org_id>'. These helpers accept an optional orgId
+// and, when none is given, resolve the default org from the
+// `organizations` table. We also fall back to the legacy 'published'
+// key if the per-org row doesn't exist yet (graceful behaviour during
+// the deploy window between code rolling out and the migration
+// running).
+
+// Resolve the default org id (the oldest non-deleted org). Exported so
+// the admin context layer in Phase 2 can reuse the same logic before
+// the user has picked an active org.
+export async function getDefaultOrgId() {
   try {
     const { data } = await supabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'published')
+      .from('organizations')
+      .select('id')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle()
-    return data?.value || null
+    return data?.id || null
   } catch {
     return null
   }
 }
 
-export async function saveAppConfig(config) {
+export async function getAppConfig(orgId) {
+  try {
+    const resolvedOrgId = orgId || (await getDefaultOrgId())
+    if (resolvedOrgId) {
+      const { data } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', `published:${resolvedOrgId}`)
+        .maybeSingle()
+      if (data?.value) return data.value
+    }
+    // Legacy fallback — pre-migration data, or freshly-installed
+    // single-tenant DB where the migration hasn't run yet.
+    const { data: legacy } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'published')
+      .maybeSingle()
+    return legacy?.value || null
+  } catch {
+    return null
+  }
+}
+
+export async function saveAppConfig(config, orgId) {
+  const resolvedOrgId = orgId || (await getDefaultOrgId())
+  if (!resolvedOrgId) {
+    throw new Error('saveAppConfig: no organization available to save against')
+  }
   const { error } = await supabase
     .from('app_config')
-    .upsert({ key: 'published', value: config, updated_at: new Date().toISOString() })
+    .upsert({
+      key: `published:${resolvedOrgId}`,
+      value: config,
+      updated_at: new Date().toISOString(),
+    })
   if (error) throw error
 }
 

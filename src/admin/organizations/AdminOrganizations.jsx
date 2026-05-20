@@ -37,7 +37,7 @@ function formatDate(iso) {
   }
 }
 
-export default function AdminOrganizations({ onAddOrg }) {
+export default function AdminOrganizations({ onAddOrg, onNavigate }) {
   const { activeOrgId, switchOrg, refresh } = useOrg();
   const [orgs, setOrgs]       = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +83,15 @@ export default function AdminOrganizations({ onAddOrg }) {
 
   async function handleSwitch(id) {
     switchOrg(id);
+  }
+
+  /* Click-through to the per-org settings page. Switches to the org
+   * first (so the AdminOrg page loads that org's bundle), then
+   * navigates to the 'org' tab — same destination as the OrgBadge /
+   * sidebar shortcut, but starting from a list of all orgs. */
+  function handleOpen(id) {
+    if (id !== activeOrgId) switchOrg(id);
+    onNavigate?.('org');
   }
 
   return (
@@ -133,7 +142,12 @@ export default function AdminOrganizations({ onAddOrg }) {
                 const isActive  = org.id === activeOrgId;
                 const isDeleted = !!org.deleted_at;
                 return (
-                  <tr key={org.id} className={isDeleted ? 'ao-row--deleted' : ''}>
+                  <tr
+                    key={org.id}
+                    className={`${isDeleted ? 'ao-row--deleted' : ''} ${!isDeleted ? 'ao-row--clickable' : ''}`}
+                    onClick={!isDeleted ? () => handleOpen(org.id) : undefined}
+                    title={!isDeleted ? `Open ${org.name} settings` : ''}
+                  >
                     <td>
                       <div className="ao-org-cell">
                         <span className="ao-swatch" style={{ background: org.brand_color || '#FD6F46' }} />
@@ -156,8 +170,13 @@ export default function AdminOrganizations({ onAddOrg }) {
                       )}
                     </td>
                     <td className="ao-date">{formatDate(org.created_at)}</td>
-                    <td>
+                    <td onClick={e => e.stopPropagation()}>
                       <div className="ao-actions">
+                        {!isDeleted && (
+                          <button className="ao-action" onClick={() => handleOpen(org.id)}>
+                            Open settings
+                          </button>
+                        )}
                         {!isDeleted && !isActive && (
                           <button className="ao-action" onClick={() => handleSwitch(org.id)}>Switch to</button>
                         )}

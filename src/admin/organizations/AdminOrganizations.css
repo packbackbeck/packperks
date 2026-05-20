@@ -137,6 +137,9 @@
 .ao-table tbody tr:last-child td { border-bottom: none; }
 .ao-table tbody tr:hover { background: #FCFAF5; }
 
+.ao-row--clickable { cursor: pointer; }
+.ao-row--clickable:hover .ao-org-name { color: #FD6F46; }
+
 .ao-row--deleted {
   opacity: 0.55;
 }

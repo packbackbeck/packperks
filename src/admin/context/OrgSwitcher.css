@@ -1,0 +1,167 @@
+/* OrgSwitcher — sidebar-footer dropdown for active-org selection */
+
+.orgsw {
+  position: relative;
+  width: 100%;
+}
+
+.orgsw__trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid #2A2A2A;
+  border-radius: 8px;
+  color: #ECEAE5;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.orgsw__trigger:hover { background: #1E1E1E; border-color: #333; }
+
+.orgsw__chip {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+}
+.orgsw__chip--sm {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.orgsw__name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orgsw__caret {
+  flex-shrink: 0;
+  color: #7A7166;
+}
+
+/* ── Dropdown ───────────────────────────────────────────────────────── */
+.orgsw__dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: #1A1A1A;
+  border: 1px solid #2A2A2A;
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.45);
+  max-height: 60vh;
+  overflow-y: auto;
+  animation: orgsw-pop 0.12s ease-out both;
+}
+
+@keyframes orgsw-pop {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.orgsw__section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+}
+
+.orgsw__section-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #4A4540;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 4px 8px 2px;
+}
+
+.orgsw__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #C8C4BC;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.orgsw__item:hover {
+  background: #232323;
+  color: #FFFFFF;
+}
+
+.orgsw__item--active {
+  background: rgba(214, 35, 0, 0.10);
+  color: #FF5533;
+  cursor: default;
+}
+.orgsw__item--active:hover {
+  background: rgba(214, 35, 0, 0.10);
+  color: #FF5533;
+}
+
+.orgsw__item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orgsw__check {
+  flex-shrink: 0;
+  color: #FF5533;
+}
+
+.orgsw__divider {
+  height: 1px;
+  background: #2A2A2A;
+  margin: 4px 0;
+}
+
+.orgsw__action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #A8A49D;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.orgsw__action:hover {
+  background: #232323;
+  color: #FFFFFF;
+}
+.orgsw__action svg {
+  flex-shrink: 0;
+  color: inherit;
+}

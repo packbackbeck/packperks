@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { getActiveOrgId } from '../context/orgState';
 
 /* ─────────────────────────────────────────────────────────────────────
  * logAction — writes one row into admin_action_log.
@@ -42,10 +43,14 @@ export async function logAction({
       .eq('id', user.id)
       .maybeSingle();
 
+    // Prefer the currently-active org from the switcher over the
+    // admin's home-org so PackPerks staff actions get logged under
+    // whichever client org they're managing right now.
+    const orgId = getActiveOrgId() || profile?.org_id || null;
     const { error } = await supabase.from('admin_action_log').insert({
       actor_id:    user.id,
       actor_email: profile?.email || user.email || null,
-      org_id:      profile?.org_id || null,
+      org_id:      orgId,
       action,
       target_type: targetType,
       target_id:   targetId,

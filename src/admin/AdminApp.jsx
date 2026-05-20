@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth as useAuthRole } from './auth/AuthContext';
+import { OrgProvider, useOrg } from './context/OrgContext';
+import OrgOnboardingWizard from './organizations/OrgOnboardingWizard';
+import AdminOrganizations from './organizations/AdminOrganizations';
 import AuthGate from './auth/AuthGate';
 import AdminTopBar from './AdminTopBar';
 import AdminSidebar from './AdminSidebar';
@@ -25,7 +28,9 @@ export default function AdminApp() {
   return (
     <AuthProvider>
       <AuthGate>
-        <AdminShell />
+        <OrgProvider>
+          <AdminShell />
+        </OrgProvider>
       </AuthGate>
     </AuthProvider>
   );
@@ -55,8 +60,8 @@ export default function AdminApp() {
  * ───────────────────────────────────────────────────────────────────── */
 const VALID_PAGES = new Set([
   'overview', 'rewards', 'users', 'claims', 'cupscans', 'cupqr',
-  'transactions', 'donations', 'org', 'settings', 'history', 'reports',
-  'support', 'receipts',
+  'transactions', 'donations', 'org', 'organizations', 'settings',
+  'history', 'reports', 'support', 'receipts',
 ]);
 const DEFAULT_PAGE = 'overview';
 
@@ -70,6 +75,8 @@ function AdminShell() {
   const [page, setPageState] = useState(readHashPage);
   const draftState = useAdminDraft();
   const { profile } = useAuthRole();
+  const { activeOrgId, activeOrgSlug } = useOrg();
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   /* Track which pages have been visited so we can keep them mounted
    * after first visit. Set is fine here — React's reference equality
@@ -108,7 +115,11 @@ function AdminShell() {
   }, []);
 
   function handlePreview() {
-    window.open('/', '_blank');
+    // Multi-org: open the active org's user app slug so the preview
+    // matches what's actually being edited.
+    // We read activeOrg via useOrg() up above to avoid stale closures.
+    const slug = activeOrgSlug;
+    window.open(slug ? `/${slug}/` : '/', '_blank');
   }
 
   /* Keep-alive page wrapper.
@@ -138,8 +149,13 @@ function AdminShell() {
           onNavigate={setPage}
           draftState={draftState}
           role={profile?.role}
+          onAddOrg={() => setWizardOpen(true)}
         />
-        <main className="admin-app__main">
+        {/* Keying <main> by activeOrgId forces every admin page to
+            remount + re-fetch whenever the user switches orgs. The
+            top-level shell (topbar, sidebar) stays mounted so the
+            switch feels instant and doesn't lose hash routing. */}
+        <main className="admin-app__main" key={activeOrgId || 'bootstrap'}>
           <KeepAlive id="overview">
             <AdminOverview draftState={draftState} onNavigate={setPage} />
           </KeepAlive>
@@ -163,6 +179,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="org">
             <AdminOrg onNavigate={setPage} />
+          </KeepAlive>
+          <KeepAlive id="organizations">
+            <AdminOrganizations onNavigate={setPage} onAddOrg={() => setWizardOpen(true)} />
           </KeepAlive>
           <KeepAlive id="settings">
             <AdminSettings draftState={draftState} onNavigate={setPage} />
@@ -188,6 +207,17 @@ function AdminShell() {
           </KeepAlive>
         </main>
       </div>
+
+      {/* Create-org wizard — modal portal sibling so it overlays the
+          whole shell. State lives here so the switcher (sidebar) and
+          the Organisations management page (main area) can both
+          trigger it through the same `onAddOrg` callback. */}
+      {wizardOpen && (
+        <OrgOnboardingWizard
+          onClose={() => setWizardOpen(false)}
+          onCreated={() => setWizardOpen(false)}
+        />
+      )}
     </div>
   );
 }

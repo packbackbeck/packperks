@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { toJpeg, toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches } from '../lib/adminApi';
+import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import QuickLinks from '../shared/QuickLinks';
@@ -52,8 +53,11 @@ const APP_URL = (() => {
  * the QR on screen is scannable directly.
  * ───────────────────────────────────────────────────────────────────── */
 export default function AdminCupQr({ onNavigate }) {
+  const { activeOrg } = useOrg();
   const [count, setCount] = useState(3);
-  const [restaurant, setRestaurant] = useState('Burger King — Amsterdam Damrak');
+  const [restaurant, setRestaurant] = useState(
+    activeOrg ? `${activeOrg.partner_brand_name || activeOrg.name} — Location` : 'Location 1'
+  );
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [batch, setBatch] = useState(null); // { batch_id, cup_ids, url, generatedAt, expires_at }
@@ -104,7 +108,10 @@ export default function AdminCupQr({ onNavigate }) {
       // Use the batch_id form — keeps the QR module density constant
       // regardless of how many cups are in the batch. (Direct UUID lists
       // worked up to ~30 cups before QRs got unreadable.)
-      const url = `${APP_URL}?batch=${res.batch_id}`;
+      // Multi-org: prefix with the active org's slug so a scan opens
+      // the right brand's user app (e.g. /coffeeshop/?batch=…).
+      const slugPath = activeOrg?.slug ? `${activeOrg.slug}/` : '';
+      const url = `${APP_URL}${slugPath}?batch=${res.batch_id}`;
       // P-21: optional expiry. Compute from the picked preset and set
       // the column on every cup in the new batch in one round trip.
       // Done after the batch insert so we don't wedge generation if the

@@ -195,63 +195,91 @@ begin
 end $$;
 
 
--- ── Step 6: enforce NOT NULL + add indexes for org_id ─────────────────
--- Safe because the backfill above touched every row. Wrapped in DO
--- blocks per-table so missing tables don't error out the migration.
+-- ── Step 6: add indexes + DEFAULT (but stay nullable) ─────────────────
+-- We intentionally do NOT enforce NOT NULL yet. The existing edge
+-- functions (generate-cups, claim-cups, invite-admin, bootstrap-admin)
+-- insert rows without org_id; making the column required here would
+-- break them until they're individually updated to thread the active
+-- org through.
+--
+-- Instead we:
+--   • Set a DEFAULT pointing at the canonical default org (BK) so any
+--     edge-function insert that omits org_id auto-tags to BK (no
+--     orphan rows, no NOT NULL violations).
+--   • Add indexes for query performance.
+--
+-- Phase 7 will update each edge function to receive org_id from the
+-- request body, at which point we can promote these columns to NOT
+-- NULL with a follow-up migration.
 do $$
+declare
+  default_org_id uuid;
 begin
+  select id
+    into default_org_id
+    from organizations
+   where deleted_at is null
+   order by created_at asc nulls last
+   limit 1;
+
+  if default_org_id is null then
+    raise notice 'No default org — skipping default-value setup';
+    return;
+  end if;
+
+  -- Apply default + index to each tenant table that exists.
   if to_regclass('public.users') is not null then
-    alter table users alter column org_id set not null;
+    execute format('alter table users alter column org_id set default %L', default_org_id);
     create index if not exists idx_users_org_id on users(org_id);
   end if;
 
   if to_regclass('public.cup_balances') is not null then
-    alter table cup_balances alter column org_id set not null;
+    execute format('alter table cup_balances alter column org_id set default %L', default_org_id);
     create index if not exists idx_cup_balances_org_id on cup_balances(org_id);
   end if;
 
   if to_regclass('public.cups') is not null then
-    alter table cups alter column org_id set not null;
+    execute format('alter table cups alter column org_id set default %L', default_org_id);
     create index if not exists idx_cups_org_id on cups(org_id);
   end if;
 
   if to_regclass('public.cup_scans') is not null then
-    alter table cup_scans alter column org_id set not null;
+    execute format('alter table cup_scans alter column org_id set default %L', default_org_id);
     create index if not exists idx_cup_scans_org_id on cup_scans(org_id);
   end if;
 
   if to_regclass('public.claims') is not null then
-    alter table claims alter column org_id set not null;
+    execute format('alter table claims alter column org_id set default %L', default_org_id);
     create index if not exists idx_claims_org_id on claims(org_id);
   end if;
 
   if to_regclass('public.activity_history') is not null then
-    alter table activity_history alter column org_id set not null;
+    execute format('alter table activity_history alter column org_id set default %L', default_org_id);
     create index if not exists idx_activity_history_org_id on activity_history(org_id);
   end if;
 
   if to_regclass('public.donation_transfers') is not null then
-    alter table donation_transfers alter column org_id set not null;
+    execute format('alter table donation_transfers alter column org_id set default %L', default_org_id);
     create index if not exists idx_donation_transfers_org_id on donation_transfers(org_id);
   end if;
 
   if to_regclass('public.admin_profiles') is not null then
-    alter table admin_profiles alter column org_id set not null;
+    execute format('alter table admin_profiles alter column org_id set default %L', default_org_id);
     create index if not exists idx_admin_profiles_org_id on admin_profiles(org_id);
   end if;
 
   if to_regclass('public.admin_invitations') is not null then
-    alter table admin_invitations alter column org_id set not null;
+    execute format('alter table admin_invitations alter column org_id set default %L', default_org_id);
     create index if not exists idx_admin_invitations_org_id on admin_invitations(org_id);
   end if;
 
   if to_regclass('public.admin_action_log') is not null then
-    alter table admin_action_log alter column org_id set not null;
+    execute format('alter table admin_action_log alter column org_id set default %L', default_org_id);
     create index if not exists idx_admin_action_log_org_id on admin_action_log(org_id);
   end if;
 
   if to_regclass('public.admin_login_history') is not null then
-    alter table admin_login_history alter column org_id set not null;
+    execute format('alter table admin_login_history alter column org_id set default %L', default_org_id);
     create index if not exists idx_admin_login_history_org_id on admin_login_history(org_id);
   end if;
 end $$;

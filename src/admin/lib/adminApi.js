@@ -1,4 +1,17 @@
 import { supabase } from '../../lib/supabase';
+import { applyOrgFilter, getActiveOrgId } from '../context/orgState';
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Multi-org note (Phase 2): every query in this file that touches a
+ * tenant-scoped table (users, claims, cups, cup_scans, etc.) is wrapped
+ * with `applyOrgFilter()` so it returns only rows belonging to the
+ * currently-active organisation. When no org is active yet (very brief
+ * bootstrap window before OrgContext resolves) applyOrgFilter is a
+ * no-op so we don't accidentally return empty results.
+ *
+ * For inserts/updates we explicitly include `org_id: getActiveOrgId()`
+ * in the payload so new rows are tagged correctly.
+ * ───────────────────────────────────────────────────────────────────── */
 
 export async function getAdminStats() {
   const [usersRes, balancesRes, claimsRes, scansRes, historyRes, cupActivityRes] = await Promise.all([
@@ -6,16 +19,16 @@ export async function getAdminStats() {
     // panels (device breakdown pie + top-returners leaderboard) — without
     // them every user falls into the "Unknown" device bucket and the
     // leaderboard shows "Anonymous" for everyone.
-    supabase.from('users').select('id, display_name, email, device, created_at, updated_at'),
-    supabase.from('cup_balances').select('user_id, balance, lifetime_cups'),
+    applyOrgFilter(supabase.from('users').select('id, display_name, email, device, created_at, updated_at')),
+    applyOrgFilter(supabase.from('cup_balances').select('user_id, balance, lifetime_cups')),
     // reward_id is needed by the Overview "Reward Popularity" chart —
     // without it the chart filtered everything out and rendered blank.
-    supabase.from('claims').select('id, type, reward_id, cups_redeemed, payout_amount, status, created_at'),
-    supabase.from('cup_scans').select('id, status, cups_awarded, scanned_at'),
-    supabase.from('activity_history').select('id, type, created_at').order('created_at', { ascending: false }).limit(20),
+    applyOrgFilter(supabase.from('claims').select('id, type, reward_id, cups_redeemed, payout_amount, status, created_at')),
+    applyOrgFilter(supabase.from('cup_scans').select('id, status, cups_awarded, scanned_at')),
+    applyOrgFilter(supabase.from('activity_history').select('id, type, created_at').order('created_at', { ascending: false }).limit(20)),
     // Fetch all cup_added events for reliable daily chart (no limit, guaranteed
     // written) and to compute the retention metric (need user_id for that).
-    supabase.from('activity_history').select('id, type, created_at, user_id').eq('type', 'cup_added'),
+    applyOrgFilter(supabase.from('activity_history').select('id, type, created_at, user_id').eq('type', 'cup_added')),
   ]);
 
   const users    = usersRes.data || [];
@@ -85,16 +98,20 @@ export async function getAdminStats() {
 }
 
 export async function getAdminUsers() {
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, display_name, email, iban, device, selected_reward_id, created_at, updated_at')
-    .order('created_at', { ascending: false });
+  const { data: users, error } = await applyOrgFilter(
+    supabase
+      .from('users')
+      .select('id, display_name, email, iban, device, selected_reward_id, created_at, updated_at')
+      .order('created_at', { ascending: false })
+  );
 
   if (error) throw error;
 
-  const { data: balances } = await supabase
-    .from('cup_balances')
-    .select('user_id, balance, lifetime_cups');
+  const { data: balances } = await applyOrgFilter(
+    supabase
+      .from('cup_balances')
+      .select('user_id, balance, lifetime_cups')
+  );
 
   const balanceMap = Object.fromEntries(
     (balances || []).map(b => [b.user_id, { balance: b.balance, lifetime: b.lifetime_cups }])
@@ -162,18 +179,21 @@ const CLAIMS_COLS = `
 `;
 
 export async function getAdminClaims() {
-  const { data, error } = await supabase
-    .from('claims')
-    .select(CLAIMS_COLS)
-    .order('created_at', { ascending: false });
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .select(CLAIMS_COLS)
+      .order('created_at', { ascending: false })
+  );
 
   if (error) throw error;
 
   const [{ data: users }, { data: admins }] = await Promise.all([
-    supabase.from('users').select('id, display_name, email'),
+    applyOrgFilter(supabase.from('users').select('id, display_name, email')),
     // Pull the admin profiles referenced by approved_by so the UI can
-    // show "Approved by Jasper" without an extra query per row.
-    supabase.from('admin_profiles').select('id, display_name, email, color, avatar_url'),
+    // show "Approved by Jasper" without an extra query per row. Admin
+    // profiles are also org-scoped now.
+    applyOrgFilter(supabase.from('admin_profiles').select('id, display_name, email, color, avatar_url')),
   ]);
 
   const userMap  = Object.fromEntries((users || []).map(u => [u.id, u]));
@@ -244,22 +264,24 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
 // we alias it to `created_at` client-side so the rest of the admin UI
 // can stay consistent with how other tables are surfaced.
 export async function getAdminCupScans() {
-  const { data, error } = await supabase
-    .from('cup_scans')
-    .select(`
-      id, user_id, source, scan_type, batch_id,
-      requested_cup_ids, activated_cup_ids,
-      cups_awarded, status, error_code, error_message,
-      photo_url, photo_path, scanned_at
-    `)
-    .order('scanned_at', { ascending: false })
-    .limit(500);
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('cup_scans')
+      .select(`
+        id, user_id, source, scan_type, batch_id,
+        requested_cup_ids, activated_cup_ids,
+        cups_awarded, status, error_code, error_message,
+        photo_url, photo_path, scanned_at
+      `)
+      .order('scanned_at', { ascending: false })
+      .limit(500)
+  );
 
   if (error) throw error;
 
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, display_name, email');
+  const { data: users } = await applyOrgFilter(
+    supabase.from('users').select('id, display_name, email')
+  );
 
   const userMap = Object.fromEntries((users || []).map(u => [u.id, u]));
 
@@ -294,17 +316,19 @@ export async function updateScanStatusWithNote(scanId, status, note = '') {
 }
 
 export async function getAdminReceiptChecks() {
-  const { data, error } = await supabase
-    .from('claims')
-    .select(CLAIMS_COLS)
-    .eq('type', 'cashback')
-    .order('created_at', { ascending: false });
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .select(CLAIMS_COLS)
+      .eq('type', 'cashback')
+      .order('created_at', { ascending: false })
+  );
 
   if (error) throw error;
 
   const [{ data: users }, { data: admins }] = await Promise.all([
-    supabase.from('users').select('id, display_name, email'),
-    supabase.from('admin_profiles').select('id, display_name, email, color, avatar_url'),
+    applyOrgFilter(supabase.from('users').select('id, display_name, email')),
+    applyOrgFilter(supabase.from('admin_profiles').select('id, display_name, email, color, avatar_url')),
   ]);
 
   const userMap  = Object.fromEntries((users || []).map(u => [u.id, u]));
@@ -322,7 +346,11 @@ export async function getAdminReceiptChecks() {
 // them and increments the scanner's balance.
 export async function generateCups(count = 1) {
   const { data, error } = await supabase.functions.invoke('generate-cups', {
-    body: { count },
+    // Multi-org: thread the active org id through so newly-minted
+    // cups belong to the currently-selected organisation in the
+    // dashboard. Falls back to the DB DEFAULT if the edge function
+    // hasn't been redeployed yet.
+    body: { count, org_id: getActiveOrgId() },
   });
   if (error) {
     let payload = null;
@@ -362,11 +390,13 @@ export async function uploadRewardImage(file) {
  * ───────────────────────────────────────────────────────────────────── */
 
 export async function getDonationTransfers() {
-  const { data, error } = await supabase
-    .from('donation_transfers')
-    .select('*')
-    .order('transfer_date', { ascending: false })
-    .order('created_at', { ascending: false });
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('donation_transfers')
+      .select('*')
+      .order('transfer_date', { ascending: false })
+      .order('created_at', { ascending: false })
+  );
   if (error) throw error;
   return data || [];
 }
@@ -384,6 +414,7 @@ export async function createDonationTransfer({ amount, transferDate, recipient, 
       receipt_path: receiptPath || null,
       receipt_filename: receiptFilename || null,
       created_by: user?.id ?? null,
+      org_id: getActiveOrgId(),
     })
     .select('*')
     .single();
@@ -436,10 +467,12 @@ export async function getDonationCollectedTotal() {
   // the fix that added addDonationClaim). Include any status — donations
   // are auto-completed but we don't want to miss rows if status ever
   // diverges.
-  const { data: byType } = await supabase
-    .from('claims')
-    .select('payout_amount, cups_redeemed')
-    .eq('type', 'donation');
+  const { data: byType } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .select('payout_amount, cups_redeemed')
+      .eq('type', 'donation')
+  );
   if ((byType || []).length > 0) {
     return {
       amount: byType.reduce((s, c) => s + (c.payout_amount || 0), 0),
@@ -451,10 +484,12 @@ export async function getDonationCollectedTotal() {
   // exist for every donation ever made (pre- and post-fix). Parse the
   // cup count out of the label ("Donated N cups to …") and estimate the
   // euro value at €1.00/cup — the same default refund rate.
-  const { data: hist } = await supabase
-    .from('activity_history')
-    .select('label')
-    .eq('type', 'cups_donated');
+  const { data: hist } = await applyOrgFilter(
+    supabase
+      .from('activity_history')
+      .select('label')
+      .eq('type', 'cups_donated')
+  );
   const histCups = (hist || []).reduce((sum, row) => {
     const m = row.label?.match(/Donated (\d+) cup/);
     return sum + (m ? parseInt(m[1], 10) : 0);
@@ -465,12 +500,14 @@ export async function getDonationCollectedTotal() {
 
   // Fallback B (legacy): direct_refund + no reward_id — kept for any
   // data that predates both of the above fixes.
-  const { data: fallback } = await supabase
-    .from('claims')
-    .select('payout_amount, cups_redeemed')
-    .eq('status', 'completed')
-    .eq('type', 'direct_refund')
-    .is('reward_id', null);
+  const { data: fallback } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .select('payout_amount, cups_redeemed')
+      .eq('status', 'completed')
+      .eq('type', 'direct_refund')
+      .is('reward_id', null)
+  );
   return {
     amount: (fallback || []).reduce((s, c) => s + (c.payout_amount || 0), 0),
     cups:   (fallback || []).reduce((s, c) => s + (c.cups_redeemed || 0), 0),
@@ -517,11 +554,13 @@ export async function listCupBatches({ limit = 30 } = {}) {
   // them up client-side. The cups table is small enough (hundreds of
   // rows) that this is faster than a server-side aggregation query
   // for the demo. If it ever grows past ~10k cups we'd want a view.
-  const { data, error } = await supabase
-    .from('cups')
-    .select('batch_id, status, expires_at, revoked_at, revoked_reason, created_at')
-    .order('created_at', { ascending: false })
-    .limit(2000);
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('cups')
+      .select('batch_id, status, expires_at, revoked_at, revoked_reason, created_at')
+      .order('created_at', { ascending: false })
+      .limit(2000)
+  );
   if (error) throw error;
   const byBatch = new Map();
   for (const row of (data || [])) {
@@ -579,17 +618,32 @@ export async function updateScanStatus(scanId, status) {
 // already prevents cross-org reads.
 
 export async function getOrgBundle() {
+  // The "active org" is determined by OrgContext (URL/localStorage/first).
+  // We fetch that org explicitly rather than `.limit(1)` so the switcher
+  // actually swaps which org's details + team load.
+  const orgId = getActiveOrgId();
+  const orgQuery = orgId
+    ? supabase.from('organizations').select('*').eq('id', orgId).maybeSingle()
+    : supabase.from('organizations').select('*').is('deleted_at', null).order('created_at').limit(1).maybeSingle();
+
   const [orgRes, locRes, teamRes, invRes] = await Promise.all([
-    supabase.from('organizations').select('*').limit(1).maybeSingle(),
-    supabase.from('locations').select('*').order('name'),
-    supabase.from('admin_profiles')
-      .select('id, email, display_name, avatar_url, color, role, status, last_login_at, created_at, invited_by')
-      .neq('status', 'deleted')
-      .order('created_at'),
-    supabase.from('admin_invitations')
-      .select('*')
-      .eq('status', 'pending')
-      .order('invited_at', { ascending: false }),
+    orgQuery,
+    // Locations are already org-scoped by `org_id` FK — keep using it.
+    orgId
+      ? supabase.from('locations').select('*').eq('org_id', orgId).order('name')
+      : supabase.from('locations').select('*').order('name'),
+    applyOrgFilter(
+      supabase.from('admin_profiles')
+        .select('id, email, display_name, avatar_url, color, role, status, last_login_at, created_at, invited_by')
+        .neq('status', 'deleted')
+        .order('created_at')
+    ),
+    applyOrgFilter(
+      supabase.from('admin_invitations')
+        .select('*')
+        .eq('status', 'pending')
+        .order('invited_at', { ascending: false })
+    ),
   ]);
   return {
     org: orgRes.data || null,
@@ -597,6 +651,196 @@ export async function getOrgBundle() {
     team: teamRes.data || [],
     invitations: invRes.data || [],
   };
+}
+
+/* Create a new organisation from the onboarding wizard payload.
+ *
+ * `payload` shape (every field optional except name + slug):
+ *   {
+ *     brand:    { name, slug, partner_brand_name, email_domain_hint,
+ *                 brand_color, logo_url },
+ *     legal:    { legal_name, kvk_number, btw_number, address,
+ *                 postal_code, city, country, contact_email,
+ *                 contact_phone, website },
+ *     location: { name, address, postal_code, city, phone, status },
+ *     economics:{ cashbackRatePerCup, refundRatePerCup, maxCupsPerScan,
+ *                 maxCupsToShare },
+ *     rewards:  [ { name, cupsNeeded, euros, image, description, tags } ],
+ *     copy:     { heroHeadline, heroSubtext, donationRecipient,
+ *                 donationDescription, privacyUrl, termsUrl, cookieUrl },
+ *     features: { featureCupSharing, featureDonations,
+ *                 featureDirectRefunds },
+ *     invites:  [ { email, role, method } ],
+ *   }
+ *
+ * Order of operations (all sequential, abort on first error so we
+ * don't leave a half-created org):
+ *   1. Insert the organisations row → capture new_org_id
+ *   2. Insert the first location row (if provided)
+ *   3. Upsert app_config row keyed 'published:<new_org_id>' with
+ *      rewards + settings JSON
+ *   4. Fire invite-admin edge fn for each invite (best-effort; failures
+ *      are surfaced but don't roll back the org)
+ *
+ * Returns the new organisation row so the caller can immediately
+ * switch into it.
+ */
+export async function createOrganization(payload) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const brand   = payload.brand    || {};
+  const legal   = payload.legal    || {};
+  const location = payload.location || null;
+  const economics = payload.economics || {};
+  const wizardRewards = payload.rewards || [];
+  const copy = payload.copy || {};
+  const features = payload.features || {};
+  const invites = payload.invites || [];
+
+  // 1. Organisations row.
+  const orgInsert = {
+    name: brand.name,
+    slug: brand.slug,
+    partner_brand_name: brand.partner_brand_name || brand.name,
+    email_domain_hint: brand.email_domain_hint || null,
+    brand_color: brand.brand_color || '#FD6F46',
+    logo_url: brand.logo_url || null,
+    legal_name: legal.legal_name || null,
+    kvk_number: legal.kvk_number || null,
+    btw_number: legal.btw_number || null,
+    address: legal.address || null,
+    postal_code: legal.postal_code || null,
+    city: legal.city || null,
+    country: legal.country || null,
+    contact_email: legal.contact_email || null,
+    contact_phone: legal.contact_phone || null,
+    website: legal.website || null,
+    created_by_packperks_admin: user?.id ?? null,
+  };
+  const { data: orgRow, error: orgErr } = await supabase
+    .from('organizations')
+    .insert(orgInsert)
+    .select('*')
+    .single();
+  if (orgErr) throw orgErr;
+  const newOrgId = orgRow.id;
+
+  // 2. First location (optional).
+  if (location && location.name) {
+    const { error: locErr } = await supabase.from('locations').insert({
+      org_id: newOrgId,
+      name: location.name,
+      address: location.address || null,
+      postal_code: location.postal_code || null,
+      city: location.city || null,
+      phone: location.phone || null,
+      status: location.status || 'active',
+    });
+    if (locErr) console.warn('createOrganization: location insert failed', locErr);
+  }
+
+  // 3. Published config (rewards + settings) for the new org.
+  const settings = {
+    cashbackRatePerCup: economics.cashbackRatePerCup ?? 1.25,
+    refundRatePerCup:   economics.refundRatePerCup   ?? 1.00,
+    heroHeadline:       copy.heroHeadline       || 'Collect & Get Rewards',
+    heroSubtext:        copy.heroSubtext        || 'Return your packaging and earn cashback.',
+    donationRecipient:  copy.donationRecipient  || '',
+    donationDescription: copy.donationDescription || '',
+    minIbanLength:      15,
+    maxCupsPerScan:     economics.maxCupsPerScan ?? 1,
+    maxCupsToShare:     economics.maxCupsToShare ?? 10,
+    featureCupSharing:    features.featureCupSharing    ?? true,
+    featureDonations:     features.featureDonations     ?? true,
+    featureDirectRefunds: features.featureDirectRefunds ?? true,
+    maintenanceMode: false,
+    privacyUrl: copy.privacyUrl || '',
+    termsUrl:   copy.termsUrl   || '',
+    cookieUrl:  copy.cookieUrl  || '',
+  };
+  const liveRewards = (wizardRewards || []).map((r, i) => ({
+    id: r.id || `reward-${i+1}-${Date.now().toString(36)}`,
+    name: r.name,
+    description: r.description || '',
+    image: r.image || '',
+    cupsNeeded: Number(r.cupsNeeded) || 0,
+    euros: Number(r.euros) || 0,
+    bgColor: r.bgColor || brand.brand_color || '#FD6F46',
+    tags: r.tags || [],
+    displayLines: r.displayLines || [r.name],
+    allergyInfo: r.allergyInfo || '',
+    nutrition: r.nutrition || [],
+    status: 'live',
+    featured: i === 0,
+    order: i,
+  }));
+  const { error: cfgErr } = await supabase
+    .from('app_config')
+    .upsert({
+      key: `published:${newOrgId}`,
+      value: { rewards: liveRewards, settings },
+      updated_at: new Date().toISOString(),
+    });
+  if (cfgErr) console.warn('createOrganization: app_config upsert failed', cfgErr);
+
+  // 4. Team invites (best-effort).
+  const inviteResults = [];
+  for (const inv of invites) {
+    if (!inv?.email && inv?.method !== 'link') continue;
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-admin', {
+        body: {
+          email: inv.email || undefined,
+          role: inv.role || 'admin',
+          method: inv.method || 'email',
+          single_use: inv.single_use === undefined ? true : !!inv.single_use,
+          org_id: newOrgId, // edge fn should respect this if it accepts it
+        },
+      });
+      if (error) throw error;
+      inviteResults.push({ ok: true, data });
+    } catch (e) {
+      inviteResults.push({ ok: false, error: e.message || String(e) });
+    }
+  }
+
+  return { org: orgRow, inviteResults };
+}
+
+/* Soft-delete an organisation. We don't truncate any rows — claims,
+ * users, cups stay attached for audit + restorability. The org just
+ * stops appearing in the switcher and the user-app stops serving its
+ * slug. Restore via clearOrganizationDelete(orgId). */
+export async function softDeleteOrganization(orgId) {
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', orgId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function restoreOrganization(orgId) {
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({ deleted_at: null })
+    .eq('id', orgId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/* List ALL organisations including soft-deleted (for the Manage page).
+ * The switcher uses OrgContext.availableOrgs which filters to active. */
+export async function listAllOrganizations() {
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
 export async function updateOrg(orgId, updates) {
@@ -693,12 +937,14 @@ export async function revokeInvitation(invitationId) {
 // The result has the sender, the receiver (if any), the count, and
 // timestamps for both share + activation.
 export async function getCupTransactions() {
-  const { data: cups, error } = await supabase
-    .from('cups')
-    .select('id, batch_id, source, status, shared_by_user_id, activated_by_user_id, activated_at, created_at')
-    .eq('source', 'user_share')
-    .order('created_at', { ascending: false })
-    .limit(2000);
+  const { data: cups, error } = await applyOrgFilter(
+    supabase
+      .from('cups')
+      .select('id, batch_id, source, status, shared_by_user_id, activated_by_user_id, activated_at, created_at')
+      .eq('source', 'user_share')
+      .order('created_at', { ascending: false })
+      .limit(2000)
+  );
   if (error) throw error;
 
   // Group by batch_id so the table shows one row per share, not one per cup.
@@ -740,10 +986,12 @@ export async function getCupTransactions() {
     if (t.shared_by_user_id) ids.add(t.shared_by_user_id);
     if (t.activated_by_user_id) ids.add(t.activated_by_user_id);
   }
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, display_name, email, animal_index')
-    .in('id', Array.from(ids));
+  const { data: users } = await applyOrgFilter(
+    supabase
+      .from('users')
+      .select('id, display_name, email, animal_index')
+      .in('id', Array.from(ids))
+  );
   const userMap = Object.fromEntries((users || []).map(u => [u.id, u]));
 
   return Array.from(byBatch.values()).map(t => ({
@@ -760,16 +1008,20 @@ export async function getCupTransactions() {
 // admin_profiles that authored them. Owners + admins see the whole org;
 // other roles only see their own actions (enforced by RLS).
 export async function getAdminActionLog(limit = 500) {
-  const { data, error } = await supabase
-    .from('admin_action_log')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('admin_action_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  );
   if (error) throw error;
 
-  const { data: admins } = await supabase
-    .from('admin_profiles')
-    .select('id, email, display_name, avatar_url, color, role');
+  const { data: admins } = await applyOrgFilter(
+    supabase
+      .from('admin_profiles')
+      .select('id, email, display_name, avatar_url, color, role')
+  );
   const adminMap = Object.fromEntries((admins || []).map(a => [a.id, a]));
 
   return (data || []).map(row => ({

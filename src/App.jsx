@@ -44,6 +44,8 @@ import {
   parseCupQr,
   onAuthStateChange,
   getCurrentAuthEmail,
+  getOrgBySlug,
+  getDefaultOrg,
 } from './lib/api';
 import './App.css';
 
@@ -147,6 +149,19 @@ export default function App() {
     maintenanceMode: false,
   });
 
+  /* ── Active organisation (multi-org) ──
+   * The user-facing app is now per-org. The slug in the URL path
+   * (e.g. /coffeeshop/) selects which org's config to load. If no slug,
+   * we fall back to the default (oldest non-deleted) org so existing
+   * /  URLs keep working as before for the BK demo.
+   *
+   * `activeOrg` drives:
+   *   • Hero copy + branding (org.partner_brand_name in user-visible text)
+   *   • Per-org app_config lookup (org.id passed to getAppConfig)
+   *   • Brand color (org.brand_color exposed to CSS variables / chips)
+   */
+  const [activeOrg, setActiveOrg] = useState(null);
+
   /* ── UI preferences ── */
   const [selectedRewardId, setSelectedRewardId] = useState('chicken-sandwich'); // loaded from Supabase in init
   const [claimed, setClaimed] = usePersistedState('claimed', false); // transient UI flag, localStorage is fine
@@ -184,6 +199,19 @@ export default function App() {
   useEffect(() => {
     async function init() {
       try {
+        // Step 0: resolve the active organisation from the URL slug.
+        // Path shape: /<slug>/?... — first non-empty segment is the slug.
+        // If no slug (e.g. visiting /), fall back to the default org so
+        // the existing demo URL keeps working without breakage.
+        const pathSlug = (window.location.pathname || '/')
+          .split('/')
+          .filter(Boolean)[0] || null;
+        const isReservedSlug = pathSlug === 'admin'; // admin route uses its own shell
+        const org = (!isReservedSlug && pathSlug)
+          ? (await getOrgBySlug(pathSlug)) || (await getDefaultOrg())
+          : (await getDefaultOrg());
+        if (org) setActiveOrg(org);
+
         const user = await getOrCreateUser();
 
         // Generate a display name for brand-new users
@@ -217,7 +245,9 @@ export default function App() {
         const [balance, hist, config, claims] = await Promise.all([
           getCupBalance(user.id),
           getHistory(user.id),
-          getAppConfig(),
+          // Per-org config: passes the active org id so each org has
+          // its own published rewards + settings document.
+          getAppConfig(org?.id),
           getMyClaims(user.id),
         ]);
 
@@ -561,10 +591,11 @@ export default function App() {
       });
       setCupCount(result.newBalance ?? cupCount + (result.activatedCount || 0));
       setLastCupsScanned(result.activatedCount || 1);
+      const brand = activeOrg?.partner_brand_name || activeOrg?.name || 'the store';
       const label =
         (result.activatedCount || 1) === 1
-          ? 'Cup returned at Burger King'
-          : `${result.activatedCount} cups returned at Burger King`;
+          ? `Cup returned at ${brand}`
+          : `${result.activatedCount} cups returned at ${brand}`;
       addHistory('cup_added', label);
       haptic('success');
       setPage('cup-scan-success');
@@ -870,7 +901,7 @@ export default function App() {
       )}
 
       <Modal open={termsOpen} onClose={() => setTermsOpen(false)} title="Voucher Terms">
-        <p><strong>How it works:</strong> Return your reusable PackBack cups at any participating Burger King location. Each returned cup adds to your balance.</p>
+        <p><strong>How it works:</strong> Return your reusable PackBack cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} location. Each returned cup adds to your balance.</p>
         <ul>
           <li>Rewards are digital vouchers — no app download needed.</li>
           <li>One reward can be claimed per cup cycle.</li>

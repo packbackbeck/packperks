@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import ProfileMenu from './auth/ProfileMenu';
-import OrgBadge from './auth/OrgBadge';
+import OrgSwitcher from './context/OrgSwitcher';
 import { logAction } from './auth/actionLog';
 import './AdminSidebar.css';
 
@@ -155,7 +155,7 @@ const ROLE_VISIBLE_TABS = {
   checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'reports']),
 };
 
-export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState, role }) {
+export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState, role, onAddOrg }) {
   const totalPending = pendingClaims + pendingScans;
   const settings = draftState?.draft?.settings || {};
   const toggleFeature = draftState?.toggleFeature;
@@ -296,7 +296,7 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
        * WorkflowDock (bottom-right) as the "Preview" action so we have
        * one canonical place for workflow controls. */}
       <div className="admin-sidebar__footer">
-        <OrgBadge onNavigate={onNavigate} />
+        <OrgSwitcher onNavigate={onNavigate} onAddOrg={onAddOrg} />
         <ProfileMenu />
       </div>
     </aside>

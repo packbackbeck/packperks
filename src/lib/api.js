@@ -470,6 +470,57 @@ export async function getDefaultOrgId() {
   }
 }
 
+// Fetch an organisation row by its URL slug. Used by the user-facing
+// app to bootstrap branding/copy/rewards for a path like /coffeeshop/.
+export async function getOrgBySlug(slug) {
+  if (!slug) return null
+  try {
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint')
+      .eq('slug', slug)
+      .is('deleted_at', null)
+      .maybeSingle()
+    return data || null
+  } catch {
+    return null
+  }
+}
+
+// Fetch an organisation row by id. Used after a deep-link cup scan to
+// resolve which org the scanned batch belongs to (in case the user
+// arrived via QR rather than the slug).
+export async function getOrgById(orgId) {
+  if (!orgId) return null
+  try {
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint')
+      .eq('id', orgId)
+      .maybeSingle()
+    return data || null
+  } catch {
+    return null
+  }
+}
+
+// Fetch the default (oldest non-deleted) organisation row. Used as a
+// fallback when the URL has no slug.
+export async function getDefaultOrg() {
+  try {
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    return data || null
+  } catch {
+    return null
+  }
+}
+
 export async function getAppConfig(orgId) {
   try {
     const resolvedOrgId = orgId || (await getDefaultOrgId())

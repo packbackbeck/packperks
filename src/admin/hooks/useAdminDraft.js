@@ -1,10 +1,31 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { rewards as defaultRewards } from '../../data/rewards';
 import { saveAppConfig } from '../../lib/api';
+import { useOrg } from '../context/OrgContext';
 
-const DRAFT_KEY = 'pp_admin_draft';
-const VERSIONS_KEY = 'pp_admin_versions';
-const PUBLISHED_KEY = 'pp_admin_published';
+/* ─────────────────────────────────────────────────────────────────────
+ * Multi-org note (Phase 2): the admin draft (working copy of rewards +
+ * settings + dashboard blocks) is now scoped to the active organisation.
+ * Each org gets its own slot in localStorage so switching between orgs
+ * preserves each one's in-progress edits independently.
+ *
+ * Storage keys (suffix is the org id, or 'default' before context loads):
+ *   pp_admin_draft:<orgId>
+ *   pp_admin_versions:<orgId>
+ *   pp_admin_published:<orgId>
+ *
+ * One-time migration: if an org has no draft stored under the new key
+ * but the legacy `pp_admin_draft` (no-suffix) key exists, we copy it
+ * across once so pre-multi-org users don't lose their working copy.
+ * ───────────────────────────────────────────────────────────────────── */
+
+const LEGACY_DRAFT_KEY     = 'pp_admin_draft';
+const LEGACY_VERSIONS_KEY  = 'pp_admin_versions';
+const LEGACY_PUBLISHED_KEY = 'pp_admin_published';
+
+function draftKey(orgId)     { return `pp_admin_draft:${orgId || 'default'}`; }
+function versionsKey(orgId)  { return `pp_admin_versions:${orgId || 'default'}`; }
+function publishedKey(orgId) { return `pp_admin_published:${orgId || 'default'}`; }
 
 export const DEFAULT_SETTINGS = {
   cashbackRatePerCup: 1.25,
@@ -62,29 +83,76 @@ function loadFromStorage(key, fallback) {
   }
 }
 
+/* One-time migration from the legacy (no-suffix) keys to the per-org
+ * keys. Runs once per orgId — if the per-org key already has data we
+ * skip, so a re-publish doesn't get clobbered by old legacy data.
+ *
+ * The legacy keys themselves are NOT deleted — multiple orgs may want
+ * to bootstrap from the same legacy draft, and we'd rather leak a few
+ * KB of localStorage than risk data loss. */
+function migrateLegacyKeysOnce(orgId) {
+  if (!orgId) return;
+  const pairs = [
+    [LEGACY_DRAFT_KEY,     draftKey(orgId)],
+    [LEGACY_VERSIONS_KEY,  versionsKey(orgId)],
+    [LEGACY_PUBLISHED_KEY, publishedKey(orgId)],
+  ];
+  for (const [oldK, newK] of pairs) {
+    try {
+      const existing = localStorage.getItem(newK);
+      if (existing) continue; // already migrated for this org
+      const legacy = localStorage.getItem(oldK);
+      if (legacy) localStorage.setItem(newK, legacy);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export function useAdminDraft() {
-  const [draft, setDraft] = useState(() => loadFromStorage(DRAFT_KEY, buildDefaultDraft()));
-  const [versions, setVersions] = useState(() => loadFromStorage(VERSIONS_KEY, []));
-  const [published, setPublished] = useState(() => loadFromStorage(PUBLISHED_KEY, null));
-  const [isDirty, setIsDirty] = useState(false);
+  // The hook needs the active org to key its storage. We tolerate the
+  // (very brief) bootstrap window where activeOrgId is null by using a
+  // 'default' suffix until it resolves.
+  const orgCtx = useOrg();
+  const activeOrgId = orgCtx?.activeOrgId || null;
+
+  const [draft, setDraft]     = useState(() => loadFromStorage(draftKey(activeOrgId), buildDefaultDraft()));
+  const [versions, setVersions]   = useState(() => loadFromStorage(versionsKey(activeOrgId), []));
+  const [published, setPublished] = useState(() => loadFromStorage(publishedKey(activeOrgId), null));
+  const [isDirty, setIsDirty]   = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [publishNote, setPublishNote] = useState('');
   const [publishError, setPublishError] = useState(null);
 
-  /* Auto-save: every call to updateDraft immediately persists to
-   * localStorage. There's no more manual "Save" button — the workflow
-   * is just edit → (autosaved) → Publish.
-   *
-   * `isDirty` no longer means "needs a click to save"; it means "has
-   * un-published changes" (i.e. the local draft has moved ahead of the
-   * last published snapshot). That's still useful for the Publish-pulse
-   * indicator. */
+  /* When the active org changes (admin used the switcher) reload all
+   * three slots from the new org's storage. Use a ref to skip the very
+   * first effect run (state was already initialised correctly from the
+   * useState initializer). */
+  const initialOrgIdRef = useRef(activeOrgId);
+  useEffect(() => {
+    if (activeOrgId === initialOrgIdRef.current) return;
+    initialOrgIdRef.current = activeOrgId;
+    migrateLegacyKeysOnce(activeOrgId);
+    setDraft(loadFromStorage(draftKey(activeOrgId), buildDefaultDraft()));
+    setVersions(loadFromStorage(versionsKey(activeOrgId), []));
+    setPublished(loadFromStorage(publishedKey(activeOrgId), null));
+    setIsDirty(false);
+    setLastSaved(null);
+    setPublishNote('');
+    setPublishError(null);
+  }, [activeOrgId]);
+
+  // One-time legacy migration when the org first resolves.
+  useEffect(() => {
+    if (activeOrgId) migrateLegacyKeysOnce(activeOrgId);
+  }, [activeOrgId]);
+
   const updateDraft = useCallback((updater) => {
     setDraft(prev => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
       const ts = Date.now();
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...next, _savedAt: ts }));
+        localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: ts }));
       } catch {
         /* quota / private-mode failure — fall through, state still updates */
       }
@@ -92,18 +160,15 @@ export function useAdminDraft() {
       return next;
     });
     setIsDirty(true);
-  }, []);
+  }, [activeOrgId]);
 
-  /* Kept for backwards compatibility (⌘S, legacy callers). Updates are
-   * already persisted on every change, so this is effectively a no-op
-   * touch of the timestamp. */
   const saveDraft = useCallback(() => {
     const ts = Date.now();
     const toSave = { ...draft, _savedAt: ts };
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(toSave));
+    localStorage.setItem(draftKey(activeOrgId), JSON.stringify(toSave));
     setIsDirty(false);
     setLastSaved(ts);
-  }, [draft]);
+  }, [draft, activeOrgId]);
 
   const publishDraft = useCallback((note) => {
     const ts = Date.now();
@@ -124,17 +189,18 @@ export function useAdminDraft() {
     setLastSaved(ts);
     setPublishNote('');
 
-    localStorage.setItem(VERSIONS_KEY, JSON.stringify(newVersions));
-    localStorage.setItem(PUBLISHED_KEY, JSON.stringify(newPublished));
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, _savedAt: ts }));
+    localStorage.setItem(versionsKey(activeOrgId), JSON.stringify(newVersions));
+    localStorage.setItem(publishedKey(activeOrgId), JSON.stringify(newPublished));
+    localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...draft, _savedAt: ts }));
 
-    // Push to Supabase so the user app picks it up on next load
+    // Push to Supabase — pass orgId so each org has its own
+    // `published:<orgId>` row in app_config.
     setPublishError(null);
-    saveAppConfig({ rewards: draft.rewards, settings: draft.settings }).catch(err => {
+    saveAppConfig({ rewards: draft.rewards, settings: draft.settings }, activeOrgId).catch(err => {
       console.error('saveAppConfig failed:', err);
       setPublishError(err?.message || 'Could not save to Supabase. Check app_config table + RLS policies.');
     });
-  }, [draft, versions, publishNote]);
+  }, [draft, versions, publishNote, activeOrgId]);
 
   const restoreVersion = useCallback((versionId) => {
     const version = versions.find(v => v.id === versionId);
@@ -147,17 +213,15 @@ export function useAdminDraft() {
     setDraft(prev => {
       const newSettings = { ...prev.settings, [key]: !prev.settings[key] };
       const next = { ...prev, settings: newSettings };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...next, _savedAt: Date.now() }));
-      saveAppConfig({ rewards: next.rewards, settings: newSettings }).catch(err => {
+      localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: Date.now() }));
+      saveAppConfig({ rewards: next.rewards, settings: newSettings }, activeOrgId).catch(err => {
         console.error('toggleFeature failed:', err);
         setPublishError(err?.message || 'Could not save feature toggle to Supabase.');
       });
       return next;
     });
-  }, []);
+  }, [activeOrgId]);
 
-  /* statusLabel is now informational only — there's no Save button to
-   * mirror. "Unsaved changes" never appears since every edit auto-saves. */
   const statusLabel = (() => {
     if (isDirty) return 'Auto-saved';
     if (lastSaved && !published) return 'Draft saved';
@@ -181,5 +245,6 @@ export function useAdminDraft() {
     publishError,
     clearPublishError: () => setPublishError(null),
     toggleFeature,
+    activeOrgId,
   };
 }

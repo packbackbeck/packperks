@@ -41,9 +41,17 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
 
   let count = 1;
+  let orgId: string | null = null;
   try {
     const body = await req.json();
     count = parseInt(body?.count, 10) || 1;
+    // Multi-org: caller can pass org_id so the new cups belong to the
+    // currently-active organisation in the admin dashboard. Older
+    // callers omit it and the cups table's DEFAULT (set by migration
+    // 011) points at the canonical default org as a fallback.
+    if (typeof body?.org_id === "string" && body.org_id.length > 0) {
+      orgId = body.org_id;
+    }
   } catch {
     return jsonResponse({ error: "invalid_json" }, 400);
   }
@@ -59,6 +67,7 @@ Deno.serve(async (req) => {
     batch_id: batchId,
     source: "admin_batch",
     status: "available",
+    ...(orgId ? { org_id: orgId } : {}),
   }));
 
   const { data, error } = await supabase

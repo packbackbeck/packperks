@@ -637,7 +637,22 @@ export default function UserPage({
       <div className="user-page__history">
         <span className="user-page__section-title">{copy.activityLabel || 'Activity'}</span>
         {history.length === 0 ? (
-          <span className="user-page__history-empty">No activity yet. Start by returning a cup!</span>
+          !authEmail ? (
+            <div className="user-page__history-empty user-page__history-empty--signin">
+              <span>Your activity is linked to your account.</span>
+              {onOpenSignIn && (
+                <button
+                  type="button"
+                  className="user-page__history-signin-btn"
+                  onClick={onOpenSignIn}
+                >
+                  Sign in to see your history
+                </button>
+              )}
+            </div>
+          ) : (
+            <span className="user-page__history-empty">No activity yet. Start by returning a cup!</span>
+          )
         ) : (
           <div className="user-page__card user-page__card--list user-page__history-scroll">
             {[...history].reverse().map((item, idx) => (

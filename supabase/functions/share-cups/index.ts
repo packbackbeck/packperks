@@ -1,66 +1,87 @@
 // ──────────────────────────────────────────────────────────────────────────
-// PackPerks — share-cups Edge Function (v2 — P-46 expiry)
+// PackPerks — share-cups Edge Function (v3 — H-3 CORS + H-4 ownership)
 //
-// User taps "Share cup" in the app, picks how many → this function:
-//   1. Verifies the user has at least `count` cups in their balance.
-//   2. Atomically decrements the balance by `count` and mints `count`
-//      fresh rows in `cups` (status='available', source='user_share',
-//      shared_by_user_id = sender, expires_at = now + 24h).
-//   3. Returns the new cup UUIDs + expires_at so the client can show
-//      a countdown to the sender.
-//
-// P-46: 24h expiry on shared cups protects against "I shared this
-// 3 months ago and now a stranger scanned it" scenarios. The window
-// is server-set, not client-set, so users can't extend it.
-//
-// Body: { user_id: uuid, count: number }
-// Returns: { cup_ids: [uuid, ...], newBalance, count, batch_id, expires_at }
+// Body: { user_id: uuid, count: number, device_id: uuid }
+// Returns: { cup_ids, newBalance, count, batch_id, expires_at }
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL      = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// Set ALLOWED_ORIGIN in Supabase Edge Function secrets for production
+// (e.g. "https://packperks.app"). Unset → wildcard for local dev.
+const ALLOWED_ORIGIN    = Deno.env.get("ALLOWED_ORIGIN") ?? null;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// Shared cups expire 24h after creation. Long enough for everyone
-// who'd realistically claim a friend's share, short enough to limit
-// the blast radius of a misplaced QR.
 const SHARE_EXPIRY_HOURS = 24;
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "content-type": "application/json" },
-  });
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allow  = ALLOWED_ORIGIN
+    ? (origin === ALLOWED_ORIGIN ? origin : null)
+    : "*";
+  const h: Record<string, string> = {
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+  if (allow) h["Access-Control-Allow-Origin"] = allow;
+  return h;
+}
+
+/** Verify the caller owns `userId`.
+ *  Email users:    JWT → auth_uid join in users table.
+ *  Anonymous users: device_id match in users table (proof-of-possession). */
+async function ownsUser(req: Request, userId: string, deviceId: string | null): Promise<boolean> {
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const jwt = authHeader.replace("Bearer ", "");
+    const { data: { user }, error } = await supabase.auth.getUser(jwt);
+    if (!error && user) {
+      const { data } = await supabase
+        .from("users").select("id")
+        .eq("auth_uid", user.id).eq("id", userId)
+        .maybeSingle();
+      return data !== null;
+    }
+  }
+  if (!deviceId || !UUID_RE.test(deviceId)) return false;
+  const { data } = await supabase
+    .from("users").select("id")
+    .eq("id", userId).eq("device_id", deviceId)
+    .maybeSingle();
+  return data !== null;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
-  if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const CORS = corsHeaders(req);
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS, "content-type": "application/json" },
+    });
 
-  let body: { user_id?: string; count?: number };
-  try { body = await req.json(); } catch { return jsonResponse({ error: "invalid_json" }, 400); }
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  const userId = body?.user_id;
-  const count = parseInt(String(body?.count), 10) || 0;
+  let body: { user_id?: string; count?: number; device_id?: string };
+  try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
+
+  const userId   = body?.user_id ?? null;
+  const deviceId = body?.device_id ?? null;
+  const count    = parseInt(String(body?.count), 10) || 0;
 
   if (!userId || !UUID_RE.test(userId))
-    return jsonResponse({ error: "missing_or_invalid_user_id" }, 400);
+    return json({ error: "missing_or_invalid_user_id" }, 400);
   if (count < 1 || count > 10)
-    return jsonResponse({ error: "invalid_count", detail: "count must be 1..10" }, 400);
+    return json({ error: "invalid_count", detail: "count must be 1..10" }, 400);
+
+  if (!await ownsUser(req, userId, deviceId))
+    return json({ error: "forbidden" }, 403);
 
   const { data: balanceRow, error: balErr } = await supabase
     .from("cup_balances")
@@ -68,18 +89,18 @@ Deno.serve(async (req) => {
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (balErr) return jsonResponse({ error: "db_error", detail: balErr.message }, 500);
-  if (!balanceRow) return jsonResponse({ error: "user_not_found" }, 404);
+  if (balErr) return json({ error: "db_error", detail: balErr.message }, 500);
+  if (!balanceRow) return json({ error: "user_not_found" }, 404);
   if ((balanceRow.balance || 0) < count) {
-    return jsonResponse(
+    return json(
       { error: "insufficient_balance", balance: balanceRow.balance, requested: count },
       409,
     );
   }
 
   const expiresAt = new Date(Date.now() + SHARE_EXPIRY_HOURS * 3_600_000).toISOString();
-  const batchId = crypto.randomUUID();
-  const rows = Array.from({ length: count }, () => ({
+  const batchId   = crypto.randomUUID();
+  const rows      = Array.from({ length: count }, () => ({
     id: crypto.randomUUID(),
     batch_id: batchId,
     source: "user_share",
@@ -89,11 +110,8 @@ Deno.serve(async (req) => {
   }));
 
   const { data: inserted, error: insErr } = await supabase
-    .from("cups")
-    .insert(rows)
-    .select("id");
-
-  if (insErr) return jsonResponse({ error: "db_error", detail: insErr.message }, 500);
+    .from("cups").insert(rows).select("id");
+  if (insErr) return json({ error: "db_error", detail: insErr.message }, 500);
 
   const newBalance = (balanceRow.balance || 0) - count;
   const { data: updated, error: updErr } = await supabase
@@ -106,21 +124,19 @@ Deno.serve(async (req) => {
   if (updErr || !updated?.length) {
     const ids = (inserted || []).map((r: { id: string }) => r.id);
     if (ids.length > 0) await supabase.from("cups").delete().in("id", ids);
-    return jsonResponse(
+    return json(
       { error: "balance_race", detail: "Another share request beat this one." },
       409,
     );
   }
 
-  await supabase
-    .from("activity_history")
-    .insert({
-      user_id: userId,
-      type: "cups_shared",
-      label: `Shared ${count} cup${count !== 1 ? "s" : ""} via QR code`,
-    });
+  await supabase.from("activity_history").insert({
+    user_id: userId,
+    type: "cups_shared",
+    label: `Shared ${count} cup${count !== 1 ? "s" : ""} via QR code`,
+  });
 
-  return jsonResponse({
+  return json({
     cup_ids: (inserted || []).map((r: { id: string }) => r.id),
     count,
     newBalance,

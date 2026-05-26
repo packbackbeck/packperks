@@ -30,6 +30,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -53,6 +54,14 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function rateLimit(key: string, windowSecs: number, maxCalls: number): Promise<boolean> {
+  const { data: count, error } = await supabase.rpc("check_rate_limit", {
+    p_key: key, p_window_seconds: windowSecs, p_max_calls: maxCalls,
+  });
+  if (error) { console.error("rate_limit check failed:", error.message); return true; }
+  return (count as number) <= maxCalls;
+}
+
 function makeToken() {
   const a = new Uint8Array(16);
   crypto.getRandomValues(a);
@@ -69,7 +78,16 @@ Deno.serve(async (req) => {
   const { data: { user }, error: userErr } = await supabase.auth.getUser(jwt);
   if (userErr || !user) return jsonResponse({ error: "invalid_token" }, 401);
 
-  const { data: caller } = await supabase
+  // H-5: use a user-scoped client for this lookup so RLS (org membership
+  // policy) acts as a second layer — even if the JWT check above has a bug,
+  // the scoped client can only return rows the authenticated user is
+  // allowed to see. Service_role is kept only for the privileged writes below.
+  const callerSupabase = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  });
+
+  const { data: caller } = await callerSupabase
     .from("admin_profiles")
     .select("id, role, org_id, email, display_name, status")
     .eq("id", user.id)
@@ -78,6 +96,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "not_an_admin" }, 403);
   if (caller.role !== "owner" && caller.role !== "admin")
     return jsonResponse({ error: "insufficient_role" }, 403);
+
+  // 10 invitations per admin per hour.
+  if (!await rateLimit(`invite-admin:admin:${caller.id}`, 3600, 10))
+    return jsonResponse({ error: "rate_limited", detail: "Too many invitations sent this hour. Try again later." }, 429);
 
   let body: { email?: string; role?: string; method?: string; single_use?: boolean };
   try { body = await req.json(); } catch { return jsonResponse({ error: "invalid_json" }, 400); }

@@ -42,11 +42,9 @@ export const DEFAULT_DESIGN = {
     showNextCupForFree:  true,
     showActivity:        true,
     showDirectRefund:    true,
-    // Lifetime impact card (cups returned + plastic avoided + a
-    // playful comparison). Defaults ON because most pilots will want
-    // the sustainability framing; orgs running a pure-loyalty
-    // campaign can switch it off.
     showImpact:          true,
+    showPackbackLogo:    true,
+    showBrandLogo:       true,
   },
 };
 

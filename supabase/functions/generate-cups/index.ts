@@ -8,9 +8,6 @@
 //
 // Body: { count: number }   (1..50)
 // Returns: { batch_id, cup_ids: [uuid, ...], count }
-//
-// Note: no JWT verification — admin panel is currently unauthenticated.
-// Lock this down with auth before going public.
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -36,9 +33,31 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function isActiveAdmin(req: Request): Promise<boolean> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  const jwt = authHeader.replace("Bearer ", "");
+
+  const { data: { user }, error } = await supabase.auth.getUser(jwt);
+  if (error || !user) return false;
+
+  const { data: admin } = await supabase
+    .from("admin_profiles")
+    .select("id")
+    .eq("id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  return admin !== null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+
+  if (!await isActiveAdmin(req)) {
+    return jsonResponse({ error: "forbidden" }, 403);
+  }
 
   let count = 1;
   let orgId: string | null = null;

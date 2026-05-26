@@ -4,30 +4,32 @@
 
 .cup-progress__track {
   position: relative;
-  background: #E24400;
+  background: var(--bk-red);
   border-radius: 40px;
   min-height: 70px;
   transition: background var(--duration-slow) ease;
 }
 
 .cup-progress__track--complete {
-  background: #1A8737;
+  background: var(--bk-green);
 }
 
-/* Progress fill — yellow/golden by default, green when complete */
+/* Progress fill — single brand color shaded with a transparent-black
+   overlay so it reads as a natural depth gradient without a second hue.
+   Uses CSS variables so the org palette from App Design takes effect. */
 .cup-progress__fill {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
   border-radius: 40px;
-  background: linear-gradient(135deg, var(--bk-orange) 0%, #F5C040 50%, var(--bk-orange) 100%);
+  background: linear-gradient(260deg, var(--bk-orange) 0%, rgba(0, 0, 0, 0.18) 100%);
   transition: width var(--duration-slow) var(--ease-out-expo), background var(--duration-slow) ease;
   z-index: 0;
 }
 
 .cup-progress__fill--complete {
-  background: linear-gradient(135deg, #22A447 0%, #1A8737 50%, #22A447 100%);
+  background: linear-gradient(260deg, var(--bk-green) 0%, rgba(0, 0, 0, 0.18) 100%);
 }
 
 /* Cups row floats above the fill */

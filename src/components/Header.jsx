@@ -45,7 +45,7 @@ function OrgMark({ org }) {
  * (per the design brief) — they're two visual entry points to the
  * same destination. The middle tile triggers the add-more-cups scan
  * flow without taking the user off the home screen first. */
-export default function Header({ cupCount, onBadgeClick, onAddCup, org }) {
+export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }) {
   const cupTileRef = useRef(null);
   const prevCount = useRef(cupCount);
 
@@ -58,15 +58,23 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org }) {
     }
   }, [cupCount]);
 
+  const sections = design?.sections || {};
+  const showPackback = sections.showPackbackLogo !== false;
+  const showBrand = sections.showBrandLogo !== false;
   const brandLabel = org?.name || 'Burger King';
+  const showLockup = showPackback || showBrand;
 
   return (
     <header className="header" role="banner">
-      <div className="header__brands" aria-label={`PackBack × ${brandLabel}`}>
-        <img src={packbackLogo} alt="PackBack" className="header__logo-packback" />
-        <span className="header__x">x</span>
-        <OrgMark org={org} />
-      </div>
+      {showLockup && (
+        <div className="header__brands" aria-label={`PackBack × ${brandLabel}`}>
+          {showPackback && (
+            <img src={packbackLogo} alt="PackBack" className="header__logo-packback" />
+          )}
+          {showPackback && showBrand && <span className="header__x">x</span>}
+          {showBrand && <OrgMark org={org} />}
+        </div>
+      )}
 
       <div className="header__tiles" role="group" aria-label="Account actions">
         {/* Tile 1 — Cup balance. Opens the profile / user-settings page. */}

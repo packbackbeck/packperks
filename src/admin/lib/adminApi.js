@@ -125,32 +125,38 @@ export async function getAdminUsers() {
 }
 
 export async function getUserActivity(userId) {
-  const { data, error } = await supabase
-    .from('activity_history')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('activity_history')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+  );
 
   if (error) throw error;
   return data || [];
 }
 
 export async function getUserClaims(userId) {
-  const { data, error } = await supabase
-    .from('claims')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+  );
 
   if (error) throw error;
   return data || [];
 }
 
 export async function adjustUserBalance(userId, newBalance) {
-  const { error } = await supabase
-    .from('cup_balances')
-    .update({ balance: newBalance, updated_at: new Date().toISOString() })
-    .eq('user_id', userId);
+  const { error } = await applyOrgFilter(
+    supabase
+      .from('cup_balances')
+      .update({ balance: newBalance, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+  );
 
   if (error) throw error;
 }
@@ -158,10 +164,12 @@ export async function adjustUserBalance(userId, newBalance) {
 export async function adminUpdateUser(userId, updates) {
   const allowed = ['display_name', 'email', 'iban'];
   const filtered = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)));
-  const { error } = await supabase
-    .from('users')
-    .update({ ...filtered, updated_at: new Date().toISOString() })
-    .eq('id', userId);
+  const { error } = await applyOrgFilter(
+    supabase
+      .from('users')
+      .update({ ...filtered, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+  );
   if (error) throw error;
 }
 
@@ -236,11 +244,12 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
   // We look up the claim's type first because the same status string
   // means a different payout direction depending on type.
   if (status === 'completed' || status === 'failed') {
-    const { data: existing } = await supabase
-      .from('claims')
-      .select('type')
-      .eq('id', claimId)
-      .single();
+    const { data: existing } = await applyOrgFilter(
+      supabase
+        .from('claims')
+        .select('type')
+        .eq('id', claimId)
+    ).maybeSingle();
     if (status === 'completed' && existing?.type === 'cashback') {
       update.payout_status = 'queued';
     } else {
@@ -250,12 +259,13 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
     update.payout_status = 'not_queued';
   }
 
-  const { data, error } = await supabase
-    .from('claims')
-    .update(update)
-    .eq('id', claimId)
-    .select('*')
-    .single();
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .update(update)
+      .eq('id', claimId)
+      .select('*')
+  ).maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -277,33 +287,35 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
  * couple this CRUD helper to actionLog so tests can mock cleanly. */
 export async function hideClaimImage(claimId, reason) {
   const { data: { user } } = await supabase.auth.getUser();
-  const { data, error } = await supabase
-    .from('claims')
-    .update({
-      image_hidden: true,
-      image_hidden_reason: reason ? `admin: ${reason}` : 'admin: no reason given',
-      image_hidden_at: new Date().toISOString(),
-      image_hidden_by: user?.id ?? null,
-    })
-    .eq('id', claimId)
-    .select(CLAIMS_COLS)
-    .single();
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .update({
+        image_hidden: true,
+        image_hidden_reason: reason ? `admin: ${reason}` : 'admin: no reason given',
+        image_hidden_at: new Date().toISOString(),
+        image_hidden_by: user?.id ?? null,
+      })
+      .eq('id', claimId)
+      .select(CLAIMS_COLS)
+  ).maybeSingle();
   if (error) throw error;
   return data;
 }
 
 export async function unhideClaimImage(claimId) {
-  const { data, error } = await supabase
-    .from('claims')
-    .update({
-      image_hidden: false,
-      image_hidden_reason: null,
-      image_hidden_at: null,
-      image_hidden_by: null,
-    })
-    .eq('id', claimId)
-    .select(CLAIMS_COLS)
-    .single();
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('claims')
+      .update({
+        image_hidden: false,
+        image_hidden_reason: null,
+        image_hidden_at: null,
+        image_hidden_by: null,
+      })
+      .eq('id', claimId)
+      .select(CLAIMS_COLS)
+  ).maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -357,10 +369,12 @@ export async function getCupScanSignedUrl(photoPath, ttlSec = 600) {
 }
 
 export async function updateScanStatusWithNote(scanId, status, note = '') {
-  const { error } = await supabase
-    .from('cup_scans')
-    .update({ status, rejection_note: note || null })
-    .eq('id', scanId);
+  const { error } = await applyOrgFilter(
+    supabase
+      .from('cup_scans')
+      .update({ status, rejection_note: note || null })
+      .eq('id', scanId)
+  );
   if (error) throw error;
 }
 
@@ -575,26 +589,32 @@ export async function getDonationCollectedTotal() {
  * `listCupBatches`  pulls a recent-first list of batches with their
  *                   cup count, activated count, expiry, revocation. */
 export async function setBatchExpiry(batchId, expiresAt) {
-  const { error } = await supabase
-    .from('cups')
-    .update({ expires_at: expiresAt })
-    .eq('batch_id', batchId);
+  const { error } = await applyOrgFilter(
+    supabase
+      .from('cups')
+      .update({ expires_at: expiresAt })
+      .eq('batch_id', batchId)
+  );
   if (error) throw error;
 }
 
 export async function revokeBatch(batchId, reason) {
-  const { error } = await supabase
-    .from('cups')
-    .update({ revoked_at: new Date().toISOString(), revoked_reason: reason || null })
-    .eq('batch_id', batchId);
+  const { error } = await applyOrgFilter(
+    supabase
+      .from('cups')
+      .update({ revoked_at: new Date().toISOString(), revoked_reason: reason || null })
+      .eq('batch_id', batchId)
+  );
   if (error) throw error;
 }
 
 export async function unrevokeBatch(batchId) {
-  const { error } = await supabase
-    .from('cups')
-    .update({ revoked_at: null, revoked_reason: null })
-    .eq('batch_id', batchId);
+  const { error } = await applyOrgFilter(
+    supabase
+      .from('cups')
+      .update({ revoked_at: null, revoked_reason: null })
+      .eq('batch_id', batchId)
+  );
   if (error) throw error;
 }
 
@@ -653,10 +673,12 @@ export async function getReceiptSignedUrl(photoPath, ttlSec = 600) {
 }
 
 export async function updateScanStatus(scanId, status) {
-  const { error } = await supabase
-    .from('cup_scans')
-    .update({ status })
-    .eq('id', scanId);
+  const { error } = await applyOrgFilter(
+    supabase
+      .from('cup_scans')
+      .update({ status })
+      .eq('id', scanId)
+  );
   if (error) throw error;
 }
 

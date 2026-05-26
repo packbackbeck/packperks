@@ -61,6 +61,14 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function rateLimit(key: string, windowSecs: number, maxCalls: number): Promise<boolean> {
+  const { data: count, error } = await supabase.rpc("check_rate_limit", {
+    p_key: key, p_window_seconds: windowSecs, p_max_calls: maxCalls,
+  });
+  if (error) { console.error("rate_limit check failed:", error.message); return true; }
+  return (count as number) <= maxCalls;
+}
+
 interface UserRow {
   id: string;
   auth_user_id: string | null;
@@ -87,6 +95,10 @@ Deno.serve(async (req) => {
   const authUser = userData.user;
   const authEmail = (authUser.email || "").toLowerCase();
   if (!authEmail) return jsonResponse({ error: "no_email_on_token" }, 400);
+
+  // 3 restore attempts per auth user per 15 minutes.
+  if (!await rateLimit(`restore:auth:${authUser.id}`, 900, 3))
+    return jsonResponse({ error: "rate_limited", detail: "Too many restore attempts. Wait 15 minutes and try again." }, 429);
 
   // 2. Parse body for the current device id (the LOCAL one — i.e. the
   //    fresh device the user is restoring INTO).

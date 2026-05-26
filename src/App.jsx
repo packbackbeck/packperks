@@ -300,7 +300,7 @@ export default function App() {
           : (await getDefaultOrg());
         if (org) setActiveOrg(org);
 
-        const user = await getOrCreateUser();
+        const user = await getOrCreateUser(org?.id);
 
         // Generate a display name for brand-new users
         let displayName = user.display_name;
@@ -434,6 +434,7 @@ export default function App() {
    * they hit Save. Same-origin so no security gymnastics. */
   useEffect(() => {
     function onMessage(e) {
+      if (e.origin !== window.location.origin) return;
       if (e.data?.type !== 'packperks-preview-design') return;
       const next = e.data.payload || {};
       setLiveSettings(s => ({ ...s, design: next }));
@@ -526,7 +527,7 @@ export default function App() {
     if (userId) {
       persist(
         updateCupBalance(userId, 0),
-        createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: count * 1.00, iban }),
+        createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: count * 1.00, iban, orgId: activeOrg?.id }),
         addHistoryEntry(userId, 'cups_withdrawn', label)
       );
     }
@@ -581,6 +582,7 @@ export default function App() {
         cupsRedeemed: selectedReward.cupsNeeded,
         payoutAmount: selectedReward.euros,
         iban: claimedIban,
+        orgId: activeOrg?.id,
       });
       // Keep the claim ID around so the rejection page can surface it
       // (and pass it to the support mailto link).
@@ -989,7 +991,7 @@ export default function App() {
                   // page can aggregate real cup + euro totals. Uses the refund
                   // rate (€/cup) as the per-cup value — same basis used for
                   // direct-refund claims.
-                  addDonationClaim(userId, actual, actual * (liveSettings.refundRatePerCup || 1.00)),
+                  addDonationClaim(userId, actual, actual * (liveSettings.refundRatePerCup || 1.00), activeOrg?.id),
                 );
               }
             }}
@@ -1007,6 +1009,7 @@ export default function App() {
         onBadgeClick={() => setPage('user')}
         onAddCup={handleAddCup}
         org={activeOrg}
+        design={design}
       />
 
       <section className="app__hero">

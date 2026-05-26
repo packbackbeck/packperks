@@ -32,6 +32,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -438,6 +439,17 @@ async function lookupRequiredItem(rewardId: string | null): Promise<string> {
   return FALLBACK[rewardId] ?? `Reward "${rewardId}"`;
 }
 
+// ── Rate limiting ─────────────────────────────────────────────────────────
+// Returns true = allowed, false = blocked.
+// Fails open on DB error so a rate-limit table outage never blocks real users.
+async function rateLimit(key: string, windowSecs: number, maxCalls: number): Promise<boolean> {
+  const { data: count, error } = await supabase.rpc("check_rate_limit", {
+    p_key: key, p_window_seconds: windowSecs, p_max_calls: maxCalls,
+  });
+  if (error) { console.error("rate_limit check failed:", error.message); return true; }
+  return (count as number) <= maxCalls;
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -446,6 +458,29 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse({ error: "method_not_allowed" }, 405);
   }
+
+  // H-5: authenticate caller as an active admin before touching any data.
+  // Use a user-scoped client for the admin_profiles lookup so RLS enforces
+  // org membership even if this auth block is ever accidentally bypassed.
+  const auth = req.headers.get("Authorization") || "";
+  const jwt = auth.replace(/^Bearer\s+/i, "");
+  if (!jwt) return jsonResponse({ error: "missing_token" }, 401);
+
+  const { data: { user }, error: userErr } = await supabase.auth.getUser(jwt);
+  if (userErr || !user) return jsonResponse({ error: "invalid_token" }, 401);
+
+  const callerSupabase = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  });
+
+  const { data: admin } = await callerSupabase
+    .from("admin_profiles")
+    .select("id, org_id, status")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!admin || admin.status !== "active")
+    return jsonResponse({ error: "not_an_admin" }, 403);
 
   let claimId: string | undefined;
   try {
@@ -456,16 +491,29 @@ Deno.serve(async (req) => {
   }
   if (!claimId) return jsonResponse({ error: "missing_claim_id" }, 400);
 
+  // H-5 defence-in-depth: scope claim lookup to admin's org so a logic bug
+  // in the auth block above can never expose a different org's claims.
   const { data: claim, error: claimErr } = await supabase
     .from("claims")
-    .select("id, user_id, reward_id, receipt_photo_path, status")
+    .select("id, user_id, reward_id, receipt_photo_path, status, org_id")
     .eq("id", claimId)
+    .eq("org_id", admin.org_id)
     .maybeSingle();
 
   if (claimErr) return jsonResponse({ error: "db_error", detail: claimErr.message }, 500);
   if (!claim) return jsonResponse({ error: "claim_not_found" }, 404);
   if (!claim.receipt_photo_path)
     return jsonResponse({ error: "no_photo_attached" }, 400);
+
+  // 3 attempts per claim, 5 per user — both per 24 h.
+  const [claimOk, userOk] = await Promise.all([
+    rateLimit(`verify-receipt:claim:${claimId}`, 86400, 3),
+    rateLimit(`verify-receipt:user:${claim.user_id}`, 86400, 5),
+  ]);
+  if (!claimOk)
+    return jsonResponse({ error: "rate_limited", detail: "This claim has already been verified 3 times today. Contact support if you need a manual review." }, 429);
+  if (!userOk)
+    return jsonResponse({ error: "rate_limited", detail: "Too many receipt verifications today. Try again tomorrow." }, 429);
 
   const requiredItem = await lookupRequiredItem(claim.reward_id);
 

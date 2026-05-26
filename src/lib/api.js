@@ -68,7 +68,7 @@ function formatTime(ts) {
 // present (i.e. the user has signed in with their email at least once),
 // and falls back to the device path otherwise. Returning an existing
 // row by either lookup is always preferred over inserting a duplicate.
-export async function getOrCreateUser() {
+export async function getOrCreateUser(orgId) {
   const deviceId = getDeviceId()
 
   // 1. Auth path — if a Supabase session is in scope, look the user up
@@ -116,21 +116,23 @@ export async function getOrCreateUser() {
       return linked || byDevice
     }
     // No row yet — fall through and create one bound to both keys.
+    const newRow = {
+      device_id: deviceId,
+      auth_user_id: authUid,
+      email: authEmail || null,
+      email_verified_at: new Date().toISOString(),
+      animal_index: 0,
+    }
+    if (orgId) newRow.org_id = orgId
     const { data: created, error: createErr } = await supabase
       .from('users')
-      .insert({
-        device_id: deviceId,
-        auth_user_id: authUid,
-        email: authEmail || null,
-        email_verified_at: new Date().toISOString(),
-        animal_index: 0,
-      })
+      .insert(newRow)
       .select()
       .single()
     if (createErr) throw createErr
-    await supabase
-      .from('cup_balances')
-      .insert({ user_id: created.id, balance: 0, lifetime_cups: 0 })
+    const balRow = { user_id: created.id, balance: 0, lifetime_cups: 0 }
+    if (orgId) balRow.org_id = orgId
+    await supabase.from('cup_balances').insert(balRow)
     return created
   }
 
@@ -143,9 +145,11 @@ export async function getOrCreateUser() {
 
   if (existing) return existing
 
+  const anonRow = { device_id: deviceId, animal_index: 0 }
+  if (orgId) anonRow.org_id = orgId
   const { data: newUser, error } = await supabase
     .from('users')
-    .insert({ device_id: deviceId, animal_index: 0 })
+    .insert(anonRow)
     .select()
     .single()
 
@@ -163,9 +167,9 @@ export async function getOrCreateUser() {
   if (error) throw error
 
   // Ignore duplicate balance row (same race condition safety)
-  await supabase
-    .from('cup_balances')
-    .insert({ user_id: newUser.id, balance: 0, lifetime_cups: 0 })
+  const anonBalRow = { user_id: newUser.id, balance: 0, lifetime_cups: 0 }
+  if (orgId) anonBalRow.org_id = orgId
+  await supabase.from('cup_balances').insert(anonBalRow)
 
   return newUser
 }
@@ -461,7 +465,7 @@ export async function getCupScanSignedUrl(photoPath, ttlSec = 600) {
 
 export async function shareCups(userId, count) {
   const { data, error } = await supabase.functions.invoke('share-cups', {
-    body: { user_id: userId, count },
+    body: { user_id: userId, count, device_id: getDeviceId() },
   })
   if (error) {
     let payload = null
@@ -475,7 +479,7 @@ export async function shareCups(userId, count) {
 // Optional opts: { scanId, scanType, photoPath } pass-through to server
 // so admins can review the photo and audit every attempt.
 export async function claimCups(userId, parsed, opts = {}) {
-  const body = { user_id: userId }
+  const body = { user_id: userId, device_id: getDeviceId() }
   if (Array.isArray(parsed)) {
     body.cup_ids = parsed
   } else if (parsed?.batchId) {
@@ -635,9 +639,12 @@ export async function getAppConfig(orgId) {
         .eq('key', `published:${resolvedOrgId}`)
         .maybeSingle()
       if (data?.value) return data.value
+      // Org is known but has no published config yet — return null rather
+      // than leaking another org's config through the legacy key.
+      return null
     }
-    // Legacy fallback — pre-migration data, or freshly-installed
-    // single-tenant DB where the migration hasn't run yet.
+    // No org context at all (e.g. fresh single-tenant install before
+    // migration 011 ran) — try the pre-migration legacy key.
     const { data: legacy } = await supabase
       .from('app_config')
       .select('value')
@@ -683,33 +690,35 @@ export async function getMyClaims(userId) {
 // aggregate real cup and euro totals. Unlike other claims, donations
 // are auto-completed (no admin review / receipt needed) — the user is
 // voluntarily giving up their cup value, so there's nothing to approve.
-export async function addDonationClaim(userId, cupsCount, payoutAmount) {
-  const { error } = await supabase
-    .from('claims')
-    .insert({
-      user_id: userId,
-      type: 'donation',
-      cups_redeemed: cupsCount,
-      payout_amount: payoutAmount ?? 0,
-      status: 'completed',
-    })
+export async function addDonationClaim(userId, cupsCount, payoutAmount, orgId) {
+  const insert = {
+    user_id: userId,
+    type: 'donation',
+    cups_redeemed: cupsCount,
+    payout_amount: payoutAmount ?? 0,
+    status: 'completed',
+  }
+  if (orgId) insert.org_id = orgId
+  const { error } = await supabase.from('claims').insert(insert)
   if (error) throw error
 }
 
-export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath }) {
+export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath, orgId }) {
+  const insert = {
+    user_id: userId,
+    type,
+    reward_id: rewardId ?? null,
+    cups_redeemed: cupsRedeemed,
+    payout_amount: payoutAmount,
+    iban,
+    receipt_photo_url: receiptPhotoUrl ?? null,
+    receipt_photo_path: receiptPhotoPath ?? null,
+    status: 'pending',
+  }
+  if (orgId) insert.org_id = orgId
   const { data, error } = await supabase
     .from('claims')
-    .insert({
-      user_id: userId,
-      type,
-      reward_id: rewardId ?? null,
-      cups_redeemed: cupsRedeemed,
-      payout_amount: payoutAmount,
-      iban,
-      receipt_photo_url: receiptPhotoUrl ?? null,
-      receipt_photo_path: receiptPhotoPath ?? null,
-      status: 'pending',
-    })
+    .insert(insert)
     .select('id')
     .single()
 

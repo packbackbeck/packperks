@@ -488,6 +488,8 @@ function CopyPanel({ copy, onPatch }) {
 /* ─── Sections panel ──────────────────────────────────────────────── */
 function SectionsPanel({ sections, onPatch }) {
   const rows = [
+    { key: 'showPackbackLogo',   label: 'PackBack logo',         hint: 'The "PackBack" wordmark on the left of the header lockup. Hiding it also removes the × separator.' },
+    { key: 'showBrandLogo',      label: 'Brand / restaurant logo', hint: 'The partner logo (BK, KFC, etc.) on the right of the header lockup.' },
     { key: 'showShareCup',       label: 'Share a cup',           hint: 'Peer-to-peer cup transfer entry point.' },
     { key: 'showDonate',         label: 'Donate cups',           hint: 'Donation CTA in the bottom actions.' },
     { key: 'showNextCupForFree', label: '"Next cup for free"',    hint: 'Quick-share variant for the bottom row.' },
@@ -690,14 +692,20 @@ function DevicePreview({ design, org }) {
         {/* Header — 3-tile cluster matching real Header.jsx layout. */}
         <div className="aad-preview__header">
           <div className="aad-preview__brand">
-            <span className="aad-preview__pp">PackBack</span>
-            <span className="aad-preview__x">×</span>
-            {org?.logo_url ? (
-              <img src={org.logo_url} alt="" className="aad-preview__logo" />
-            ) : (
-              <span className="aad-preview__logo-chip" style={{ background: c.accent }}>
-                {initial}
-              </span>
+            {sections.showPackbackLogo !== false && (
+              <span className="aad-preview__pp">PackBack</span>
+            )}
+            {sections.showPackbackLogo !== false && sections.showBrandLogo !== false && (
+              <span className="aad-preview__x">×</span>
+            )}
+            {sections.showBrandLogo !== false && (
+              org?.logo_url ? (
+                <img src={org.logo_url} alt="" className="aad-preview__logo" />
+              ) : (
+                <span className="aad-preview__logo-chip" style={{ background: c.accent }}>
+                  {initial}
+                </span>
+              )
             )}
           </div>
           <div className="aad-preview__tiles">

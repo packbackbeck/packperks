@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getOrgBundle, updateOrg, upsertLocation, deleteLocation,
   updateTeamMember, inviteAdmin, revokeInvitation,
+  uploadRewardImage, // reused as a generic public-image uploader for logos
 } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
 import PermissionGate from '../auth/PermissionGate';
 import { useAuth, hasPermission } from '../auth/AuthContext';
+import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import AdminActivityLog from '../activity/AdminActivityLog';
 import QuickLinks from '../shared/QuickLinks';
@@ -101,6 +103,7 @@ export default function AdminOrg({ onNavigate }) {
 
 /* ── Org info card ─────────────────────────────────────────────────── */
 function OrgInfoCard({ org, canEdit, onSaved }) {
+  const { refresh: refreshOrgCtx } = useOrg();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(org);
   const [saving, setSaving] = useState(false);
@@ -108,18 +111,47 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
 
   useEffect(() => { setDraft(org); }, [org]);
 
+  // Logo upload (file input — bucket-uploaded, public URL written back
+  // to organizations.logo_url). uploadRewardImage is the existing
+  // helper for public images; we reuse it rather than maintain a
+  // second bucket for what is essentially the same asset type.
+  const fileInputRef = useRef(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  async function handleLogoFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setErr(null);
+    setUploadingLogo(true);
+    try {
+      const url = await uploadRewardImage(file);
+      if (!url) throw new Error('Logo upload failed.');
+      setDraft(d => ({ ...d, logo_url: url }));
+    } catch (ex) {
+      setErr(ex.message);
+    } finally {
+      setUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
   async function handleSave() {
     setErr(null); setSaving(true);
     try {
       const before = { ...org };
       const updated = await updateOrg(org.id, {
         name: draft.name?.trim() || org.name,
+        slug: draft.slug?.trim() || org.slug,
+        partner_brand_name: draft.partner_brand_name?.trim() || null,
+        email_domain_hint: draft.email_domain_hint?.trim() || null,
+        logo_url: draft.logo_url?.trim() || null,
         legal_name: draft.legal_name?.trim() || null,
         kvk_number: draft.kvk_number?.trim() || null,
         btw_number: draft.btw_number?.trim() || null,
         address: draft.address?.trim() || null,
         postal_code: draft.postal_code?.trim() || null,
         city: draft.city?.trim() || null,
+        country: draft.country?.trim() || null,
         contact_email: draft.contact_email?.trim() || null,
         contact_phone: draft.contact_phone?.trim() || null,
         website: draft.website?.trim() || null,
@@ -127,6 +159,9 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
       });
       onSaved(updated);
       setEditing(false);
+      // Refresh the global OrgContext so the top-bar logo + switcher
+      // pill pick up the new logo/colour/name without a full reload.
+      refreshOrgCtx?.(updated.id);
       logAction({
         action: 'org.update',
         targetType: 'organization',
@@ -142,12 +177,20 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
       <section className="org-card">
         <div className="org-card__row org-card__row--header">
           <div className="org-card__title-row">
-            <span className="org-card__logo" style={{ background: org.brand_color || '#FD6F46' }}>
-              {(org.name || 'O')[0]}
-            </span>
+            {org.logo_url ? (
+              <img
+                src={org.logo_url}
+                alt={org.name}
+                className="org-card__logo org-card__logo--img"
+              />
+            ) : (
+              <span className="org-card__logo" style={{ background: org.brand_color || '#FD6F46' }}>
+                {(org.name || 'O')[0]}
+              </span>
+            )}
             <div>
               <h2 className="org-card__title">{org.name}</h2>
-              <p className="org-card__sub">{org.legal_name}</p>
+              <p className="org-card__sub">{org.legal_name || org.partner_brand_name || '—'}</p>
             </div>
           </div>
           {canEdit && (
@@ -158,9 +201,13 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
         </div>
 
         <div className="org-card__grid">
+          <Field label="URL slug" value={org.slug ? `/${org.slug}/` : '—'} mono />
+          <Field label="Partner brand name" value={org.partner_brand_name} />
+          <Field label="Team email domain" value={org.email_domain_hint} mono />
           <Field label="KvK" value={org.kvk_number} mono />
           <Field label="BTW" value={org.btw_number} mono />
           <Field label="Address" value={fullAddress(org)} span={2} />
+          <Field label="Country" value={org.country} />
           <Field label="Contact email" value={org.contact_email} />
           <Field label="Contact phone" value={org.contact_phone} />
           <Field label="Website" value={org.website} />
@@ -189,17 +236,75 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
         </div>
       </div>
 
+      {/* Logo uploader sits above the field grid because it's the
+          most visually-anchored field and admins look for it first. */}
+      <div className="org-logo-uploader">
+        <div className="org-logo-uploader__preview">
+          {draft.logo_url ? (
+            <img src={draft.logo_url} alt={draft.name || 'Logo'} />
+          ) : (
+            <span
+              className="org-logo-uploader__placeholder"
+              style={{ background: draft.brand_color || '#FD6F46' }}
+            >
+              {(draft.name || 'O')[0]}
+            </span>
+          )}
+        </div>
+        <div className="org-logo-uploader__controls">
+          <span className="org-field__label">Logo</span>
+          <div className="org-logo-uploader__buttons">
+            <button
+              type="button"
+              className="org-btn org-btn--ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingLogo || saving}
+            >
+              {uploadingLogo ? 'Uploading…' : (draft.logo_url ? 'Replace logo' : 'Upload logo')}
+            </button>
+            {draft.logo_url && (
+              <button
+                type="button"
+                className="org-btn org-btn--ghost"
+                onClick={() => setDraft(d => ({ ...d, logo_url: '' }))}
+                disabled={uploadingLogo || saving}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            placeholder="…or paste an image URL"
+            value={draft.logo_url || ''}
+            onChange={e => setDraft(d => ({ ...d, logo_url: e.target.value }))}
+            className="org-input org-input--url"
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleLogoFile}
+            style={{ display: 'none' }}
+          />
+        </div>
+      </div>
+
       <div className="org-card__grid">
-        <EditField label="Display name"  value={draft.name}          onChange={v => setDraft(d => ({ ...d, name: v }))} />
-        <EditField label="Legal name"    value={draft.legal_name}    onChange={v => setDraft(d => ({ ...d, legal_name: v }))} />
-        <EditField label="KvK"           value={draft.kvk_number}    onChange={v => setDraft(d => ({ ...d, kvk_number: v }))} mono />
-        <EditField label="BTW"           value={draft.btw_number}    onChange={v => setDraft(d => ({ ...d, btw_number: v }))} mono />
-        <EditField label="Address"       value={draft.address}       onChange={v => setDraft(d => ({ ...d, address: v }))} span={2} />
-        <EditField label="Postal code"   value={draft.postal_code}   onChange={v => setDraft(d => ({ ...d, postal_code: v }))} />
-        <EditField label="City"          value={draft.city}          onChange={v => setDraft(d => ({ ...d, city: v }))} />
-        <EditField label="Contact email" value={draft.contact_email} onChange={v => setDraft(d => ({ ...d, contact_email: v }))} type="email" />
-        <EditField label="Contact phone" value={draft.contact_phone} onChange={v => setDraft(d => ({ ...d, contact_phone: v }))} />
-        <EditField label="Website"       value={draft.website}       onChange={v => setDraft(d => ({ ...d, website: v }))} span={2} />
+        <EditField label="Display name"      value={draft.name}               onChange={v => setDraft(d => ({ ...d, name: v }))} />
+        <EditField label="URL slug"          value={draft.slug}               onChange={v => setDraft(d => ({ ...d, slug: v }))} mono />
+        <EditField label="Partner brand name" value={draft.partner_brand_name} onChange={v => setDraft(d => ({ ...d, partner_brand_name: v }))} span={2} />
+        <EditField label="Team email domain" value={draft.email_domain_hint}  onChange={v => setDraft(d => ({ ...d, email_domain_hint: v }))} mono />
+        <EditField label="Legal name"        value={draft.legal_name}         onChange={v => setDraft(d => ({ ...d, legal_name: v }))} />
+        <EditField label="KvK"               value={draft.kvk_number}         onChange={v => setDraft(d => ({ ...d, kvk_number: v }))} mono />
+        <EditField label="BTW"               value={draft.btw_number}         onChange={v => setDraft(d => ({ ...d, btw_number: v }))} mono />
+        <EditField label="Address"           value={draft.address}            onChange={v => setDraft(d => ({ ...d, address: v }))} span={2} />
+        <EditField label="Postal code"       value={draft.postal_code}        onChange={v => setDraft(d => ({ ...d, postal_code: v }))} />
+        <EditField label="City"              value={draft.city}               onChange={v => setDraft(d => ({ ...d, city: v }))} />
+        <EditField label="Country"           value={draft.country}            onChange={v => setDraft(d => ({ ...d, country: v }))} />
+        <EditField label="Contact email"     value={draft.contact_email}      onChange={v => setDraft(d => ({ ...d, contact_email: v }))} type="email" />
+        <EditField label="Contact phone"     value={draft.contact_phone}      onChange={v => setDraft(d => ({ ...d, contact_phone: v }))} />
+        <EditField label="Website"           value={draft.website}            onChange={v => setDraft(d => ({ ...d, website: v }))} span={2} />
         <div className="org-field">
           <span className="org-field__label">Brand colour</span>
           <input type="color" value={draft.brand_color || '#FD6F46'} onChange={e => setDraft(d => ({ ...d, brand_color: e.target.value }))} className="org-color-input" />

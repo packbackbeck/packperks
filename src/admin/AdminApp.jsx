@@ -21,6 +21,7 @@ import AdminOrg from './organization/AdminOrg';
 import AdminActivityLog from './activity/AdminActivityLog';
 import AdminSupport from './support/AdminSupport';
 import AdminDonations from './donations/AdminDonations';
+import AdminAppDesign from './appdesign/AdminAppDesign';
 import { useAdminDraft } from './hooks/useAdminDraft';
 import './AdminApp.css';
 
@@ -59,7 +60,7 @@ export default function AdminApp() {
  * that resolves to Claims.
  * ───────────────────────────────────────────────────────────────────── */
 const VALID_PAGES = new Set([
-  'overview', 'rewards', 'users', 'claims', 'cupscans', 'cupqr',
+  'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
   'transactions', 'donations', 'org', 'organizations', 'settings',
   'history', 'reports', 'support', 'receipts',
 ]);
@@ -161,6 +162,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="rewards">
             <AdminRewards draftState={draftState} onNavigate={setPage} />
+          </KeepAlive>
+          <KeepAlive id="appdesign">
+            <AdminAppDesign draftState={draftState} />
           </KeepAlive>
           <KeepAlive id="users">
             <AdminUsers onNavigate={setPage} />

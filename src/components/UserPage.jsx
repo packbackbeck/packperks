@@ -1,9 +1,12 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { toJpeg } from 'html-to-image';
 import './UserPage.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
 import ActivityDetailModal from './ActivityDetailModal';
 import { validateIban } from '../utils/iban';
+import { getGlobalImpact } from '../lib/api';
 
 /* ── Inline SVG animal avatars ── */
 const ANIMALS = [
@@ -202,7 +205,29 @@ function getBrowserInfo() {
   return 'Unknown Browser';
 }
 
-export default function UserPage({ profile, onSaveProfile, cupCount, history, userClaims = [], rewards = [], authEmail = null, onOpenSignIn, onAddCup, onWithdraw, onShareCup, onOpenShare, onOpenDonate, onRefreshClaims, onClose }) {
+export default function UserPage({
+  profile,
+  onSaveProfile,
+  cupCount,
+  history,
+  userClaims = [],
+  rewards = [],
+  authEmail = null,
+  onOpenSignIn,
+  onAddCup,
+  onWithdraw,
+  onShareCup,
+  onOpenShare,
+  onOpenNextCupFree,
+  onOpenDonate,
+  // Per-org design overrides — drive section visibility + button copy.
+  showActivity = true,
+  showImpact = true,
+  lifetimeCups = 0,
+  copy = {},
+  onRefreshClaims,
+  onClose,
+}) {
   // Refresh claim status when the user enters this page — admin approvals
   // that happened while the user wasn't looking get pulled in automatically.
   useEffect(() => { onRefreshClaims?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -220,6 +245,43 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
 
+  /* ── "Save your cups" persistent banner ──
+   * Surfaces high in the page (right under the cup-count badge) when:
+   *   • The user has actually earned ≥1 cup (no point pestering an
+   *     empty account about backup), AND
+   *   • There's no auth email linked yet (so a fresh phone would
+   *     forget them), AND
+   *   • They haven't dismissed it in the last 14 days.
+   *
+   * Dismissal is a 14-day snooze, not a permanent kill, so we surface
+   * again later when they've likely accumulated more cups and the
+   * "save your progress" pitch lands harder. Stored locally — if they
+   * switch devices the banner reappears, which is the correct
+   * behaviour (we WANT them to set up backup on every new device). */
+  const SNOOZE_KEY = 'pp_email_banner_dismissed_until';
+  const SNOOZE_MS  = 14 * 24 * 60 * 60 * 1000;
+  const [bannerSnoozed, setBannerSnoozed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem(SNOOZE_KEY);
+      if (!raw) return false;
+      const until = parseInt(raw, 10);
+      return Number.isFinite(until) && until > Date.now();
+    } catch {
+      return false;
+    }
+  });
+  function dismissBanner() {
+    try {
+      localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
+    } catch { /* private-mode / quota — fine, banner stays gone in-memory */ }
+    setBannerSnoozed(true);
+  }
+  // The composite gate. Re-evaluated every render so a sign-in (which
+  // sets `authEmail`) hides the banner immediately without a refresh.
+  const showSaveEmailBanner =
+    cupCount >= 1 && !authEmail && !bannerSnoozed;
+
   // IBAN state
   const [ibanValue, setIbanValue] = useState(profile.iban || '');
   const [ibanRevealed, setIbanRevealed] = useState(false);
@@ -228,6 +290,10 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
   const [ibanError, setIbanError] = useState('');
 
   const [activeActivity, setActiveActivity] = useState(null);
+  // Impact-detail modal — opens when the customer taps the Your-impact
+  // card. Fetches community totals lazily on open so we don't pay the
+  // round-trip cost for users who never tap it.
+  const [impactOpen, setImpactOpen] = useState(false);
 
   // Share sheet: lifted to App.jsx — call prop to open it
 
@@ -354,6 +420,46 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
         </div>
       </div>
 
+      {/* ── Save-your-cups banner ── persistent reminder for users with
+            ≥1 cup who haven't linked an email. Dismissible for 14 days. */}
+      {showSaveEmailBanner && (
+        <div className="user-page__save-banner" role="region" aria-label="Save your cups">
+          <div className="user-page__save-banner-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </div>
+          <div className="user-page__save-banner-body">
+            <div className="user-page__save-banner-title">Save your cups</div>
+            <div className="user-page__save-banner-sub">
+              Keep your balance if you change phone or browser.
+            </div>
+          </div>
+          <div className="user-page__save-banner-actions">
+            <button
+              type="button"
+              className="user-page__save-banner-cta"
+              onClick={onOpenSignIn}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="user-page__save-banner-dismiss"
+              onClick={dismissBanner}
+              aria-label="Dismiss for two weeks"
+              title="Dismiss for two weeks"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Details ── */}
       <div className="user-page__card user-page__card--list">
         <div className="user-page__row">
@@ -467,9 +573,9 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
         {onOpenShare && (
           <button className="user-page__action-btn" onClick={handleShare}>
             <svg width="15" height="13" viewBox="0 0 15 13" fill="none">
-              <path d="M7.5 12.5L1.5 6.5C0 5 0 2.5 1.5 1.5C3 0.5 5 0.5 6.5 2L7.5 3L8.5 2C10 0.5 12 0.5 13.5 1.5C15 2.5 15 5 13.5 6.5L7.5 12.5Z" fill="#E24400"/>
+              <path d="M7.5 12.5L1.5 6.5C0 5 0 2.5 1.5 1.5C3 0.5 5 0.5 6.5 2L7.5 3L8.5 2C10 0.5 12 0.5 13.5 1.5C15 2.5 15 5 13.5 6.5L7.5 12.5Z" fill="var(--bk-red)"/>
             </svg>
-            Share your Cup
+            {copy.shareButtonLabel || 'Share your Cup'}
           </button>
         )}
 
@@ -481,15 +587,15 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
           Add more cups
         </button>
 
-        {onOpenShare && (
-          <button className="user-page__action-btn user-page__action-btn--free" onClick={onOpenShare}>
+        {onOpenNextCupFree && (
+          <button className="user-page__action-btn user-page__action-btn--free" onClick={onOpenNextCupFree}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="8" width="18" height="4" rx="1" />
               <path d="M12 8v13" />
               <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
               <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
             </svg>
-            Next cup for free
+            {copy.nextCupFreeLabel || 'Next cup for free'}
           </button>
         )}
 
@@ -501,15 +607,35 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
               <path d="M15.18 7.9 12 10" />
               <path d="M16.93 10H20a2 2 0 0 1 0 4H2" />
             </svg>
-            Donate
+            {copy.donateButtonLabel || 'Donate'}
           </button>
         )}
 
       </div>
 
-      {/* ── Activity ── */}
+      {/* ── Lifetime impact card ──
+       * Sits ABOVE the activity feed (sustainability angle is more
+       * motivating than a chronological log) and BELOW the action
+       * grid (rewards still come first). Clickable — opens a detail
+       * modal with community totals + a shareable image. */}
+      {showImpact && lifetimeCups > 0 && (
+        <div className="user-page__history">
+          <span className="user-page__section-title">Your impact</span>
+          <button
+            type="button"
+            className="user-page__card user-page__card--list user-page__impact-card"
+            onClick={() => setImpactOpen(true)}
+            aria-label="See your detailed impact"
+          >
+            <ImpactSummary cups={lifetimeCups} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Activity ── visibility gated by per-org design.sections.showActivity */}
+      {showActivity && (
       <div className="user-page__history">
-        <span className="user-page__section-title">Activity</span>
+        <span className="user-page__section-title">{copy.activityLabel || 'Activity'}</span>
         {history.length === 0 ? (
           <span className="user-page__history-empty">No activity yet. Start by returning a cup!</span>
         ) : (
@@ -569,6 +695,7 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
           </div>
         )}
       </div>
+      )}
 
       {/* ── Save your progress / account ──
        * Re-skinned to match the rest of the user-page cards: a section
@@ -658,7 +785,17 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
         />
       )}
 
+      {impactOpen && (
+        <ImpactDetailModal
+          cups={lifetimeCups}
+          profile={profile}
+          onClose={() => setImpactOpen(false)}
+        />
+      )}
+
       {/* ── Footer ── */}
+      {/* (ImpactCard helper component is declared at module scope below
+           so the JSX above can render it inline.) */}
       <footer className="user-page__footer">
         <nav className="user-page__legal">
           <button className="user-page__legal-link">Privacy Policy</button>
@@ -678,4 +815,316 @@ export default function UserPage({ profile, onSaveProfile, cupCount, history, us
       </footer>
     </div>
   );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Impact card + detail modal.
+ *
+ * The card on the profile page is just the SUMMARY — three muted
+ * rows the customer can scan in a glance. Tapping it opens the
+ * DETAIL modal which fetches community totals from the server and
+ * lets them share the whole thing as an image.
+ *
+ * 1 cup ≈ 5 g of plastic is the PackBack pilot estimate (a thin
+ * grocery bag is also ~5 g, which is why the bag comparison reads
+ * 1:1). Switch to a per-org constant later if the partner uses a
+ * different cup material.
+ * ───────────────────────────────────────────────────────────────────── */
+
+const GRAMS_PER_CUP = 5;
+
+/* Five everyday comparisons. All ground "5 g of plastic" in tangible
+ * objects people see every day — no Eiffel Towers, no football
+ * pitches, no abstract percentages. Same user sees a stable phrasing
+ * (picked via `cups % len`) that shifts as they earn more cups. */
+const COMPARISON_PHRASES = [
+  /* Coffee cups directly — 1:1 ratio (each returned cup IS a coffee
+   * cup kept out of landfill). */
+  (cups) => `${cups} disposable coffee cup${cups === 1 ? '' : 's'} kept out of landfill`,
+
+  /* Plastic grocery bags — thin bags weigh ~5 g each, so 1 cup ≈ 1
+   * bag by mass. */
+  (cups) => `roughly ${cups} plastic grocery bag${cups === 1 ? '' : 's'} of waste avoided`,
+
+  /* Plastic straws — ~0.5 g each, so 1 cup ≈ 10 straws. */
+  (cups) => {
+    const straws = cups * 10;
+    return `about ${straws.toLocaleString()} plastic straw${straws === 1 ? '' : 's'} kept out of the ocean`;
+  },
+
+  /* Disposable forks — ~5 g each, 1:1 ratio. */
+  (cups) => `${cups} disposable plastic fork${cups === 1 ? '' : 's'} that didn't get thrown away`,
+
+  /* Weight ladder — picks an everyday object that matches the user's
+   * total plastic mass. The user gets a sense of "is this a sugar
+   * packet or a brick?" without needing to do mental math. */
+  (cups) => {
+    const g = cups * GRAMS_PER_CUP;
+    if (g < 30)   return `about the weight of a sugar packet of plastic saved`;
+    if (g < 80)   return `about the weight of a chocolate bar of plastic saved`;
+    if (g < 200)  return `about the weight of an apple of plastic saved`;
+    if (g < 600)  return `about the weight of a paperback book of plastic saved`;
+    if (g < 1500) return `about the weight of a bag of sugar of plastic saved`;
+    if (g < 5000) return `about the weight of a brick of plastic saved`;
+    return `about ${(g / 1000).toFixed(1)} kg of plastic — a small backpack's worth`;
+  },
+];
+
+function pickComparison(cups) {
+  if (cups <= 0) return 'Return your first cup to see your impact';
+  const i = cups % COMPARISON_PHRASES.length;
+  return COMPARISON_PHRASES[i](cups);
+}
+
+function formatGrams(g) {
+  if (g >= 1000) return `${(g / 1000).toFixed(1)} kg`;
+  return `${g} g`;
+}
+
+/* ─── ImpactSummary — what shows inside the clickable card on the
+ * profile page. Three rows. Tap target is the wrapping button in
+ * UserPage. ─── */
+function ImpactSummary({ cups }) {
+  const grams = cups * GRAMS_PER_CUP;
+  return (
+    <div className="user-page__impact-summary">
+      <div className="user-page__impact-row">
+        <div className="user-page__impact-icon user-page__impact-icon--green">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
+            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
+            <line x1="6" y1="1" x2="6" y2="4" />
+            <line x1="10" y1="1" x2="10" y2="4" />
+            <line x1="14" y1="1" x2="14" y2="4" />
+          </svg>
+        </div>
+        <span className="user-page__impact-label">Cups returned</span>
+        <span className="user-page__impact-val">{cups}</span>
+      </div>
+      <div className="user-page__divider" />
+      <div className="user-page__impact-row">
+        <div className="user-page__impact-icon user-page__impact-icon--blue">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+            <path d="M2 21c0-3 1.85-5.36 5.08-6" />
+          </svg>
+        </div>
+        <span className="user-page__impact-label">Plastic avoided</span>
+        <span className="user-page__impact-val">~{formatGrams(grams)}</span>
+      </div>
+      <div className="user-page__divider" />
+      <div className="user-page__impact-row user-page__impact-row--cta">
+        <span className="user-page__impact-cta-text">See the full picture</span>
+        <svg className="user-page__history-chevron" width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+/* ─── ImpactDetailModal — opens when the summary card is tapped.
+ * Shows the personal stats, the community totals (server-sourced),
+ * and a Share button that captures a branded card as an image. ─── */
+function ImpactDetailModal({ cups, profile, onClose }) {
+  const [community, setCommunity] = useState(null); // { totalLifetimeCups, returningUsers }
+  const [communityErr, setCommunityErr] = useState(null);
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const shareCardRef = useRef(null);
+
+  // Pull community totals once on open. We don't pass orgId — the
+  // RLS-readable cup_balances rows are already org-scoped for the
+  // signed-in user's brand, so an unscoped SUM is "this community"
+  // from their perspective. If we ever want cross-org PackPerks-wide
+  // totals, pass `null` explicitly to getGlobalImpact.
+  useEffect(() => {
+    let cancelled = false;
+    getGlobalImpact().then(res => {
+      if (cancelled) return;
+      setCommunity(res);
+    }).catch(err => {
+      if (cancelled) return;
+      console.warn('getGlobalImpact failed:', err);
+      setCommunityErr('Couldn\'t reach the server for community totals.');
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Esc / backdrop close
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const grams         = cups * GRAMS_PER_CUP;
+  const comparison    = pickComparison(cups);
+  const communityCups = community?.totalLifetimeCups || 0;
+  const communityKg   = (communityCups * GRAMS_PER_CUP) / 1000;
+
+  async function handleShare() {
+    if (!shareCardRef.current) return;
+    setSharing(true);
+    setShared(false);
+    try {
+      // Capture the off-screen branded share card. Pixel-ratio 2x for
+      // crisp text on phone screens; cacheBust avoids html-to-image
+      // re-using a stale render if the user re-shares.
+      const dataUrl = await toJpeg(shareCardRef.current, {
+        quality: 0.92,
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#F4EBDC',
+      });
+      // navigator.share with files isn't universally supported. Best
+      // path: fetch the data-URL as a Blob, hand it to share. Fall
+      // back to a download link otherwise.
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], 'packperks-impact.jpg', { type: 'image/jpeg' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'My PackPerks impact',
+          text: `I've returned ${cups} cups with PackPerks — that's ${formatGrams(grams)} of plastic kept out of landfill.`,
+        });
+        setShared(true);
+      } else {
+        // Plain download fallback.
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'packperks-impact.jpg';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setShared(true);
+      }
+    } catch (e) {
+      // AbortError fires when the user cancels the native share sheet
+      // — not an error from our side, just suppress.
+      if (e?.name !== 'AbortError') console.error('Share failed:', e);
+    } finally {
+      setSharing(false);
+      setTimeout(() => setShared(false), 2400);
+    }
+  }
+
+  /* Portal to document.body so the fixed-position backdrop + sheet
+   * are NOT contained by any ancestor with a transform / filter /
+   * perspective. Without this, `position: fixed` becomes relative
+   * to the nearest such ancestor — which is why the dimmed layer
+   * left side gaps and the sheet anchored to the page bottom
+   * instead of the viewport bottom. */
+  return createPortal((
+    <div className="impact-modal" onClick={onClose}>
+      <div className="impact-modal__sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Your impact">
+        <button className="impact-modal__close" onClick={onClose} aria-label="Close">×</button>
+
+        <header className="impact-modal__header">
+          <span className="impact-modal__eyebrow">Your lifetime impact</span>
+          <h2 className="impact-modal__title">Look what you've done</h2>
+        </header>
+
+        {/* Personal stats */}
+        <div className="impact-modal__stats">
+          <div className="impact-modal__stat">
+            <div className="impact-modal__stat-val">{cups.toLocaleString()}</div>
+            <div className="impact-modal__stat-label">Cups returned</div>
+          </div>
+          <div className="impact-modal__stat-divider" />
+          <div className="impact-modal__stat">
+            <div className="impact-modal__stat-val">~{formatGrams(grams)}</div>
+            <div className="impact-modal__stat-label">Plastic avoided</div>
+          </div>
+        </div>
+
+        <div className="impact-modal__compare">{comparison}</div>
+
+        {/* Community totals — REAL number from server */}
+        <div className="impact-modal__community">
+          <span className="impact-modal__community-label">Together with everyone using PackPerks</span>
+          {communityErr ? (
+            <span className="impact-modal__community-err">{communityErr}</span>
+          ) : community === null ? (
+            <span className="impact-modal__community-loading">Loading community total…</span>
+          ) : (
+            <div className="impact-modal__community-stats">
+              <div className="impact-modal__community-stat">
+                <span className="impact-modal__community-val">{communityCups.toLocaleString()}</span>
+                <span className="impact-modal__community-sub">cups returned</span>
+              </div>
+              <div className="impact-modal__community-stat">
+                <span className="impact-modal__community-val">
+                  {communityKg >= 1 ? `${communityKg.toFixed(1)} kg` : `${(communityKg * 1000).toFixed(0)} g`}
+                </span>
+                <span className="impact-modal__community-sub">plastic avoided</span>
+              </div>
+              {community.returningUsers > 0 && (
+                <div className="impact-modal__community-stat">
+                  <span className="impact-modal__community-val">{community.returningUsers.toLocaleString()}</span>
+                  <span className="impact-modal__community-sub">people taking part</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button
+          className="impact-modal__share"
+          onClick={handleShare}
+          disabled={sharing}
+        >
+          {sharing ? 'Preparing image…' : shared ? '✓ Shared!' : (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+              Share my impact
+            </>
+          )}
+        </button>
+
+        {/* ─── Off-screen branded share card ───
+         * Rendered absolutely-positioned at -9999px so it's not visible
+         * but html-to-image can still rasterise it. Designed to look
+         * great as a square-ish social image (1080×1350 at 2x). */}
+        <div className="impact-share-card" ref={shareCardRef} aria-hidden="true">
+          <div className="impact-share-card__brand">
+            <span className="impact-share-card__brand-tag">PackPerks</span>
+            <span className="impact-share-card__brand-tagline">Reusable cups · real rewards</span>
+          </div>
+          <div className="impact-share-card__hero">
+            <div className="impact-share-card__big">{cups.toLocaleString()}</div>
+            <div className="impact-share-card__big-label">cups returned</div>
+          </div>
+          <div className="impact-share-card__rows">
+            <div className="impact-share-card__row">
+              <span className="impact-share-card__row-label">Plastic kept out of landfill</span>
+              <span className="impact-share-card__row-val">~{formatGrams(grams)}</span>
+            </div>
+            <div className="impact-share-card__row">
+              <span className="impact-share-card__row-label">Equivalent</span>
+              <span className="impact-share-card__row-val impact-share-card__row-val--small">{comparison}</span>
+            </div>
+            {community && communityCups > 0 && (
+              <div className="impact-share-card__row impact-share-card__row--community">
+                <span className="impact-share-card__row-label">PackPerks community</span>
+                <span className="impact-share-card__row-val">{communityCups.toLocaleString()} cups together</span>
+              </div>
+            )}
+          </div>
+          <div className="impact-share-card__footer">
+            {profile?.displayName ? `Returned by ${profile.displayName}` : 'Returned with PackPerks'}
+          </div>
+        </div>
+      </div>
+    </div>
+  ), document.body);
 }

@@ -1,9 +1,10 @@
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   width: 100%;
   background: transparent;
+  gap: 12px;
 }
 
 .header__brands {
@@ -24,6 +25,22 @@
   object-fit: contain;
 }
 
+/* Coloured-initial chip — fallback when the active org has no logo. */
+.header__logo-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 7px;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: var(--font-primary);
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
 .header__x {
   font-family: var(--font-primary);
   font-weight: var(--fw-regular);
@@ -32,42 +49,75 @@
   color: rgba(0, 0, 0, 0.6);
 }
 
-/* Badge — Figma: 38px height, rounded 10px, bg #502314 */
-.header__badge {
+/* ── Account-action tiles (top-right) ──
+ * Three square tiles replace the old single cup-count pill. Same
+ * footprint as the brand-mark on the left (38px tall) so the header
+ * row stays visually balanced. */
+.header__tiles {
   display: inline-flex;
-  height: 38px;
+  gap: 6px;
+}
+
+.header__tile {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: var(--sp-3);
+  gap: 4px;
+  width: 44px;
+  height: 38px;
+  padding: 0 8px;
   background: var(--bk-brown);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  transition: transform var(--duration-fast) ease;
+  color: var(--white);
   border: none;
+  border-radius: var(--radius-sm);
   font-family: inherit;
+  cursor: pointer;
+  transition: transform var(--duration-fast) ease, filter var(--duration-fast) ease;
 }
+.header__tile:hover { filter: brightness(1.1); }
+.header__tile:active { transform: scale(0.95); }
 
-@keyframes badge-bump {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(1.08); }
-  100% { transform: scale(1); }
+/* Cup-balance tile is slightly wider to fit the number + glyph
+ * comfortably without ever truncating "1,000" etc. */
+.header__tile--cups {
+  width: auto;
+  min-width: 48px;
+  padding: 0 10px;
+  gap: 5px;
 }
-
-.header__badge--bump {
-  animation: badge-bump 0.35s var(--ease-out-expo);
-}
-
-.header__badge-text {
+.header__tile-count {
   font-family: var(--font-primary);
   font-weight: var(--fw-bold);
   font-size: var(--fs-md);
-  line-height: 1.1;
+  line-height: 1;
   color: var(--white);
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.header__tile-icon {
+  width: 18px;
+  height: 19px;
 }
 
-.header__badge-icon {
-  width: 22px;
-  height: 23px;
+/* "+ Add more cups" — accent-coloured so it visually pops out as the
+ * primary action of the three tiles. Without an accent, three brown
+ * squares all read as equally important. */
+.header__tile--add {
+  background: var(--bk-orange);
+  color: var(--white);
+}
+.header__tile--add:hover { filter: brightness(1.08); }
+
+.header__tile--user {
+  background: var(--bk-brown);
+}
+
+/* Bump animation — fires when cup count changes. Same effect as the
+ * old pill's bump, now scoped to just the cup tile. */
+@keyframes header-tile-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.10); }
+  100% { transform: scale(1); }
+}
+.header__tile--bump {
+  animation: header-tile-bump 0.35s var(--ease-out-expo);
 }

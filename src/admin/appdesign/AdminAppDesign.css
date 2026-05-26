@@ -1,0 +1,757 @@
+/* ─── AdminAppDesign — page styles ─────────────────────────────────── */
+.aad {
+  padding: 28px 32px;
+  max-width: 1280px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.aad__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.aad__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FD6F46;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.aad__title {
+  margin: 4px 0 6px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #0F0F0F;
+}
+.aad__sub {
+  margin: 0;
+  font-size: 13px;
+  color: #5A554F;
+  line-height: 1.55;
+  max-width: 640px;
+}
+
+.aad__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.aad__ok {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1A8737;
+  background: rgba(26, 135, 55, 0.12);
+  border: 1px solid rgba(26, 135, 55, 0.25);
+  padding: 5px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+.aad__error {
+  font-size: 12px;
+  color: #8E1F12;
+  background: #FEE7E3;
+  border: 1px solid #F6B5AD;
+  padding: 5px 10px;
+  border-radius: 6px;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+.aad__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.aad__btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.aad__btn--primary { background: #FD6F46; color: #FFFFFF; }
+.aad__btn--primary:hover:not(:disabled) { background: #E8542B; }
+.aad__btn--ghost { background: transparent; color: #5A554F; border-color: #D6CFC2; }
+.aad__btn--ghost:hover:not(:disabled) { background: #F4EFE5; color: #0F0F0F; }
+
+.aad__link {
+  background: transparent;
+  border: none;
+  color: #FD6F46;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.aad__link:hover { color: #C4583A; }
+
+.aad__hint-inline {
+  font-size: 11px;
+  color: #7A7166;
+}
+.aad__hint-inline strong { color: #5A554F; }
+
+/* ── Layout split 2/3 + 1/3 ────────────────────────────────────────── */
+.aad__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.aad__controls {
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────── */
+.aad__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 0;
+  background: #FAF8F3;
+  border-bottom: 1px solid #ECE5D8;
+}
+
+.aad__tab {
+  padding: 9px 14px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7A7166;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease;
+  position: relative;
+  top: 1px;
+}
+.aad__tab:hover { color: #0F0F0F; }
+.aad__tab--active {
+  background: #FFFFFF;
+  color: #0F0F0F;
+  border: 1px solid #ECE5D8;
+  border-bottom: 1px solid #FFFFFF;
+}
+
+.aad__pane {
+  padding: 22px 22px 24px;
+}
+
+/* ── Section headers within panels ─────────────────────────────────── */
+.aad-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+.aad-section-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F0F0F;
+}
+
+/* ── Colors panel ──
+ * Grouped layout: Brand / Surface / Text / State. Each group has a
+ * small descriptive header above its grid so designers know what
+ * role each token plays before they touch it. */
+.aad-colors__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.aad-colors__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.aad-colors__group-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+.aad-colors__group-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4A3F36;
+}
+.aad-colors__group-hint {
+  font-size: 11.5px;
+  color: #7A7166;
+  line-height: 1.4;
+}
+
+.aad-colors__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.aad-color {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #FAF8F3;
+  border: 1px solid #ECE5D8;
+  border-radius: 10px;
+}
+.aad-color__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.aad-color__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0F0F0F;
+}
+
+/* Contrast chip — only shown when the field has a paired colour to
+ * test against. Bands map to WCAG: green = AA body, amber = AA
+ * large-only, red = fail. */
+.aad-color__contrast {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+}
+.aad-color__contrast--aa       { background: rgba(26, 135, 55, 0.14); color: #15662A; }
+.aad-color__contrast--aa-large { background: rgba(214, 149, 0, 0.18); color: #8A5A00; }
+.aad-color__contrast--fail     { background: rgba(199, 62, 29, 0.16); color: #8E1F12; }
+
+/* Live "Aa" preview tile — swatch with the paired text colour. Lets
+ * the admin see the actual feel ("is my text readable on background?")
+ * rather than just two HEX codes. */
+.aad-color__preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  border-radius: 8px;
+  font-family: var(--font-primary, 'DM Sans', sans-serif);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  border: 1px solid #D6CFC2;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.aad-color__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aad-color__picker {
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #D6CFC2;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #FFFFFF;
+}
+.aad-color__hex {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid #D6CFC2;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #0F0F0F;
+  background: #FFFFFF;
+  text-transform: uppercase;
+}
+.aad-color__hex:focus { outline: none; border-color: #FD6F46; }
+.aad-color__hint {
+  margin: 0;
+  font-size: 11px;
+  color: #7A7166;
+  line-height: 1.4;
+}
+
+/* ── Copy panel ──
+ * Grouped by where the copy lives in the user app (header / actions /
+ * sections). Char-count chips warn when a label would overflow on
+ * mobile (soft = bigger phones, hard = small phones). */
+.aad-copy__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.aad-copy__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.aad-copy__group-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+.aad-copy__group-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4A3F36;
+}
+.aad-copy__group-hint {
+  font-size: 11.5px;
+  color: #7A7166;
+  line-height: 1.4;
+}
+
+.aad-copy__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.aad-copy__row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  background: #FAF8F3;
+  border: 1px solid #ECE5D8;
+  border-radius: 10px;
+}
+.aad-copy__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F0F0F;
+}
+.aad-copy__hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #7A7166;
+  line-height: 1.4;
+}
+
+.aad-copy__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.aad-copy__input {
+  flex: 1;
+  padding: 9px 56px 9px 12px;
+  border: 1px solid #D6CFC2;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #0F0F0F;
+  background: #FFFFFF;
+}
+.aad-copy__input:focus { outline: none; border-color: #FD6F46; }
+.aad-copy__input--overflow {
+  border-color: #C73E1D;
+  box-shadow: 0 0 0 2px rgba(199, 62, 29, 0.12);
+}
+.aad-copy__count {
+  position: absolute;
+  right: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #9E9A93;
+  pointer-events: none;
+  letter-spacing: 0.2px;
+}
+.aad-copy__count--warn { color: #B8922A; }
+.aad-copy__count--bad  { color: #C73E1D; }
+
+/* ── Sections panel ─────────────────────────────────────────────────── */
+.aad-sections__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.aad-section-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #FAF8F3;
+  border: 1px solid #ECE5D8;
+  border-radius: 10px;
+}
+.aad-section-row__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0F0F0F;
+}
+.aad-section-row__hint {
+  font-size: 11px;
+  color: #7A7166;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.aad-toggle {
+  width: 38px;
+  height: 22px;
+  background: #D6CFC2;
+  border: none;
+  border-radius: 11px;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.16s ease;
+}
+.aad-toggle--on { background: #1A8737; }
+.aad-toggle__dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  transition: transform 0.16s ease;
+}
+.aad-toggle--on .aad-toggle__dot { transform: translateX(16px); }
+
+/* ── Smart import panel ─────────────────────────────────────────────── */
+.aad-import__intro {
+  margin: -4px 0 16px;
+  font-size: 13px;
+  color: #5A554F;
+  line-height: 1.55;
+}
+
+.aad-import__zone {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  background: #FAF8F3;
+  border: 1px dashed #D6CFC2;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.aad-import__thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  padding: 6px;
+}
+
+.aad-import__placeholder {
+  width: 88px;
+  height: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  border-radius: 10px;
+  color: #7A7166;
+  font-size: 11px;
+}
+
+.aad-import__zone-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aad-import__error {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #FEE7E3;
+  border: 1px solid #F6B5AD;
+  border-radius: 8px;
+  color: #8E1F12;
+  font-size: 13px;
+}
+
+.aad-import__palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.aad-import__chip {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  background: #FAF8F3;
+  border: 1px solid #ECE5D8;
+  border-radius: 8px;
+}
+.aad-import__chip-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid #D6CFC2;
+  flex-shrink: 0;
+}
+.aad-import__chip-key {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0F0F0F;
+}
+.aad-import__chip-hex {
+  font-size: 11px;
+  color: #7A7166;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.aad-import__apply {
+  display: block;
+  width: 100%;
+}
+
+/* ── Live preview (right column) ────────────────────────────────────── */
+.aad__preview {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  border-radius: 14px;
+}
+
+.aad__preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7A7166;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.aad__preview-help {
+  font-size: 11px;
+  color: #7A7166;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+.aad__preview-help code {
+  background: #F4EFE5;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── Live preview (simulated phone, NOT an iframe) ──
+ * See DevicePreview comments in AdminAppDesign.jsx for the full
+ * "why no iframe" reasoning. Short version: the iframe approaches
+ * couldn't escape reload loops, so we render a close-enough mock
+ * directly in the admin tree. Pure CSS, instant updates, zero
+ * reload risk. */
+.aad-device {
+  align-self: center;
+  width: 320px;
+  height: 600px;
+  position: relative;
+  border: 10px solid #0F0F0F;
+  border-radius: 36px;
+  background: #0F0F0F;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+.aad-device__notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92px;
+  height: 18px;
+  background: #0F0F0F;
+  border-radius: 0 0 14px 14px;
+  z-index: 2;
+}
+.aad-device__screen {
+  width: 100%;
+  height: 100%;
+  padding: 28px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  border-radius: 22px;
+  font-family: var(--font-primary, 'DM Sans', sans-serif);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.aad-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.aad-preview__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.aad-preview__pp { font-size: 11px; font-weight: 800; letter-spacing: -0.01em; }
+.aad-preview__x  { font-size: 11px; opacity: 0.55; padding: 0 2px; }
+.aad-preview__logo,
+.aad-preview__logo-chip {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: contain;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+}
+.aad-preview__tiles { display: inline-flex; gap: 4px; }
+.aad-preview__tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.aad-preview__headline {
+  margin: 8px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.aad-preview__sub {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  transition: color 0.18s ease;
+}
+
+/* Progress bar with the REAL accent → accentDeep gradient. This
+ * mirrors the .featured-reward__gradient rule from the live app
+ * — same gradient flow, same colour stops. */
+.aad-preview__progress {
+  height: 28px;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.18s ease;
+}
+.aad-preview__progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 55%;
+  border-radius: 14px;
+  transition: background 0.18s ease;
+}
+
+.aad-preview__reward {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  transition: background 0.18s ease;
+}
+.aad-preview__reward-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  transition: background 0.18s ease;
+}
+.aad-preview__reward-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.aad-preview__reward-name {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.1;
+  transition: color 0.18s ease;
+}
+.aad-preview__reward-row { display: inline-flex; gap: 5px; }
+.aad-preview__reward-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.aad-preview__reward-pill--ghost {
+  background: transparent;
+  border: 1px solid;
+}
+
+.aad-preview__cta {
+  border: none;
+  padding: 11px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: default;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.aad-preview__actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.aad-preview__action {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 6px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.aad-preview__activity {
+  font-size: 9.5px;
+  text-align: center;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  transition: color 0.18s ease;
+}

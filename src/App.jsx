@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Header from './components/Header';
+import { applyDesignColors, mergeDesign } from './admin/appdesign/designDefaults';
 import CupProgress from './components/CupProgress';
 import FeaturedReward from './components/FeaturedReward';
 import GoalSection from './components/GoalSection';
@@ -34,6 +35,11 @@ import {
   createClaim,
   addDonationClaim,
   updateUserProfile,
+  getUserStats,
+  // Multi-org design tokens — applied as CSS variables in a useEffect
+  // below so each org's app skin renders without a hard refresh.
+  // (Note: applyDesignColors lives in the admin tree but is pure DOM
+  // mutation; safe to import from the user app.)
   logCupScan,
   getAppConfig,
   uploadReceiptPhoto,
@@ -122,6 +128,10 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [profile, setProfile] = useState(null);
   const [cupCount, setCupCount] = useState(0);
+  // Lifetime count — never decremented when the user redeems rewards.
+  // Drives the Impact card on the user page. Sourced from
+  // cup_balances.lifetime_cups via getUserStats() during init.
+  const [lifetimeCups, setLifetimeCups] = useState(0);
   const [history, setHistory] = useState([]);
   // User's own claims, used by the activity modal to display live status
   // (admin approvals reflect here after the user reopens the activity).
@@ -195,10 +205,88 @@ export default function App() {
   const isUnlocked = cupCount >= selectedReward.cupsNeeded;
   const cupsRemaining = Math.max(0, selectedReward.cupsNeeded - cupCount);
 
+  /* Effective section flags: an action button is visible only when
+   * BOTH the feature flag (sidebar Quick Settings) AND the design
+   * section toggle (App Design tab) say it should be. This way feature
+   * flags continue to act as a global kill-switch while design
+   * sections act as per-org layout choices. */
+  const design = mergeDesign(liveSettings?.design);
+  const showShare       = !!liveSettings.featureCupSharing    && design.sections.showShareCup       !== false;
+  const showNextCupFree = !!liveSettings.featureCupSharing    && design.sections.showNextCupForFree !== false;
+  const showDonate      = !!liveSettings.featureDonations     && design.sections.showDonate         !== false;
+  const showRefund      = !!liveSettings.featureDirectRefunds && design.sections.showDirectRefund   !== false;
+  const showActivity    = design.sections.showActivity !== false;
+  // Impact card — defaults ON; orgs that don't want sustainability
+  // copy in front of their customers can flip it off in App Design.
+  const showImpact      = design.sections.showImpact !== false;
+  const designCopy      = design.copy;
+
+  /* Detect "preview mode" — when the App Design tab's iframe embeds
+   * us with ?preview=1, we skip every Supabase round-trip (auth,
+   * user creation, balance, history, claims) and just render the
+   * layout. Why: those round-trips fire onAuthStateChange events
+   * that cascade through the parent's draftState, which used to
+   * trigger an iframe reload loop. In preview mode we want a static,
+   * stable render that ONLY reflects the design tokens we receive
+   * over postMessage. */
+  const isPreviewMode = (() => {
+    if (typeof window === 'undefined') return false;
+    try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
+    catch { return false; }
+  })();
+
   /* ── Init: load user + state from Supabase ── */
   useEffect(() => {
     async function init() {
       try {
+        // Preview mode short-circuit. We still need the per-org
+        // config so the iframe paints with the right brand
+        // (rewards + settings + design), but we skip the user-data
+        // path entirely.
+        if (isPreviewMode) {
+          const pathSlug = (window.location.pathname || '/').split('/').filter(Boolean)[0] || null;
+          const previewOrg = (pathSlug ? await getOrgBySlug(pathSlug) : null) || (await getDefaultOrg());
+          if (previewOrg) setActiveOrg(previewOrg);
+          // Minimal fake user state — just enough so downstream
+          // renders don't crash on null. The values are visible in
+          // the preview (e.g. cup count badge shows "2 cups").
+          setUserId('preview-user');
+          setProfile({
+            displayName: 'Preview',
+            animalIndex: 0,
+            email: '',
+            iban: '',
+            phone: 'Preview device',
+          });
+          setCupCount(2);
+          setLifetimeCups(0);
+          setHistory([]);
+          setUserClaims([]);
+          // Pull the published config so reward cards + brand colours
+          // reflect the org's published state (the parent then layers
+          // the live draft on top via postMessage).
+          if (previewOrg?.id) {
+            try {
+              const config = await getAppConfig(previewOrg.id);
+              if (config?.rewards) {
+                const seedById = Object.fromEntries(rewards.map(r => [r.id, r]));
+                const looksLikeBuildAsset = (url) =>
+                  typeof url === 'string' &&
+                  (url.startsWith('/assets/') || url.startsWith('/src/') || url.startsWith('./') || url.startsWith('../'));
+                const live = config.rewards
+                  .filter(r => r.status === 'live')
+                  .map(r => looksLikeBuildAsset(r.image) && seedById[r.id]?.image
+                    ? { ...r, image: seedById[r.id].image }
+                    : r);
+                if (live.length > 0) setLiveRewards(live);
+              }
+              if (config?.settings) setLiveSettings(s => ({ ...s, ...config.settings }));
+            } catch { /* preview tolerates missing config */ }
+          }
+          setIsLoading(false);
+          return;
+        }
+
         // Step 0: resolve the active organisation from the URL slug.
         // Path shape: /<slug>/?... — first non-empty segment is the slug.
         // If no slug (e.g. visiting /), fall back to the default org so
@@ -288,6 +376,16 @@ export default function App() {
         setHistory(hist);
         setUserClaims(claims);
 
+        // Fetch lifetime_cups separately so we don't widen the existing
+        // getCupBalance contract for every consumer. Best-effort —
+        // the impact card just shows 0 if this fails.
+        try {
+          const stats = await getUserStats(user.id);
+          setLifetimeCups(stats.lifetimeCups || 0);
+        } catch (e) {
+          console.warn('getUserStats failed (impact card will show 0):', e);
+        }
+
         // Deep-link: phone camera scans the bin's QR which opens this URL
         // with ?batch=<uuid> or ?cups=<uuid,uuid>. Auto-trigger the claim
         // flow so the user doesn't need to open the in-app scanner.
@@ -317,6 +415,36 @@ export default function App() {
     init();
   }, []);
 
+  /* ── Apply per-org design palette to :root CSS variables ──
+   * The admin's App Design tab writes settings.design.colors per-org;
+   * here we re-target the existing --bk-* tokens at whatever the
+   * active org has chosen. Components don't need to know — they keep
+   * using var(--bk-orange) etc. and just get a different colour. */
+  useEffect(() => {
+    const merged = mergeDesign(liveSettings?.design);
+    applyDesignColors(merged.colors);
+    return () => applyDesignColors(null); // reset on unmount
+  }, [liveSettings?.design]);
+
+  /* ── Preview-mode override (admin App Design tab) ──
+   * When the user app runs inside the admin's App Design iframe, the
+   * parent posts the current DRAFT design over postMessage on every
+   * change. We merge that override into liveSettings.design so the
+   * iframe always reflects what the admin is editing, even before
+   * they hit Save. Same-origin so no security gymnastics. */
+  useEffect(() => {
+    function onMessage(e) {
+      if (e.data?.type !== 'packperks-preview-design') return;
+      const next = e.data.payload || {};
+      setLiveSettings(s => ({ ...s, design: next }));
+    }
+    window.addEventListener('message', onMessage);
+    // Tell the parent we're ready so it can flush its first design payload.
+    try { window.parent?.postMessage({ type: 'packperks-preview-ready' }, '*'); }
+    catch { /* parent might not exist */ }
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
   /* ── Auth-state listener (email magic link flow) ──
    * Fires when:
    *   • the page loads with a pending magic-link code in the URL —
@@ -326,6 +454,14 @@ export default function App() {
    * Either way we read the latest auth email + refresh the local user
    * row so any newly-linked auth_user_id surfaces in subsequent reads. */
   useEffect(() => {
+    // Preview mode: skip the auth-state listener entirely. The
+    // inner iframe shares the parent admin's Supabase session via
+    // cookies, so onAuthStateChange would fire SIGNED_IN here on
+    // mount → trigger getOrCreateUser → state update → repeat
+    // across the parent's design-payload cycle. Detaching the
+    // listener in preview mode breaks that loop cleanly.
+    if (isPreviewMode) return;
+
     let cancelled = false;
     // Pre-populate from any session that already existed on load.
     getCurrentAuthEmail().then(e => { if (!cancelled) setAuthEmail(e); });
@@ -346,7 +482,7 @@ export default function App() {
       }
     });
     return () => { cancelled = true; unsubscribe?.(); };
-  }, []);
+  }, [isPreviewMode]);
 
   /* ── Helpers ── */
   const addHistory = (type, label) => {
@@ -446,6 +582,9 @@ export default function App() {
         payoutAmount: selectedReward.euros,
         iban: claimedIban,
       });
+      // Keep the claim ID around so the rejection page can surface it
+      // (and pass it to the support mailto link).
+      setLastClaimId(claimId);
 
       // 2. Upload photo to storage, attach path to the claim
       await uploadReceiptPhoto(claimId, compressed);
@@ -548,6 +687,10 @@ export default function App() {
    * returned newBalance instead of optimistically guessing. */
   const [lastCupsScanned, setLastCupsScanned] = useState(1);
   const [cupScanError, setCupScanError] = useState(null);
+  // Tracks the most-recently-attempted claim so the rejection page can
+  // pass it to the "Get help" mailto link. Only set during the verify
+  // flow, never cleared, since a stale id is still useful for support.
+  const [lastClaimId, setLastClaimId] = useState(null);
 
   /* New signature: receives the parsed QR ({batchId} | {cupIds}) plus
    * optional scan-event metadata from CupScanPage so we can audit-log
@@ -713,6 +856,8 @@ export default function App() {
         isSystemError={aiVerdict?.isSystemError === true}
         reason={aiVerdict?.summary || checkReason}
         requiredItem={aiRequiredItem}
+        claimId={lastClaimId}
+        partnerBrand={activeOrg?.partner_brand_name || activeOrg?.name}
         onTryAgain={handleRejectedTryAgain}
         onClose={handleRejectedClose}
       />
@@ -755,9 +900,14 @@ export default function App() {
           authEmail={authEmail}
           onOpenSignIn={() => setShowSignIn(true)}
           onAddCup={handleAddCup}
-          onWithdraw={liveSettings.featureDirectRefunds ? handleWithdraw : null}
-          onOpenShare={liveSettings.featureCupSharing ? () => setShareSheetOpen(true) : null}
-          onOpenDonate={liveSettings.featureDonations ? () => setDonateSheetOpen(true) : null}
+          onWithdraw={showRefund ? handleWithdraw : null}
+          onOpenShare={showShare ? () => setShareSheetOpen(true) : null}
+          onOpenNextCupFree={showNextCupFree ? () => setShareSheetOpen(true) : null}
+          onOpenDonate={showDonate ? () => setDonateSheetOpen(true) : null}
+          showActivity={showActivity}
+          showImpact={showImpact}
+          lifetimeCups={lifetimeCups}
+          copy={designCopy}
           onRefreshClaims={async () => {
             // Re-pull claims when user lands on the activity tab — that's when
             // they'd notice an admin status change. Cheap enough to do eagerly.
@@ -852,7 +1002,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <Header cupCount={cupCount} onBadgeClick={() => setPage('user')} />
+      <Header
+        cupCount={cupCount}
+        onBadgeClick={() => setPage('user')}
+        onAddCup={handleAddCup}
+        org={activeOrg}
+      />
 
       <section className="app__hero">
         <h1 className="app__headline">{liveSettings.heroHeadline}</h1>
@@ -877,9 +1032,10 @@ export default function App() {
         onClaimAttempt={handleClaimAttempt}
         onResetClaim={handleResetClaim}
         onOpenTerms={handleOpenTerms}
-        onOpenRefund={liveSettings.featureDirectRefunds ? handleOpenRefund : null}
+        onOpenRefund={showRefund ? handleOpenRefund : null}
         onViewDetail={() => handleViewDetail(selectedReward)}
         onNudge={handleNudge}
+        onAddCup={handleAddCup}
       />
 
       <GoalSection

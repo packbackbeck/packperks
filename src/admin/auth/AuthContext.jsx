@@ -116,7 +116,8 @@ export function hasPermission(role, action) {
   const matrix = {
     owner:   true, // owner gets everything by default
     admin:   new Set([
-      'view', 'claim.approve', 'reward.edit', 'reward.publish',
+      'view', 'claim.approve', 'claim.hide_image',
+      'reward.edit', 'reward.publish',
       'cupqr.generate', 'customer.adjust', 'export',
       'team.invite', 'team.role', 'team.password', 'team.block',
       'org.edit', 'audit.read', 'settings.maintenance',

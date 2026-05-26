@@ -17,6 +17,7 @@ export default function FeaturedReward({
   onOpenRefund,
   onViewDetail,
   onNudge,
+  onAddCup,
 }) {
   // If the user has a saved IBAN (from profile), pre-fill the input —
   // the field UI is identical to "they just typed it", just already
@@ -74,7 +75,7 @@ export default function FeaturedReward({
           aria-label={`${cupsCollected} of ${reward.cupsNeeded} cups collected`}
         />
         <div className="featured-reward__content">
-          <div className="featured-reward__image-wrap" style={{ background: reward.bgColor || '#FEA01E' }}>
+          <div className="featured-reward__image-wrap" style={{ background: reward.bgColor || 'var(--bk-orange)' }}>
             <img
               src={reward.image}
               alt={reward.name}
@@ -180,9 +181,29 @@ export default function FeaturedReward({
             </button>
 
             {nudgeVisible && !isUnlocked && (
-              <p className="featured-reward__nudge" role="alert">
-                Return {cupsRemaining} more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
-              </p>
+              <>
+                <p className="featured-reward__nudge" role="alert">
+                  Return {cupsRemaining} more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
+                </p>
+                {/* Direct-action follow-up. Shows AFTER the user taps the
+                    locked CTA, so it's not visual noise on first paint —
+                    it appears exactly when "what do I do next?" is the
+                    question on the user's mind. Highlighted (orange,
+                    pulsing) to draw the eye away from the disabled CTA. */}
+                {onAddCup && (
+                  <button
+                    type="button"
+                    className="featured-reward__add-cups-btn"
+                    onClick={onAddCup}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Add more cups
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

@@ -1,0 +1,126 @@
+/* ColumnPicker — shared column-toggle dropdown.
+ * Visually matches the original ac-col-picker styles from AdminClaims.css
+ * so the move is purely structural; pages already wearing this UI keep
+ * the exact same look. New consumers (AdminCupScans) inherit it for
+ * free. */
+
+.cp {
+  position: relative;
+  margin-left: auto;
+}
+
+.cp__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E5DECF;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #4A4540;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.cp__trigger:hover {
+  background: #F8F4EC;
+  border-color: #DCD3C1;
+}
+
+.cp__count {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  background: #ECE5D8;
+  color: #6C5E47;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.cp__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 320px;
+  padding: 10px;
+  background: #FFFFFF;
+  border: 1px solid #E5DECF;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(83, 51, 165, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: cp-pop 0.14s ease-out;
+}
+@keyframes cp-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cp__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 8px;
+  border-bottom: 1px solid #F0EDE8;
+  margin-bottom: 4px;
+}
+.cp__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6B645B;
+}
+.cp__reset {
+  background: none;
+  border: none;
+  color: #5333A5;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+.cp__reset:hover { color: #42298B; text-decoration: underline; }
+
+.cp__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.cp__row:hover { background: #F8F4EC; }
+
+.cp__row input {
+  margin-top: 2px;
+  width: 14px;
+  height: 14px;
+  accent-color: #5333A5;
+  cursor: pointer;
+}
+
+.cp__row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cp__row-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2A2724;
+}
+.cp__row-desc {
+  font-size: 11.5px;
+  color: #7A7166;
+  line-height: 1.4;
+}

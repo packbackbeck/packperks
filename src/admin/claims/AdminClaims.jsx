@@ -10,6 +10,7 @@ import PiiMask from '../shared/PiiMask';
 import ClaimStatusPills, { ClaimStatusPill } from '../shared/ClaimStatusPills';
 import EmptyState from '../shared/EmptyState';
 import QuickLinks from '../shared/QuickLinks';
+import ColumnPicker from '../shared/ColumnPicker';
 import './AdminClaims.css';
 
 /* Compact receipt thumbnail used in the table. Resolves a signed URL on
@@ -20,13 +21,40 @@ function ReceiptThumb({ claim, onZoom }) {
   const [signed, setSigned] = useState(null);
   useEffect(() => {
     let cancelled = false;
+    // Skip fetching the signed URL when the image is hidden — we won't
+    // render it anyway and there's no reason to spend storage RPS on it.
+    if (claim.image_hidden) return;
     if (!claim.receipt_photo_url && claim.receipt_photo_path) {
       getReceiptSignedUrl(claim.receipt_photo_path, 600).then(u => {
         if (!cancelled) setSigned(u);
       });
     }
     return () => { cancelled = true; };
-  }, [claim.receipt_photo_url, claim.receipt_photo_path]);
+  }, [claim.receipt_photo_url, claim.receipt_photo_path, claim.image_hidden]);
+
+  // Hidden variant — preempts the photo render entirely so admins
+  // browsing the table never see an inappropriate / PII-leaking image
+  // by accident. The tone depends on whether AI hid it (red) or an
+  // admin did (amber).
+  if (claim.image_hidden) {
+    const isAiHidden = !claim.image_hidden_by;
+    return (
+      <div
+        className={`ac-thumb ac-thumb--hidden ${isAiHidden ? 'ac-thumb--hidden-ai' : 'ac-thumb--hidden-admin'}`}
+        title={isAiHidden
+          ? `Hidden — inappropriate (${(claim.image_hidden_reason || 'auto').replace(/^ai_/, '')})`
+          : `Hidden by admin: ${(claim.image_hidden_reason || '').replace(/^admin:\s*/, '') || 'no reason'}`}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+        <span className="ac-thumb__hidden-label">
+          {isAiHidden ? 'Hidden' : 'Hidden'}
+        </span>
+      </div>
+    );
+  }
 
   const src = claim.receipt_photo_url || signed;
 
@@ -209,11 +237,18 @@ function formatDate(ts) {
 const STATUS_OPTIONS = ['all', 'pending', 'completed', 'failed'];
 const SORT_KEYS = ['created_at', 'cups_redeemed', 'payout_amount', 'status'];
 
-/* Toggleable columns for the Claims table. The five non-toggleable
- * columns (checkbox, Receipt thumbnail, User, Date, Actions) live
- * outside this list — they're always shown because the row would be
- * unintelligible without them. */
+/* Toggleable columns for the Claims table. The four non-toggleable
+ * columns (checkbox, User, Date, Actions) live outside this list —
+ * they're always shown because the row would be unintelligible
+ * without them.
+ *
+ * The Receipt thumbnail column USED to be non-toggleable; we made it
+ * toggleable so admins reviewing pending claims on a smaller laptop
+ * can hide the picture column when they don't need to see the photo
+ * in the row (e.g. when they're using the right-pane Review mode and
+ * the photo shows up there anyway). */
 const COLUMN_CONFIG = [
+  { id: 'receipt',    label: 'Receipt',      desc: 'Thumbnail of the uploaded receipt image',                          defaultOn: true  },
   { id: 'validation', label: 'Validation',  desc: 'AI verdict on the receipt (combined with the old AI check column)', defaultOn: true  },
   { id: 'reward',     label: 'Reward / Type', desc: 'Which reward the customer picked, or "Direct refund"',           defaultOn: false },
   { id: 'cups',       label: 'Cups',        desc: 'Cups spent on this claim',                                          defaultOn: false },
@@ -388,7 +423,6 @@ export default function AdminClaims({ onNavigate, draftState }) {
    *
    * Hidden columns persist in localStorage so an admin's chosen view
    * survives reloads. */
-  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
   const [visibleCols, setVisibleCols] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_VISIBLE_COLS;
     try {
@@ -707,52 +741,15 @@ export default function AdminClaims({ onNavigate, draftState }) {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        {/* Column picker — toggleable visibility of the non-essential
-         *  columns. Persisted to localStorage so an admin's view
-         *  survives reloads. */}
-        <div className="ac-col-picker">
-          <button
-            type="button"
-            className="ac-col-picker__trigger"
-            onClick={() => setColumnPickerOpen(o => !o)}
-            aria-expanded={columnPickerOpen}
-            title="Show or hide columns"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="18" rx="1" />
-              <rect x="14" y="3" width="7" height="11" rx="1" />
-            </svg>
-            Columns
-            <span className="ac-col-picker__count">{visibleCols.size}/{COLUMN_CONFIG.length}</span>
-          </button>
-          {columnPickerOpen && (
-            <div className="ac-col-picker__menu" onMouseLeave={() => setColumnPickerOpen(false)}>
-              <div className="ac-col-picker__head">
-                <span className="ac-col-picker__title">Show columns</span>
-                <button
-                  type="button"
-                  className="ac-col-picker__reset"
-                  onClick={() => setVisibleCols(new Set(DEFAULT_VISIBLE_COLS))}
-                >
-                  Reset
-                </button>
-              </div>
-              {COLUMN_CONFIG.map(c => (
-                <label key={c.id} className="ac-col-picker__row">
-                  <input
-                    type="checkbox"
-                    checked={visibleCols.has(c.id)}
-                    onChange={() => toggleCol(c.id)}
-                  />
-                  <span className="ac-col-picker__label">
-                    <span className="ac-col-picker__name">{c.label}</span>
-                    <span className="ac-col-picker__desc">{c.desc}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Column picker — shared component, same dropdown is now used
+         *  on the Cup Scans table too. State + storage stay local so
+         *  each table persists its own column choices. */}
+        <ColumnPicker
+          columns={COLUMN_CONFIG}
+          visible={visibleCols}
+          onToggle={toggleCol}
+          onReset={() => setVisibleCols(new Set(DEFAULT_VISIBLE_COLS))}
+        />
       </div>
 
       {/* Bulk actions bar */}
@@ -794,7 +791,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                       onChange={() => toggleSelectAll(filteredIds)}
                     />
                   </th>
-                  <th style={{ width: 50 }}>Receipt</th>
+                  {isCol('receipt') && <th style={{ width: 50 }}>Receipt</th>}
                   <ThCol label="User" />
                   {isCol('validation') && <ThCol label="Validation" />}
                   {isCol('reward')    && <ThCol label="Reward / Type" />}
@@ -810,7 +807,10 @@ export default function AdminClaims({ onNavigate, draftState }) {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={5 + visibleCols.size} className="ac-table__empty">
+                  // 4 fixed cols (checkbox, User, Date, Actions) + the
+                  // toggleable ones still on. Was 5 before Receipt
+                  // became toggleable.
+                  <tr><td colSpan={4 + visibleCols.size} className="ac-table__empty">
                     {claims.length === 0 ? (
                       <EmptyState
                         icon={
@@ -864,9 +864,11 @@ export default function AdminClaims({ onNavigate, draftState }) {
                           onChange={() => toggleSelect(claim.id)}
                         />
                       </td>
-                      <td style={{ padding: '6px 8px 6px 0' }}>
-                        <ReceiptThumb claim={claim} onZoom={setLightboxSrc} />
-                      </td>
+                      {isCol('receipt') && (
+                        <td style={{ padding: '6px 8px 6px 0' }}>
+                          <ReceiptThumb claim={claim} onZoom={setLightboxSrc} />
+                        </td>
+                      )}
                       <td>
                         <div className="ac-user-cell">
                           <div className="ac-user-avatar">
@@ -980,6 +982,12 @@ export default function AdminClaims({ onNavigate, draftState }) {
             updating={updating !== null}
             onApprove={(id, reason) => handleStatusUpdate(id, 'completed', reason)}
             onFail={(id, reason) => handleStatusUpdate(id, 'failed', reason)}
+            onClaimUpdate={(updated) => {
+              // Merge a partial update (e.g. from hide/unhide image) back
+              // into the table state so the panel + row stay in sync
+              // without a full refetch.
+              setClaims(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c));
+            }}
           />
         )}
       </div>

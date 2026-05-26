@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { applyOrgFilter } from '../context/orgState';
 import { useAuth } from '../auth/AuthContext';
 import { logAction } from '../auth/actionLog';
 import QuickLinks from '../shared/QuickLinks';
@@ -218,10 +219,13 @@ function downloadFile(content, filename, mime) {
 
 /* ── Data loaders ── */
 async function loadDataset(dataset, fromIso, toIso) {
+  // Multi-org: every query here is scoped to the currently-active org
+  // via applyOrgFilter. Without this, reports leaked rows across orgs
+  // (KFC's report would include BK's users/claims).
   if (dataset === 'users') {
     const [{ data: users }, { data: balances }] = await Promise.all([
-      supabase.from('users').select('id, display_name, email, iban, created_at, updated_at'),
-      supabase.from('cup_balances').select('user_id, balance, lifetime_cups'),
+      applyOrgFilter(supabase.from('users').select('id, display_name, email, iban, created_at, updated_at')),
+      applyOrgFilter(supabase.from('cup_balances').select('user_id, balance, lifetime_cups')),
     ]);
     const balMap = Object.fromEntries((balances || []).map(b => [b.user_id, b]));
     let rows = (users || []).map(u => ({
@@ -240,14 +244,16 @@ async function loadDataset(dataset, fromIso, toIso) {
       : dataset === 'cup_scans'
       ? 'id, user_id, cups_awarded, status, created_at'
       : 'id, user_id, type, label, created_at';
-    let q = supabase.from(table).select(cols).order('created_at', { ascending: false });
+    let q = applyOrgFilter(supabase.from(table).select(cols).order('created_at', { ascending: false }));
     if (fromIso) q = q.gte('created_at', fromIso);
     if (toIso)   q = q.lte('created_at', toIso);
     const { data } = await q;
     const rows = data || [];
     const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
     if (userIds.length) {
-      const { data: users } = await supabase.from('users').select('id, display_name, email').in('id', userIds);
+      const { data: users } = await applyOrgFilter(
+        supabase.from('users').select('id, display_name, email').in('id', userIds)
+      );
       const map = Object.fromEntries((users || []).map(u => [u.id, u]));
       return rows.map(r => ({ ...r, user_name: map[r.user_id]?.display_name || '—', user_email: map[r.user_id]?.email || '' }));
     }

@@ -174,6 +174,105 @@
   background: #F8F4EC;
   border-color: #DCD3C1;
 }
+
+/* "Hide image" button overlay — sits in the top-right of the photo
+ * area, only visible to admins with claim.hide_image. Subtle so it
+ * doesn't compete with the "Click to enlarge" hint at the bottom. */
+.rc-detail__photo-hide {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(15, 15, 15, 0.6);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.rc-detail__photo-hide:hover {
+  background: rgba(199, 62, 29, 0.85);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Hidden-image placeholder (renders in place of the photo when
+ * claim.image_hidden = true). Two tones, mirroring the table thumb:
+ *   --ai    → AI moderator caught it (red)
+ *   --admin → an admin chose to hide it (amber) */
+.rc-detail__hidden {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px 24px;
+  gap: 8px;
+  background: #FAF8F3;
+  border-bottom: 1px solid #F0EDE8;
+}
+.rc-detail__hidden--ai {
+  background: rgba(199, 62, 29, 0.06);
+}
+.rc-detail__hidden--admin {
+  background: rgba(214, 149, 0, 0.06);
+}
+.rc-detail__hidden-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+.rc-detail__hidden--ai    .rc-detail__hidden-icon { color: #C73E1D; }
+.rc-detail__hidden--admin .rc-detail__hidden-icon { color: #8A5A00; }
+
+.rc-detail__hidden-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0F0F0F;
+}
+.rc-detail__hidden-sub {
+  font-size: 11px;
+  color: #6B645B;
+}
+.rc-detail__hidden-date {
+  color: #9E9A93;
+}
+.rc-detail__hidden-help {
+  margin: 4px 12px 6px;
+  font-size: 11px;
+  color: #6B645B;
+  line-height: 1.5;
+  max-width: 280px;
+}
+.rc-detail__hidden-unhide {
+  margin-top: 4px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid #D6CFC2;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5A554F;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.rc-detail__hidden-unhide:hover:not(:disabled) {
+  background: #F4EFE5;
+  color: #0F0F0F;
+}
+.rc-detail__hidden-unhide:disabled { opacity: 0.5; cursor: not-allowed; }
 .rc-detail__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .rc-detail__btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border: none; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
 .rc-detail__btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -250,6 +349,42 @@
 .rc-ai-panel--pass      .rc-ai-panel__confidence { background: #1A8737; color: white; }
 .rc-ai-panel--fail      .rc-ai-panel__confidence { background: #C73E1D; color: white; }
 .rc-ai-panel--uncertain .rc-ai-panel__confidence { background: #D69500; color: white; }
+
+/* Right side of the AI panel header — holds the manual-review pill
+ * (when present) and the confidence chip. Gap keeps them visually
+ * paired without collapsing into one click target. */
+.rc-ai-panel__header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* "Manual review needed" pill, surfaced when AI confidence is below
+ * the manual-review threshold even if every check passed. Yellow tone
+ * mirrors the existing `uncertain` panel skin. */
+.rc-ai-panel__pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+.rc-ai-panel__pill--review {
+  background: rgba(214, 149, 0, 0.18);
+  color: #8A5A00;
+  border: 1px solid rgba(214, 149, 0, 0.45);
+}
+
+/* Inline failure code shown next to the friendly label in the check
+ * list, e.g. "Real KFC receipt · Wrong brand". Keeps the human-
+ * readable description first while still surfacing the raw failure
+ * category to admins who need it for triage. */
+.rc-ai-check__code {
+  font-weight: 600;
+  color: #C73E1D;
+  margin-left: 2px;
+}
 
 .rc-ai-panel__checks {
   display: flex;

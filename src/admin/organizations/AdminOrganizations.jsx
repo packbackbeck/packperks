@@ -150,7 +150,22 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                   >
                     <td>
                       <div className="ao-org-cell">
-                        <span className="ao-swatch" style={{ background: org.brand_color || '#FD6F46' }} />
+                        {org.logo_url ? (
+                          <img
+                            src={org.logo_url}
+                            alt={org.name}
+                            className="ao-swatch ao-swatch--img"
+                          />
+                        ) : (
+                          <span
+                            className="ao-swatch"
+                            style={{ background: org.brand_color || '#FD6F46' }}
+                          >
+                            <span className="ao-swatch__letter">
+                              {(org.name || 'O').charAt(0).toUpperCase()}
+                            </span>
+                          </span>
+                        )}
                         <div>
                           <div className="ao-org-name">{org.name}</div>
                           {org.partner_brand_name && org.partner_brand_name !== org.name && (

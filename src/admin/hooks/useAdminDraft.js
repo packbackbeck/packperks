@@ -1,6 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { rewards as defaultRewards } from '../../data/rewards';
-import { saveAppConfig } from '../../lib/api';
+import { useState, useCallback, useEffect } from 'react';
+import { saveAppConfig, getAppConfig } from '../../lib/api';
 import { useOrg } from '../context/OrgContext';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -61,14 +60,14 @@ export const DEFAULT_DASHBOARD_BLOCKS = [
   { id: 'quick-settings',       label: 'Quick Settings',       type: 'quick', visible: true,  span: 1 },
 ];
 
-function buildDefaultDraft() {
+/* Empty starting state for an org whose published config hasn't been
+ * fetched yet (or has nothing). We intentionally do NOT seed with
+ * `defaultRewards` here — that was BK's hardcoded sample data which
+ * was leaking into every newly-switched-to org. The useEffect below
+ * hydrates real rewards from Supabase shortly after mount/switch. */
+function buildEmptyDraft() {
   return {
-    rewards: defaultRewards.map((r, i) => ({
-      ...r,
-      status: 'live',
-      featured: i === 0,
-      order: i,
-    })),
+    rewards: [],
     settings: { ...DEFAULT_SETTINGS },
     dashboardBlocks: DEFAULT_DASHBOARD_BLOCKS.map(b => ({ ...b })),
   };
@@ -116,7 +115,7 @@ export function useAdminDraft() {
   const orgCtx = useOrg();
   const activeOrgId = orgCtx?.activeOrgId || null;
 
-  const [draft, setDraft]     = useState(() => loadFromStorage(draftKey(activeOrgId), buildDefaultDraft()));
+  const [draft, setDraft]     = useState(() => loadFromStorage(draftKey(activeOrgId), buildEmptyDraft()));
   const [versions, setVersions]   = useState(() => loadFromStorage(versionsKey(activeOrgId), []));
   const [published, setPublished] = useState(() => loadFromStorage(publishedKey(activeOrgId), null));
   const [isDirty, setIsDirty]   = useState(false);
@@ -124,27 +123,62 @@ export function useAdminDraft() {
   const [publishNote, setPublishNote] = useState('');
   const [publishError, setPublishError] = useState(null);
 
-  /* When the active org changes (admin used the switcher) reload all
-   * three slots from the new org's storage. Use a ref to skip the very
-   * first effect run (state was already initialised correctly from the
-   * useState initializer). */
-  const initialOrgIdRef = useRef(activeOrgId);
+  /* Hydrate the draft whenever the active org changes (or on first
+   * mount). Resolution order:
+   *   1. Per-org localStorage `pp_admin_draft:<orgId>` — last working
+   *      copy from this browser (preferred — preserves in-progress
+   *      edits across reloads).
+   *   2. Supabase `app_config` row `published:<orgId>` — the last
+   *      published snapshot. This is what makes a brand-new org load
+   *      its actual rewards (from the wizard) instead of accidentally
+   *      inheriting BK's seeded sample data.
+   *   3. Empty draft (no rewards yet) — the admin will add some.
+   */
   useEffect(() => {
-    if (activeOrgId === initialOrgIdRef.current) return;
-    initialOrgIdRef.current = activeOrgId;
+    let cancelled = false;
     migrateLegacyKeysOnce(activeOrgId);
-    setDraft(loadFromStorage(draftKey(activeOrgId), buildDefaultDraft()));
-    setVersions(loadFromStorage(versionsKey(activeOrgId), []));
-    setPublished(loadFromStorage(publishedKey(activeOrgId), null));
-    setIsDirty(false);
-    setLastSaved(null);
-    setPublishNote('');
-    setPublishError(null);
-  }, [activeOrgId]);
 
-  // One-time legacy migration when the org first resolves.
-  useEffect(() => {
-    if (activeOrgId) migrateLegacyKeysOnce(activeOrgId);
+    const local = loadFromStorage(draftKey(activeOrgId), null);
+    if (local) {
+      setDraft(local);
+      setVersions(loadFromStorage(versionsKey(activeOrgId), []));
+      setPublished(loadFromStorage(publishedKey(activeOrgId), null));
+      setIsDirty(false);
+      setLastSaved(null);
+      setPublishNote('');
+      setPublishError(null);
+      return;
+    }
+
+    // No local working copy yet — fall back to the published snapshot
+    // for this org from Supabase. getAppConfig accepts an explicit org
+    // id and reads the `published:<orgId>` row, falling back to the
+    // legacy unsuffixed `published` row for backwards compat.
+    setDraft(buildEmptyDraft());
+    setPublished(null);
+    getAppConfig(activeOrgId).then(config => {
+      if (cancelled) return;
+      if (config && (Array.isArray(config.rewards) || config.settings)) {
+        const next = {
+          rewards: Array.isArray(config.rewards)
+            ? config.rewards.map((r, i) => ({ ...r, order: r.order ?? i }))
+            : [],
+          settings: { ...DEFAULT_SETTINGS, ...(config.settings || {}) },
+          dashboardBlocks: DEFAULT_DASHBOARD_BLOCKS.map(b => ({ ...b })),
+        };
+        setDraft(next);
+        setPublished({ ...next, _publishedAt: Date.now() });
+      }
+      setVersions(loadFromStorage(versionsKey(activeOrgId), []));
+      setIsDirty(false);
+      setLastSaved(null);
+      setPublishNote('');
+      setPublishError(null);
+    }).catch(err => {
+      console.error('useAdminDraft: getAppConfig failed', err);
+    });
+
+    return () => { cancelled = true; };
   }, [activeOrgId]);
 
   const updateDraft = useCallback((updater) => {

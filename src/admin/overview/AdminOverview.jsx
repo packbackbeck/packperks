@@ -6,6 +6,7 @@ import {
 import { getAdminStats } from '../lib/adminApi';
 import PiiMask from '../shared/PiiMask';
 import QuickLinks from '../shared/QuickLinks';
+import { useReorder } from './useReorder';
 import './AdminOverview.css';
 
 /* ── Data helpers ── */
@@ -276,8 +277,10 @@ function EyeToggle({ id, visible, onToggle }) {
  *     handleStatFocus jumps straight to the Claims page.
  *
  * The visual affordance (cursor, arrow chevron) follows the same rule. */
-function StatCard({ id, label, value, sub, color, icon, tooltip, editMode, visible, onToggle, focused, onFocus }) {
+function StatCard({ id, label, value, sub, color, icon, tooltip, editMode, visible, onToggle, focused, onFocus, reorder }) {
   const isClickable = !editMode && (SPOTLIGHT[id] || id === 'stat-pending');
+  const isDragging  = editMode && reorder?.dragId === id;
+  const isDropOver  = editMode && reorder?.overId === id && reorder?.dragId !== id;
   return (
     <div
       className={[
@@ -286,9 +289,21 @@ function StatCard({ id, label, value, sub, color, icon, tooltip, editMode, visib
         !visible && !editMode ? 'ov-hidden' : '',
         focused ? 'ov-stat--focused' : '',
         isClickable ? 'ov-stat--clickable' : '',
+        editMode ? 'ov-stat--editing' : '',
+        isDragging ? 'ov-stat--dragging' : '',
+        isDropOver ? 'ov-stat--drop-target' : '',
       ].filter(Boolean).join(' ')}
       onClick={() => isClickable && onFocus(id)}
+      /* Drag-and-drop wiring — only takes effect when editMode is on.
+         draggable={false} otherwise so normal clicks aren't suppressed
+         on iPad/touch devices. */
+      draggable={editMode}
+      onDragStart={editMode ? () => reorder?.onCardDragStart(id) : undefined}
+      onDragOver={editMode ? (e) => reorder?.onCardDragOver(e, id) : undefined}
+      onDrop={editMode ? () => reorder?.onCardDrop(id) : undefined}
+      onDragEnd={editMode ? () => reorder?.onCardDragEnd() : undefined}
     >
+      {editMode && <DragHandle />}
       {editMode && <EyeToggle id={id} visible={visible} onToggle={onToggle} />}
       {focused && !editMode && (
         <div className="ov-stat__focus-ring" style={{ borderColor: color }} />
@@ -326,18 +341,49 @@ function StatCard({ id, label, value, sub, color, icon, tooltip, editMode, visib
 }
 
 /* ── Chart block ── */
-function ChartBlock({ id, label, children, editMode, visible, onToggle, fullWidth }) {
+function ChartBlock({ id, label, children, editMode, visible, onToggle, fullWidth, reorder }) {
+  const isDragging = editMode && reorder?.dragId === id;
+  const isDropOver = editMode && reorder?.overId === id && reorder?.dragId !== id;
   return (
-    <div className={[
-      'ov-card',
-      fullWidth ? 'ov-card--span2' : '',
-      !visible && editMode ? 'ov-card--hidden' : '',
-      !visible && !editMode ? 'ov-hidden' : '',
-    ].filter(Boolean).join(' ')}>
+    <div
+      className={[
+        'ov-card',
+        fullWidth ? 'ov-card--span2' : '',
+        !visible && editMode ? 'ov-card--hidden' : '',
+        !visible && !editMode ? 'ov-hidden' : '',
+        editMode ? 'ov-card--editing' : '',
+        isDragging ? 'ov-card--dragging' : '',
+        isDropOver ? 'ov-card--drop-target' : '',
+      ].filter(Boolean).join(' ')}
+      draggable={editMode}
+      onDragStart={editMode ? () => reorder?.onCardDragStart(id) : undefined}
+      onDragOver={editMode ? (e) => reorder?.onCardDragOver(e, id) : undefined}
+      onDrop={editMode ? () => reorder?.onCardDrop(id) : undefined}
+      onDragEnd={editMode ? () => reorder?.onCardDragEnd() : undefined}
+    >
+      {editMode && <DragHandle />}
       {editMode && <EyeToggle id={id} visible={visible} onToggle={onToggle} />}
       <div className="ov-card__title">{label}</div>
       <div className="ov-card__body">{children}</div>
     </div>
+  );
+}
+
+/* ── Drag handle ── shown in the top-left of cards while editing.
+ *  A 6-dot grip glyph is the universal "drag me" affordance — Notion,
+ *  Linear, Trello all use it. */
+function DragHandle() {
+  return (
+    <span className="ov-drag-handle" aria-hidden="true" title="Drag to reorder">
+      <svg width="11" height="14" viewBox="0 0 11 14" fill="currentColor">
+        <circle cx="2" cy="2"  r="1.3" />
+        <circle cx="2" cy="7"  r="1.3" />
+        <circle cx="2" cy="12" r="1.3" />
+        <circle cx="9" cy="2"  r="1.3" />
+        <circle cx="9" cy="7"  r="1.3" />
+        <circle cx="9" cy="12" r="1.3" />
+      </svg>
+    </span>
   );
 }
 
@@ -428,6 +474,45 @@ export default function AdminOverview({ draftState, onNavigate }) {
   function isVisible(id) {
     return blocks.find(b => b.id === id)?.visible ?? true;
   }
+
+  /* Reorder helper — used by the customize-mode drag hooks below.
+   * Takes a SUBSET of block ids in a new order (e.g. just the stat
+   * cards) and merges that order back into the global dashboardBlocks
+   * array. Blocks not in the subset keep their relative position
+   * — we only touch the indices that belong to the reordered group. */
+  function reorderSubset(scopedIdsInNewOrder) {
+    updateDraft(prev => {
+      const idSet = new Set(scopedIdsInNewOrder);
+      const queue = [...scopedIdsInNewOrder];
+      const next = prev.dashboardBlocks.map(b => {
+        if (!idSet.has(b.id)) return b; // leave non-scoped blocks alone
+        const nextId = queue.shift();
+        // Find the full block object for nextId to preserve its other
+        // fields (visible, type, span, label).
+        return prev.dashboardBlocks.find(x => x.id === nextId) || b;
+      });
+      return { ...prev, dashboardBlocks: next };
+    });
+  }
+
+  /* Stat cards in the order the admin has chosen. Built each render
+   * by walking dashboardBlocks (which carries the persisted order)
+   * and picking out the stat-prefixed ids, then mapping them onto the
+   * static STAT_CARDS lookup below. Cards present in STAT_CARDS but
+   * NOT in dashboardBlocks (shouldn't happen post-migration) get
+   * appended at the end so we never silently drop a card. */
+  const STAT_IDS_IN_BLOCKS = blocks.filter(b => b.type === 'stat').map(b => b.id);
+
+  // Stat reorder wiring — only active when editMode is on; cards
+  // become draggable then.
+  const statReorder = useReorder(STAT_IDS_IN_BLOCKS, reorderSubset);
+
+  // Chart blocks reorder — same hook, different scope. Used by the
+  // 2-col charts grid below.
+  const CHART_IDS_IN_BLOCKS = blocks
+    .filter(b => b.type === 'chart')
+    .map(b => b.id);
+  const chartReorder = useReorder(CHART_IDS_IN_BLOCKS, reorderSubset);
 
   function handleStatFocus(id) {
     if (id === 'stat-pending') { onNavigate('claims'); return; }
@@ -659,7 +744,9 @@ export default function AdminOverview({ draftState, onNavigate }) {
       {editMode && (
         <div className="ov-edit-banner">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          Edit mode — click the eye icon on any block to show or hide it.
+          <span>
+            <strong>Customize mode.</strong> Drag the grip handle to reorder, click the eye to show or hide.
+          </span>
         </div>
       )}
 
@@ -667,20 +754,40 @@ export default function AdminOverview({ draftState, onNavigate }) {
        *  by the leaner "Pending Claims" stat card below + the per-page
        *  badges on the sidebar (claims count, scans count). */}
 
-      {/* Stat cards */}
-      <div className="ov-stats-grid">
-        {STAT_CARDS.map(card => (
-          <StatCard
-            key={card.id}
-            {...card}
-            editMode={editMode}
-            visible={isVisible(card.id)}
-            onToggle={toggleBlock}
-            focused={focusedStat === card.id}
-            onFocus={handleStatFocus}
-          />
-        ))}
-      </div>
+      {/* Stat cards — rendered in the admin's chosen order. We index
+          STAT_CARDS by id, then walk STAT_IDS_IN_BLOCKS (the saved
+          order). Any card present in STAT_CARDS but missing from
+          blocks gets appended so we never silently drop a card. */}
+      {(() => {
+        const byId = Object.fromEntries(STAT_CARDS.map(c => [c.id, c]));
+        const orderedIds = STAT_IDS_IN_BLOCKS.filter(id => byId[id]);
+        for (const c of STAT_CARDS) {
+          if (!orderedIds.includes(c.id)) orderedIds.push(c.id);
+        }
+        return (
+          <div className={`ov-stats-grid${editMode ? ' ov-grid--editing' : ''}`}>
+            {orderedIds.map(id => {
+              const card = byId[id];
+              if (!card) return null;
+              return (
+                <StatCard
+                  key={card.id}
+                  {...card}
+                  editMode={editMode}
+                  visible={isVisible(card.id)}
+                  onToggle={toggleBlock}
+                  focused={focusedStat === card.id}
+                  onFocus={handleStatFocus}
+                  /* Reorder wiring — only active in edit mode, no-ops
+                     otherwise. The StatCard itself decides whether to
+                     render the grip handle and set draggable=true. */
+                  reorder={statReorder}
+                />
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Charts grid — 2-column layout */}
       <div className="ov-charts-grid">
@@ -694,7 +801,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
           const primType  = def?.type || 'area';
           return (
             <ChartBlock id="chart-cups-per-day" label={primTitle}
-              fullWidth editMode={editMode} visible={isVisible('chart-cups-per-day')} onToggle={toggleBlock}>
+              fullWidth editMode={editMode} visible={isVisible('chart-cups-per-day')} onToggle={toggleBlock} reorder={chartReorder}>
               {/* The old "← Back to Cups Added" button was removed.
                *  Clicking the focused stat card again (or any other
                *  spotlight card) already toggles focus off — the
@@ -731,7 +838,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
 
         {/* Claims per day (2fr) + Cup Distribution (1fr) — SAME ROW */}
         <ChartBlock id="chart-claims-per-day" label={`Claims — Last ${period} Days`}
-          editMode={editMode} visible={isVisible('chart-claims-per-day')} onToggle={toggleBlock}>
+          editMode={editMode} visible={isVisible('chart-claims-per-day')} onToggle={toggleBlock} reorder={chartReorder}>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={claimsData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={period <= 7 ? 28 : period <= 14 ? 18 : 12}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F0EDE8" vertical={false} />
@@ -744,7 +851,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
         </ChartBlock>
 
         <ChartBlock id="chart-cup-dist" label="Cup Status Distribution"
-          editMode={editMode} visible={isVisible('chart-cup-dist')} onToggle={toggleBlock}>
+          editMode={editMode} visible={isVisible('chart-cup-dist')} onToggle={toggleBlock} reorder={chartReorder}>
           {cupDist.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={150}>
@@ -773,7 +880,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
 
         {/* Reward popularity (2fr) + Activity feed (1fr) */}
         <ChartBlock id="chart-reward-pop" label="Reward Popularity (Claims)"
-          editMode={editMode} visible={isVisible('chart-reward-pop')} onToggle={toggleBlock}>
+          editMode={editMode} visible={isVisible('chart-reward-pop')} onToggle={toggleBlock} reorder={chartReorder}>
           {rewardPop.length > 0 ? (
             <div className="ov-pop-list">
               {rewardPop.map((r, i) => {
@@ -799,7 +906,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
         </ChartBlock>
 
         <ChartBlock id="feed-activity" label="Recent Activity"
-          editMode={editMode} visible={isVisible('feed-activity')} onToggle={toggleBlock}>
+          editMode={editMode} visible={isVisible('feed-activity')} onToggle={toggleBlock} reorder={chartReorder}>
           <div className="ov-feed">
             {(s.recentActivity?.length > 0) ? s.recentActivity.slice(0, 8).map((item, i) => {
               const meta = ACT_META[item.type] || { label: item.type, color: '#6B6860', symbol: '·' };

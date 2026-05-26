@@ -58,6 +58,83 @@
   font-weight: 800;
 }
 
+/* Image variant of the title-row logo — preserves the same footprint
+ * as the initial-chip so the surrounding layout doesn't shift. */
+.org-card__logo--img {
+  object-fit: contain;
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  padding: 4px;
+}
+
+/* ── Logo uploader (edit mode) ──────────────────────────────────────── */
+.org-logo-uploader {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #FAF8F3;
+  border: 1px solid #ECE5D8;
+  border-radius: 10px;
+}
+
+.org-logo-uploader__preview {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.org-logo-uploader__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 6px;
+}
+
+.org-logo-uploader__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 28px;
+}
+
+.org-logo-uploader__controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.org-logo-uploader__buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.org-input--url {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #D6CFC2;
+  border-radius: 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: #FFFFFF;
+}
+.org-input--url:focus {
+  outline: none;
+  border-color: #FD6F46;
+}
+
 .org-card__title {
   font-size: 16px;
   font-weight: 800;

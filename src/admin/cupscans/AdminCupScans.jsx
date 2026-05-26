@@ -4,7 +4,22 @@ import { getAdminCupScans, getCupScanSignedUrl } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
 import EmptyState from '../shared/EmptyState';
 import QuickLinks from '../shared/QuickLinks';
+import ColumnPicker from '../shared/ColumnPicker';
 import './AdminCupScans.css';
+
+/* Toggleable columns for the Cup Scans table. User + When + Status
+ * stay always-shown — they're the bare minimum to read a row. Photo
+ * is toggleable per request (admins reviewing on a smaller screen,
+ * or who don't want to see images at all, can hide it). */
+const CS_COLUMN_CONFIG = [
+  { id: 'photo',     label: 'Photo',     desc: 'Thumbnail of the scan / receipt image',                    defaultOn: true  },
+  { id: 'source',    label: 'Source',    desc: 'QR / camera / gallery / deep-link',                        defaultOn: true  },
+  { id: 'batch',     label: 'Batch',     desc: 'Cup batch the scan came from',                             defaultOn: true  },
+  { id: 'submitted', label: 'Submitted', desc: 'How many cup IDs the QR carried',                          defaultOn: true  },
+  { id: 'awarded',   label: 'Awarded',   desc: 'How many cups were actually credited to the user',         defaultOn: true  },
+  { id: 'error',     label: 'Error',     desc: 'Failure code + message (when the scan didn\'t succeed)',   defaultOn: true  },
+];
+const CS_DEFAULT_VISIBLE_COLS = CS_COLUMN_CONFIG.filter(c => c.defaultOn).map(c => c.id);
 
 /* AdminCupScans — every QR claim attempt, success or failure.
  *
@@ -190,6 +205,31 @@ export default function AdminCupScans({ onNavigate }) {
   const [search, setSearch]       = useState('');
   const [sortKey, setSortKey]     = useState('created_at');
   const [sortDir, setSortDir]     = useState('desc');
+
+  /* Column visibility — persisted to localStorage (keyed separately
+   * from claims so each table owns its own toggle state). */
+  const [visibleCols, setVisibleCols] = useState(() => {
+    if (typeof window === 'undefined') return new Set(CS_DEFAULT_VISIBLE_COLS);
+    try {
+      const raw = localStorage.getItem('pp_admin_cup_scans_cols');
+      if (raw) return new Set(JSON.parse(raw));
+    } catch { /* ignore parse failures */ }
+    return new Set(CS_DEFAULT_VISIBLE_COLS);
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('pp_admin_cup_scans_cols', JSON.stringify([...visibleCols]));
+    } catch { /* quota / private-mode — fine, just don't persist */ }
+  }, [visibleCols]);
+  function toggleCol(id) {
+    setVisibleCols(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  const isCol = (id) => visibleCols.has(id);
   const [lightboxSrc, setLightbox] = useState(null);
 
   useEffect(() => {
@@ -310,6 +350,12 @@ export default function AdminCupScans({ onNavigate }) {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+        <ColumnPicker
+          columns={CS_COLUMN_CONFIG}
+          visible={visibleCols}
+          onToggle={toggleCol}
+          onReset={() => setVisibleCols(new Set(CS_DEFAULT_VISIBLE_COLS))}
+        />
       </div>
 
       <div className="cs-table-wrap">
@@ -319,20 +365,23 @@ export default function AdminCupScans({ onNavigate }) {
           <table className="cs-table">
             <thead>
               <tr>
-                <ThCol label="Photo"  field="photo_path"   sortable={false} width={64} />
+                {isCol('photo')     && <ThCol label="Photo"     field="photo_path" sortable={false} width={64} />}
                 <ThCol label="User"   field="user" />
-                <ThCol label="Source" field="scan_type" />
-                <ThCol label="Batch"  field="batch_id"     sortable={false} />
-                <ThCol label="Submitted" field="requested_count" sortable={false} width={80} />
-                <ThCol label="Awarded"   field="cups_awarded" width={80} />
-                <ThCol label="Status"    field="status" />
-                <ThCol label="Error"     field="error_code" sortable={false} />
-                <ThCol label="When"      field="created_at" />
+                {isCol('source')    && <ThCol label="Source"    field="scan_type" />}
+                {isCol('batch')     && <ThCol label="Batch"     field="batch_id" sortable={false} />}
+                {isCol('submitted') && <ThCol label="Submitted" field="requested_count" sortable={false} width={80} />}
+                {isCol('awarded')   && <ThCol label="Awarded"   field="cups_awarded" width={80} />}
+                <ThCol label="Status" field="status" />
+                {isCol('error')     && <ThCol label="Error"     field="error_code" sortable={false} />}
+                <ThCol label="When"   field="created_at" />
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={9} className="cs-table__empty">
+                // 3 always-shown columns (User, Status, When) + the
+                // currently-on toggleable ones. Was hard-coded 9
+                // before the column picker.
+                <tr><td colSpan={3 + visibleCols.size} className="cs-table__empty">
                   {scans.length === 0 ? (
                     <EmptyState
                       icon={
@@ -366,7 +415,7 @@ export default function AdminCupScans({ onNavigate }) {
                 </td></tr>
               ) : filtered.map(scan => (
                 <tr key={scan.id} className="cs-row">
-                  <td><ScanThumb scan={scan} onZoom={setLightbox} /></td>
+                  {isCol('photo') && <td><ScanThumb scan={scan} onZoom={setLightbox} /></td>}
 
                   <td>
                     <button
@@ -383,20 +432,22 @@ export default function AdminCupScans({ onNavigate }) {
                     </button>
                   </td>
 
-                  <td><TypeBadge type={scan.scan_type} /></td>
+                  {isCol('source') && <td><TypeBadge type={scan.scan_type} /></td>}
 
-                  <td>
-                    {scan.batch_id ? (
-                      <button
-                        type="button"
-                        className="cs-batch-link"
-                        onClick={() => onNavigate?.('cupqr')}
-                        title="Open Cup QR Codes tab"
-                      >
-                        {scan.batch_id.slice(0, 8)}…
-                      </button>
-                    ) : <span className="cs-muted">—</span>}
-                  </td>
+                  {isCol('batch') && (
+                    <td>
+                      {scan.batch_id ? (
+                        <button
+                          type="button"
+                          className="cs-batch-link"
+                          onClick={() => onNavigate?.('cupqr')}
+                          title="Open Cup QR Codes tab"
+                        >
+                          {scan.batch_id.slice(0, 8)}…
+                        </button>
+                      ) : <span className="cs-muted">—</span>}
+                    </td>
+                  )}
 
                   {/* P-32: split the legacy "0/5" cell into two
                    *  columns — Submitted = what the customer tried to
@@ -405,36 +456,42 @@ export default function AdminCupScans({ onNavigate }) {
                    *  "they hit a bin that only had 3 valid cups out
                    *  of 5 advertised" much easier to spot than the old
                    *  combined fraction. */}
-                  <td className="cs-center">
-                    <span
-                      className="cs-cups cs-cups--muted"
-                      title={
-                        (scan.requested_cup_ids || []).length > 0
-                          ? `Requested cup IDs:\n${(scan.requested_cup_ids || []).join('\n')}`
-                          : ''
-                      }
-                    >
-                      {scan.requested_cup_ids?.length ?? 0}
-                    </span>
-                  </td>
-                  <td className="cs-center">
-                    <span
-                      className="cs-cups"
-                      title={
-                        (scan.activated_cup_ids || []).length > 0
-                          ? `Activated cup IDs:\n${(scan.activated_cup_ids || []).join('\n')}`
-                          : 'No cups added to balance'
-                      }
-                    >
-                      {scan.cups_awarded ?? 0}
-                    </span>
-                  </td>
+                  {isCol('submitted') && (
+                    <td className="cs-center">
+                      <span
+                        className="cs-cups cs-cups--muted"
+                        title={
+                          (scan.requested_cup_ids || []).length > 0
+                            ? `Requested cup IDs:\n${(scan.requested_cup_ids || []).join('\n')}`
+                            : ''
+                        }
+                      >
+                        {scan.requested_cup_ids?.length ?? 0}
+                      </span>
+                    </td>
+                  )}
+                  {isCol('awarded') && (
+                    <td className="cs-center">
+                      <span
+                        className="cs-cups"
+                        title={
+                          (scan.activated_cup_ids || []).length > 0
+                            ? `Activated cup IDs:\n${(scan.activated_cup_ids || []).join('\n')}`
+                            : 'No cups added to balance'
+                        }
+                      >
+                        {scan.cups_awarded ?? 0}
+                      </span>
+                    </td>
+                  )}
 
                   <td><StatusBadge status={scan.status} /></td>
 
-                  <td className="cs-error">
-                    <ErrorCodeCell code={scan.error_code} message={scan.error_message} />
-                  </td>
+                  {isCol('error') && (
+                    <td className="cs-error">
+                      <ErrorCodeCell code={scan.error_code} message={scan.error_message} />
+                    </td>
+                  )}
 
                   <td className="cs-date">{formatDate(scan.created_at)}</td>
                 </tr>

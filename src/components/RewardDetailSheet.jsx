@@ -48,7 +48,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
         </button>
 
         {/* ── Hero image ── */}
-        <div className="rds-image-wrap" style={{ background: reward.bgColor || '#FEA01E' }}>
+        <div className="rds-image-wrap" style={{ background: reward.bgColor || 'var(--bk-orange)' }}>
           <img src={reward.image} alt={reward.name} className="rds-image" />
         </div>
 

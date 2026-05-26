@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { sendMagicLink, signOutUser, getCurrentAuthEmail } from '../lib/api';
+import {
+  sendMagicLink,
+  signOutUser,
+  getCurrentAuthEmail,
+  requestRestoreOtp,
+  verifyRestoreOtp,
+  finaliseRestore,
+} from '../lib/api';
 import './SignInSheet.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -30,11 +37,22 @@ import './SignInSheet.css';
  * exposed — outside the sheet there's no reason for them to do it.
  */
 export default function SignInSheet({ open, onClose, onLinked }) {
-  const [status, setStatus] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'signedIn' | 'error'
+  /* Mode = which top-level flow the sheet is showing. The original
+   * one-flow design grew to two:
+   *   • 'save'    — link an email to back the current device up
+   *                 (original magic-link flow)
+   *   • 'restore' — recover an existing account on a new device
+   *                 (OTP code entry + server-side merge)
+   * Each mode has its own status machine (see `status` below). */
+  const [mode, setMode] = useState('save'); // 'save' | 'restore'
+  const [status, setStatus] = useState('idle'); // see comments per-mode below
   const [email, setEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [restoreResult, setRestoreResult] = useState(null); // { status, merged_balance? }
   const [error, setError] = useState(null);
   const [currentEmail, setCurrentEmail] = useState(null);
   const inputRef = useRef(null);
+  const codeRef  = useRef(null);
 
   // When the sheet opens, find out whether the user is already signed
   // in so we render the right initial state.
@@ -49,14 +67,26 @@ export default function SignInSheet({ open, onClose, onLinked }) {
     return () => { cancelled = true; };
   }, [open]);
 
-  // Auto-focus the email input when the sheet shows the form.
+  // Auto-focus the email input (save mode or first step of restore)
+  // or the OTP input (restore code-entry step) when the sheet opens.
   useEffect(() => {
-    if (open && status === 'idle') {
-      // tiny delay so the slide-in animation settles before focus.
-      const t = setTimeout(() => inputRef.current?.focus(), 220);
-      return () => clearTimeout(t);
+    if (!open) return;
+    let t;
+    if (status === 'idle' || status === 'restore_email') {
+      t = setTimeout(() => inputRef.current?.focus(), 220);
+    } else if (status === 'restore_code') {
+      t = setTimeout(() => codeRef.current?.focus(), 220);
     }
+    return () => t && clearTimeout(t);
   }, [open, status]);
+
+  // Reset transient state when the sheet closes so the next open is clean.
+  useEffect(() => {
+    if (open) return;
+    setOtpCode('');
+    setRestoreResult(null);
+    setError(null);
+  }, [open]);
 
   // Lock body scroll while sheet is open (matches other sheets in app).
   useEffect(() => {
@@ -94,6 +124,77 @@ export default function SignInSheet({ open, onClose, onLinked }) {
       setError(err.message);
       setStatus('error');
     }
+  }
+
+  /* ── Restore-by-email flow ────────────────────────────────────────────
+   * Three steps the user walks through:
+   *   1. Type the email they used previously → requestRestoreOtp fires.
+   *   2. Type the 6-digit code from email → verifyRestoreOtp creates
+   *      an auth session.
+   *   3. We immediately call finaliseRestore, which hits the edge
+   *      function to merge their device row into their email row.
+   *      The result tells us whether anything was actually merged so
+   *      we can show the right confirmation copy. */
+  async function handleRequestRestore(e) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setError(null);
+    setStatus('restore_sending');
+    try {
+      await requestRestoreOtp(email);
+      setStatus('restore_code');
+    } catch (err) {
+      setError(
+        err.message === 'invalid_email'
+          ? "That email doesn't look quite right — try again."
+          : err.message || 'Something went wrong. Please try again.',
+      );
+      setStatus('restore_email');
+    }
+  }
+
+  async function handleVerifyRestore(e) {
+    e.preventDefault();
+    if (otpCode.length !== 6) return;
+    setError(null);
+    setStatus('restore_verifying');
+    try {
+      await verifyRestoreOtp(email, otpCode);
+      // Auth session is now in place. Ask the edge function to merge.
+      const result = await finaliseRestore();
+      setRestoreResult(result);
+      setCurrentEmail(email.trim());
+      setStatus('restore_done');
+      // Tell the parent to re-pull the user row — App.jsx then refreshes
+      // cup count / history with the merged state.
+      onLinked?.();
+    } catch (err) {
+      const code = err?.detail?.error || err?.message;
+      const friendly =
+        code === 'invalid_code'
+          ? 'That code is 6 digits — check the email and try again.'
+          : code === 'otp_expired' || code === 'token_has_expired' || /expired/i.test(code || '')
+            ? 'That code expired. Tap "Send a new code" below to get a fresh one.'
+            : code === 'invalid_token' || /invalid/i.test(code || '')
+              ? "That code doesn't match. Double-check the email — codes are 6 digits, no spaces."
+              : (code || 'Something went wrong verifying the code.');
+      setError(friendly);
+      setStatus('restore_code');
+    }
+  }
+
+  function switchToRestore() {
+    setError(null);
+    setStatus('restore_email');
+    setMode('restore');
+  }
+
+  function switchToSave() {
+    setError(null);
+    setOtpCode('');
+    setRestoreResult(null);
+    setStatus('idle');
+    setMode('save');
   }
 
   if (!open) return null;
@@ -147,8 +248,8 @@ export default function SignInSheet({ open, onClose, onLinked }) {
           </div>
         )}
 
-        {/* Idle form (or error variant of it) */}
-        {(status === 'idle' || status === 'sending' || status === 'error') && (
+        {/* Idle form (or error variant of it) — "save" mode only */}
+        {mode === 'save' && (status === 'idle' || status === 'sending' || status === 'error') && (
           <form className="signin-state" onSubmit={handleSubmit}>
             <div className="signin-art">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -190,7 +291,167 @@ export default function SignInSheet({ open, onClose, onLinked }) {
               We'll only use this address to sign you in. No marketing,
               ever.
             </p>
+
+            {/* Restore entry — sits at the bottom so the primary CTA
+                stays "Save", but lost-my-cups users can find their way
+                in without us inventing a separate route. */}
+            <div className="signin-divider">
+              <span className="signin-divider__rule" />
+              <span className="signin-divider__label">Already used PackPerks?</span>
+              <span className="signin-divider__rule" />
+            </div>
+            <button
+              type="button"
+              className="signin-btn signin-btn--ghost"
+              onClick={switchToRestore}
+            >
+              I lost my cups — restore by email
+            </button>
           </form>
+        )}
+
+        {/* ── Restore: step 1 — ask for email ── */}
+        {mode === 'restore' && (status === 'restore_email' || status === 'restore_sending') && (
+          <form className="signin-state" onSubmit={handleRequestRestore}>
+            <div className="signin-art">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 4v6h6" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+            </div>
+            <h2 className="signin-title">Restore your cups</h2>
+            <p className="signin-sub">
+              Enter the email you used before. We'll send a 6-digit code
+              to confirm it's you, then bring your cup balance back to
+              this device.
+            </p>
+
+            <label className="signin-label" htmlFor="restore-email">Email</label>
+            <input
+              id="restore-email"
+              ref={inputRef}
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              className="signin-input"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={status === 'restore_sending'}
+              required
+            />
+
+            {error && <p className="signin-error">{error}</p>}
+
+            <button
+              type="submit"
+              className="signin-btn signin-btn--primary"
+              disabled={status === 'restore_sending' || !email.trim()}
+            >
+              {status === 'restore_sending' ? 'Sending…' : 'Send 6-digit code'}
+            </button>
+            <button
+              type="button"
+              className="signin-btn signin-btn--ghost"
+              onClick={switchToSave}
+            >
+              Back to sign-in
+            </button>
+          </form>
+        )}
+
+        {/* ── Restore: step 2 — verify the code + merge ── */}
+        {mode === 'restore' && (status === 'restore_code' || status === 'restore_verifying') && (
+          <form className="signin-state" onSubmit={handleVerifyRestore}>
+            <div className="signin-art signin-art--sent">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+            </div>
+            <h2 className="signin-title">Enter your code</h2>
+            <p className="signin-sub">
+              We sent a 6-digit code to <strong>{email}</strong>. Type
+              it below — codes expire after a few minutes.
+            </p>
+
+            <label className="signin-label" htmlFor="restore-code">6-digit code</label>
+            <input
+              id="restore-code"
+              ref={codeRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              className="signin-input signin-input--code"
+              placeholder="123456"
+              value={otpCode}
+              onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              disabled={status === 'restore_verifying'}
+              required
+            />
+
+            {error && <p className="signin-error">{error}</p>}
+
+            <button
+              type="submit"
+              className="signin-btn signin-btn--primary"
+              disabled={status === 'restore_verifying' || otpCode.length !== 6}
+            >
+              {status === 'restore_verifying' ? 'Restoring…' : 'Restore my cups'}
+            </button>
+            <button
+              type="button"
+              className="signin-btn signin-btn--ghost"
+              onClick={() => {
+                // Restart from step 1 — resends a new code.
+                setOtpCode('');
+                setError(null);
+                setStatus('restore_email');
+              }}
+              disabled={status === 'restore_verifying'}
+            >
+              Send a new code
+            </button>
+          </form>
+        )}
+
+        {/* ── Restore: step 3 — done ── */}
+        {mode === 'restore' && status === 'restore_done' && (
+          <div className="signin-state">
+            <div className="signin-art signin-art--ok">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <h2 className="signin-title">
+              {restoreResult?.status === 'merged'
+                ? 'Welcome back!'
+                : restoreResult?.status === 'no_prior_history'
+                  ? "You're signed in"
+                  : 'Cups restored'}
+            </h2>
+            <p className="signin-sub">
+              {restoreResult?.status === 'merged' ? (
+                <>
+                  Your previous balance has been merged into this device.
+                  You now have <strong>{restoreResult.merged_balance} cup{restoreResult.merged_balance === 1 ? '' : 's'}</strong> total.
+                </>
+              ) : restoreResult?.status === 'repointed' ? (
+                <>Your previous cup balance is now available on this device.</>
+              ) : restoreResult?.status === 'linked' ? (
+                <>This device is now backed up to <strong>{currentEmail}</strong>.</>
+              ) : restoreResult?.status === 'no_prior_history' ? (
+                <>We didn't find an earlier balance under <strong>{currentEmail}</strong>, but you're now signed in — any cups you collect from now on will be saved to this email.</>
+              ) : (
+                <>You're all set.</>
+              )}
+            </p>
+            <button className="signin-btn signin-btn--primary" onClick={onClose}>
+              Done
+            </button>
+          </div>
         )}
       </div>
     </div>

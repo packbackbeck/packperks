@@ -175,7 +175,8 @@ const CLAIMS_COLS = `
   ai_contains_required_item, ai_failure_checks, ai_reason,
   ai_required_item, extracted_total_eur, extracted_datetime,
   extracted_receipt_id, verified_at,
-  approved_by, approved_at, approval_note
+  approved_by, approved_at, approval_note,
+  image_hidden, image_hidden_reason, image_hidden_at, image_hidden_by
 `;
 
 export async function getAdminClaims() {
@@ -254,6 +255,54 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
     .update(update)
     .eq('id', claimId)
     .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/* Hide the receipt image attached to a claim from all admin reviewers.
+ * The user-side `receipts/` storage object is left untouched — the
+ * user keeps seeing their own upload in their own UI. This only
+ * suppresses the image in the admin claims table + detail panel,
+ * replacing it with a neutral "hidden" placeholder.
+ *
+ * Use cases:
+ *   • PII the AI didn't catch (handwritten card numbers, IDs in frame)
+ *   • Borderline content the AI moderator let through
+ *   • Anything else a senior admin decides shouldn't be reviewable
+ *
+ * The companion `unhideClaimImage` reverses the hide (e.g. after the
+ * issue is resolved or it was hidden in error). Both write the audit
+ * trail via the calling component's logAction() invocation — we don't
+ * couple this CRUD helper to actionLog so tests can mock cleanly. */
+export async function hideClaimImage(claimId, reason) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('claims')
+    .update({
+      image_hidden: true,
+      image_hidden_reason: reason ? `admin: ${reason}` : 'admin: no reason given',
+      image_hidden_at: new Date().toISOString(),
+      image_hidden_by: user?.id ?? null,
+    })
+    .eq('id', claimId)
+    .select(CLAIMS_COLS)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function unhideClaimImage(claimId) {
+  const { data, error } = await supabase
+    .from('claims')
+    .update({
+      image_hidden: false,
+      image_hidden_reason: null,
+      image_hidden_at: null,
+      image_hidden_by: null,
+    })
+    .eq('id', claimId)
+    .select(CLAIMS_COLS)
     .single();
   if (error) throw error;
   return data;

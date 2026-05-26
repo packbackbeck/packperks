@@ -151,10 +151,29 @@
 }
 
 .ao-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+}
+
+.ao-swatch__letter {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+
+/* Image variant — used when the org has a logo_url. White background
+ * + small inner padding so transparent / dark logos read cleanly. */
+.ao-swatch--img {
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  padding: 3px;
+  object-fit: contain;
 }
 
 .ao-org-name {

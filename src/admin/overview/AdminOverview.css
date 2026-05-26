@@ -1,6 +1,11 @@
 .admin-overview {
   padding: 32px 32px 48px;
-  max-width: 1400px;
+  /* Was hard-capped at 1400px which left large empty gutters on
+   * 1920px+ displays. Push it well past common ultrawide so the
+   * grids actually fill the available space; the children below
+   * cap their own min-widths so we never stretch a single card
+   * to absurd widths. */
+  max-width: 1900px;
 }
 
 /* Header */
@@ -82,26 +87,109 @@
 .ov-edit-banner {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: rgba(255, 197, 47, 0.08);
-  border: 1px solid rgba(255, 197, 47, 0.25);
+  gap: 10px;
+  padding: 11px 16px;
+  background: rgba(255, 197, 47, 0.10);
+  border: 1px solid rgba(255, 197, 47, 0.30);
   border-radius: 10px;
-  color: #B8922A;
+  color: #7A5A0E;
   font-size: 13px;
-  margin-bottom: 24px;
+  line-height: 1.4;
+  margin-bottom: 22px;
+}
+.ov-edit-banner strong { color: #4A3508; font-weight: 700; }
+
+/* ── Customize-mode card affordances ──
+ * Each stat card / chart card grows a 6-dot drag handle in the
+ * top-left and gets a soft dashed outline so the whole canvas
+ * reads as "editable" without being noisy. */
+.ov-drag-handle {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 20px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #B8B0A0;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: grab;
+  z-index: 3;
+  transition: color 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+}
+.ov-drag-handle:hover {
+  color: #5C544A;
+  background: #FFFFFF;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+.ov-drag-handle:active { cursor: grabbing; }
+
+/* Cards in edit mode get an extra left padding so the title +
+ * content doesn't sit under the handle, and a dashed outline to
+ * communicate "draggable". */
+.ov-stat--editing,
+.ov-card--editing {
+  cursor: grab;
+  outline: 1px dashed transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.14s ease, transform 0.14s ease, opacity 0.14s ease, box-shadow 0.14s ease;
+}
+.ov-stat--editing:hover,
+.ov-card--editing:hover {
+  outline-color: rgba(83, 51, 165, 0.35);
+}
+.ov-stat--editing { padding-left: 40px; }
+.ov-card--editing { padding-left: 44px; }
+
+/* The card being actively dragged fades + scales down slightly so the
+ * user gets clear feedback the action started. */
+.ov-stat--dragging,
+.ov-card--dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+  cursor: grabbing;
 }
 
-/* Stats grid */
+/* Drop target — the card the dragged item would land in front of
+ * once released. Bright purple ring so it's unmistakable. */
+.ov-stat--drop-target,
+.ov-card--drop-target {
+  outline: 2px solid #5333A5;
+  outline-offset: 2px;
+  box-shadow: 0 4px 18px rgba(83, 51, 165, 0.20);
+}
+
+/* During an active drag, dim the rest of the grid slightly so the
+ * focal point is the dragged card + the live drop target. */
+.ov-grid--editing { /* placeholder — no styles needed today, kept for future extensibility */ }
+
+/* Stats grid — explicit step-down between layouts that divide 6
+ * evenly (6 → 3 → 2 → 1). `auto-fit` was tempting but produced an
+ * awkward 5+1 / 4+2 wrap whenever the viewport landed in a mid-width
+ * band — the orphan card on a fresh row looked broken. Hard
+ * breakpoints keep the grid visually balanced at every size.
+ *
+ * Thresholds account for the 220px sidebar + 32px page padding on
+ * each side, so each query is "viewport at which the *main* column
+ * still has room for N comfortably-sized cards". */
 .ov-stats-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
 
-@media (max-width: 1200px) {
-  .ov-stats-grid { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1280px) {
+  .ov-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .ov-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 460px) {
+  .ov-stats-grid { grid-template-columns: 1fr; }
 }
 
 .ov-hidden {
@@ -176,11 +264,20 @@
 .ov-stat__trend--up { background: rgba(74, 222, 128, 0.12); color: #16A34A; }
 .ov-stat__trend--down { background: rgba(248, 113, 113, 0.12); color: #DC2626; }
 
-/* Charts grid */
+/* Charts grid — 2:1 ratio (big primary chart + side companion) on
+ * normal widths. On wide displays we stay 2:1 because the
+ * full-width primary chart already gives `grid-column: 1 / -1` and
+ * subsequent rows pair up at 2:1 — going to a 3-column layout on
+ * ultrawide would cram four side-charts onto one row which read
+ * worse than two. Min-widths on each card keep the chart legible
+ * if a row genuinely runs out of space. */
 .ov-charts-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 14px;
+}
+@media (max-width: 900px) {
+  .ov-charts-grid { grid-template-columns: 1fr; }
 }
 
 .ov-card {

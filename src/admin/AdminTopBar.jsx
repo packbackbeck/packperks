@@ -2,7 +2,33 @@ import FeatureSearch from './auth/FeatureSearch';
 import WorkflowDock from './auth/WorkflowDock';
 import packperksLogoDark from '../assets/images/packperks-logo-dark.svg';
 import burgerKingLogo from '../assets/images/burger-king-logo.png';
+import { useOrg } from './context/OrgContext';
 import './AdminTopBar.css';
+
+/* Resolve the brand-mark for the right side of the "PackPerks × ___"
+ * lockup. Resolution order:
+ *   1. activeOrg.logo_url — uploaded / pasted in the wizard
+ *   2. Bundled BK logo for the seed BK org (slug 'burger-king')
+ *   3. Coloured initial chip using org.brand_color + first letter
+ */
+function OrgMark({ org }) {
+  if (org?.logo_url) {
+    return <img src={org.logo_url} alt={org.name || 'Organisation'} className="admin-topbar__brand-bk" />;
+  }
+  if (org?.slug === 'burger-king' || org?.slug === 'burgerking') {
+    return <img src={burgerKingLogo} alt={org.name || 'Burger King'} className="admin-topbar__brand-bk" />;
+  }
+  const letter = (org?.name || '?').trim().charAt(0).toUpperCase() || '?';
+  return (
+    <span
+      className="admin-topbar__brand-chip"
+      style={{ background: org?.brand_color || '#FD6F46' }}
+      aria-label={org?.name || 'Organisation'}
+    >
+      {letter}
+    </span>
+  );
+}
 
 /* Stripped-down admin top bar.
  *
@@ -22,6 +48,7 @@ import './AdminTopBar.css';
  *   • publish-error bar at the very top when a publish fails (rare) */
 export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenSupport }) {
   const { publishError, clearPublishError } = draftState || {};
+  const { activeOrg } = useOrg();
 
   return (
     <>
@@ -45,7 +72,7 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenS
           <div className="admin-topbar__brand">
             <img src={packperksLogoDark} alt="PackPerks" className="admin-topbar__brand-pp" />
             <span className="admin-topbar__brand-x">×</span>
-            <img src={burgerKingLogo} alt="Burger King" className="admin-topbar__brand-bk" />
+            <OrgMark org={activeOrg} />
           </div>
         </div>
 

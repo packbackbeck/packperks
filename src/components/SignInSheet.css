@@ -128,6 +128,18 @@
   margin-bottom: 14px;
   transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
+
+/* Numeric-only 6-digit OTP input gets wider character spacing so the
+ * code is easy to read back from the screen, and a tabular font so all
+ * six glyphs are the same width. */
+.signin-input--code {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4em;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 14px 10px;
+}
 .signin-input::placeholder { color: #B8B2A8; }
 .signin-input:hover { background: #FFFFFF; }
 .signin-input:focus {
@@ -186,4 +198,28 @@
   color: #9E9A93;
   line-height: 1.45;
   max-width: 320px;
+}
+
+/* Divider between the primary "save email" form and the secondary
+ * "restore" entry point — keeps the visual hierarchy clear that
+ * "restore" is the lesser-used path without hiding it in a menu. */
+.signin-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 18px 0 10px;
+}
+.signin-divider__rule {
+  flex: 1;
+  height: 1px;
+  background: #E5DECF;
+}
+.signin-divider__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9E9A93;
+  white-space: nowrap;
 }

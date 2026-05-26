@@ -346,6 +346,23 @@
   object-fit: contain;
 }
 
+/* Coloured initial chip — used when the active org has no logo_url
+ * and isn't one of the bundled brand assets. The background colour
+ * comes from the org's brand_color so it stays visually distinct. */
+.admin-topbar__brand-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
 /* P-37: timezone pill in the top-bar right slot. Tiny enough that it
  * fades into the chrome but always visible so admins know which tz
  * the dashboard's clocks are speaking. */

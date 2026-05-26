@@ -266,6 +266,38 @@
 }
 .ac-thumb--empty:hover { border-color: #E8E2D9; }
 
+/* Hidden-image variant of the thumbnail. Replaces the photo with a
+ * coloured pill so the admin sees there WAS an image but can't view
+ * it directly. Tone splits AI-flagged (red) vs admin-hidden (amber):
+ * a quick visual cue for triage. */
+.ac-thumb--hidden {
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.ac-thumb--hidden:hover { border-color: currentColor; }
+.ac-thumb--hidden-ai {
+  background: rgba(199, 62, 29, 0.10);
+  border-color: rgba(199, 62, 29, 0.35);
+  color: #8E1F12;
+}
+.ac-thumb--hidden-admin {
+  background: rgba(214, 149, 0, 0.10);
+  border-color: rgba(214, 149, 0, 0.35);
+  color: #8A5A00;
+}
+.ac-thumb__hidden-label {
+  font-size: 8px;
+}
+
 /* Make verdict chips look clickable when they are */
 .ac-receipt-chip--clickable {
   border: none;

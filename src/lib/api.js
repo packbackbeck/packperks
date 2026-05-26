@@ -206,6 +206,66 @@ export async function signOutUser() {
   if (error) throw error
 }
 
+// ── Restore-by-email flow (lost-my-cups recovery) ─────────────────────────
+// Symmetric to sendMagicLink but explicitly intended for the "I lost my
+// cups" path where the user types the 6-digit OTP into the UI instead of
+// clicking the link in the email. Same Supabase Auth endpoint either way
+// — the difference is purely how the client picks up the session.
+export async function requestRestoreOtp(email) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    throw new Error('invalid_email')
+  }
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      // Create the auth.users row if it doesn't exist yet. The edge
+      // function's "no_prior_history" branch handles the case where
+      // the email has no PackPerks footprint — they just become a
+      // fresh user after the standard SIGNED_IN flow.
+      shouldCreateUser: true,
+      // No emailRedirectTo override — we WANT the user to come back
+      // through the in-app code entry, not a magic-link round trip.
+    },
+  })
+  if (error) throw error
+}
+
+// Verify the 6-digit code the user typed. On success, a Supabase Auth
+// session is established (same as if they'd clicked the magic link).
+// We then call the restore-by-email edge function to actually merge
+// their device row into the email-side history.
+export async function verifyRestoreOtp(email, code) {
+  if (!email || !code) throw new Error('missing_email_or_code')
+  const cleaned = String(code).replace(/\D/g, '').slice(0, 6)
+  if (cleaned.length !== 6) throw new Error('invalid_code')
+  const { error } = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: cleaned,
+    type: 'email',
+  })
+  if (error) throw error
+}
+
+// Finalise the restore: ask the edge function to find the email-side
+// users row, merge any cups the current device has into it, and link
+// the rows together. Must be called AFTER verifyRestoreOtp succeeds so
+// there's a valid auth session for the JWT check on the server.
+//
+// Returns the function's structured response — UIs that want to show
+// "we restored N cups" can read `merged_balance` when status === 'merged'.
+export async function finaliseRestore() {
+  const deviceId = getDeviceId()
+  const { data, error } = await supabase.functions.invoke('restore-by-email', {
+    body: { device_id: deviceId },
+  })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.detail || payload?.error || error.message), { detail: payload })
+  }
+  return data
+}
+
 // Read-only helper for components that want to show the current email
 // in a "signed in as …" affordance.
 export async function getCurrentAuthEmail() {
@@ -250,6 +310,50 @@ export async function getCupBalance(userId) {
 
   if (error) throw error
   return data?.balance ?? 0
+}
+
+// Cumulative stats for the user-app impact card.
+// `lifetime_cups` is the running total of every cup ever credited to
+// this user — never decremented, even when they redeem rewards. Used
+// by the impact metrics card to show "you've returned N cups across
+// your whole time using PackPerks". The current `balance` is also
+// returned in the same trip so the caller can avoid a second query.
+export async function getUserStats(userId) {
+  if (!userId) return { balance: 0, lifetimeCups: 0 }
+  const { data, error } = await supabase
+    .from('cup_balances')
+    .select('balance, lifetime_cups')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return {
+    balance:      data?.balance       ?? 0,
+    lifetimeCups: data?.lifetime_cups ?? 0,
+  }
+}
+
+// Community-wide totals for the Impact detail modal. Sums every
+// cup_balances row's `lifetime_cups` (optionally scoped to a single
+// org) so the customer sees the real, server-sourced "look what we've
+// done together" number — not a marketing estimate.
+//
+// Scoping: pass an `orgId` to get just that brand's community total
+// (the more common case for per-org campaigns). Pass null/undefined
+// to get the cross-org PackPerks-wide total. RLS on cup_balances
+// permits authenticated reads (same as `getCupBalance` already does)
+// so anonymous users count too.
+export async function getGlobalImpact(orgId) {
+  let query = supabase.from('cup_balances').select('lifetime_cups')
+  if (orgId) query = query.eq('org_id', orgId)
+  const { data, error } = await query
+  if (error) throw error
+  let totalLifetime = 0
+  let userCount = 0
+  for (const row of data || []) {
+    totalLifetime += row?.lifetime_cups || 0
+    if ((row?.lifetime_cups || 0) > 0) userCount += 1
+  }
+  return { totalLifetimeCups: totalLifetime, returningUsers: userCount }
 }
 
 export async function updateCupBalance(userId, newBalance) {

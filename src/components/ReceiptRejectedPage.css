@@ -98,6 +98,59 @@
   color: #C73E1D;
 }
 
+/* "Your cups are safe" reassurance banner. Pinned high in the layout
+ * (between title and check list) so users see it before they read any
+ * fine print. Soft green to convey "all good" without competing with
+ * the success-state colour palette. */
+.rj-cups-safe {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 1rem;
+  background: rgba(26, 135, 55, 0.10);
+  border: 1px solid rgba(26, 135, 55, 0.30);
+  border-radius: 12px;
+  font-size: 0.82rem;
+  color: #14532D;
+  line-height: 1.4;
+}
+.rj-cups-safe svg {
+  flex-shrink: 0;
+  color: #1A8737;
+}
+
+/* "What to do next" — actionable copy tailored to the failure code.
+ * Visually distinct from the optional "Why" reason block (which is
+ * the verbose AI summary) so it draws the eye even on a long page. */
+.rj-next {
+  width: 100%;
+  max-width: 340px;
+  background: #FFFFFF;
+  border: 1px solid #E7DDD0;
+  border-radius: 12px;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+}
+.rj-next__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6B645B;
+}
+.rj-next__text {
+  font-size: 0.9rem;
+  color: #1A1A1A;
+  line-height: 1.45;
+}
+
 .rj-reason {
   width: 100%;
   max-width: 340px;
@@ -158,7 +211,22 @@
   cursor: pointer;
 }
 .rj-actions__secondary:hover { color: #1A1A1A; }
-/* Append these to src/components/ReceiptRejectedPage.css */
+
+/* "Still stuck? Get help" link — opens mailto: with pre-filled claim
+ * metadata. Lives below the primary CTAs so it's available but never
+ * competes with the recommended action ("Try a different receipt"). */
+.rj-help {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #7A7166;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.rj-help:hover { color: #1A1A1A; }
+
 
 .rj-checks__skipped {
   margin-top: 0.625rem;

@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
-import { getReceiptSignedUrl } from '../lib/adminApi';
+import { getReceiptSignedUrl, hideClaimImage, unhideClaimImage } from '../lib/adminApi';
 import PiiMask from '../shared/PiiMask';
 import ClaimStatusPills from '../shared/ClaimStatusPills';
 import PermissionGate from '../auth/PermissionGate';
+import { useAuth, hasPermission } from '../auth/AuthContext';
+import { logAction } from '../auth/actionLog';
+import { useOrg } from '../context/OrgContext';
+import {
+  getPassLabel,
+  getFailureLabel,
+  ALL_FAILURE_CODES,
+  AI_MANUAL_REVIEW_CONFIDENCE,
+} from '../lib/aiVerdictLabels';
 // Reuse the existing styles defined for the receipts page — they cover
 // .rc-detail, .rc-status, .rc-ai-panel, .rc-lightbox, etc.
 import '../receipts/AdminReceiptCheck.css';
@@ -22,13 +31,6 @@ import '../receipts/AdminReceiptCheck.css';
  * which contain the audit-log + state-merge logic.
  * ───────────────────────────────────────────────────────────────────── */
 
-const AI_CHECK_LABELS = {
-  is_receipt: 'Is a receipt',
-  is_authentic_burger_king: 'Authentic Burger King',
-  contains_required_item: 'Contains reward item',
-  duplicate_receipt: 'Not a duplicate',
-};
-
 function formatDate(ts) {
   if (!ts) return '—';
   return new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -47,6 +49,9 @@ function formatDate(ts) {
 const AI_CONFIDENCE_PASS_THRESHOLD = 0.50;
 
 function AiVerdictPanel({ claim }) {
+  const { activeOrg } = useOrg();
+  const partnerBrand = activeOrg?.partner_brand_name || activeOrg?.name;
+
   if (!claim || !claim.verified_at) {
     return (
       <div className="rc-ai-panel rc-ai-panel--empty">
@@ -55,34 +60,55 @@ function AiVerdictPanel({ claim }) {
       </div>
     );
   }
-  const checks = [
-    { key: 'is_receipt',                 passed: claim.ai_is_receipt },
-    { key: 'is_authentic_burger_king',   passed: claim.ai_is_burger_king },
-    { key: 'contains_required_item',     passed: claim.ai_contains_required_item },
+  // The "core three" checks are tracked as booleans on the claim row
+  // for fast filtering. Post-AI guards (duplicate_receipt,
+  // is_newer_than_cup_return) don't have their own boolean column —
+  // they only appear inside `ai_failure_checks`, so we synthesise rows
+  // for them below.
+  const coreChecks = [
+    { key: 'is_receipt',               passed: claim.ai_is_receipt },
+    { key: 'is_authentic_burger_king', passed: claim.ai_is_burger_king },
+    { key: 'contains_required_item',   passed: claim.ai_contains_required_item },
   ];
   const failedChecks = claim.ai_failure_checks || [];
-  const isDuplicate = failedChecks.includes('duplicate_receipt');
+  const isDuplicate    = failedChecks.includes('duplicate_receipt');
+  const isOldReceipt   = failedChecks.includes('is_newer_than_cup_return');
+  // Anything not in the core three is treated as a "post-AI guard"
+  // failure and rendered as its own chip. This way new guard codes
+  // automatically render correctly without needing per-code wiring.
+  const extraFailures = failedChecks.filter(c => !coreChecks.some(cc => cc.key === c));
   const confidence = claim.ai_confidence ?? 0;
-  const rawAllPassed = checks.every(c => c.passed) && !isDuplicate;
+  const rawAllPassed = coreChecks.every(c => c.passed) && extraFailures.length === 0;
 
   // Effective verdict gates the "all passed" optimism on the model's
   // own confidence. If Claude is < 50% sure but happened to emit all
   // three `true`s, we treat the whole verdict as "uncertain" — the
   // admin must look at the photo and decide.
-  const lowConfidence = confidence < AI_CONFIDENCE_PASS_THRESHOLD;
+  //
+  // Manual-review pill: bumped to AI_MANUAL_REVIEW_CONFIDENCE so even
+  // "kinda confident" verdicts get a "needs eyes" nudge.
+  const lowConfidence       = confidence < AI_CONFIDENCE_PASS_THRESHOLD;
+  const needsManualReview   = confidence < AI_MANUAL_REVIEW_CONFIDENCE && rawAllPassed;
   const allPassed = rawAllPassed && !lowConfidence;
-  const tone = allPassed ? 'pass' : (lowConfidence && rawAllPassed ? 'uncertain' : 'fail');
+  const tone = allPassed ? 'pass' : (needsManualReview ? 'uncertain' : 'fail');
 
   return (
     <div className={`rc-ai-panel rc-ai-panel--${tone}`}>
       <div className="rc-ai-panel__header">
         <span className="rc-ai-panel__title">AI check</span>
-        <span className={`rc-ai-panel__confidence${lowConfidence ? ' rc-ai-panel__confidence--low' : ''}`}>
-          {(confidence * 100).toFixed(0)}% confident
-        </span>
+        <div className="rc-ai-panel__header-right">
+          {needsManualReview && (
+            <span className="rc-ai-panel__pill rc-ai-panel__pill--review">
+              Manual review needed
+            </span>
+          )}
+          <span className={`rc-ai-panel__confidence${lowConfidence ? ' rc-ai-panel__confidence--low' : ''}`}>
+            {(confidence * 100).toFixed(0)}% confident
+          </span>
+        </div>
       </div>
 
-      {lowConfidence && rawAllPassed && (
+      {needsManualReview && (
         <div className="rc-ai-panel__override">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
@@ -96,18 +122,29 @@ function AiVerdictPanel({ claim }) {
         </div>
       )}
       <div className="rc-ai-panel__checks">
-        {checks.map(c => (
+        {coreChecks.map(c => (
           <div key={c.key} className={`rc-ai-check rc-ai-check--${c.passed ? 'pass' : 'fail'}`}>
             <span className="rc-ai-check__dot">{c.passed ? '✓' : '✕'}</span>
-            <span className="rc-ai-check__label">{AI_CHECK_LABELS[c.key]}</span>
+            <span className="rc-ai-check__label">
+              {getPassLabel(c.key, { partnerBrand })}
+              {!c.passed && (
+                <span className="rc-ai-check__code"> · {getFailureLabel(c.key, { partnerBrand })}</span>
+              )}
+            </span>
           </div>
         ))}
-        {isDuplicate && (
-          <div className="rc-ai-check rc-ai-check--fail">
+        {/* Post-AI guard failures (duplicate, older-than-cups, future
+             codes). Always render as fail since they only appear in
+             ai_failure_checks when they tripped. */}
+        {extraFailures.map(code => (
+          <div key={code} className="rc-ai-check rc-ai-check--fail">
             <span className="rc-ai-check__dot">✕</span>
-            <span className="rc-ai-check__label">Not a duplicate</span>
+            <span className="rc-ai-check__label">
+              {getPassLabel(code, { partnerBrand })}
+              <span className="rc-ai-check__code"> · {getFailureLabel(code, { partnerBrand })}</span>
+            </span>
           </div>
-        )}
+        ))}
       </div>
       {claim.ai_required_item && (
         <div className="rc-ai-panel__row">
@@ -150,9 +187,16 @@ function AiVerdictPanel({ claim }) {
   );
 }
 
-export default function ClaimDetailPanel({ claim, onApprove, onFail, updating }) {
+export default function ClaimDetailPanel({ claim, onApprove, onFail, onClaimUpdate, updating }) {
+  const { profile } = useAuth();
+  const canHideImage = hasPermission(profile?.role, 'claim.hide_image');
   const [lightbox, setLightbox] = useState(false);
   const [signedUrl, setSignedUrl] = useState(null);
+  /* Hide-image modal (admin-side moderation). Mirrors the decision-
+   * modal pattern below: one piece of state opens the dialog, the
+   * dialog itself takes the reason input. */
+  const [hideModal, setHideModal] = useState(false);
+  const [hideBusy, setHideBusy] = useState(false);
   /* Decision modal — opened by Approve/Reject. Lives at this level so
    * the same modal handles both flows (different copy + required-reason
    * rule). `kind: 'approve' | 'reject' | null`. */
@@ -230,9 +274,36 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, updating })
         <ClaimStatusPills claim={claim} />
       </div>
 
-      {/* Receipt photo */}
+      {/* Receipt photo (or a "hidden" placeholder when an admin or
+          the AI moderator has flagged the image as inappropriate /
+          PII / etc. The user-side upload is left untouched — only the
+          admin view is suppressed). */}
       <div className="rc-detail__photo-wrap">
-        {photoSrc ? (
+        {claim.image_hidden ? (
+          <HiddenImageTile
+            reason={claim.image_hidden_reason}
+            hiddenBy={claim.image_hidden_by}
+            hiddenAt={claim.image_hidden_at}
+            canUnhide={canHideImage}
+            busy={hideBusy}
+            onUnhide={async () => {
+              setHideBusy(true);
+              try {
+                const updated = await unhideClaimImage(claim.id);
+                logAction({
+                  action: 'claim.unhide_image',
+                  targetType: 'claim',
+                  targetId: claim.id,
+                });
+                onClaimUpdate?.(updated);
+              } catch (e) {
+                console.error('unhide failed:', e);
+              } finally {
+                setHideBusy(false);
+              }
+            }}
+          />
+        ) : photoSrc ? (
           <>
             <img
               src={photoSrc}
@@ -247,6 +318,20 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, updating })
               </svg>
               Click to enlarge
             </div>
+            {canHideImage && (
+              <button
+                type="button"
+                className="rc-detail__photo-hide"
+                onClick={() => setHideModal(true)}
+                title="Hide this image from admin reviewers"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+                Hide image
+              </button>
+            )}
           </>
         ) : (
           <div className="rc-detail__photo-empty">
@@ -406,12 +491,141 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, updating })
         />
       )}
 
-      {lightbox && photoSrc && (
+      {lightbox && photoSrc && !claim.image_hidden && (
         <div className="rc-lightbox" onClick={() => setLightbox(false)}>
           <button className="rc-lightbox__close" onClick={e => { e.stopPropagation(); setLightbox(false); }}>×</button>
           <img src={photoSrc} alt="Receipt enlarged" className="rc-lightbox__img" onClick={e => e.stopPropagation()} />
         </div>
       )}
+
+      {hideModal && (
+        <HideImageModal
+          busy={hideBusy}
+          onCancel={() => setHideModal(false)}
+          onConfirm={async (reason) => {
+            setHideBusy(true);
+            try {
+              const updated = await hideClaimImage(claim.id, reason);
+              logAction({
+                action: 'claim.hide_image',
+                targetType: 'claim',
+                targetId: claim.id,
+                metadata: { reason: reason || null },
+              });
+              onClaimUpdate?.(updated);
+              setHideModal(false);
+            } catch (e) {
+              console.error('hide failed:', e);
+            } finally {
+              setHideBusy(false);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * HiddenImageTile — neutral placeholder rendered in place of the
+ * receipt photo when claim.image_hidden = true.
+ *
+ * Two flavours:
+ *   • AI-flagged (image_hidden_by === null) → red "Hidden by content
+ *     moderation" tone. Surfaces the moderation category from
+ *     image_hidden_reason so an admin can see why without exposing
+ *     the image.
+ *   • Admin-hidden → amber "Hidden by admin" tone. Surfaces the
+ *     freeform reason the admin typed.
+ *
+ * Both variants offer an Unhide button gated by `canUnhide` (the
+ * `claim.hide_image` permission). Reverting goes through
+ * unhideClaimImage in adminApi.
+ * ───────────────────────────────────────────────────────────────────── */
+function HiddenImageTile({ reason, hiddenBy, hiddenAt, canUnhide, busy, onUnhide }) {
+  const isAiHidden = !hiddenBy;
+  const category = (reason || '').replace(/^ai_/, '').replace(/^admin:\s*/, '');
+  const formatted = hiddenAt
+    ? new Date(hiddenAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  return (
+    <div className={`rc-detail__hidden ${isAiHidden ? 'rc-detail__hidden--ai' : 'rc-detail__hidden--admin'}`}>
+      <div className="rc-detail__hidden-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+      </div>
+      <div className="rc-detail__hidden-title">
+        {isAiHidden ? 'Hidden — inappropriate' : 'Image hidden by admin'}
+      </div>
+      <div className="rc-detail__hidden-sub">
+        {isAiHidden
+          ? `Auto-flagged by content moderation${category ? ` (${category})` : ''}.`
+          : `Reason: ${category || 'not provided'}`}
+        {formatted && <span className="rc-detail__hidden-date"> · {formatted}</span>}
+      </div>
+      <p className="rc-detail__hidden-help">
+        The user's own copy of this upload is still visible to them.
+        Approval requires reviewable evidence — consider rejecting this claim.
+      </p>
+      {canUnhide && (
+        <button
+          type="button"
+          className="rc-detail__hidden-unhide"
+          onClick={onUnhide}
+          disabled={busy}
+        >
+          {busy ? 'Working…' : 'Unhide image'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * HideImageModal — confirm dialog with an optional reason field.
+ *
+ * Hiding a receipt is reversible (we keep the storage object and a
+ * full audit trail) so we don't require a reason, but we strongly
+ * encourage one — the placeholder lists what we're looking for so the
+ * admin doesn't have to think too hard.
+ * ───────────────────────────────────────────────────────────────────── */
+function HideImageModal({ busy, onCancel, onConfirm }) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className="rc-decision-backdrop" onClick={onCancel}>
+      <div className="rc-decision-modal" onClick={e => e.stopPropagation()}>
+        <h3 className="rc-decision-modal__title">Hide this image?</h3>
+        <p className="rc-decision-modal__sub">
+          The image will be replaced with a "hidden" placeholder for every admin
+          who reviews this claim. The user's own copy is not affected. You can
+          unhide later from this same panel.
+        </p>
+        <label className="rc-decision-modal__label" htmlFor="hide-reason">
+          Reason <span style={{ color: '#9E9A93', fontWeight: 400 }}>(optional but recommended)</span>
+        </label>
+        <textarea
+          id="hide-reason"
+          className="rc-decision-modal__textarea"
+          rows={3}
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="e.g. credit card number visible, PII in frame, AI moderator missed NSFW content"
+          disabled={busy}
+        />
+        <div className="rc-decision-modal__actions">
+          <button className="rc-decision-modal__cancel" onClick={onCancel} disabled={busy}>Cancel</button>
+          <button
+            className="rc-decision-modal__confirm rc-decision-modal__confirm--reject"
+            onClick={() => onConfirm(reason.trim())}
+            disabled={busy}
+          >
+            {busy ? 'Hiding…' : 'Hide image'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -24,7 +24,8 @@ import './CupClaimErrorPage.css';
  *                       — fallback: be honest, suggest support.
  */
 
-const COPY = {
+function buildCopy(brand) {
+  return {
   already_claimed: {
     emoji: '🔁',
     title: 'Someone already used this QR',
@@ -42,7 +43,7 @@ const COPY = {
   batch_not_found: {
     emoji: '❌',
     title: "This QR isn't valid",
-    body: "The server doesn't recognise this receipt. It might be misprinted, expired, or not from a participating Burger King.",
+    body: `The server doesn't recognise this receipt. It might be misprinted, expired, or not from a participating ${brand}.`,
     hint: "Try scanning a different receipt — make sure it's from a participating restaurant and the QR is fully in frame.",
     primary: 'Scan a different QR',
   },
@@ -57,7 +58,7 @@ const COPY = {
     emoji: '🚫',
     title: "This QR has been cancelled",
     body: "An admin marked this batch as no longer valid — usually because the receipt was misprinted or reissued.",
-    hint: "Ask Burger King staff for a replacement receipt. Your other cups are unaffected.",
+    hint: `Ask ${brand} staff for a replacement receipt. Your other cups are unaffected.`,
     primary: 'Back to home',
   },
   invalid_uuid: {
@@ -71,7 +72,7 @@ const COPY = {
     emoji: '❌',
     title: 'This QR is empty',
     body: "The QR code didn't contain any cup tokens. That shouldn't normally happen — it might be a test QR.",
-    hint: "Ask the staff at Burger King for a fresh receipt with cup tokens.",
+    hint: `Ask the staff at ${brand} for a fresh receipt with cup tokens.`,
     primary: 'Back to home',
   },
   too_many: {
@@ -95,7 +96,8 @@ const COPY = {
     hint: "Try scanning a different QR. If this keeps happening, contact support.",
     primary: 'Scan another QR',
   },
-};
+  };
+}
 
 export default function CupClaimErrorPage({
   code = 'unknown',
@@ -103,7 +105,9 @@ export default function CupClaimErrorPage({
   alreadyClaimed = [],
   onTryAgain,
   onClose,
+  orgName,
 }) {
+  const COPY = buildCopy(orgName || 'the restaurant');
   const copy = COPY[code] || COPY.unknown;
   // The body falls back to the server-supplied human reason if we don't
   // have a canned variant — this preserves any specific text the edge

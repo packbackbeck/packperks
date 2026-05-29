@@ -72,6 +72,14 @@
   object-fit: cover;
 }
 
+/* Admin-uploaded images (http(s) URLs) — fit and center, don't crop. */
+.featured-reward__image--uploaded {
+  object-fit: contain;
+  object-position: center;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
 .featured-reward__info {
   display: flex;
   flex-direction: column;

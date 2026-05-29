@@ -32,11 +32,13 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
           <img
             src={reward.image}
             alt=""
-            className="reward-card__image"
+            className={
+              'reward-card__image' +
+              (typeof reward.image === 'string' && /^https?:\/\//.test(reward.image)
+                ? ' reward-card__image--uploaded'
+                : '')
+            }
             loading="lazy"
-            style={typeof reward.image === 'string' && reward.image.startsWith('http')
-              ? { width: '150%', maxWidth: 'none', transform: 'translate(-17%, -25%)', objectFit: 'contain' }
-              : undefined}
           />
         </div>
         <div className="reward-card__info">

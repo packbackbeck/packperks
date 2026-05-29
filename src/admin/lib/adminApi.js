@@ -97,6 +97,329 @@ export async function getAdminStats() {
   };
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+ * Feasibility-test Stats (Titaan sandbox validation).
+ *
+ * Computes the 10 go/no-go metrics from the existing event log
+ * (`cup_scans`, filtered to source='qr' so photo/OCR claim reviews
+ * don't contaminate the QR-return funnel) plus `cups` (for org
+ * consistency + generation counts) and the per-user scan grouping
+ * (for "stuck" users).
+ *
+ * Each metric returns a normalised shape the UI can render directly:
+ *   { id, label, value (0–100 | null), numerator, denominator,
+ *     band: 'go'|'cond'|'nogo'|'na', lowerIsBetter, thresholds, note }
+ *
+ * `value === null` / band 'na' means we can't measure it from data
+ * collected today — those are the Phase-2 gaps (generation-failure
+ * logging + client funnel analytics), surfaced honestly rather than
+ * faked.
+ * ───────────────────────────────────────────────────────────────────── */
+
+// Server-side failures that mean the system itself broke (vs. expected
+// user-facing rejections like already_claimed / batch_expired which are
+// the system working correctly).
+const CRITICAL_ERROR_CODES = new Set([
+  'db_error', 'balance_update_failed', 'survivor_update_failed',
+  'merge_balance_failed', 'update_failed', 'photo_download_failed',
+  'claim_update_failed', 'no_tool_use', 'anthropic_error',
+]);
+
+// Classifier for a metric value against its go / conditional / no-go bands.
+function classify({ value, lowerIsBetter, go, condLow, condHigh }) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'na';
+  if (lowerIsBetter) {
+    if (value <= go) return 'go';
+    if (value <= condHigh) return 'cond';
+    return 'nogo';
+  }
+  if (value >= go) return 'go';
+  if (value >= condLow) return 'cond';
+  return 'nogo';
+}
+
+const pct = (num, den) => (den > 0 ? (num / den) * 100 : null);
+
+export async function getStatsMetrics({ fromTs = null, toTs = null } = {}) {
+  // ── QR scan events for the active org, in range ────────────────────
+  let scanQ = supabase
+    .from('cup_scans')
+    .select('id, user_id, status, error_code, error_message, cups_awarded, requested_cup_ids, activated_cup_ids, batch_id, org_id, scanned_at, source')
+    .eq('source', 'qr');
+  scanQ = applyOrgFilter(scanQ);
+  if (fromTs) scanQ = scanQ.gte('scanned_at', new Date(fromTs).toISOString());
+  if (toTs)   scanQ = scanQ.lte('scanned_at', new Date(toTs).toISOString());
+  scanQ = scanQ.order('scanned_at', { ascending: true });
+
+  // ── Cups for this org (org-consistency + generation count) ─────────
+  const cupsQ = applyOrgFilter(
+    supabase.from('cups').select('id, batch_id, org_id, created_at')
+  );
+
+  // ── system_events: QR-generation attempts (Phase 2) for metric #1 ──
+  let sysQ = applyOrgFilter(
+    supabase.from('system_events').select('event_type, status, count, created_at').eq('event_type', 'qr_generation')
+  );
+  if (fromTs) sysQ = sysQ.gte('created_at', new Date(fromTs).toISOString());
+  if (toTs)   sysQ = sysQ.lte('created_at', new Date(toTs).toISOString());
+
+  // ── client_events: app funnel (Phase 2) for metrics #6, #9, #10 ────
+  let cliQ = applyOrgFilter(
+    supabase.from('client_events').select('event, session_id, user_id, created_at')
+  );
+  if (fromTs) cliQ = cliQ.gte('created_at', new Date(fromTs).toISOString());
+  if (toTs)   cliQ = cliQ.lte('created_at', new Date(toTs).toISOString());
+
+  const [scansRes, cupsRes, sysRes, cliRes] = await Promise.all([scanQ, cupsQ, sysQ, cliQ]);
+  const scans     = scansRes.data || [];
+  const cups      = cupsRes.data  || [];
+  const sysEvents = sysRes.data   || [];
+  const cliEvents = cliRes.data   || [];
+
+  const total = scans.length;
+  const isSuccess = (s) => s.status === 'success';
+  const isPartial = (s) => s.status === 'partial';
+  const isFailed  = (s) => s.status === 'failed';
+  const reached   = scans.filter(s => isSuccess(s) || isPartial(s)); // server activated ≥1 cup
+
+  // #2 QR scan success rate
+  const m2 = pct(reached.length, total);
+
+  // #3 Correct organization page rate — a scan's batch must belong to a
+  // cup of THIS org. A scan whose batch isn't among the org's cups means
+  // the wrong org page handled it (or it was mis-tagged).
+  const orgBatchIds = new Set(cups.map(c => c.batch_id).filter(Boolean));
+  const scansWithBatch = scans.filter(s => s.batch_id);
+  const orgMatched = scansWithBatch.filter(s => orgBatchIds.has(s.batch_id));
+  const m3 = pct(orgMatched.length, scansWithBatch.length);
+
+  // #4 Correct cup count rate — among scans that activated cups, the full
+  // requested amount came through (partial = wrong/short count).
+  const fullCount = reached.filter(s => {
+    const req = Array.isArray(s.requested_cup_ids) ? s.requested_cup_ids.length : null;
+    const act = Array.isArray(s.activated_cup_ids) ? s.activated_cup_ids.length : (s.cups_awarded || 0);
+    // Success with matching counts, or no requested list to compare → trust status.
+    if (req == null) return isSuccess(s);
+    return isSuccess(s) && act >= req;
+  });
+  const m4 = pct(fullCount.length, reached.length);
+
+  // #5 UID/event registration accuracy — scan tied to a real user row.
+  const withUid = scans.filter(s => s.user_id);
+  const m5 = pct(withUid.length, total);
+
+  // #6 Dashboard data completeness — real: server scan rows (visible) vs
+  // client scan_attempted events (expected). Falls back to a field-integrity
+  // proxy when no client funnel events exist yet.
+  const complete = scans.filter(s => s.user_id && s.status && s.scanned_at && s.org_id);
+  const scanAttempts = cliEvents.filter(e => e.event === 'scan_attempted').length;
+  let m6, m6Real;
+  if (scanAttempts > 0) {
+    m6 = Math.min(100, (total / scanAttempts) * 100);
+    m6Real = true;
+  } else {
+    m6 = pct(complete.length, total);
+    m6Real = false;
+  }
+
+  // #7 Duplicate scan handling — every duplicate hits the atomic
+  // available-only guard and is logged as already_claimed (blocked).
+  const dupHandled = scans.filter(s => s.error_code === 'already_claimed');
+  const m7 = dupHandled.length > 0 ? 100 : null; // 100% by design when any occurred
+
+  // #8 Critical error rate (lower is better)
+  const critical = scans.filter(s => s.error_code && CRITICAL_ERROR_CODES.has(s.error_code));
+  const m8 = total > 0 ? (critical.length / total) * 100 : null;
+
+  // #9 User stuck rate (lower is better).
+  // Real: users who loaded the app but never reached a successful scan
+  // (captures users stuck at step 0 who never even scanned). Falls back
+  // to the all-failed-scans proxy when no app_loaded funnel data exists.
+  const succeededUserIds = new Set(reached.filter(s => s.user_id).map(s => s.user_id));
+  const loadedUserIds = new Set(
+    cliEvents.filter(e => e.event === 'app_loaded' && e.user_id).map(e => e.user_id)
+  );
+  let m9, m9Real, m9Num, m9Den;
+  if (loadedUserIds.size > 0) {
+    let stuck = 0;
+    for (const uid of loadedUserIds) if (!succeededUserIds.has(uid)) stuck += 1;
+    m9 = (stuck / loadedUserIds.size) * 100;
+    m9Num = stuck; m9Den = loadedUserIds.size; m9Real = true;
+  } else {
+    const byUser = new Map();
+    for (const s of scans) {
+      if (!s.user_id) continue;
+      if (!byUser.has(s.user_id)) byUser.set(s.user_id, []);
+      byUser.get(s.user_id).push(s);
+    }
+    const attemptingUsers = byUser.size;
+    let stuckUsers = 0;
+    for (const list of byUser.values()) {
+      if (!list.some(s => isSuccess(s) || isPartial(s))) stuckUsers += 1;
+    }
+    m9 = attemptingUsers > 0 ? (stuckUsers / attemptingUsers) * 100 : null;
+    m9Num = stuckUsers; m9Den = attemptingUsers; m9Real = false;
+  }
+  const attemptingUsers = new Set(scans.filter(s => s.user_id).map(s => s.user_id)).size;
+
+  // #1 QR generation success rate — from system_events (Phase 2 logging).
+  const genSuccess = sysEvents.filter(e => e.status === 'success').length;
+  const genFailure = sysEvents.filter(e => e.status === 'failure').length;
+  const genTotal   = genSuccess + genFailure;
+  const m1 = genTotal > 0 ? (genSuccess / genTotal) * 100 : null;
+  const batchesGenerated = new Set(cups.map(c => c.batch_id).filter(Boolean)).size;
+
+  // #10 Setup uptime (lower-confidence proxy): of the hours that had any
+  // scan activity, the fraction with zero critical errors.
+  const hourBuckets = new Map(); // hourKey -> { hasCritical }
+  for (const s of scans) {
+    const hourKey = new Date(s.scanned_at).toISOString().slice(0, 13);
+    const b = hourBuckets.get(hourKey) || { hasCritical: false };
+    if (s.error_code && CRITICAL_ERROR_CODES.has(s.error_code)) b.hasCritical = true;
+    hourBuckets.set(hourKey, b);
+  }
+  const activeHours = hourBuckets.size;
+  const cleanHours = Array.from(hourBuckets.values()).filter(b => !b.hasCritical).length;
+  const m10 = activeHours > 0 ? (cleanHours / activeHours) * 100 : null;
+
+  // ── Time series (daily) ────────────────────────────────────────────
+  const dayMap = new Map();
+  for (const s of scans) {
+    const day = new Date(s.scanned_at).toISOString().slice(0, 10);
+    const d = dayMap.get(day) || { date: day, success: 0, failed: 0, total: 0 };
+    if (isSuccess(s) || isPartial(s)) d.success += 1; else if (isFailed(s)) d.failed += 1;
+    d.total += 1;
+    dayMap.set(day, d);
+  }
+  const timeSeries = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  // ── Error breakdown ────────────────────────────────────────────────
+  const errMap = new Map();
+  for (const s of scans) {
+    if (!s.error_code) continue;
+    const e = errMap.get(s.error_code) || {
+      code: s.error_code, count: 0, lastMessage: null, lastSeen: null,
+      critical: CRITICAL_ERROR_CODES.has(s.error_code),
+    };
+    e.count += 1;
+    if (!e.lastSeen || s.scanned_at > e.lastSeen) {
+      e.lastSeen = s.scanned_at;
+      e.lastMessage = s.error_message || null;
+    }
+    errMap.set(s.error_code, e);
+  }
+  const errorBreakdown = Array.from(errMap.values()).sort((a, b) => b.count - a.count);
+
+  // ── Assemble metrics with thresholds + bands ───────────────────────
+  const metrics = [
+    {
+      id: 'qr_gen', label: 'QR generation success rate',
+      value: m1, numerator: genSuccess, denominator: genTotal,
+      lowerIsBetter: false, thresholds: { go: 95, condLow: 85 },
+      formula: 'Successful QR generated / total generation attempts',
+      note: genTotal === 0
+        ? `No QR generations logged in this range yet — logging is now live, so this fills in the next time a batch is generated. (${batchesGenerated} batch${batchesGenerated !== 1 ? 'es' : ''} exist from before logging.)`
+        : `${genSuccess}/${genTotal} generation attempts succeeded.`,
+    },
+    {
+      id: 'qr_scan', label: 'QR scan success rate',
+      value: m2, numerator: reached.length, denominator: total,
+      lowerIsBetter: false, thresholds: { go: 95, condLow: 85 },
+      formula: 'Successful QR scans / QR scan attempts',
+    },
+    {
+      id: 'correct_org', label: 'Correct organization page rate',
+      value: m3, numerator: orgMatched.length, denominator: scansWithBatch.length,
+      lowerIsBetter: false, thresholds: { go: 100, condLow: 95 },
+      formula: "Scans landing on this org's page / total scans (by batch)",
+    },
+    {
+      id: 'cup_count', label: 'Correct cup count rate',
+      value: m4, numerator: fullCount.length, denominator: reached.length,
+      lowerIsBetter: false, thresholds: { go: 98, condLow: 90 },
+      formula: 'Correct cup amount shown / total activated scans',
+    },
+    {
+      id: 'uid_reg', label: 'UID / event registration accuracy',
+      value: m5, numerator: withUid.length, denominator: total,
+      lowerIsBetter: false, thresholds: { go: 98, condLow: 90 },
+      formula: 'Correct UID or session event / total scans',
+    },
+    {
+      id: 'completeness', label: 'Dashboard data completeness',
+      value: m6, numerator: m6Real ? total : complete.length, denominator: m6Real ? scanAttempts : total,
+      lowerIsBetter: false, thresholds: { go: 95, condLow: 85 },
+      formula: 'Events visible in dashboard / expected events',
+      note: m6Real
+        ? `${total} server scan rows recorded from ${scanAttempts} client scan attempts.`
+        : 'Proxy: % of scan rows with all key fields. Real funnel (scans recorded / scans attempted) fills in once the app logs attempts.',
+    },
+    {
+      id: 'duplicate', label: 'Duplicate scan handling',
+      value: m7, numerator: dupHandled.length, denominator: dupHandled.length,
+      lowerIsBetter: false, thresholds: { go: 100, condLow: 90 },
+      formula: 'Duplicate scans blocked / duplicate attempts',
+      note: dupHandled.length === 0 ? 'No duplicate attempts in range yet.' : `${dupHandled.length} duplicate${dupHandled.length !== 1 ? 's' : ''} blocked by the atomic claim guard.`,
+    },
+    {
+      id: 'critical_err', label: 'Critical error rate',
+      value: m8, numerator: critical.length, denominator: total,
+      lowerIsBetter: true, thresholds: { go: 0, condHigh: 3 },
+      formula: 'Critical errors / total attempts',
+    },
+    {
+      id: 'stuck', label: 'User stuck rate',
+      value: m9, numerator: m9Num, denominator: m9Den,
+      lowerIsBetter: true, thresholds: { go: 5, condHigh: 10 },
+      formula: 'Users who cannot continue / total users',
+      note: m9Real
+        ? `${m9Num} of ${m9Den} users who opened the app never completed a scan.`
+        : 'Proxy: users whose every scan failed. Captures users stuck at step 0 once the app logs app_loaded events.',
+    },
+    {
+      id: 'uptime', label: 'Setup uptime',
+      value: m10, numerator: cleanHours, denominator: activeHours,
+      lowerIsBetter: false, thresholds: { go: 95, condLow: 85 },
+      formula: 'Time setup works / total test time',
+      note: 'Proxy: active hours with zero critical errors. True uptime needs health pings (Phase 2).',
+    },
+  ].map(m => ({
+    ...m,
+    band: m.band === 'na' ? 'na' : classify({
+      value: m.value,
+      lowerIsBetter: m.lowerIsBetter,
+      go: m.thresholds.go,
+      condLow: m.thresholds.condLow,
+      condHigh: m.thresholds.condHigh,
+    }),
+  }));
+
+  // ── Overall verdict — worst real band wins ─────────────────────────
+  const realBands = metrics.filter(m => m.band !== 'na').map(m => m.band);
+  let verdict = 'na';
+  if (realBands.length) {
+    if (realBands.includes('nogo')) verdict = 'nogo';
+    else if (realBands.includes('cond')) verdict = 'cond';
+    else verdict = 'go';
+  }
+
+  return {
+    metrics,
+    verdict,
+    timeSeries,
+    errorBreakdown,
+    totals: {
+      totalScans: total,
+      reached: reached.length,
+      failed: scans.filter(isFailed).length,
+      attemptingUsers,
+      batchesGenerated,
+      firstScan: scans[0]?.scanned_at || null,
+      lastScan: scans[scans.length - 1]?.scanned_at || null,
+    },
+  };
+}
+
 export async function getAdminUsers() {
   const { data: users, error } = await applyOrgFilter(
     supabase

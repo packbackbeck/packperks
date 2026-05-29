@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { saveAppConfig, getAppConfig } from '../../lib/api';
 import { useOrg } from '../context/OrgContext';
 
@@ -82,30 +82,54 @@ function loadFromStorage(key, fallback) {
   }
 }
 
-/* One-time migration from the legacy (no-suffix) keys to the per-org
- * keys. Runs once per orgId — if the per-org key already has data we
- * skip, so a re-publish doesn't get clobbered by old legacy data.
+const LEGACY_MIGRATION_FLAG = 'pp_admin_legacy_cleanup_v2';
+
+/* One-time legacy data cleanup. Runs once per browser, not per org.
  *
- * The legacy keys themselves are NOT deleted — multiple orgs may want
- * to bootstrap from the same legacy draft, and we'd rather leak a few
- * KB of localStorage than risk data loss. */
+ * History: an earlier version of this hook copied the legacy (pre-multi-org)
+ * `pp_admin_draft` key into `pp_admin_draft:<orgId>` the FIRST time each
+ * org was visited. That meant every newly-created org silently inherited
+ * the first/default org's draft data and never refetched from Supabase —
+ * cross-tenant data leak.
+ *
+ * This rewrite drops the legacy-to-per-org copy entirely. Anyone using
+ * multi-org for any time has already published their data to Supabase
+ * (the source of truth); any unpublished draft sitting only in the
+ * legacy key is acceptable collateral against the leak.
+ *
+ * On first run after the fix, also clean up the existing pollution by
+ * deleting any per-org draft/versions/published key whose value is
+ * byte-identical to the legacy key (those entries can only have been
+ * produced by the buggy copy). The org will then re-fetch its real
+ * published config from Supabase on next mount. */
 function migrateLegacyKeysOnce(orgId) {
   if (!orgId) return;
-  const pairs = [
-    [LEGACY_DRAFT_KEY,     draftKey(orgId)],
-    [LEGACY_VERSIONS_KEY,  versionsKey(orgId)],
-    [LEGACY_PUBLISHED_KEY, publishedKey(orgId)],
-  ];
-  for (const [oldK, newK] of pairs) {
+  try {
+    if (localStorage.getItem(LEGACY_MIGRATION_FLAG)) return;
+  } catch {
+    return;
+  }
+
+  for (const legacyKey of [LEGACY_DRAFT_KEY, LEGACY_VERSIONS_KEY, LEGACY_PUBLISHED_KEY]) {
+    let legacyVal = null;
+    try { legacyVal = localStorage.getItem(legacyKey); } catch { /* ignore */ }
+    if (!legacyVal) continue;
+    const prefix = legacyKey + ':';
+    const toDelete = [];
     try {
-      const existing = localStorage.getItem(newK);
-      if (existing) continue; // already migrated for this org
-      const legacy = localStorage.getItem(oldK);
-      if (legacy) localStorage.setItem(newK, legacy);
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix) && localStorage.getItem(k) === legacyVal) {
+          toDelete.push(k);
+        }
+      }
+      toDelete.forEach(k => localStorage.removeItem(k));
     } catch {
       /* ignore */
     }
   }
+
+  try { localStorage.setItem(LEGACY_MIGRATION_FLAG, '1'); } catch { /* ignore */ }
 }
 
 export function useAdminDraft() {
@@ -123,6 +147,17 @@ export function useAdminDraft() {
   const [publishNote, setPublishNote] = useState('');
   const [publishError, setPublishError] = useState(null);
 
+  /* Tracks which org id this hook has successfully hydrated from storage
+   * for. Auto-save paths (toggleFeature, publishDraft) MUST refuse to
+   * write to Supabase unless this matches the current activeOrgId.
+   *
+   * Why: without this guard, a user opening admin and clicking a feature
+   * toggle BEFORE the draft has finished loading from Supabase will push
+   * stale React state (possibly inherited from another org via the old
+   * localStorage migration bug) into the current org's published row.
+   * That's how Titaan's row got overwritten with BK draft data. */
+  const hydratedForOrgRef = useRef(null);
+
   /* Hydrate the draft whenever the active org changes (or on first
    * mount). Resolution order:
    *   1. Per-org localStorage `pp_admin_draft:<orgId>` — last working
@@ -136,6 +171,9 @@ export function useAdminDraft() {
    */
   useEffect(() => {
     let cancelled = false;
+    // Reset hydration flag on every org change. Auto-save paths refuse
+    // to write to Supabase until the flag matches the current org again.
+    hydratedForOrgRef.current = null;
     migrateLegacyKeysOnce(activeOrgId);
 
     const local = loadFromStorage(draftKey(activeOrgId), null);
@@ -147,6 +185,7 @@ export function useAdminDraft() {
       setLastSaved(null);
       setPublishNote('');
       setPublishError(null);
+      hydratedForOrgRef.current = activeOrgId;
       return;
     }
 
@@ -174,6 +213,7 @@ export function useAdminDraft() {
       setLastSaved(null);
       setPublishNote('');
       setPublishError(null);
+      hydratedForOrgRef.current = activeOrgId;
     }).catch(err => {
       console.error('useAdminDraft: getAppConfig failed', err);
     });
@@ -230,6 +270,11 @@ export function useAdminDraft() {
     // Push to Supabase — pass orgId so each org has its own
     // `published:<orgId>` row in app_config.
     setPublishError(null);
+    if (hydratedForOrgRef.current !== activeOrgId) {
+      console.warn('publishDraft: blocked — draft not yet hydrated for org', activeOrgId);
+      setPublishError('Draft is still loading. Wait a moment and try publishing again.');
+      return;
+    }
     saveAppConfig({ rewards: draft.rewards, settings: draft.settings }, activeOrgId).catch(err => {
       console.error('saveAppConfig failed:', err);
       setPublishError(err?.message || 'Could not save to Supabase. Check app_config table + RLS policies.');
@@ -244,6 +289,15 @@ export function useAdminDraft() {
   }, [versions]);
 
   const toggleFeature = useCallback((key) => {
+    // Refuse to auto-save if the draft hasn't been hydrated for this org
+    // yet. This blocks the cross-tenant corruption path where a polluted
+    // initial state would otherwise get pushed straight into the wrong
+    // org's published row in Supabase.
+    if (hydratedForOrgRef.current !== activeOrgId) {
+      console.warn('toggleFeature: blocked — draft not yet hydrated for org', activeOrgId);
+      setPublishError('Settings are still loading. Refresh and try again.');
+      return;
+    }
     setDraft(prev => {
       const newSettings = { ...prev.settings, [key]: !prev.settings[key] };
       const next = { ...prev, settings: newSettings };

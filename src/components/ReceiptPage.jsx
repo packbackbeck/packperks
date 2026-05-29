@@ -38,7 +38,8 @@ const STEPS = [
   { icon: <PhotoStepIcon />, label: 'Photo receipt', done: false, active: true },
 ];
 
-export default function ReceiptPage({ reward, onSubmit, onBack }) {
+export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
+  const brand = orgName || 'the restaurant';
   const videoRef = useRef(null);
   const fileRef = useRef(null);
   const [cameraError, setCameraError] = useState(null);
@@ -119,7 +120,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack }) {
       <div className="receipt-page__header">
         <h1 className="receipt-page__title">Take a photo of your receipt</h1>
         <p className="receipt-page__subtitle">
-          Snap the receipt from your Burger King visit so we can verify your purchase and send your cashback.
+          Snap the receipt from your {brand} visit so we can verify your purchase and send your cashback.
         </p>
       </div>
 
@@ -137,7 +138,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack }) {
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span>From a <strong>Burger King</strong> location</span>
+            <span>From a <strong>{brand}</strong> location</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>

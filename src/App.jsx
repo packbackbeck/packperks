@@ -24,7 +24,7 @@ import SignInSheet from './components/SignInSheet';
 import HomeSkeleton from './components/HomeSkeleton';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
-import { track, EVENTS } from './utils/analytics';
+import { track, EVENTS, setAnalyticsContext } from './utils/analytics';
 import {
   getOrCreateUser,
   generateInitialProfile,
@@ -313,6 +313,10 @@ export default function App() {
         }
 
         setUserId(user.id);
+        // Funnel analytics: tie this session to the resolved org + user,
+        // then mark the app as loaded (top of the feasibility-test funnel).
+        setAnalyticsContext({ orgId: org?.id, userId: user.id });
+        track(EVENTS.APP_LOADED, { slug: pathSlug || null });
         // Detect the device once per session and push it to Supabase so
         // the admin Users tab can show what kind of phone is using the
         // app. We only re-push if it changed (e.g. user switched
@@ -367,7 +371,11 @@ export default function App() {
               }
               return r;
             });
-          if (live.length > 0) setLiveRewards(live);
+          if (live.length > 0) {
+            setLiveRewards(live);
+            // Funnel: rewards rendered for the user (mid-funnel signal).
+            track(EVENTS.REWARD_SHOWN, { count: live.length });
+          }
         }
         if (config?.settings) {
           setLiveSettings(s => ({ ...s, ...config.settings }));
@@ -728,6 +736,11 @@ export default function App() {
       catch (e) { console.error('photo upload failed (continuing):', e); }
     }
 
+    // Funnel: a scan attempt reached the client claim path. Paired with
+    // the resulting cup_scans row, this powers dashboard-completeness (#6)
+    // — every attempt should produce exactly one server-side scan row.
+    track(EVENTS.SCAN_ATTEMPTED, { user_id: uid, scan_id: scanId });
+
     try {
       const result = await claimCups(uid, parsed, {
         scanId,
@@ -824,12 +837,13 @@ export default function App() {
         alreadyClaimed={cupScanError?.alreadyClaimed}
         onTryAgain={() => { setCupScanError(null); setPage('cup-scan'); }}
         onClose={() => { setCupScanError(null); setPage('home'); }}
+        orgName={activeOrg?.partner_brand_name || activeOrg?.name}
       />
     );
   }
 
   if (page === 'receipt') {
-    return <ReceiptPage reward={selectedReward} onSubmit={handleReceiptSubmit} onBack={() => setPage('home')} />;
+    return <ReceiptPage reward={selectedReward} onSubmit={handleReceiptSubmit} onBack={() => setPage('home')} orgName={activeOrg?.partner_brand_name || activeOrg?.name} />;
   }
 
   if (page === 'verifying') {
@@ -945,6 +959,7 @@ export default function App() {
           <ShareCupSheet
             open={shareSheetOpen}
             userId={userId}
+            orgName={activeOrg?.partner_brand_name || activeOrg?.name}
             onClose={(result) => {
               setShareSheetOpen(false);
               // share-cups edge function already decremented the balance
@@ -970,6 +985,7 @@ export default function App() {
         {liveSettings.featureDonations && (
           <DonateSheet
             open={donateSheetOpen}
+            orgName={activeOrg?.partner_brand_name || activeOrg?.name}
             onClose={(cupsToDonate) => {
               setDonateSheetOpen(false);
               // Donate has no server-side enforcement (vs. share-cups which
@@ -1056,6 +1072,8 @@ export default function App() {
           onPick={(id) => { handlePickReward(id); }}
           onClaim={handleClaimFromDetail}
           onClose={() => setDetailReward(null)}
+          orgName={activeOrg?.partner_brand_name || activeOrg?.name}
+          showCashbackStep={!!liveSettings?.featureDirectRefunds}
         />
       )}
 
@@ -1065,10 +1083,14 @@ export default function App() {
           <li>Rewards are digital vouchers — no app download needed.</li>
           <li>One reward can be claimed per cup cycle.</li>
           <li>Vouchers are valid for 30 days after claiming.</li>
-          <li>Cashback is sent to your IBAN within 3 business days.</li>
+          {liveSettings?.featureDirectRefunds && (
+            <li>Cashback is sent to your IBAN within 3 business days.</li>
+          )}
           <li>You can switch your reward goal at any time before claiming.</li>
         </ul>
-        <p><strong>Refund policy:</strong> If you prefer cash over a food reward, use &quot;Get the direct refund&quot; to withdraw your cup deposit instead.</p>
+        {liveSettings?.featureDirectRefunds && (
+          <p><strong>Refund policy:</strong> If you prefer cash over a food reward, use &quot;Get the direct refund&quot; to withdraw your cup deposit instead.</p>
+        )}
         <button className="modal-btn" onClick={() => setTermsOpen(false)}>Got it</button>
       </Modal>
 

@@ -61,7 +61,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }
   const sections = design?.sections || {};
   const showPackback = sections.showPackbackLogo !== false;
   const showBrand = sections.showBrandLogo !== false;
-  const brandLabel = org?.name || 'Burger King';
+  const brandLabel = org?.partner_brand_name || org?.name || 'the restaurant';
   const showLockup = showPackback || showBrand;
 
   return (

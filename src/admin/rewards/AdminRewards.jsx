@@ -197,37 +197,119 @@ export default function AdminRewards({ draftState, onNavigate }) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const rows = parseCSV(ev.target.result);
-      if (rows.length === 0) { alert('No valid rows found. Make sure the CSV has a header row with at least a "name" column.'); return; }
-      const newRewards = rows.map((row, idx) => ({
-        id: `imported-${++nextTempId}`,
-        name: row.name || 'Untitled',
-        description: row.description || '',
-        image: row.image || row.imageurl || '',
-        cupsNeeded: parseInt(row.cupsneeded || row.cups) || 3,
-        euros: parseFloat(row.euros || row.price) || 0,
-        bgColor: row.bgcolor || row.color || '#FEA01E',
-        tags: row.tags ? row.tags.split('|').map(t => t.trim()).filter(Boolean) : ['FREE'],
-        displayLines: [row.name || 'Untitled'],
-        allergyInfo: row.allergyinfo || row.allergy || '',
-        nutrition: [],
-        status: 'draft', featured: false, order: rewards.length + idx,
-        discountEnabled: false, discountPercent: 10,
-      }));
+      // Drop fully-empty rows (admins downloading the template get a few
+      // blank rows by default — those shouldn't import as "Untitled").
+      const meaningful = rows.filter(r =>
+        Object.values(r).some(v => typeof v === 'string' && v.trim() !== '')
+      );
+      if (meaningful.length === 0) {
+        alert('No filled-in rows found. Open the template, fill in at least the "name" column for each reward, save, and upload again.');
+        return;
+      }
+
+      const ALLOWED_STATUSES = new Set(['draft', 'live', 'scheduled', 'paused', 'expired', 'archived']);
+      const truthy = (v) => {
+        if (v === true) return true;
+        if (typeof v !== 'string') return false;
+        return ['true', 'yes', 'y', '1'].includes(v.trim().toLowerCase());
+      };
+      const parseDateTime = (v) => {
+        if (!v || !String(v).trim()) return null;
+        const d = new Date(String(v).trim());
+        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+      };
+      // Build a nutrition array only from non-empty cells, in the same
+      // order the editor uses by default.
+      const buildNutrition = (row) => {
+        const labels = [
+          ['Energy',  row.nutritionenergy],
+          ['Fat',     row.nutritionfat],
+          ['Carbs',   row.nutritioncarbs],
+          ['Protein', row.nutritionprotein],
+          ['Salt',    row.nutritionsalt],
+        ];
+        return labels
+          .filter(([, val]) => val && String(val).trim() !== '')
+          .map(([label, value]) => ({ label, value: String(value).trim() }));
+      };
+
+      let featuredTaken = rewards.some(r => r.featured);
+      const newRewards = meaningful.map((row, idx) => {
+        const rawStatus = (row.status || '').trim().toLowerCase();
+        const wantsFeatured = truthy(row.featured);
+        const featured = wantsFeatured && !featuredTaken;
+        if (featured) featuredTaken = true;
+        return {
+          id: `imported-${++nextTempId}`,
+          name: row.name || 'Untitled',
+          description: row.description || '',
+          image: row.image || row.imageurl || '',
+          cupsNeeded: parseInt(row.cupsneeded || row.cups) || 3,
+          euros: parseFloat(row.euros || row.price) || 0,
+          subsidy: parseFloat(row.subsidy) || 0,
+          bgColor: row.bgcolor || row.color || '#FEA01E',
+          tags: row.tags ? row.tags.split('|').map(t => t.trim()).filter(Boolean) : ['FREE'],
+          displayLines: [row.name || 'Untitled'],
+          allergyInfo: row.allergyinfo || row.allergy || '',
+          nutrition: buildNutrition(row),
+          status: ALLOWED_STATUSES.has(rawStatus) ? rawStatus : 'draft',
+          releaseAt: parseDateTime(row.releaseat),
+          expiresAt: parseDateTime(row.expiresat),
+          featured,
+          order: rewards.length + idx,
+          discountEnabled: truthy(row.discountenabled),
+          discountPercent: parseInt(row.discountpercent) || 10,
+        };
+      });
       updateDraft(prev => ({ ...prev, rewards: [...prev.rewards, ...newRewards] }));
       setSelectedId(newRewards[0].id);
-      alert(`Imported ${newRewards.length} reward${newRewards.length !== 1 ? 's' : ''} as Draft.`);
+      alert(`Imported ${newRewards.length} reward${newRewards.length !== 1 ? 's' : ''}. Review and Publish when ready.`);
     };
     reader.readAsText(file);
     e.target.value = '';
   }
 
   function downloadTemplate() {
-    const csv = 'name,description,euros,cupsNeeded,bgColor,tags,image,allergyInfo\n"Chicken Sandwich","Crispy chicken fillet",5.49,3,#FEA01E,"FREE|PLANT-BASED","https://example.com/img.png","Contains: Gluten"\n';
-    const blob = new Blob([csv], { type: 'text/csv' });
+    // Complete template: every column maps 1:1 to an editable field in
+    // the reward edit panel. Rows are intentionally empty — admins fill
+    // them in. The header is the contract — the importer keys off these
+    // exact names (case-insensitive, lowercased).
+    //
+    // Field notes for the admin opening this in Excel/Sheets:
+    //   • tags             — pipe-separated, e.g. "FREE|NEW". Allowed:
+    //                        FREE, PLANT-BASED, NEW, LIMITED, POPULAR.
+    //   • status           — draft | scheduled | live | paused | expired | archived
+    //   • releaseAt        — ISO date-time, e.g. 2026-06-01T09:00:00Z
+    //   • expiresAt        — ISO date-time, e.g. 2026-07-01T23:59:59Z
+    //   • featured         — true | false (only one reward can be featured;
+    //                        the import drops featured=true on later rows)
+    //   • discountEnabled  — true | false
+    //   • discountPercent  — integer 1–99
+    //   • bgColor          — hex like #FEA01E. Quote it so Excel doesn't
+    //                        eat the #.
+    //   • nutrition*       — leave blank to skip nutrition entirely.
+    //   • subsidy          — optional euros the partner tops up on top
+    //                        of what cups fund (e.g. premium rewards).
+    const headers = [
+      'name', 'description', 'euros', 'cupsNeeded', 'subsidy',
+      'bgColor', 'image', 'tags',
+      'status', 'releaseAt', 'expiresAt',
+      'featured', 'discountEnabled', 'discountPercent',
+      'nutritionEnergy', 'nutritionFat', 'nutritionCarbs', 'nutritionProtein', 'nutritionSalt',
+      'allergyInfo',
+    ];
+    // Three empty rows so admins can paste/type immediately without
+    // having to add rows in Excel first.
+    const emptyRow = headers.map(() => '').join(',');
+    const csv = [headers.join(','), emptyRow, emptyRow, emptyRow].join('\n') + '\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'rewards-template.csv';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
   }
 
   const liveCount  = rewards.filter(r => r.status === 'live').length;
@@ -251,7 +333,15 @@ export default function AdminRewards({ draftState, onNavigate }) {
             style={{ display: 'none' }}
             onChange={handleImportCSV}
           />
-          <button className="rew-header__import" onClick={() => fileInputRef.current?.click()} title="Import rewards from CSV">
+          <button className="rew-header__import" onClick={downloadTemplate} title="Download a CSV template — fill it in, then upload via Import CSV">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download template
+          </button>
+          <button className="rew-header__import" onClick={() => fileInputRef.current?.click()} title="Upload a filled-in CSV to import rewards as drafts">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
               <polyline points="17 8 12 3 7 8"/>
@@ -306,7 +396,6 @@ export default function AdminRewards({ draftState, onNavigate }) {
           <div className="rew-list__inner">
             <div className="rew-list__label">
               CATALOG ({displayRewards.length}/{rewards.length})
-              <button className="rew-list__template-btn" onClick={downloadTemplate} title="Download CSV template">↓ template</button>
             </div>
             {displayRewards.map(reward => (
               <RewardListCard

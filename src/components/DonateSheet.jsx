@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import './DonateSheet.css';
 
-export default function DonateSheet({ open, onClose, cupCount }) {
+export default function DonateSheet({ open, onClose, cupCount, orgName }) {
+  const brand = orgName || 'the restaurant';
   // Default to full cup count
   const [amount, setAmount] = useState(cupCount || 1);
 
@@ -46,7 +47,7 @@ export default function DonateSheet({ open, onClose, cupCount }) {
               <h2 className="ds__title">You don't have any cups yet</h2>
               <p className="ds__desc">
                 You need at least 1 cup in your balance before you can donate.
-                Return a reusable cup at any participating Burger King to get started —
+                Return a reusable cup at any participating {brand} to get started —
                 then come back here to donate.
               </p>
             </div>

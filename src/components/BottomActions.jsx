@@ -1,12 +1,13 @@
 import './BottomActions.css';
 import { track, EVENTS } from '../utils/analytics';
 
-export default function BottomActions({ onAddCup, onWithdraw, cupCount }) {
+export default function BottomActions({ onAddCup, onWithdraw, cupCount, orgName }) {
+  const brand = orgName || 'PackBack';
   const handleShare = async () => {
     track(EVENTS.SHARE_CUP);
     const shareData = {
-      title: 'PackPerks × Burger King',
-      text: "I'm collecting reusable cups and earning free Burger King rewards! Join me 🍔♻️",
+      title: `PackPerks × ${brand}`,
+      text: `I'm collecting reusable cups and earning free ${brand} rewards! Join me ♻️`,
       url: window.location.href,
     };
     try {

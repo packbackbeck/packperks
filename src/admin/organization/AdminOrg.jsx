@@ -742,8 +742,8 @@ function InviteModal({ onClose, onInvited, allowAdmin }) {
             <h3 className="invite-modal__title">Invite a teammate</h3>
             <p className="invite-modal__sub">
               {method === 'email'
-                ? <>We'll email them a sign-in link. They'll join <strong>Burger King Netherlands</strong> with the role you pick below.</>
-                : <>We'll generate a shareable URL. Send it through Slack, WhatsApp, or wherever — anyone with the link can self-onboard into <strong>Burger King Netherlands</strong>.</>}
+                ? <>We'll email them a sign-in link. They'll join <strong>{org?.name || 'this organisation'}</strong> with the role you pick below.</>
+                : <>We'll generate a shareable URL. Send it through Slack, WhatsApp, or wherever — anyone with the link can self-onboard into <strong>{org?.name || 'this organisation'}</strong>.</>}
             </p>
           </div>
           <button type="button" className="invite-modal__close" onClick={onClose} aria-label="Close">×</button>

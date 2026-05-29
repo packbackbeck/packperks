@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { useOrg } from '../context/OrgContext';
 import packperksLogo from '../../assets/images/packperks-logo.svg';
-import burgerKingLogo from '../../assets/images/burger-king-logo.png';
 import './WelcomeSplash.css';
 
 const ROLE_COPY = {
@@ -17,7 +17,9 @@ const ROLE_COPY = {
  * doesn't get in the way of the dashboard. */
 export default function WelcomeSplash({ onDone, autoMs = 3500 }) {
   const { profile } = useAuth();
+  const { activeOrg } = useOrg();
   const name = profile?.display_name || profile?.email?.split('@')[0] || 'there';
+  const brandLabel = activeOrg?.partner_brand_name || activeOrg?.name || 'PackPerks';
 
   useEffect(() => {
     if (!autoMs) return;
@@ -30,8 +32,12 @@ export default function WelcomeSplash({ onDone, autoMs = 3500 }) {
       <div className="ws-card">
         <div className="ws-brands">
           <img src={packperksLogo} alt="PackPerks" className="ws-brands__pp" />
-          <span className="ws-brands__x">×</span>
-          <img src={burgerKingLogo} alt="Burger King" className="ws-brands__bk" />
+          {activeOrg?.logo_url ? (
+            <>
+              <span className="ws-brands__x">×</span>
+              <img src={activeOrg.logo_url} alt={brandLabel} className="ws-brands__bk" />
+            </>
+          ) : null}
         </div>
 
         <div
@@ -47,7 +53,7 @@ export default function WelcomeSplash({ onDone, autoMs = 3500 }) {
 
         <h1 className="ws-title">Welcome, {name}!</h1>
         <p className="ws-sub">
-          You're now signed in to the <strong>Burger King</strong> admin console.
+          You're now signed in to the <strong>{brandLabel}</strong> admin console.
         </p>
 
         {profile?.role && (

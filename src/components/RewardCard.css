@@ -37,6 +37,17 @@
   object-fit: cover;
 }
 
+/* Admin-uploaded images (http(s) URLs) are usually product cut-outs
+ * with their own aspect ratio. Fit the whole image inside the frame
+ * and center it instead of cropping. Small padding so the product
+ * doesn't kiss the edges of the card. */
+.reward-card__image--uploaded {
+  object-fit: contain;
+  object-position: center;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
 .reward-card__info {
   display: flex;
   flex-direction: column;

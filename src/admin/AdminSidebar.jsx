@@ -140,6 +140,17 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'stats',
+    label: 'Stats',
+    /* Activity/pulse glyph — distinct from the bar-chart "Reports" icon.
+     * This is the feasibility-test go/no-go dashboard. */
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    ),
+  },
   // (Org is reachable via the OrgBadge in the sidebar footer, so we
   //  don't duplicate it as a nav row.)
   // (Help & Support is reachable via the ? icon in the top-right
@@ -164,8 +175,8 @@ const ROLE_VISIBLE_TABS = {
   // Manager + Checker also see the Org tab (read-only) so they know
   // where they work; the editing controls inside are gated by
   // PermissionGate so they're disabled.
-  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'reports']),
-  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'reports']),
+  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'reports', 'stats']),
+  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'reports', 'stats']),
 };
 
 export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState, role, onAddOrg }) {

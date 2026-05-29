@@ -1,0 +1,236 @@
+.admin-stats {
+  padding: 28px 32px 64px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.stats-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.stats-header__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1D1D1D;
+  margin: 0 0 4px;
+}
+.stats-header__sub {
+  font-size: 13px;
+  color: #6C6259;
+  margin: 0;
+  max-width: 620px;
+}
+.stats-header__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.stats-range,
+.stats-refresh {
+  font-size: 13px;
+  border: 1px solid #E4DFD6;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #1D1D1D;
+  cursor: pointer;
+}
+.stats-refresh:hover { background: #F7F4EF; }
+.stats-refresh:disabled { opacity: 0.6; cursor: default; }
+
+.stats-error {
+  background: rgba(220,38,38,0.08);
+  border: 1px solid #DC2626;
+  color: #B91C1C;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ── Verdict banner ── */
+.stats-verdict {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1.5px solid;
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+.stats-verdict__badge {
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.stats-verdict__text {
+  font-size: 13.5px;
+  color: #3A352F;
+  flex: 1;
+}
+.stats-verdict__totals {
+  display: flex;
+  gap: 18px;
+  font-size: 12.5px;
+  color: #6C6259;
+  flex-shrink: 0;
+}
+.stats-verdict__totals strong { color: #1D1D1D; font-size: 15px; }
+
+/* ── Metric cards ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.stats-card {
+  background: #fff;
+  border: 1px solid #EDE8DF;
+  border-top: 3px solid #ccc;
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stats-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.stats-card__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #3A352F;
+  line-height: 1.3;
+}
+.stats-card__pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.stats-card__value {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 2px 0;
+}
+.stats-card__counts {
+  font-size: 12px;
+  color: #6C6259;
+  font-variant-numeric: tabular-nums;
+}
+.stats-card__formula {
+  font-size: 11px;
+  color: #9E9A93;
+  margin-top: 2px;
+}
+.stats-card__threshold {
+  font-size: 10.5px;
+  color: #A8A39A;
+  border-top: 1px dashed #EDE8DF;
+  padding-top: 6px;
+  margin-top: 4px;
+}
+.stats-card__note {
+  font-size: 11px;
+  color: #8A7E54;
+  background: rgba(232,145,12,0.07);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-top: 2px;
+}
+
+/* ── Charts ── */
+.stats-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 880px) {
+  .stats-charts { grid-template-columns: 1fr; }
+}
+.stats-panel {
+  background: #fff;
+  border: 1px solid #EDE8DF;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.stats-panel__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1D1D1D;
+  margin: 0 0 12px;
+}
+.stats-empty {
+  font-size: 13px;
+  color: #9E9A93;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ── Tooltip ── */
+.stats-tooltip {
+  background: #fff;
+  border: 1px solid #E4DFD6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+.stats-tooltip__label { font-weight: 700; margin-bottom: 4px; color: #1D1D1D; }
+.stats-tooltip__row { display: flex; align-items: center; gap: 6px; color: #3A352F; }
+.stats-tooltip__dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* ── Error table ── */
+.stats-errtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.stats-errtable th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9E9A93;
+  padding: 6px 10px;
+  border-bottom: 1px solid #EDE8DF;
+}
+.stats-errtable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #F4F0E9;
+  color: #3A352F;
+  vertical-align: top;
+}
+.stats-errtable code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  background: #F4F0E9;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.stats-errtable__msg { color: #6C6259; max-width: 360px; }
+.stats-sev {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.stats-sev--crit { color: #DC2626; background: rgba(220,38,38,0.10); }
+.stats-sev--warn { color: #E8910C; background: rgba(232,145,12,0.12); }

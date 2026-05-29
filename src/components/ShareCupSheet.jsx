@@ -27,7 +27,8 @@ const APP_URL = (() => {
  *             the QR payload. Sender can't "undo" from here because the
  *             receiver may already have scanned.
  */
-export default function ShareCupSheet({ open, onClose, cupCount, userId }) {
+export default function ShareCupSheet({ open, onClose, cupCount, userId, orgName }) {
+  const brand = orgName || 'the restaurant';
   const [phase, setPhase] = useState('choose'); // 'choose' | 'qr'
   const [amount, setAmount] = useState(1);
   const [sharing, setSharing] = useState(false);
@@ -165,7 +166,7 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId }) {
               <h2 className="scs__title">You don't have any cups yet</h2>
               <p className="scs__desc">
                 You need at least 1 cup in your balance before you can share or pass it on as
-                "Next cup for free". Return a reusable cup at any participating Burger King
+                "Next cup for free". Return a reusable cup at any participating {brand}
                 first, then come back here.
               </p>
             </div>

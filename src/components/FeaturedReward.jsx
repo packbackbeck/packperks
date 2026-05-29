@@ -79,7 +79,12 @@ export default function FeaturedReward({
             <img
               src={reward.image}
               alt={reward.name}
-              className="featured-reward__image"
+              className={
+                'featured-reward__image' +
+                (typeof reward.image === 'string' && /^https?:\/\//.test(reward.image)
+                  ? ' featured-reward__image--uploaded'
+                  : '')
+              }
             />
           </div>
           <div className="featured-reward__info">

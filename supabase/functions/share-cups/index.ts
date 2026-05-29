@@ -34,7 +34,7 @@ function corsHeaders(req: Request): Record<string, string> {
 }
 
 /** Verify the caller owns `userId`.
- *  Email users:    JWT → auth_uid join in users table.
+ *  Email users:    JWT → auth_user_id join in users table.
  *  Anonymous users: device_id match in users table (proof-of-possession). */
 async function ownsUser(req: Request, userId: string, deviceId: string | null): Promise<boolean> {
   const authHeader = req.headers.get("Authorization");
@@ -44,9 +44,12 @@ async function ownsUser(req: Request, userId: string, deviceId: string | null): 
     if (!error && user) {
       const { data } = await supabase
         .from("users").select("id")
-        .eq("auth_uid", user.id).eq("id", userId)
+        .eq("auth_user_id", user.id).eq("id", userId)
         .maybeSingle();
-      return data !== null;
+      // If this JWT belongs to a real auth user but isn't linked to the
+      // claimed users row, fall through to the device check rather than
+      // hard-denying — an anonymous row may still be owned via device_id.
+      if (data !== null) return true;
     }
   }
   if (!deviceId || !UUID_RE.test(deviceId)) return false;

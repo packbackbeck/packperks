@@ -176,6 +176,10 @@ const VERIFY_TOOL = {
         type: ["string", "null"],
         description: "Transaction / order number, used to detect duplicate claims.",
       },
+      packperks_token: {
+        type: ["string", "null"],
+        description: "If the receipt displays a 'PackPerks Verified Test Receipt' badge with a code in the format PPK-XXXXXXXX, return that EXACT code (uppercase, including the PPK- prefix). Otherwise null. Read it verbatim; do not invent one.",
+      },
       country: { type: ["string", "null"] },
       warnings: { type: "array", items: { type: "string" } },
     },
@@ -231,6 +235,8 @@ CONFIDENCE SCORING:
 
 Bias toward LOWER confidence when uncertain — a human admin reviews anything in the 0.50–0.91 band. Always populate items[] with all line items you can read, the total, and the receipt_id.
 
+PACKPERKS TEST RECEIPTS: Some receipts carry a "PackPerks Verified Test Receipt" badge with a code like PPK-1A2B3C4D. If you see one, copy that exact code into packperks_token. Still run the three checks honestly — the server validates the token separately and decides whether to accept.
+
 You MUST call the record_receipt_verdict tool exactly once. Do not output plain text.`;
 }
 
@@ -253,6 +259,7 @@ interface ThreeCheckVerdict {
   total_eur?: number | null;
   datetime_iso?: string | null;
   receipt_id?: string | null;
+  packperks_token?: string | null;
 }
 
 function decideStatus(v: ThreeCheckVerdict): {
@@ -489,7 +496,43 @@ Deno.serve(async (req) => {
   let { status, failureChecks, skippedChecks } = decideStatus(verdict);
   let postAiReason: string | null = null;
 
-  if (verdict.receipt_id && status !== "failed") {
+  // ── PackPerks test-receipt override ───────────────────────────────────
+  // If the AI read a PackPerks token off the receipt AND it matches a row
+  // we generated for this org, accept it: this is a legit test receipt
+  // minted from the admin Receipt Generator. We still confirm the claimed
+  // reward item appears on the generated receipt before auto-completing.
+  let packperksTest = false;
+  if (verdict.packperks_token) {
+    const { data: gen } = await supabase
+      .from("generated_receipts")
+      .select("items")
+      .eq("token", String(verdict.packperks_token).trim().toUpperCase())
+      .eq("org_id", claim.org_id)
+      .maybeSingle();
+    if (gen) {
+      packperksTest = true;
+      const names = (Array.isArray(gen.items) ? gen.items : [])
+        .map((i: { name?: string }) => String(i?.name || "").toLowerCase());
+      const req = requiredItem.toLowerCase();
+      const itemPresent =
+        !claim.reward_id ||
+        names.some((n) => n && (n.includes(req) || req.includes(n)));
+      verdict.check_is_receipt = { passed: true, reason: "PackPerks test receipt" };
+      verdict.check_is_authentic_burger_king = { passed: true, reason: "PackPerks verified test receipt" };
+      verdict.check_contains_required_item = {
+        passed: itemPresent,
+        reason: itemPresent ? "Required item present on test receipt." : "Required item not listed on the test receipt.",
+      };
+      failureChecks = itemPresent ? [] : ["contains_required_item"];
+      skippedChecks = [];
+      status = itemPresent ? "completed" : "pending";
+      postAiReason = itemPresent
+        ? "Accepted: PackPerks verified test receipt."
+        : "PackPerks test receipt, but the claimed reward isn't on it — sent to review.";
+    }
+  }
+
+  if (!packperksTest && verdict.receipt_id && status !== "failed") {
     const { data: dup } = await supabase
       .from("claims")
       .select("id, status")
@@ -505,7 +548,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (verdict.datetime_iso && status !== "failed") {
+  if (!packperksTest && verdict.datetime_iso && status !== "failed") {
     try {
       const receiptDate = new Date(verdict.datetime_iso);
       if (!Number.isNaN(receiptDate.getTime())) {
@@ -555,8 +598,8 @@ Deno.serve(async (req) => {
   const { error: upErr } = await supabase
     .from("claims")
     .update({
-      ai_verdict: verdict,
-      ai_confidence: confidenceNumber,
+      ai_verdict: { ...verdict, packperks_test: packperksTest },
+      ai_confidence: packperksTest ? 1 : confidenceNumber,
       ai_is_receipt: verdict.check_is_receipt?.passed ?? null,
       ai_is_burger_king: verdict.check_is_authentic_burger_king?.passed ?? null,
       ai_contains_required_item: verdict.check_contains_required_item?.passed ?? null,
@@ -583,5 +626,6 @@ Deno.serve(async (req) => {
     verdict,
     summary,
     requiredItem,
+    packperksTest,
   });
 });

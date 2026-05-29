@@ -1,0 +1,25 @@
+.arg { padding: 0; }
+
+.arg-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 16px 32px 0;
+  border-bottom: 1px solid #EDE8DF;
+}
+.arg-tab {
+  appearance: none;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #9E9A93;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.arg-tab:hover { color: #3A352F; }
+.arg-tab--active {
+  color: #1A8737;
+  border-bottom-color: #1A8737;
+}

@@ -99,10 +99,9 @@ const NAV_ITEMS = [
   },
   {
     id: 'cupqr',
-    // P-27: "Cup QR Codes" implied QR codes printed on cups themselves.
-    // The receipts are the QR carriers; cups are the tokens those QR
-    // codes mint. "QR Receipt Batches" is what admins actually generate.
-    label: 'QR Receipt Batches',
+    // "Receipt Generator" hosts two tabs: the QR cup-receipt batch
+    // generator and the rewards test-receipt image generator.
+    label: 'Receipt Generator',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="3" width="7" height="7" />

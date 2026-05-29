@@ -16,7 +16,7 @@ import AdminHistory from './history/AdminHistory';
 import AdminReports from './reports/AdminReports';
 import AdminStats from './stats/AdminStats';
 import AdminReceiptCheck from './receipts/AdminReceiptCheck';
-import AdminCupQr from './cupqr/AdminCupQr';
+import AdminReceiptGenerator from './cupqr/AdminReceiptGenerator';
 import AdminTransactions from './transactions/AdminTransactions';
 import AdminOrg from './organization/AdminOrg';
 import AdminActivityLog from './activity/AdminActivityLog';
@@ -177,7 +177,7 @@ function AdminShell() {
             <AdminCupScans onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="cupqr">
-            <AdminCupQr onNavigate={setPage} />
+            <AdminReceiptGenerator onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="transactions">
             <AdminTransactions onNavigate={setPage} />

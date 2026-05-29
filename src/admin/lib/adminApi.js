@@ -420,6 +420,51 @@ export async function getStatsMetrics({ fromTs = null, toTs = null } = {}) {
   };
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+ * Rewards Receipt Generator (feasibility test).
+ *
+ * createGeneratedReceipt mints a unique PackPerks token, persists the
+ * receipt's items/date to `generated_receipts`, and returns the row. The
+ * token is printed on the generated image; verify-receipt reads it back
+ * and auto-accepts the receipt when it matches a row for the same org.
+ * ───────────────────────────────────────────────────────────────────── */
+function makeReceiptToken() {
+  const a = new Uint8Array(4);
+  (globalThis.crypto || crypto).getRandomValues(a);
+  return 'PPK-' + Array.from(a).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+export async function createGeneratedReceipt({ items, total, receiptDate, venue }) {
+  const orgId = getActiveOrgId();
+  const token = makeReceiptToken();
+  const { data, error } = await supabase
+    .from('generated_receipts')
+    .insert({
+      org_id: orgId,
+      token,
+      items: items || [],
+      total: total ?? null,
+      receipt_date: receiptDate || null,
+      venue: venue || null,
+    })
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function listGeneratedReceipts({ limit = 30 } = {}) {
+  const { data, error } = await applyOrgFilter(
+    supabase
+      .from('generated_receipts')
+      .select('id, token, items, total, receipt_date, venue, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  );
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 export async function getAdminUsers() {
   const { data: users, error } = await applyOrgFilter(
     supabase

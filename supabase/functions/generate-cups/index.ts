@@ -111,12 +111,15 @@ Deno.serve(async (req) => {
   }
 
   const batchId = crypto.randomUUID();
+  // Always stamp the cups with an org (the cups.org_id DB default to BK was
+  // removed in migration 021 to stop cross-org leakage). Prefer the org_id
+  // passed by the dashboard, fall back to the calling admin's org.
   const rows = Array.from({ length: count }, () => ({
     id: crypto.randomUUID(),
     batch_id: batchId,
     source: "admin_batch",
     status: "available",
-    ...(orgId ? { org_id: orgId } : {}),
+    ...(effectiveOrg ? { org_id: effectiveOrg } : {}),
   }));
 
   const { data, error } = await supabase

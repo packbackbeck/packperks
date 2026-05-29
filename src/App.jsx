@@ -180,7 +180,7 @@ export default function App() {
   useEffect(() => { activeOrgIdRef.current = activeOrg?.id || null; }, [activeOrg]);
 
   /* ── UI preferences ── */
-  const [selectedRewardId, setSelectedRewardId] = useState('chicken-sandwich'); // loaded from Supabase in init
+  const [selectedRewardId, setSelectedRewardId] = useState(''); // set from the active org's rewards on load (see effect below)
 
   // Keep the selected reward valid for the active org. The default
   // ('chicken-sandwich') is a Burger King id; on other orgs we snap to the

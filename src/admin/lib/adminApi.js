@@ -565,12 +565,19 @@ export async function getAdminClaims() {
 
   if (error) throw error;
 
+  // Resolve names by the ids the claims actually reference — NOT via an
+  // org filter. A claim already belongs to the active org (filtered above);
+  // its customer/approver must always resolve by id even if that user row
+  // is cross-org or (legacy) org-less, otherwise the row shows "Unknown".
+  const userIds  = [...new Set((data || []).map(c => c.user_id).filter(Boolean))];
+  const adminIds = [...new Set((data || []).map(c => c.approved_by).filter(Boolean))];
   const [{ data: users }, { data: admins }] = await Promise.all([
-    applyOrgFilter(supabase.from('users').select('id, display_name, email')),
-    // Pull the admin profiles referenced by approved_by so the UI can
-    // show "Approved by Jasper" without an extra query per row. Admin
-    // profiles are also org-scoped now.
-    applyOrgFilter(supabase.from('admin_profiles').select('id, display_name, email, color, avatar_url')),
+    userIds.length
+      ? supabase.from('users').select('id, display_name, email').in('id', userIds)
+      : Promise.resolve({ data: [] }),
+    adminIds.length
+      ? supabase.from('admin_profiles').select('id, display_name, email, color, avatar_url').in('id', adminIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const userMap  = Object.fromEntries((users || []).map(u => [u.id, u]));

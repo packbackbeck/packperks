@@ -181,6 +181,18 @@ export default function App() {
 
   /* ── UI preferences ── */
   const [selectedRewardId, setSelectedRewardId] = useState('chicken-sandwich'); // loaded from Supabase in init
+
+  // Keep the selected reward valid for the active org. The default
+  // ('chicken-sandwich') is a Burger King id; on other orgs we snap to the
+  // featured reward (or the first) so the selection — and any claim made
+  // from it — always references a reward that belongs to THIS org.
+  useEffect(() => {
+    if (!liveRewards.length) return;
+    if (!liveRewards.some(r => r.id === selectedRewardId)) {
+      const featured = liveRewards.find(r => r.featured) || liveRewards[0];
+      if (featured) setSelectedRewardId(featured.id);
+    }
+  }, [liveRewards, selectedRewardId]);
   const [claimed, setClaimed] = usePersistedState('claimed', false); // transient UI flag, localStorage is fine
 
   /* ── Navigation ── */
@@ -590,10 +602,14 @@ export default function App() {
     try {
       const compressed = await compressImage(photoDataUrl);
 
-      // 1. Create the claim row first (status='pending', no photo yet)
+      // 1. Create the claim row first (status='pending', no photo yet).
+      //    Use selectedReward.id (the RESOLVED reward), not the raw
+      //    selectedRewardId — the latter can still hold the cross-org
+      //    default ('chicken-sandwich') if the user never tapped a card,
+      //    which would make verify-receipt check for the wrong item.
       const claimId = await createClaim(userId, {
         type: 'cashback',
-        rewardId: selectedRewardId,
+        rewardId: selectedReward.id,
         cupsRedeemed: selectedReward.cupsNeeded,
         payoutAmount: selectedReward.euros,
         iban: claimedIban,

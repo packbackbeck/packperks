@@ -704,7 +704,14 @@ export async function addDonationClaim(userId, cupsCount, payoutAmount, orgId) {
 }
 
 export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath, orgId }) {
+  // Generate the claim id client-side and insert WITHOUT a RETURNING
+  // select. Why: the anonymous user app has INSERT on `claims` but no
+  // SELECT policy (locked down in C-1), so `.insert().select().single()`
+  // would fail trying to read the new row back. Supplying our own id
+  // sidesteps the read entirely — anon INSERT alone is enough.
+  const id = safeUUID()
   const insert = {
+    id,
     user_id: userId,
     type,
     reward_id: rewardId ?? null,
@@ -716,14 +723,9 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
     status: 'pending',
   }
   if (orgId) insert.org_id = orgId
-  const { data, error } = await supabase
-    .from('claims')
-    .insert(insert)
-    .select('id')
-    .single()
-
+  const { error } = await supabase.from('claims').insert(insert)
   if (error) throw error
-  return data.id
+  return id
 }
 
 // ── Receipt upload + AI verification ───────────────────────────────────────

@@ -176,28 +176,18 @@ export function useAdminDraft() {
     hydratedForOrgRef.current = null;
     migrateLegacyKeysOnce(activeOrgId);
 
-    const local = loadFromStorage(draftKey(activeOrgId), null);
-    if (local) {
-      setDraft(local);
-      setVersions(loadFromStorage(versionsKey(activeOrgId), []));
-      setPublished(loadFromStorage(publishedKey(activeOrgId), null));
-      setIsDirty(false);
-      setLastSaved(null);
-      setPublishNote('');
-      setPublishError(null);
-      hydratedForOrgRef.current = activeOrgId;
-      return;
-    }
-
-    // No local working copy yet — fall back to the published snapshot
-    // for this org from Supabase. getAppConfig accepts an explicit org
-    // id and reads the `published:<orgId>` row, falling back to the
-    // legacy unsuffixed `published` row for backwards compat.
-    setDraft(buildEmptyDraft());
+    // SOURCE OF TRUTH = the org's published Supabase config. We hydrate from
+    // it on every org load, NOT from the local draft. A stale or
+    // cross-polluted local draft (e.g. a Burger King snapshot left in this
+    // browser) used to override the correct published data and show the
+    // wrong org's rewards — that's the class of bug this prevents. The local
+    // draft is only a fallback for a brand-new org that has nothing
+    // published yet (the onboarding wizard's in-progress copy).
     setPublished(null);
     getAppConfig(activeOrgId).then(config => {
       if (cancelled) return;
-      if (config && (Array.isArray(config.rewards) || config.settings)) {
+      const hasPublished = config && (Array.isArray(config.rewards) || config.settings);
+      if (hasPublished) {
         const next = {
           rewards: Array.isArray(config.rewards)
             ? config.rewards.map((r, i) => ({ ...r, order: r.order ?? i }))
@@ -207,6 +197,16 @@ export function useAdminDraft() {
         };
         setDraft(next);
         setPublished({ ...next, _publishedAt: Date.now() });
+        // Overwrite the local working copy with the published truth so a
+        // stale draft can never resurface on the next load.
+        try {
+          localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: Date.now() }));
+        } catch { /* quota / private-mode — fine, state is already set */ }
+      } else {
+        // Brand-new org with nothing published yet — use any local
+        // in-progress draft (wizard), else an empty draft.
+        const local = loadFromStorage(draftKey(activeOrgId), null);
+        setDraft(local || buildEmptyDraft());
       }
       setVersions(loadFromStorage(versionsKey(activeOrgId), []));
       setIsDirty(false);
@@ -216,6 +216,12 @@ export function useAdminDraft() {
       hydratedForOrgRef.current = activeOrgId;
     }).catch(err => {
       console.error('useAdminDraft: getAppConfig failed', err);
+      // On fetch failure, fall back to a local draft so the admin isn't
+      // stuck with a blank screen.
+      if (cancelled) return;
+      const local = loadFromStorage(draftKey(activeOrgId), null);
+      setDraft(local || buildEmptyDraft());
+      hydratedForOrgRef.current = activeOrgId;
     });
 
     return () => { cancelled = true; };

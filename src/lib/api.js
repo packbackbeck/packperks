@@ -79,11 +79,11 @@ export async function getOrCreateUser(orgId) {
   const authEmail = sessionData?.session?.user?.email
 
   if (authUid) {
-    const { data: byAuth } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_user_id', authUid)
-      .maybeSingle()
+    // Per-org identity: scope every lookup to the active org so the same
+    // person/device gets a separate row (and balance) in each org.
+    let byAuthQ = supabase.from('users').select('*').eq('auth_user_id', authUid)
+    if (orgId) byAuthQ = byAuthQ.eq('org_id', orgId)
+    const { data: byAuth } = await byAuthQ.maybeSingle()
 
     if (byAuth) {
       // Refresh the device_id binding so subsequent anonymous-path
@@ -94,13 +94,11 @@ export async function getOrCreateUser(orgId) {
       return byAuth
     }
 
-    // Session exists but no users row — check whether the current
-    // device_id row is unlinked, and adopt it under this auth uid.
-    const { data: byDevice } = await supabase
-      .from('users')
-      .select('*')
-      .eq('device_id', deviceId)
-      .maybeSingle()
+    // Session exists but no users row for this org — check whether the
+    // current device_id row (in this org) is unlinked, and adopt it.
+    let byDeviceQ = supabase.from('users').select('*').eq('device_id', deviceId)
+    if (orgId) byDeviceQ = byDeviceQ.eq('org_id', orgId)
+    const { data: byDevice } = await byDeviceQ.maybeSingle()
 
     if (byDevice && !byDevice.auth_user_id) {
       const { data: linked } = await supabase
@@ -136,12 +134,11 @@ export async function getOrCreateUser(orgId) {
     return created
   }
 
-  // 2. Anonymous device path — original behaviour, unchanged.
-  const { data: existing } = await supabase
-    .from('users')
-    .select('*')
-    .eq('device_id', deviceId)
-    .maybeSingle()
+  // 2. Anonymous device path — scoped to the active org so each org keeps
+  //    its own customer/user row for this device.
+  let existingQ = supabase.from('users').select('*').eq('device_id', deviceId)
+  if (orgId) existingQ = existingQ.eq('org_id', orgId)
+  const { data: existing } = await existingQ.maybeSingle()
 
   if (existing) return existing
 
@@ -156,11 +153,9 @@ export async function getOrCreateUser(orgId) {
   // React StrictMode mounts twice — second insert hits the unique constraint.
   // Just re-fetch the row that the first call created.
   if (error?.code === '23505') {
-    const { data: existing2 } = await supabase
-      .from('users')
-      .select('*')
-      .eq('device_id', deviceId)
-      .single()
+    let retryQ = supabase.from('users').select('*').eq('device_id', deviceId)
+    if (orgId) retryQ = retryQ.eq('org_id', orgId)
+    const { data: existing2 } = await retryQ.maybeSingle()
     return existing2
   }
 

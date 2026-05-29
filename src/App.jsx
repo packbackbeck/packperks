@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import { applyDesignColors, mergeDesign } from './admin/appdesign/designDefaults';
 import CupProgress from './components/CupProgress';
@@ -171,6 +171,13 @@ export default function App() {
    *   • Brand color (org.brand_color exposed to CSS variables / chips)
    */
   const [activeOrg, setActiveOrg] = useState(null);
+  // Always-current active org id for callbacks that live outside the
+  // render closure (e.g. the onAuthStateChange listener). Passing this to
+  // getOrCreateUser keeps a signed-in user bound to THEIR org's row —
+  // calling it without an org makes the per-org device lookup hit multiple
+  // rows and mint a fresh (orphan) user, fragmenting the cup balance.
+  const activeOrgIdRef = useRef(null);
+  useEffect(() => { activeOrgIdRef.current = activeOrg?.id || null; }, [activeOrg]);
 
   /* ── UI preferences ── */
   const [selectedRewardId, setSelectedRewardId] = useState('chicken-sandwich'); // loaded from Supabase in init
@@ -482,7 +489,7 @@ export default function App() {
       // link takes effect and `signed in as …` appears in the UserPage.
       if (event === 'SIGNED_IN') {
         try {
-          const refreshed = await getOrCreateUser();
+          const refreshed = await getOrCreateUser(activeOrgIdRef.current);
           setUserId(refreshed.id);
           setProfile(p => p ? { ...p, email: refreshed.email || nextEmail || p.email } : p);
         } catch (err) {
@@ -938,9 +945,10 @@ export default function App() {
           onClose={() => setShowSignIn(false)}
           onLinked={async () => {
             // After a sign-out, refresh the local user back to anonymous
-            // device mode so the in-memory state matches reality.
+            // device mode so the in-memory state matches reality. Pass the
+            // active org so we resolve THIS org's row, not a fresh orphan.
             try {
-              const refreshed = await getOrCreateUser();
+              const refreshed = await getOrCreateUser(activeOrg?.id);
               setUserId(refreshed.id);
             } catch (e) { console.error(e); }
           }}

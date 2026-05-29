@@ -71,6 +71,12 @@ function formatTime(ts) {
 export async function getOrCreateUser(orgId) {
   const deviceId = getDeviceId()
 
+  // Safety net: never resolve a user without an org. A device can now have
+  // one row PER org (per-org identity), so an org-less lookup hits multiple
+  // rows, errors, and mints a fresh orphan user — fragmenting the balance.
+  // Fall back to the default org so we always land on a real per-org row.
+  if (!orgId) orgId = await getDefaultOrgId()
+
   // 1. Auth path — if a Supabase session is in scope, look the user up
   //    by auth_user_id. This is the only path that survives a fresh
   //    browser / new device.

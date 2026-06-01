@@ -66,8 +66,16 @@ export function setLogoKeys(key1, key2) {
   } catch { /* ignore */ }
 }
 
-const endpoint = (ip) =>
-  `http://${ip}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000`;
+// Match the page's protocol so printing works from BOTH localhost (http)
+// and the Vercel domain (https). A plain-http page can only reach the
+// printer over http; an https page must reach it over https (otherwise the
+// browser blocks the request as mixed content). For the https case the
+// printer needs its TLS/SSL ePOS-Print enabled and its self-signed cert
+// trusted once (visit https://<printer-ip> and accept it).
+const endpoint = (ip) => {
+  const proto = (typeof window !== 'undefined' && window.location.protocol === 'https:') ? 'https' : 'http';
+  return `${proto}://${ip}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000`;
+};
 
 function xmlEscape(v) {
   return String(v ?? '')
@@ -93,6 +101,10 @@ export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, 
   const brand = (logo && Number.isInteger(logo.key1) && Number.isInteger(logo.key2))
     ? `<logo key1="${logo.key1}" key2="${logo.key2}"/><feed line="1"/>`
     : `<text dw="true" dh="true" em="true">PackPerks${NL}</text><text dw="false" dh="false" em="false"/><feed line="1"/>`;
+  // Mirrors the dashboard receipt preview: brand → headline → intro →
+  // 3 feature lines → scan CTA → native QR → assurance → refund note →
+  // dashed divider → footer (time / restaurant / total / session).
+  const DASH = '------------------------------------------'; // ~42 cols
   return [
     '<?xml version="1.0" encoding="utf-8"?>',
     '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">',
@@ -100,23 +112,31 @@ export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, 
     '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">',
     '<text align="center"/>',
     brand,
-    `<text em="true">GET YOUR REFUND${NL}AND REWARDS${NL}</text>`,
+    `<text dw="true" dh="true" em="true">GET YOUR REFUND${NL}AND REWARDS${NL}</text>`,
+    '<text dw="false" dh="false" em="false"/>',
+    '<feed line="1"/>',
+    `<text>Use PackPerks to access your deposit,${NL}track returns, and unlock extra rewards.${NL}</text>`,
+    '<feed line="1"/>',
+    `<text>Access your deposit${NL}</text>`,
+    `<text>Earn more from repeat returns${NL}</text>`,
+    `<text>Keep track of your progress${NL}</text>`,
+    '<feed line="1"/>',
+    `<text em="true">Scan to start with PackPerks${NL}</text>`,
     '<text em="false"/>',
-    '<feed line="1"/>',
-    `<text>Use PackPerks to access your deposit,${NL}track returns, and unlock rewards.${NL}</text>`,
-    '<feed line="1"/>',
-    `<text>Scan to start with PackPerks${NL}</text>`,
     '<feed line="1"/>',
     `<symbol type="qrcode_model_2" level="level_m" width="6" height="6">${xmlEscape(url)}</symbol>`,
     '<feed line="1"/>',
-    `<text>No app and no registration needed.${NL}</text>`,
+    `<text em="true">No app and no registration needed.${NL}Fast and secure.${NL}</text>`,
+    '<text em="false"/>',
     '<feed line="1"/>',
+    `<text>You can still directly refund in the same${NL}app by tapping the user icon top-right.${NL}</text>`,
+    '<feed line="1"/>',
+    `<text>${DASH}${NL}</text>`,
     '<text align="left"/>',
-    `<text>--------------------------------${NL}</text>`,
-    `<text>Time:     ${xmlEscape(when)}${NL}</text>`,
-    `<text>Location: ${xmlEscape(restaurant)}${NL}</text>`,
-    `<text>Total:    EUR ${xmlEscape(totalAmount)}${NL}</text>`,
-    `<text>Session:  ${xmlEscape(sessionId)}${NL}</text>`,
+    `<text>Time:          ${xmlEscape(when)}${NL}</text>`,
+    `<text>Restaurant:    ${xmlEscape(restaurant)}${NL}</text>`,
+    `<text>Total Amount:  EUR ${xmlEscape(totalAmount)}${NL}</text>`,
+    `<text>Session ID:    ${xmlEscape(sessionId)}${NL}</text>`,
     '<feed line="3"/>',
     '<cut type="feed"/>',
     '</epos-print>',

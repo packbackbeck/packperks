@@ -22,19 +22,12 @@ const EXPIRY_PRESETS = [
   { id: '30d',   label: 'Expires in 30 days',  ms: 30 * 24 * 60 * 60 * 1000 },
 ];
 
-// Public app URL the QR code points to. When the admin is testing
-// locally, we prefer window.location.origin so the QR opens THIS dev
-// server instead of the production Vercel URL — otherwise a freshly
-// minted cup batch can't be claimed without deploying first.
+// Public app URL the QR code points to. The QR ALWAYS targets the
+// production Vercel domain — a printed receipt is scanned by a real
+// customer's phone, which must land on the live, working app (not a
+// localhost dev server they can't reach). So batches generated from
+// localhost OR Vercel both produce QRs that open the Vercel app.
 const PROD_URL = 'https://packperks-v1.vercel.app/';
-const APP_URL = (() => {
-  if (typeof window === 'undefined') return PROD_URL;
-  const origin = window.location.origin;
-  if (origin.startsWith('http://localhost') || origin.startsWith('http://127.')) {
-    return origin + '/';
-  }
-  return PROD_URL;
-})();
 
 /* ─────────────────────────────────────────────────────────────────────
  * AdminCupQr — generates and prints scannable cup-return receipts.
@@ -44,7 +37,7 @@ const APP_URL = (() => {
  *   2. Click "Generate" → calls the generate-cups edge function, which
  *      mints N rows in the `cups` table with status='available'.
  *   3. The returned UUIDs become a comma-separated `?cups=` URL param
- *      on APP_URL — that's the QR payload.
+ *      on the Vercel PROD_URL — that's the QR payload.
  *   4. We render the receipt template (matches the PackBack mock) with
  *      the live QR; "Print / Save as PDF" opens the browser print dialog
  *      scoped to just the receipt panel.
@@ -122,7 +115,7 @@ export default function AdminCupQr({ onNavigate }) {
       // Multi-org: prefix with the active org's slug so a scan opens
       // the right brand's user app (e.g. /coffeeshop/?batch=…).
       const slugPath = activeOrg?.slug ? `${activeOrg.slug}/` : '';
-      const url = `${APP_URL}${slugPath}?batch=${res.batch_id}`;
+      const url = `${PROD_URL}${slugPath}?batch=${res.batch_id}`;
       // P-21: optional expiry. Compute from the picked preset and set
       // the column on every cup in the new batch in one round trip.
       // Done after the batch insert so we don't wedge generation if the

@@ -82,19 +82,47 @@ function detectDevice() {
   return 'Web browser';
 }
 
-/* Resize + compress a data-URL to max 800px wide at 0.65 JPEG quality (~60-120 KB) */
-function compressImage(dataUrl, maxWidth = 800, quality = 0.65) {
-  return new Promise(resolve => {
+/* Resize + compress a data-URL to max 800px wide at 0.65 JPEG quality (~60-120 KB).
+ *
+ * CRITICAL for iOS: phones hand back camera/library photos as HEIC — and
+ * sometimes with a generic `application/octet-stream` mime. If we upload
+ * those bytes/mime as-is, Supabase Storage rejects them (415 invalid_mime_type
+ * — the receipts bucket only allows real image types) and the whole claim
+ * dies with "something went wrong" before the AI ever runs.
+ *
+ * So this ALWAYS re-encodes to a real JPEG data-URL. We try createImageBitmap
+ * first (decodes HEIC on modern iOS where <img> can't), then fall back to
+ * <Image>. The output is guaranteed `data:image/jpeg;base64,…`. */
+async function compressImage(dataUrl, maxWidth = 800, quality = 0.65) {
+  const toJpeg = (source, w, h) => {
+    const scale = Math.min(1, maxWidth / w);
+    const canvas = document.createElement('canvas');
+    canvas.width  = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', quality);
+  };
+
+  // Path 1: createImageBitmap (handles HEIC / odd mimes best on iOS).
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    if (typeof createImageBitmap === 'function') {
+      const bitmap = await createImageBitmap(blob);
+      const out = toJpeg(bitmap, bitmap.width, bitmap.height);
+      bitmap.close?.();
+      return out;
+    }
+  } catch { /* fall through to <img> */ }
+
+  // Path 2: <img> decode.
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, maxWidth / img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width  = Math.round(img.width  * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      try { resolve(toJpeg(img, img.width, img.height)); }
+      catch (e) { reject(e); }
     };
-    img.onerror = () => resolve(dataUrl); // fallback: store as-is
+    img.onerror = () =>
+      reject(new Error("We couldn't read that photo. Please retake it or pick a different image."));
     img.src = dataUrl;
   });
 }

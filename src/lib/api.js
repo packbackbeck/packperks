@@ -750,13 +750,17 @@ function dataUrlToBlob(dataUrl) {
 export async function uploadReceiptPhoto(claimId, photoDataUrl) {
   if (!photoDataUrl) throw new Error('no_photo')
   const blob = dataUrlToBlob(photoDataUrl)
-  const ext = blob.type === 'image/png' ? 'png' : 'jpg'
-  const path = `${claimId}.${ext}`
+  // Force JPEG. The user app re-encodes to JPEG before calling this, but
+  // iOS sometimes hands back a generic `application/octet-stream` mime —
+  // and the receipts bucket only allows real image types, so trusting
+  // blob.type would 415 the upload and kill the claim before the AI runs.
+  // (uploadCupScanPhoto already does this; receipts must match.)
+  const path = `${claimId}.jpg`
 
   const { error } = await supabase.storage
     .from('receipts')
     .upload(path, blob, {
-      contentType: blob.type,
+      contentType: 'image/jpeg',
       upsert: true, // tolerate retries on the same claim
     })
   if (error) throw error

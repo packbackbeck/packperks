@@ -16,6 +16,16 @@
   animation: fade-in var(--duration-normal) ease both;
   gap: 0;
   z-index: 10;
+  /* Smooth exit when auto-dismissing (or tapping a CTA) → home. Must match
+     FADE_MS in CupScanSuccess.jsx. */
+  transition: opacity 450ms ease, transform 450ms ease;
+}
+
+/* Graceful bow-out: fade + lift slightly, then the app swaps to home. */
+.css-page--leaving {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
 }
 
 @keyframes fade-in {

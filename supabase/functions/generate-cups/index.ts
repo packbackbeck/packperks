@@ -133,9 +133,26 @@ Deno.serve(async (req) => {
   }
 
   await logGeneration("success", effectiveOrg, admin.id, data?.length ?? 0, { batch_id: batchId });
+
+  // Return the org we ACTUALLY minted under (+ its slug) so the dashboard
+  // can build the QR URL from the authoritative server value instead of a
+  // possibly-stale client context. This guarantees the slug in the scanned
+  // URL always matches the org that owns the cups.
+  let orgSlug: string | null = null;
+  if (effectiveOrg) {
+    const { data: orgRow } = await supabase
+      .from("organizations")
+      .select("slug")
+      .eq("id", effectiveOrg)
+      .maybeSingle();
+    orgSlug = orgRow?.slug ?? null;
+  }
+
   return jsonResponse({
     batch_id: batchId,
     cup_ids: (data || []).map((r: { id: string }) => r.id),
     count: data?.length ?? 0,
+    org_id: effectiveOrg ?? null,
+    slug: orgSlug,
   });
 });

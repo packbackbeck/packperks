@@ -248,7 +248,7 @@ async function getLogoImageXml() {
 
 /* Build the ePOS-Print XML. Prefers the rendered header image (matches the
  * dashboard preview). Falls back to a text layout if rendering failed. */
-export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, sessionId, logo = getLogoKeys(), headerImageXml = '', logoImageXml = '' }) {
+export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, sessionId, cups, logo = getLogoKeys(), headerImageXml = '', logoImageXml = '' }) {
   const when = generatedAt
     ? new Date(generatedAt).toLocaleString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -291,6 +291,12 @@ export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, 
     '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">',
     '<text align="center"/>',
     top,
+    // Prominent cup count so two receipts printed back-to-back are never
+    // confused (the QR images look identical to the eye). Dynamic text —
+    // intentionally NOT baked into the cached header image.
+    cups != null
+      ? `<text dw="true" dh="true" em="true">${xmlEscape(cups)} ${Number(cups) === 1 ? 'CUP' : 'CUPS'}${NL}</text><text dw="false" dh="false" em="false"/><feed line="1"/>`
+      : '',
     `<symbol type="qrcode_model_2" level="level_m" width="6" height="6">${xmlEscape(url)}</symbol>`,
     '<feed line="2"/>',
     `<text em="true">No app and no registration needed.${NL}Fast and secure.${NL}</text>`,
@@ -302,6 +308,7 @@ export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, 
     '<text align="left"/>',
     `<text>Time:          ${xmlEscape(when)}${NL}</text>`,
     `<text>Restaurant:    ${xmlEscape(restaurant)}${NL}</text>`,
+    cups != null ? `<text>Cups:          ${xmlEscape(cups)}${NL}</text>` : '',
     `<text>Total Amount:  EUR ${xmlEscape(totalAmount)}${NL}</text>`,
     `<text>Session ID:    ${xmlEscape(sessionId)}${NL}</text>`,
     '<feed line="4"/>',

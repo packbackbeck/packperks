@@ -114,7 +114,24 @@ export default function AdminCupQr({ onNavigate }) {
       // worked up to ~30 cups before QRs got unreadable.)
       // Multi-org: prefix with the active org's slug so a scan opens
       // the right brand's user app (e.g. /coffeeshop/?batch=…).
-      const slugPath = activeOrg?.slug ? `${activeOrg.slug}/` : '';
+      // Use the slug the SERVER actually minted the cups under (res.slug) —
+      // it's authoritative and immune to a stale/unloaded client org context.
+      // Fall back to the client's active org slug only if the server didn't
+      // return one (older edge deployment).
+      const orgSlug = res.slug || activeOrg?.slug || '';
+      const slugPath = orgSlug ? `${orgSlug}/` : '';
+      // Problem-2 guard: a non-default org MUST contribute its slug, or the
+      // phone-camera scan would open the root (default org) page instead of
+      // this brand's page. The cups are still org-stamped server-side (so
+      // cross-org "add more cups" works), but the landing page is driven by
+      // the slug in the URL.
+      if (!orgSlug) {
+        console.warn(
+          `[AdminCupQr] Batch ${res.batch_id} has no org slug ` +
+          `(server org_id=${res.org_id ?? 'none'}, active=${activeOrg?.slug ?? 'none'}) — ` +
+          `its QR will open the default org page.`
+        );
+      }
       const url = `${PROD_URL}${slugPath}?batch=${res.batch_id}`;
       // P-21: optional expiry. Compute from the picked preset and set
       // the column on every cup in the new batch in one round trip.
@@ -205,6 +222,10 @@ export default function AdminCupQr({ onNavigate }) {
         generatedAt: batch.generatedAt,
         totalAmount: refundAmount,
         sessionId,
+        // Real minted count (not the form's `count`) — this is exactly what
+        // the QR will credit on scan, so the printed number can't disagree
+        // with reality and the two receipts are never confused.
+        cups: batch.cup_ids?.length ?? count,
       }, printerIp);
       setPrintStatus({ ok: true, text: `Sent to printer at ${printerIp} ✓` });
     } catch (err) {
@@ -364,7 +385,10 @@ export default function AdminCupQr({ onNavigate }) {
           <div className="acq-card">
             <h2 className="acq-card__title">New batch</h2>
 
-            <label className="acq-field">
+            {/* NOT a <label>: a label forwards clicks anywhere in its area to
+                its first labelable descendant (the − button), so clicking the
+                title, the hint, or empty space would silently decrement. */}
+            <div className="acq-field">
               <span className="acq-field__label">How many cups returned?</span>
               <div className="acq-stepper">
                 <button
@@ -392,7 +416,7 @@ export default function AdminCupQr({ onNavigate }) {
                 >+</button>
               </div>
               <span className="acq-field__hint">1 to 50 cups per QR.</span>
-            </label>
+            </div>
 
             <label className="acq-field">
               <span className="acq-field__label">Restaurant / location</span>
@@ -437,7 +461,9 @@ export default function AdminCupQr({ onNavigate }) {
               </span>
             </label>
 
-            <label className="acq-field">
+            {/* div, not label: two inputs inside one label would forward
+                clicks on the title/hint to whichever comes first. */}
+            <div className="acq-field">
               <span className="acq-field__label">Logo NV key codes (optional)</span>
               <div className="acq-row" style={{ display: 'flex', gap: 8 }}>
                 <input
@@ -458,7 +484,7 @@ export default function AdminCupQr({ onNavigate }) {
               <span className="acq-field__hint">
                 Leave blank to print the "PackPerks" text wordmark. To print a logo image WITHOUT rasterising it each time: register the logo once into the printer's NV graphics memory (Epson TM Utility → NV graphics) with a 2-byte key code, then enter the same codes here. The receipt then prints the logo by reference (a few bytes) using ePOS-Print's logo command.
               </span>
-            </label>
+            </div>
 
             <button
               className="acq-btn acq-btn--primary"
@@ -552,6 +578,10 @@ export default function AdminCupQr({ onNavigate }) {
               <div className="acq-receipt__footer-row">
                 <span>Restaurant:</span>
                 <span>{restaurant || '—'}</span>
+              </div>
+              <div className="acq-receipt__footer-row">
+                <span>Cups:</span>
+                <span>{batch?.cup_ids?.length ?? count}</span>
               </div>
               <div className="acq-receipt__footer-row">
                 <span>Total Amount:</span>

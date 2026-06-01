@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './CupScanSuccess.css';
 
 function formatDate(d = new Date()) {
@@ -7,12 +8,38 @@ function formatTime(d = new Date()) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+// How long the success screen stays before it gracefully bows out to home.
+const AUTO_DISMISS_MS = 5000;
+// Matches the fade-out transition duration in CupScanSuccess.css.
+const FADE_MS = 450;
+
 export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome }) {
   const now = new Date();
   const scanId = 'CUP-' + Date.now().toString(36).toUpperCase().slice(-5);
 
+  const [leaving, setLeaving] = useState(false);
+  const navigatedRef = useRef(false);
+
+  // Fade the screen out, then navigate exactly once (guards against the
+  // auto-dismiss timer and a manual tap both firing).
+  const leaveTo = useCallback((dest) => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    setLeaving(true);
+    setTimeout(() => dest(), FADE_MS);
+  }, []);
+
+  const goReward = useCallback(() => leaveTo(onHome), [leaveTo, onHome]);
+  const goAddMore = useCallback(() => leaveTo(onAddMore), [leaveTo, onAddMore]);
+
+  // Auto-dismiss → smoothly transition to the home screen after 5s.
+  useEffect(() => {
+    const t = setTimeout(() => leaveTo(onHome), AUTO_DISMISS_MS);
+    return () => clearTimeout(t);
+  }, [leaveTo, onHome]);
+
   return (
-    <div className="css-page">
+    <div className={`css-page${leaving ? ' css-page--leaving' : ''}`}>
       {/* Green glow */}
       <div className="css-page__glow" />
 
@@ -78,7 +105,19 @@ export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome 
 
       {/* CTAs */}
       <div className="css-page__actions">
-        <button className="css-page__btn css-page__btn--primary" onClick={onAddMore}>
+        <button className="css-page__btn css-page__btn--primary" onClick={goReward}>
+          {/* gift / reward icon */}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 12 20 22 4 22 4 12"/>
+            <rect x="2" y="7" width="20" height="5"/>
+            <line x1="12" y1="22" x2="12" y2="7"/>
+            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+          </svg>
+          Select reward
+        </button>
+        <button className="css-page__btn css-page__btn--outline" onClick={goAddMore}>
+          {/* cup icon */}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
             <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
@@ -86,10 +125,7 @@ export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome 
             <line x1="10" y1="1" x2="10" y2="4"/>
             <line x1="14" y1="1" x2="14" y2="4"/>
           </svg>
-          Scan another cup
-        </button>
-        <button className="css-page__btn css-page__btn--outline" onClick={onHome}>
-          Back to home
+          Add more cups
         </button>
       </div>
     </div>

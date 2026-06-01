@@ -74,7 +74,7 @@ export default function SignInSheet({ open, onClose, onLinked }) {
     let t;
     if (status === 'idle' || status === 'restore_email') {
       t = setTimeout(() => inputRef.current?.focus(), 220);
-    } else if (status === 'restore_code') {
+    } else if (status === 'restore_code' || status === 'sent') {
       t = setTimeout(() => codeRef.current?.focus(), 220);
     }
     return () => t && clearTimeout(t);
@@ -109,6 +109,37 @@ export default function SignInSheet({ open, onClose, onLinked }) {
         ? "That email doesn't look quite right — try again."
         : err.message || 'Something went wrong. Please try again.');
       setStatus('error');
+    }
+  }
+
+  /* Verify the 6-digit code from the "save" email. Our Supabase email
+   * template sends a code (+ link); on a phone the link often opens in a
+   * different browser and loses the device session, so typing the code
+   * in-place is the reliable path. verifyOtp(type:'email') signs them in
+   * right here; App.jsx's SIGNED_IN handler then links the auth user onto
+   * this device's PackPerks row. */
+  async function handleVerifySaveCode(e) {
+    e.preventDefault();
+    if (otpCode.length !== 6) return;
+    setError(null);
+    setStatus('verifying');
+    try {
+      await verifyRestoreOtp(email, otpCode); // verifyOtp({ type: 'email' })
+      setCurrentEmail(email.trim());
+      setStatus('signedIn');
+      onLinked?.();
+    } catch (err) {
+      const code = err?.detail?.error || err?.message;
+      const friendly =
+        code === 'invalid_code'
+          ? 'That code is 6 digits — check the email and try again.'
+          : /expired/i.test(code || '')
+            ? 'That code expired. Tap "Resend" below to get a fresh one.'
+            : /invalid/i.test(code || '')
+              ? "That code doesn't match. Double-check the email — 6 digits, no spaces."
+              : (code || 'Something went wrong verifying the code.');
+      setError(friendly);
+      setStatus('sent');
     }
   }
 
@@ -224,9 +255,9 @@ export default function SignInSheet({ open, onClose, onLinked }) {
           </div>
         )}
 
-        {/* "Check your inbox" confirmation */}
-        {status === 'sent' && (
-          <div className="signin-state">
+        {/* "Check your inbox" — enter the 6-digit code (or tap the link). */}
+        {(status === 'sent' || status === 'verifying') && (
+          <form className="signin-state" onSubmit={handleVerifySaveCode}>
             <div className="signin-art signin-art--sent">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -235,17 +266,49 @@ export default function SignInSheet({ open, onClose, onLinked }) {
             </div>
             <h2 className="signin-title">Check your inbox</h2>
             <p className="signin-sub">
-              We just sent a one-tap sign-in link to
-              <br /><strong>{email}</strong>.
-              <br />Open it on this device to finish linking your cups.
+              We sent a 6-digit code to <strong>{email}</strong>.
+              <br />Enter it below to finish linking your cups.
             </p>
+
+            <label className="signin-label" htmlFor="save-code">6-digit code</label>
+            <input
+              id="save-code"
+              ref={codeRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              className="signin-input signin-input--code"
+              placeholder="123456"
+              value={otpCode}
+              onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              disabled={status === 'verifying'}
+              required
+            />
+
+            {error && <p className="signin-error">{error}</p>}
+
             <button
+              type="submit"
+              className="signin-btn signin-btn--primary"
+              disabled={status === 'verifying' || otpCode.length !== 6}
+            >
+              {status === 'verifying' ? 'Verifying…' : 'Verify code'}
+            </button>
+
+            <p className="signin-fine">
+              On a computer you can also just tap the sign-in link in the email.
+            </p>
+
+            <button
+              type="button"
               className="signin-btn signin-btn--ghost"
-              onClick={() => { setStatus('idle'); setEmail(''); }}
+              onClick={() => { setStatus('idle'); setEmail(''); setOtpCode(''); setError(null); }}
             >
               Use a different email
             </button>
-          </div>
+          </form>
         )}
 
         {/* Idle form (or error variant of it) — "save" mode only */}

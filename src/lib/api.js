@@ -707,13 +707,21 @@ export async function addDonationClaim(userId, cupsCount, payoutAmount, orgId) {
   if (error) throw error
 }
 
-export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath, orgId }) {
+export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath, attachReceiptPhoto, orgId }) {
   // Generate the claim id client-side and insert WITHOUT a RETURNING
   // select. Why: the anonymous user app has INSERT on `claims` but no
   // SELECT policy (locked down in C-1), so `.insert().select().single()`
   // would fail trying to read the new row back. Supplying our own id
   // sidesteps the read entirely — anon INSERT alone is enough.
   const id = safeUUID()
+  // Set receipt_photo_path AT INSERT TIME. An anonymous user cannot UPDATE
+  // the claim afterwards: PostgREST only mutates rows the role can also
+  // SELECT, and anon has no SELECT policy on claims (they hold IBAN/payout),
+  // so an UPDATE silently affects 0 rows and the path never sticks — which
+  // made verify-receipt report "no photo" and the whole claim fail for
+  // anonymous users. The photo path is deterministic (`<id>.jpg`, since the
+  // upload forces JPEG to exactly this key), so we can set it up front.
+  const photoPath = receiptPhotoPath ?? (attachReceiptPhoto ? `${id}.jpg` : null)
   const insert = {
     id,
     user_id: userId,
@@ -723,7 +731,7 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
     payout_amount: payoutAmount,
     iban,
     receipt_photo_url: receiptPhotoUrl ?? null,
-    receipt_photo_path: receiptPhotoPath ?? null,
+    receipt_photo_path: photoPath,
     status: 'pending',
   }
   if (orgId) insert.org_id = orgId
@@ -774,13 +782,11 @@ export async function uploadReceiptPhoto(claimId, photoDataUrl) {
     })
   if (error) throw error
 
-  // Update the claim row with the path so the edge function can find it
-  const { error: updErr } = await supabase
-    .from('claims')
-    .update({ receipt_photo_path: path })
-    .eq('id', claimId)
-  if (updErr) throw updErr
-
+  // NOTE: we deliberately do NOT update claims.receipt_photo_path here.
+  // createClaim already set it at INSERT time (anon can't UPDATE claims —
+  // no SELECT policy means the UPDATE silently affects 0 rows). The path is
+  // deterministic (`${claimId}.jpg`), so the row written at creation already
+  // points at exactly this object.
   return path
 }
 

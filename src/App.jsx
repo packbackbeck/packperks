@@ -642,6 +642,10 @@ export default function App() {
         payoutAmount: selectedReward.euros,
         iban: claimedIban,
         orgId: activeOrg?.id,
+        // Set receipt_photo_path at insert time — anon users can't UPDATE
+        // claims afterwards (no SELECT policy → 0 rows updated). The upload
+        // below writes to exactly `${claimId}.jpg`.
+        attachReceiptPhoto: true,
       });
       // Keep the claim ID around so the rejection page can surface it
       // (and pass it to the support mailto link).

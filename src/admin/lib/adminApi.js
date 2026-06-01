@@ -464,6 +464,18 @@ export async function purgeOrgRecords(orgId = getActiveOrgId()) {
   return data; // { cup_scans, claims, cup_transfers }
 }
 
+/* DANGER: permanently delete the selected rows by id. Admin-gated +
+ * table-whitelisted server-side. `table` must be one of:
+ * 'users' | 'claims' | 'cup_scans' | 'donation_transfers'.
+ * Deleting users also clears their activity history + claims. */
+export async function deleteRecords(table, ids) {
+  const list = (ids || []).filter(Boolean);
+  if (list.length === 0) return { deleted: 0 };
+  const { data, error } = await supabase.rpc('admin_delete_records', { p_table: table, p_ids: list });
+  if (error) throw new Error(error.message);
+  return data; // { deleted }
+}
+
 export async function listGeneratedReceipts({ limit = 30 } = {}) {
   const { data, error } = await applyOrgFilter(
     supabase

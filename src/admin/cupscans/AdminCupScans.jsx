@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminCupScans, getCupScanSignedUrl } from '../lib/adminApi';
+import { getAdminCupScans, getCupScanSignedUrl, deleteRecords } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
 import EmptyState from '../shared/EmptyState';
 import QuickLinks from '../shared/QuickLinks';
 import ColumnPicker from '../shared/ColumnPicker';
+import { useBulkSelection } from '../shared/useBulkSelection';
+import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminCupScans.css';
 
 /* Toggleable columns for the Cup Scans table. User + When + Status
@@ -232,12 +234,14 @@ export default function AdminCupScans({ onNavigate }) {
   const isCol = (id) => visibleCols.has(id);
   const [lightboxSrc, setLightbox] = useState(null);
 
-  useEffect(() => {
+  const reload = () => {
+    setLoading(true);
     getAdminCupScans()
       .then(setScans)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(() => { reload(); }, []);
 
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -284,6 +288,8 @@ export default function AdminCupScans({ onNavigate }) {
     failed:  scans.filter(s => s.status === 'failed').length,
     cupsAwarded: scans.reduce((sum, s) => sum + (s.cups_awarded || 0), 0),
   }), [scans]);
+
+  const sel = useBulkSelection(filtered);
 
   function ThCol({ label, field, sortable = true, width }) {
     return (
@@ -365,6 +371,15 @@ export default function AdminCupScans({ onNavigate }) {
           <table className="cs-table">
             <thead>
               <tr>
+                <th className="bulk-check-cell">
+                  <input
+                    type="checkbox"
+                    checked={sel.allSelected}
+                    ref={el => { if (el) el.indeterminate = sel.someSelected && !sel.allSelected; }}
+                    onChange={sel.toggleAll}
+                    aria-label="Select all cup scans"
+                  />
+                </th>
                 {isCol('photo')     && <ThCol label="Photo"     field="photo_path" sortable={false} width={64} />}
                 <ThCol label="User"   field="user" />
                 {isCol('source')    && <ThCol label="Source"    field="scan_type" />}
@@ -381,7 +396,7 @@ export default function AdminCupScans({ onNavigate }) {
                 // 3 always-shown columns (User, Status, When) + the
                 // currently-on toggleable ones. Was hard-coded 9
                 // before the column picker.
-                <tr><td colSpan={3 + visibleCols.size} className="cs-table__empty">
+                <tr><td colSpan={4 + visibleCols.size} className="cs-table__empty">
                   {scans.length === 0 ? (
                     <EmptyState
                       icon={
@@ -414,7 +429,15 @@ export default function AdminCupScans({ onNavigate }) {
                   )}
                 </td></tr>
               ) : filtered.map(scan => (
-                <tr key={scan.id} className="cs-row">
+                <tr key={scan.id} className={`cs-row${sel.isSelected(scan.id) ? ' cs-row--selected' : ''}`}>
+                  <td className="bulk-check-cell">
+                    <input
+                      type="checkbox"
+                      checked={sel.isSelected(scan.id)}
+                      onChange={() => sel.toggle(scan.id)}
+                      aria-label="Select scan"
+                    />
+                  </td>
                   {isCol('photo') && <td><ScanThumb scan={scan} onZoom={setLightbox} /></td>}
 
                   <td>
@@ -500,6 +523,17 @@ export default function AdminCupScans({ onNavigate }) {
           </table>
         )}
       </div>
+
+      <BulkDeleteBar
+        count={sel.count}
+        noun="cup scans"
+        onClear={sel.clear}
+        onDelete={async () => {
+          await deleteRecords('cup_scans', sel.selectedIds);
+          sel.clear();
+          reload();
+        }}
+      />
 
       <Lightbox src={lightboxSrc} onClose={() => setLightbox(null)} />
 

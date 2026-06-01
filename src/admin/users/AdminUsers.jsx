@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser } from '../lib/adminApi';
+import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords } from '../lib/adminApi';
 import { logAction } from '../auth/actionLog';
 import PiiMask from '../shared/PiiMask';
 import EmptyState from '../shared/EmptyState';
 import QuickLinks from '../shared/QuickLinks';
+import { useBulkSelection } from '../shared/useBulkSelection';
+import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminUsers.css';
 
 function formatDate(ts) {
@@ -331,12 +333,14 @@ export default function AdminUsers({ onNavigate }) {
   const [sortKey, setSortKey] = useState('joined');
   const [sortDir, setSortDir] = useState('desc');
 
-  useEffect(() => {
+  const reload = () => {
+    setLoading(true);
     getAdminUsers()
       .then(setUsers)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(() => { reload(); }, []);
 
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -371,6 +375,8 @@ export default function AdminUsers({ onNavigate }) {
       return 0;
     });
   }, [users, search, sortKey, sortDir]);
+
+  const sel = useBulkSelection(filtered);
 
   function ThCol({ label, sortKey: sk, style }) {
     return (
@@ -410,6 +416,15 @@ export default function AdminUsers({ onNavigate }) {
               <table className="au-table">
                 <thead>
                   <tr>
+                    <th className="bulk-check-cell">
+                      <input
+                        type="checkbox"
+                        checked={sel.allSelected}
+                        ref={el => { if (el) el.indeterminate = sel.someSelected && !sel.allSelected; }}
+                        onChange={sel.toggleAll}
+                        aria-label="Select all users"
+                      />
+                    </th>
                     <ThCol label="User" sortKey="name" />
                     <ThCol label="Email" sortKey="email" />
                     <ThCol label="Device" sortKey="device" style={{ width: 160 }} />
@@ -421,7 +436,7 @@ export default function AdminUsers({ onNavigate }) {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={7} className="au-table__empty">
+                    <tr><td colSpan={8} className="au-table__empty">
                       {users.length === 0 ? (
                         <EmptyState
                           icon={
@@ -456,6 +471,14 @@ export default function AdminUsers({ onNavigate }) {
                       className={`au-table__row ${selectedUser?.id === user.id ? 'au-table__row--active' : ''}`}
                       onClick={() => setSelectedUser(selectedUser?.id === user.id ? null : user)}
                     >
+                      <td className="bulk-check-cell" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={sel.isSelected(user.id)}
+                          onChange={() => sel.toggle(user.id)}
+                          aria-label="Select user"
+                        />
+                      </td>
                       <td>
                         <div className="au-user-cell">
                           <div className="au-user-avatar">{(user.display_name || '?')[0].toUpperCase()}</div>
@@ -497,6 +520,19 @@ export default function AdminUsers({ onNavigate }) {
           />
         )}
       </div>
+
+      <BulkDeleteBar
+        count={sel.count}
+        noun="users"
+        onClear={sel.clear}
+        onDelete={async () => {
+          const ids = sel.selectedIds;
+          await deleteRecords('users', ids);
+          if (selectedUser && ids.includes(selectedUser.id)) setSelectedUser(null);
+          sel.clear();
+          reload();
+        }}
+      />
 
       <QuickLinks currentPage="users" onNavigate={onNavigate} />
     </div>

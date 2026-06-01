@@ -5,11 +5,14 @@ import {
   uploadDonationReceipt,
   getDonationReceiptSignedUrl,
   getDonationCollectedTotal,
+  deleteRecords,
 } from '../lib/adminApi';
 import { logAction } from '../auth/actionLog';
 import { useAuth } from '../auth/AuthContext';
 import EmptyState from '../shared/EmptyState';
 import QuickLinks from '../shared/QuickLinks';
+import { useBulkSelection } from '../shared/useBulkSelection';
+import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminDonations.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -81,6 +84,8 @@ export default function AdminDonations({ onNavigate, draftState }) {
     }
   }
   useEffect(() => { refresh(); }, []);
+
+  const sel = useBulkSelection(transfers);
 
   const totalTransferred = useMemo(
     () => transfers.reduce((s, t) => s + Number(t.amount_eur || 0), 0),
@@ -211,6 +216,17 @@ export default function AdminDonations({ onNavigate, draftState }) {
             <table className="ad-transfers__table">
               <thead>
                 <tr>
+                  {canRecord && (
+                    <th className="bulk-check-cell">
+                      <input
+                        type="checkbox"
+                        checked={sel.allSelected}
+                        ref={el => { if (el) el.indeterminate = sel.someSelected && !sel.allSelected; }}
+                        onChange={sel.toggleAll}
+                        aria-label="Select all transfers"
+                      />
+                    </th>
+                  )}
                   <th>Date</th>
                   <th>Recipient</th>
                   <th>Amount</th>
@@ -221,12 +237,18 @@ export default function AdminDonations({ onNavigate, draftState }) {
               </thead>
               <tbody>
                 {transfers.map(t => (
-                  <TransferRow key={t.id} transfer={t} />
+                  <TransferRow
+                    key={t.id}
+                    transfer={t}
+                    selectable={canRecord}
+                    checked={sel.isSelected(t.id)}
+                    onToggle={() => sel.toggle(t.id)}
+                  />
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={2} className="ad-transfers__tf-label">Total transferred</td>
+                  <td colSpan={canRecord ? 3 : 2} className="ad-transfers__tf-label">Total transferred</td>
                   <td className="ad-transfers__tf-val">{formatEuro(totalTransferred)}</td>
                   <td colSpan={3} />
                 </tr>
@@ -235,6 +257,19 @@ export default function AdminDonations({ onNavigate, draftState }) {
           </div>
         )}
       </section>
+
+      {canRecord && (
+        <BulkDeleteBar
+          count={sel.count}
+          noun="transfers"
+          onClear={sel.clear}
+          onDelete={async () => {
+            await deleteRecords('donation_transfers', sel.selectedIds);
+            sel.clear();
+            refresh();
+          }}
+        />
+      )}
 
       <QuickLinks currentPage="donations" onNavigate={onNavigate} />
     </div>
@@ -448,7 +483,7 @@ function AddTransferCard({ defaultRecipient, outstanding, onCreated }) {
 }
 
 /* ── Single transfer row with receipt lightbox ────────────────────── */
-function TransferRow({ transfer }) {
+function TransferRow({ transfer, selectable = false, checked = false, onToggle }) {
   const [signedUrl, setSignedUrl] = useState(null);
   const [lightbox, setLightbox]   = useState(false);
 
@@ -466,7 +501,17 @@ function TransferRow({ transfer }) {
 
   return (
     <>
-      <tr>
+      <tr className={checked ? 'ad-transfers__row--selected' : ''}>
+        {selectable && (
+          <td className="bulk-check-cell">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={onToggle}
+              aria-label="Select transfer"
+            />
+          </td>
+        )}
         <td className="ad-transfers__date">{formatDate(transfer.transfer_date)}</td>
         <td>{transfer.recipient}</td>
         <td className="ad-transfers__amount">{formatEuro(Number(transfer.amount_eur))}</td>
@@ -507,7 +552,7 @@ function TransferRow({ transfer }) {
       </tr>
       {lightbox && signedUrl && (
         <tr className="ad-transfers__lightbox-row">
-          <td colSpan={6}>
+          <td colSpan={selectable ? 7 : 6}>
             <div className="ad-lightbox" onClick={() => setLightbox(false)}>
               <button className="ad-lightbox__close" onClick={e => { e.stopPropagation(); setLightbox(false); }}>×</button>
               <img src={signedUrl} alt="Transfer receipt enlarged" onClick={e => e.stopPropagation()} />

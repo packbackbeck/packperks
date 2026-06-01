@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminClaims, updateClaimStatus, getReceiptSignedUrl } from '../lib/adminApi';
+import { getAdminClaims, updateClaimStatus, getReceiptSignedUrl, deleteRecords } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
 import PermissionGate from '../auth/PermissionGate';
 import { useAuth, hasPermission } from '../auth/AuthContext';
@@ -449,9 +449,30 @@ export default function AdminClaims({ onNavigate, draftState }) {
   }
   const isCol = (id) => visibleCols.has(id);
 
-  useEffect(() => {
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  const reloadClaims = () => {
+    setLoading(true);
     getAdminClaims().then(setClaims).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(() => { reloadClaims(); }, []);
+
+  async function handleBulkDelete() {
+    setDeleting(true);
+    setActionError(null);
+    try {
+      await deleteRecords('claims', [...selected]);
+      setSelected(new Set());
+      setDeleteConfirm(false);
+      reloadClaims();
+    } catch (err) {
+      console.error('Bulk claim delete failed:', err);
+      setActionError(err?.message || 'Delete failed.');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -770,7 +791,27 @@ export default function AdminClaims({ onNavigate, draftState }) {
               </button>
             </>
           )}
-          <button className="ac-bulk-btn ac-bulk-btn--clear" onClick={() => setSelected(new Set())}>
+          {!deleteConfirm ? (
+            <button className="ac-bulk-btn ac-bulk-btn--fail"
+              disabled={deleting}
+              onClick={() => setDeleteConfirm(true)}
+              title="Permanently delete the selected claims">
+              🗑 Delete {selected.size}
+            </button>
+          ) : (
+            <>
+              <span className="ac-bulk-bar__count" style={{ color: '#FCA5A5' }}>
+                ⚠️ Permanently delete {selected.size} claim{selected.size === 1 ? '' : 's'}? Can’t be undone.
+              </span>
+              <button className="ac-bulk-btn ac-bulk-btn--fail" disabled={deleting} onClick={handleBulkDelete}>
+                {deleting ? 'Deleting…' : 'Confirm delete'}
+              </button>
+              <button className="ac-bulk-btn ac-bulk-btn--clear" disabled={deleting} onClick={() => setDeleteConfirm(false)}>
+                Cancel
+              </button>
+            </>
+          )}
+          <button className="ac-bulk-btn ac-bulk-btn--clear" onClick={() => { setSelected(new Set()); setDeleteConfirm(false); }}>
             Clear
           </button>
         </div>

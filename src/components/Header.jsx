@@ -77,19 +77,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }
       )}
 
       <div className="header__tiles" role="group" aria-label="Account actions">
-        {/* Tile 1 — Cup balance. Opens the profile / user-settings page. */}
-        <button
-          ref={cupTileRef}
-          type="button"
-          className="header__tile header__tile--cups"
-          onClick={onBadgeClick}
-          aria-label={`${cupCount} cups collected. Tap to open your profile.`}
-        >
-          <span className="header__tile-count">{cupCount}</span>
-          <img src={cupIcon} alt="" className="header__tile-icon" aria-hidden="true" />
-        </button>
-
-        {/* Tile 2 — Plus button. Triggers the scan / add-more-cups flow. */}
+        {/* Tile 1 — Plus button. Triggers the scan / add-more-cups flow. */}
         <button
           type="button"
           className="header__tile header__tile--add"
@@ -100,6 +88,18 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
+        </button>
+
+        {/* Tile 2 — Cup balance. Opens the profile / user-settings page. */}
+        <button
+          ref={cupTileRef}
+          type="button"
+          className="header__tile header__tile--cups"
+          onClick={onBadgeClick}
+          aria-label={`${cupCount} cups collected. Tap to open your profile.`}
+        >
+          <span className="header__tile-count">{cupCount}</span>
+          <img src={cupIcon} alt="" className="header__tile-icon" aria-hidden="true" />
         </button>
 
         {/* Tile 3 — User avatar. Second visual entry to the same profile

@@ -83,11 +83,13 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
   const [activeTab, setActiveTab] = useState('setup');
   const [dirty, setDirty] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [newTag, setNewTag] = useState('');
 
   useEffect(() => {
     setForm(reward);
     setActiveTab('setup');
     setDirty(false);
+    setNewTag('');
   }, [reward.id]);
 
   function update(field, value) {
@@ -126,6 +128,30 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
       const tags = prev.tags || [];
       return { ...prev, tags: tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag] };
     });
+    setDirty(true);
+  }
+
+  /* Free-form custom tags. These render over the description on the
+   * featured-reward card in the user app (featured-reward__tag). The
+   * preset buttons above are convenience shortcuts; this lets an admin
+   * type any label. Tags are normalised (trimmed, uppercased) and
+   * de-duplicated case-insensitively so "Vegan" and "vegan" don't both
+   * show up. */
+  function addTag(raw) {
+    // Strip pipes — tags are stored pipe-delimited in the CSV import/export.
+    const value = (raw || '').replace(/\|/g, ' ').trim().toUpperCase();
+    if (!value) return;
+    setForm(prev => {
+      const tags = prev.tags || [];
+      if (tags.some(t => t.toUpperCase() === value)) return prev;
+      return { ...prev, tags: [...tags, value] };
+    });
+    setDirty(true);
+    setNewTag('');
+  }
+
+  function removeTag(tag) {
+    setForm(prev => ({ ...prev, tags: (prev.tags || []).filter(t => t !== tag) }));
     setDirty(true);
   }
 
@@ -470,10 +496,62 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
         {/* Tags */}
         <section className="rep__section">
           <div className="rep__section-title">Tags</div>
+          <p className="rep__field-hint">
+            These show as pills over the description on the reward card. Add your own or tap a preset.
+          </p>
+
+          {/* Current tags — each removable. */}
+          <div className="rep__tags-current">
+            {(form.tags || []).length === 0 ? (
+              <span className="rep__tags-empty">No tags yet.</span>
+            ) : (
+              (form.tags || []).map(tag => (
+                <span key={tag} className="rep__tag-chip">
+                  {tag}
+                  <button
+                    type="button"
+                    className="rep__tag-chip-remove"
+                    onClick={() => removeTag(tag)}
+                    aria-label={`Remove tag ${tag}`}
+                    title={`Remove "${tag}"`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+
+          {/* Add a custom tag. */}
+          <div className="rep__tag-add">
+            <input
+              type="text"
+              className="rep__input rep__tag-add-input"
+              value={newTag}
+              maxLength={24}
+              placeholder="Add a tag (e.g. SPICY)"
+              onChange={e => setNewTag(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); addTag(newTag); }
+              }}
+            />
+            <button
+              type="button"
+              className="rep__tag-add-btn"
+              onClick={() => addTag(newTag)}
+              disabled={!newTag.trim()}
+            >
+              Add
+            </button>
+          </div>
+
+          {/* Preset quick-adds. */}
+          <div className="rep__tags-presets-label">Presets</div>
           <div className="rep__tags-row">
             {AVAILABLE_TAGS.map(tag => (
               <button
                 key={tag}
+                type="button"
                 className={`rep__tag ${(form.tags || []).includes(tag) ? 'rep__tag--active' : ''}`}
                 onClick={() => toggleTag(tag)}
               >

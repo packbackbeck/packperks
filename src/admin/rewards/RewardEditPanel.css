@@ -299,6 +299,87 @@
   color: #4A4540;
 }
 
+/* Current tags — removable chips */
+.rep__tags-current {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+.rep__tags-empty {
+  font-size: 12px;
+  color: #A39C92;
+  font-style: italic;
+}
+.rep__tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 20px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.rep__tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  transition: background 0.15s;
+}
+.rep__tag-chip-remove:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+/* Add a custom tag */
+.rep__tag-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.rep__tag-add-input {
+  flex: 1;
+  text-transform: uppercase;
+}
+.rep__tag-add-btn {
+  padding: 0 16px;
+  border-radius: 10px;
+  border: none;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.rep__tag-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.rep__tags-presets-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #A39C92;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
 /* Nutrition table */
 .rep__nutrition-table {
   display: flex;

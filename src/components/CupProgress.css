@@ -23,13 +23,13 @@
   left: 0;
   height: 100%;
   border-radius: 40px;
-  background: linear-gradient(260deg, var(--bk-orange) 0%, rgba(0, 0, 0, 0.18) 100%);
+  background: var(--bk-orange);
   transition: width var(--duration-slow) var(--ease-out-expo), background var(--duration-slow) ease;
   z-index: 0;
 }
 
 .cup-progress__fill--complete {
-  background: linear-gradient(260deg, var(--bk-green) 0%, rgba(0, 0, 0, 0.18) 100%);
+  background: var(--bk-green);
 }
 
 /* Cups row floats above the fill */

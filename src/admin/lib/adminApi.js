@@ -453,6 +453,17 @@ export async function createGeneratedReceipt({ items, total, receiptDate, venue 
   return data;
 }
 
+/* DANGER: permanently delete this org's activity records (cup scans,
+ * claims, cup/donation transfers). Server-side RPC is admin-gated and
+ * scoped strictly to the passed org_id. Returns per-table delete counts.
+ * Pass the org explicitly so we never accidentally purge "all orgs". */
+export async function purgeOrgRecords(orgId = getActiveOrgId()) {
+  if (!orgId) throw new Error('No active organization selected.');
+  const { data, error } = await supabase.rpc('admin_purge_org_records', { p_org_id: orgId });
+  if (error) throw new Error(error.message);
+  return data; // { cup_scans, claims, cup_transfers }
+}
+
 export async function listGeneratedReceipts({ limit = 30 } = {}) {
   const { data, error } = await applyOrgFilter(
     supabase

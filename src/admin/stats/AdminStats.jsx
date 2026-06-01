@@ -3,7 +3,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { getStatsMetrics } from '../lib/adminApi';
+import { getStatsMetrics, purgeOrgRecords } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import './AdminStats.css';
 
@@ -65,6 +65,12 @@ export default function AdminStats() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Danger-zone: org-scoped test-data purge.
+  const [purgeConfirm, setPurgeConfirm] = useState('');
+  const [purging, setPurging] = useState(false);
+  const [purgeResult, setPurgeResult] = useState(null);
+  const [purgeError, setPurgeError] = useState(null);
+
   const load = useCallback(async (rangeId) => {
     setLoading(true);
     setError(null);
@@ -86,6 +92,34 @@ export default function AdminStats() {
   const verdict = data?.verdict || 'na';
   const vMeta = BAND_META[verdict];
   const orgName = activeOrg?.partner_brand_name || activeOrg?.name || 'this organisation';
+
+  // Reset the danger-zone form whenever the active org changes, so a
+  // confirmation typed for one org can never be submitted against another.
+  useEffect(() => {
+    setPurgeConfirm('');
+    setPurgeResult(null);
+    setPurgeError(null);
+  }, [activeOrg?.id]);
+
+  const canPurge = purgeConfirm.trim().toUpperCase() === 'DELETE' && !purging && !!activeOrg?.id;
+
+  async function handlePurge() {
+    if (!canPurge) return;
+    setPurging(true);
+    setPurgeError(null);
+    setPurgeResult(null);
+    try {
+      const res = await purgeOrgRecords(activeOrg.id);
+      setPurgeResult(res);
+      setPurgeConfirm('');
+      load(range); // refresh the metrics so the cleared numbers show
+    } catch (e) {
+      console.error('purgeOrgRecords failed', e);
+      setPurgeError(e?.message || 'Failed to delete records.');
+    } finally {
+      setPurging(false);
+    }
+  }
 
   return (
     <div className="admin-stats">
@@ -250,6 +284,54 @@ export default function AdminStats() {
           </div>
         </>
       )}
+
+      {/* ── Danger zone: org-scoped test-data reset ── */}
+      <div className="stats-danger">
+        <div className="stats-danger__head">
+          <span className="stats-danger__icon" aria-hidden="true">⚠️</span>
+          <div>
+            <h2 className="stats-danger__title">Danger zone — delete test data</h2>
+            <p className="stats-danger__sub">
+              Permanently deletes <strong>cup scans</strong>, <strong>reward claims</strong>, and{' '}
+              <strong>cup transfers</strong> for <strong>{orgName}</strong> only. Other organisations
+              are not affected. This cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <ul className="stats-danger__list">
+          <li>Does <strong>not</strong> delete generated QR cup batches or rewards.</li>
+          <li>Scoped strictly to this organisation (<code>{activeOrg?.slug || activeOrg?.id || '—'}</code>).</li>
+          <li>Type <strong>DELETE</strong> below to enable the button.</li>
+        </ul>
+
+        <div className="stats-danger__row">
+          <input
+            type="text"
+            className="stats-danger__input"
+            placeholder="Type DELETE to confirm"
+            value={purgeConfirm}
+            onChange={(e) => setPurgeConfirm(e.target.value)}
+            disabled={purging}
+            aria-label="Type DELETE to confirm"
+          />
+          <button
+            className="stats-danger__btn"
+            onClick={handlePurge}
+            disabled={!canPurge}
+          >
+            {purging ? 'Deleting…' : `Delete ${orgName} test data`}
+          </button>
+        </div>
+
+        {purgeError && <div className="stats-danger__error">{purgeError}</div>}
+        {purgeResult && (
+          <div className="stats-danger__ok">
+            Deleted for {orgName}: {purgeResult.cup_scans ?? 0} cup scans, {purgeResult.claims ?? 0} claims,{' '}
+            {purgeResult.cup_transfers ?? 0} cup transfers.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

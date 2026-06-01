@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { toJpeg, toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches } from '../lib/adminApi';
-import { printCupReceipt, getPrinterIp, setPrinterIp } from '../lib/eposPrint';
+import { printCupReceipt, getPrinterIp, setPrinterIp, getLogoKeys, setLogoKeys } from '../lib/eposPrint';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
@@ -71,6 +71,10 @@ export default function AdminCupQr({ onNavigate }) {
   const [printerIp, setPrinterIpState] = useState(getPrinterIp());
   const [printing, setPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState(null); // { ok, text } | null
+  // Optional NV-graphics logo key codes (print logo by reference, no raster).
+  const initialLogo = getLogoKeys();
+  const [logoKey1, setLogoKey1] = useState(initialLogo ? String(initialLogo.key1) : '');
+  const [logoKey2, setLogoKey2] = useState(initialLogo ? String(initialLogo.key2) : '');
 
   /* P-21 — batch ops state. expiryId picks how long the new batch
    * stays valid; recent / loading / revokingId drive the recent-batches
@@ -436,7 +440,30 @@ export default function AdminCupQr({ onNavigate }) {
                 placeholder="192.168.192.168"
               />
               <span className="acq-field__hint">
-                Default Epson direct-Ethernet IP is 192.168.192.168. Your computer must be on the same subnet (e.g. set its Ethernet IPv4 to 192.168.192.100 / 255.255.255.0). "Print receipt" sends the receipt + QR straight to the printer via ePOS-Print (ESC/POS).
+                Default Epson direct-Ethernet IP is 192.168.192.168. Your computer must be on the same subnet (e.g. set its Ethernet IPv4 to 192.168.192.100 / 255.255.255.0). "Print receipt" sends the receipt + a NATIVE QR (2D-symbol command, not a raster image) straight to the printer via ePOS-Print.
+              </span>
+            </label>
+
+            <label className="acq-field">
+              <span className="acq-field__label">Logo NV key codes (optional)</span>
+              <div className="acq-row" style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="number"
+                  className="acq-input"
+                  value={logoKey1}
+                  onChange={e => { setLogoKey1(e.target.value); setLogoKeys(e.target.value, logoKey2); }}
+                  placeholder="key 1 (e.g. 80)"
+                />
+                <input
+                  type="number"
+                  className="acq-input"
+                  value={logoKey2}
+                  onChange={e => { setLogoKey2(e.target.value); setLogoKeys(logoKey1, e.target.value); }}
+                  placeholder="key 2 (e.g. 80)"
+                />
+              </div>
+              <span className="acq-field__hint">
+                Leave blank to print the "PackPerks" text wordmark. To print a logo image WITHOUT rasterising it each time: register the logo once into the printer's NV graphics memory (Epson TM Utility → NV graphics) with a 2-byte key code, then enter the same codes here. The receipt then prints the logo by reference (a few bytes) using ePOS-Print's logo command.
               </span>
             </label>
 

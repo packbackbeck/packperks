@@ -537,3 +537,22 @@
   background: #F8F4EC;
   border-color: #DCD3C1;
 }
+
+/* Epson ePOS-Print status message */
+.acq-print-status {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.acq-print-status--ok {
+  background: rgba(26, 135, 55, 0.10);
+  color: #14622A;
+  border: 1px solid rgba(26, 135, 55, 0.35);
+}
+.acq-print-status--err {
+  background: rgba(220, 38, 38, 0.08);
+  color: #B91C1C;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+}

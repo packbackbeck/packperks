@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { toJpeg, toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches } from '../lib/adminApi';
+import { printCupReceipt, getPrinterIp, setPrinterIp } from '../lib/eposPrint';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
@@ -64,6 +65,12 @@ export default function AdminCupQr({ onNavigate }) {
   const qrCanvasRef = useRef(null);
   const receiptRef = useRef(null);
   const [exporting, setExporting] = useState(null); // 'jpg' | 'pdf' | null
+
+  /* Epson TM-m30III (ePOS-Print over Ethernet). printerIp is editable +
+   * persisted; printStatus drives the inline success/error message. */
+  const [printerIp, setPrinterIpState] = useState(getPrinterIp());
+  const [printing, setPrinting] = useState(false);
+  const [printStatus, setPrintStatus] = useState(null); // { ok, text } | null
 
   /* P-21 — batch ops state. expiryId picks how long the new batch
    * stays valid; recent / loading / revokingId drive the recent-batches
@@ -181,11 +188,34 @@ export default function AdminCupQr({ onNavigate }) {
   }
 
   function handlePrint() {
-    // Add a body class so print.css can hide everything except the receipt.
+    // Browser print fallback (Save as PDF / any OS printer).
     document.body.classList.add('cupqr-printing');
     window.print();
     // remove on next tick — Safari fires afterprint before print finishes
     setTimeout(() => document.body.classList.remove('cupqr-printing'), 1000);
+  }
+
+  /* Print to the Epson TM-m30III over Ethernet via ePOS-Print. Sends the
+   * receipt (with a native QR of the batch URL) straight to the printer. */
+  async function handleEposPrint() {
+    if (!batch) return;
+    setPrinting(true);
+    setPrintStatus(null);
+    try {
+      await printCupReceipt({
+        url: batch.url,
+        restaurant,
+        generatedAt: batch.generatedAt,
+        totalAmount: refundAmount,
+        sessionId,
+      }, printerIp);
+      setPrintStatus({ ok: true, text: `Sent to printer at ${printerIp} ✓` });
+    } catch (err) {
+      console.error('ePOS print failed:', err);
+      setPrintStatus({ ok: false, text: err.message || 'Print failed.' });
+    } finally {
+      setPrinting(false);
+    }
   }
 
   /* Helper that grabs the receipt DOM at its NATURAL size (no fit-to-page
@@ -300,17 +330,36 @@ export default function AdminCupQr({ onNavigate }) {
             className="acq-btn acq-btn--ghost"
             onClick={handlePrint}
             disabled={!batch}
-            title="Open browser print dialog"
+            title="Open the browser print dialog (Save as PDF / any OS printer)"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 6 2 18 2 18 9"/>
               <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
               <rect x="6" y="14" width="12" height="8"/>
             </svg>
-            Print
+            Browser print
+          </button>
+          <button
+            className="acq-btn acq-btn--primary"
+            onClick={handleEposPrint}
+            disabled={!batch || printing}
+            title={`Print to the Epson TM-m30III at ${printerIp} over Ethernet (ESC/POS via ePOS-Print)`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"/>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+              <rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            {printing ? 'Printing…' : 'Print receipt'}
           </button>
         </div>
       </div>
+
+      {printStatus && (
+        <div className={`acq-print-status ${printStatus.ok ? 'acq-print-status--ok' : 'acq-print-status--err'}`}>
+          {printStatus.text}
+        </div>
+      )}
 
       {/* ── Left: generation controls ────────────────────────────────── */}
       <div className="acq-layout">
@@ -373,6 +422,21 @@ export default function AdminCupQr({ onNavigate }) {
               </select>
               <span className="acq-field__hint">
                 After the expiry passes, this QR can't be claimed and customers see a "this receipt has expired" message. Defaults to never-expires for backwards compatibility — set a short window if printing for a single-day event.
+              </span>
+            </label>
+
+            <label className="acq-field">
+              <span className="acq-field__label">Printer IP (Epson TM-m30III)</span>
+              <input
+                type="text"
+                className="acq-input"
+                value={printerIp}
+                onChange={e => setPrinterIpState(e.target.value)}
+                onBlur={e => setPrinterIp(e.target.value)}
+                placeholder="192.168.192.168"
+              />
+              <span className="acq-field__hint">
+                Default Epson direct-Ethernet IP is 192.168.192.168. Your computer must be on the same subnet (e.g. set its Ethernet IPv4 to 192.168.192.100 / 255.255.255.0). "Print receipt" sends the receipt + QR straight to the printer via ePOS-Print (ESC/POS).
               </span>
             </label>
 

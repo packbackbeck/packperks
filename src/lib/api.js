@@ -442,9 +442,12 @@ export async function uploadCupScanPhoto(scanId, photoDataUrl) {
   // gallery image as image/png. Forcing the content type + extension
   // keeps the admin table thumbnail and the bucket key in sync.
   const path = `${scanId}.jpg`
+  // upsert:false — anon only has INSERT (not UPDATE) on cup-scans; upsert
+  // would require UPDATE and fail RLS for anonymous users. scanId is unique
+  // per scan, so a plain insert is correct.
   const { error } = await supabase.storage
     .from('cup-scans')
-    .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+    .upload(path, blob, { contentType: 'image/jpeg', upsert: false })
   if (error) {
     console.error('cup-scan upload failed (path=' + path + ', size=' + blob.size + ' bytes):', error)
     return null
@@ -757,11 +760,17 @@ export async function uploadReceiptPhoto(claimId, photoDataUrl) {
   // (uploadCupScanPhoto already does this; receipts must match.)
   const path = `${claimId}.jpg`
 
+  // upsert:false — anonymous users only have INSERT on the receipts bucket,
+  // NOT update. upsert:true makes Storage require UPDATE permission too, so
+  // anon uploads were rejected with "new row violates row-level security
+  // policy" (signed-in users have broader perms, which is why it worked for
+  // them). The claim id is a fresh UUID per submit, so the object never
+  // pre-exists and a plain insert is correct.
   const { error } = await supabase.storage
     .from('receipts')
     .upload(path, blob, {
       contentType: 'image/jpeg',
-      upsert: true, // tolerate retries on the same claim
+      upsert: false,
     })
   if (error) throw error
 

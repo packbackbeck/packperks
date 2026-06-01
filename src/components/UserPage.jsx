@@ -8,6 +8,22 @@ import ActivityDetailModal from './ActivityDetailModal';
 import { validateIban } from '../utils/iban';
 import { getGlobalImpact } from '../lib/api';
 
+/* Build timestamp, stamped at compile time by vite (see vite.config.js).
+ * Shown subtly at the bottom of the profile so we can confirm which
+ * deployed version is live (date + time + seconds, local time). */
+const BUILD_STAMP = (() => {
+  try {
+    const iso = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null;
+    if (!iso) return null;
+    return new Date(iso).toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+  } catch {
+    return null;
+  }
+})();
+
 /* ── Inline SVG animal avatars ── */
 const ANIMALS = [
   {
@@ -826,6 +842,11 @@ export default function UserPage({
             </svg>
             Withdraw all Cups
           </button>
+        )}
+        {BUILD_STAMP && (
+          <p className="user-page__build" title="App version (build time)">
+            Build {BUILD_STAMP}
+          </p>
         )}
       </footer>
     </div>

@@ -1008,6 +1008,17 @@
   justify-content: center;
 }
 
+/* Subtle build/version stamp so we can confirm which deploy is live. */
+.user-page__build {
+  margin: 0;
+  font-family: var(--font-primary);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--text-light);
+  opacity: 0.45;
+  text-align: center;
+}
+
 .user-page__legal-link {
   font-family: var(--font-primary);
   font-size: var(--fs-xs);

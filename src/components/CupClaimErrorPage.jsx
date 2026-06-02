@@ -38,7 +38,7 @@ function buildCopy(brand) {
     title: 'These cups were already claimed',
     body: "Each cup token can only be added to one customer's balance. The cups on this receipt have already been claimed.",
     hint: "Check your activity — if this was an earlier scan of yours, the cups are already in your balance.",
-    primary: 'Check my activity',
+    primary: 'Try again',
   },
   batch_not_found: {
     emoji: '❌',

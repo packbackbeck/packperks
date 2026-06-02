@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import './CupScanSuccess.css';
 
 function formatDate(d = new Date()) {
@@ -8,10 +9,10 @@ function formatTime(d = new Date()) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-// How long the success screen stays before it gracefully bows out to home.
+// How long the success popup stays before it gracefully bows out to home.
 const AUTO_DISMISS_MS = 5000;
-// Matches the fade-out transition duration in CupScanSuccess.css.
-const FADE_MS = 450;
+// Matches the exit-transition duration in CupScanSuccess.css.
+const FADE_MS = 400;
 
 export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome }) {
   const now = new Date();
@@ -38,8 +39,15 @@ export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome 
     return () => clearTimeout(t);
   }, [leaveTo, onHome]);
 
-  return (
-    <div className={`css-page${leaving ? ' css-page--leaving' : ''}`}>
+  return createPortal(
+    <div
+      className={`css-overlay${leaving ? ' css-overlay--leaving' : ''}`}
+      onClick={goReward}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Cup added"
+    >
+      <div className="css-sheet" onClick={(e) => e.stopPropagation()}>
       {/* Green glow */}
       <div className="css-page__glow" />
 
@@ -128,6 +136,8 @@ export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome 
           Add more cups
         </button>
       </div>
-    </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

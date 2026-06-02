@@ -1,36 +1,55 @@
-/* ── Cup Scan Success Page ──
- * Fixed-position so the page fills the viewport (matches verifying /
- * rejected / cashback-success). Background is the app's bk-cream so it
- * blends with the rest of the user app instead of feeling like a
- * different screen. */
-.css-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+/* ── Cup Scan Success — modal popup over the home screen ──
+ * A dimmed/blurred backdrop reveals the home screen behind it; the
+ * success content lives in a card ("sheet") that springs up on entry
+ * and drops away on exit. Durations must match FADE_MS in the JSX. */
+.css-overlay {
   position: fixed;
   inset: 0;
-  background: var(--bk-cream);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--sp-5);
   overflow-y: auto;
-  animation: fade-in var(--duration-normal) ease both;
-  gap: 0;
-  z-index: 10;
-  /* Smooth exit when auto-dismissing (or tapping a CTA) → home. Must match
-     FADE_MS in CupScanSuccess.jsx. */
-  transition: opacity 450ms ease, transform 450ms ease;
+  background: rgba(18, 18, 18, 0.45);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: css-overlay-in 260ms ease both;
+  transition: opacity 400ms ease, backdrop-filter 400ms ease, -webkit-backdrop-filter 400ms ease;
 }
-
-/* Graceful bow-out: fade + lift slightly, then the app swaps to home. */
-.css-page--leaving {
+/* Exit: backdrop fades, sheet drops + shrinks (see below). */
+.css-overlay--leaving {
   opacity: 0;
-  transform: translateY(-10px);
   pointer-events: none;
 }
 
-@keyframes fade-in {
+.css-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 350px;
+  padding: 28px 22px 22px;
+  background: var(--bk-cream);
+  border-radius: 26px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.30);
+  overflow: hidden;
+  animation: css-sheet-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: transform 400ms cubic-bezier(0.36, 0, 0.66, -0.2), opacity 360ms ease;
+}
+.css-overlay--leaving .css-sheet {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+}
+
+@keyframes css-overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }
+}
+@keyframes css-sheet-in {
+  from { opacity: 0; transform: translateY(36px) scale(0.92); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .css-page__glow {
@@ -99,7 +118,7 @@
 
 /* Info card */
 .css-card {
-  width: 300px;
+  width: 100%;
   background: var(--white);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
@@ -190,7 +209,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-  width: 300px;
+  width: 100%;
   z-index: 1;
 }
 

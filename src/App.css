@@ -5,7 +5,9 @@
   flex-direction: column;
   align-items: center;
   gap: var(--sp-5);
-  padding: 60px var(--sp-6) var(--sp-6);
+  /* Tighter side margins so cards sit closer to the screen edges
+     (was --sp-6 / 30px horizontally). */
+  padding: 60px var(--sp-4) var(--sp-6);
   min-height: 100dvh;
   background: var(--bk-cream);
 }

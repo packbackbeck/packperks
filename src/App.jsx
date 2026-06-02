@@ -873,16 +873,10 @@ export default function App() {
     return <DonateSuccessPage amount={donatedCups} onClose={() => setPage('home')} />;
   }
 
-  if (page === 'cup-scan-success') {
-    return (
-      <CupScanSuccess
-        cupsAdded={lastCupsScanned}
-        newTotal={cupCount}
-        onAddMore={handleCupScanAgain}
-        onHome={handleCupScanHome}
-      />
-    );
-  }
+  // NOTE: cup-scan-success is intentionally NOT an early-return page. It
+  // renders as a modal popup OVER the home screen (see the home return
+  // below) so the customer sees their updated balance behind the success
+  // card. The success state is keyed off `page === 'cup-scan-success'`.
 
   if (page === 'cup-scan-error') {
     return (
@@ -1076,6 +1070,17 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* Cup-scan success — modal popup over the live home screen (portaled
+          to <body>), so the customer sees their updated balance behind it. */}
+      {page === 'cup-scan-success' && (
+        <CupScanSuccess
+          cupsAdded={lastCupsScanned}
+          newTotal={cupCount}
+          onAddMore={handleCupScanAgain}
+          onHome={handleCupScanHome}
+        />
+      )}
+
       <Header
         cupCount={cupCount}
         onBadgeClick={() => setPage('user')}

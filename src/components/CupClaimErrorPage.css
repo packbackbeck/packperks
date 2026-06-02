@@ -88,15 +88,16 @@
 .cce-page__primary:hover { filter: brightness(0.95); }
 
 .cce-page__secondary {
-  height: 44px;
-  border: none;
+  height: 50px;
+  border: 1.5px solid #1A1A1A;
+  border-radius: 26px;
   background: transparent;
-  color: #7A7166;
-  font-size: 0.875rem;
-  font-weight: 600;
+  color: #1A1A1A;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
 }
-.cce-page__secondary:hover { color: #1A1A1A; }
+.cce-page__secondary:hover { background: rgba(26,26,26,0.06); }
 
 /* Secondary hint — the smaller "what to do next" line under the
  * primary explanation. Lighter weight + slightly smaller so the

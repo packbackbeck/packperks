@@ -86,16 +86,16 @@
 /* Cup icon wrapper */
 .cup-progress__cup-icon-wrap {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .cup-progress__cup-img {
-  width: 28px;
-  height: 28px;
+  width: 48px;
+  height: 48px;
 }
 
 /* Filled cups: white icon */
@@ -106,7 +106,7 @@
 /* Checkmark overlay on filled cups */
 .cup-progress__cup-check {
   position: absolute;
-  top: 50%;
+  top: 55%;
   left: 50%;
   transform: translate(-50%, -40%);
 }

@@ -96,7 +96,6 @@ export default function FeaturedReward({
                 : reward.name
               }
             </h2>
-            <p className="featured-reward__desc">{reward.description}</p>
             <div className="featured-reward__tags">
               {/* Hide the "FREE" tag — the value chip already says what the
                   reward is worth. Other custom tags still render. */}

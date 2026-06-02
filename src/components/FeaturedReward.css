@@ -48,7 +48,7 @@
 
 .featured-reward__content {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--sp-3);
   position: relative;
   z-index: 1;
@@ -57,7 +57,9 @@
 
 .featured-reward__image-wrap {
   width: 130px;
-  height: 130px;
+  height: auto;
+  align-self: stretch;
+  min-height: 130px;
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   overflow: hidden;

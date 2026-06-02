@@ -52,7 +52,7 @@
   display: flex;
   flex-direction: column;
   width: 159px;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
 }
 
 .reward-card__name {
@@ -85,8 +85,8 @@
   padding: 3px 8px;
   border-radius: 20px;
   font-family: var(--font-primary);
-  font-weight: var(--fw-bold);
-  font-size: 10px;
+  font-weight: var(--fw-regular);
+  font-size: 12px;
   letter-spacing: 0.3px;
 }
 

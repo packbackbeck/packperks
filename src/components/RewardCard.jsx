@@ -5,6 +5,8 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
   const isUnlocked = cupCount >= reward.cupsNeeded;
   const cupsRemaining = Math.max(0, reward.cupsNeeded - cupCount);
   const progress = Math.min(1, cupCount / reward.cupsNeeded);
+  // Euro value of the reward, rounded — mirrors the featured card chip.
+  const euroValue = Math.round(Number(reward.euros ?? reward.cupsNeeded * 1.25));
 
   // Build divider positions: one line after each cup slot except the last
   // Dividers sit at 1/n, 2/n, ... (n-1)/n of the track width
@@ -43,11 +45,10 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
         </div>
         <div className="reward-card__info">
           <h3 className="reward-card__name">{reward.name}</h3>
-          <p className="reward-card__desc">{reward.description}</p>
           {/* Chips row */}
           <div className="reward-card__chips">
-            <span className="reward-card__chip reward-card__chip--free">FREE</span>
             <span className="reward-card__chip reward-card__chip--cups">
+              €{euroValue} for
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#502314" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
                 <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>

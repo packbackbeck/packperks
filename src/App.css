@@ -27,7 +27,7 @@
 
 .app__subtext {
   font-family: var(--font-primary);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   color: var(--text-light);
   line-height: 1.45;
   margin-top: var(--sp-2);

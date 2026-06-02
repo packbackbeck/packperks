@@ -6,7 +6,7 @@
   justify-content: center;
   gap: var(--sp-3);
   padding: var(--sp-4);
-  width: 335px;
+  width: 100%;
   background: var(--white);
   border-radius: var(--radius-lg);
   overflow: hidden;

@@ -959,6 +959,7 @@ export default function App() {
           profile={profile}
           onSaveProfile={handleSaveProfile}
           cupCount={cupCount}
+          cashbackRate={liveSettings.cashbackRatePerCup}
           history={history}
           userClaims={userClaims}
           rewards={liveRewards}

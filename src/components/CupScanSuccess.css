@@ -14,13 +14,13 @@
   background: rgba(18, 18, 18, 0.45);
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
-  animation: css-overlay-in 260ms ease both;
-  transition: opacity 400ms ease, backdrop-filter 400ms ease, -webkit-backdrop-filter 400ms ease;
+  /* Enter: backdrop fades + blur ramps in. Exit is a dedicated keyframe
+     (not a transition) so it never fights the entry animation's fill. */
+  animation: css-overlay-in 300ms ease both;
 }
-/* Exit: backdrop fades, sheet drops + shrinks (see below). */
 .css-overlay--leaving {
-  opacity: 0;
   pointer-events: none;
+  animation: css-overlay-out 360ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .css-sheet {
@@ -35,21 +35,31 @@
   border-radius: 26px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.30);
   overflow: hidden;
+  will-change: transform, opacity;
+  /* Enter: soft spring up + scale in. */
   animation: css-sheet-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  transition: transform 400ms cubic-bezier(0.36, 0, 0.66, -0.2), opacity 360ms ease;
 }
+/* Exit: the card eases gently down + shrinks while fading — a calm,
+   decelerated "settle away" rather than an abrupt drop. */
 .css-overlay--leaving .css-sheet {
-  opacity: 0;
-  transform: translateY(40px) scale(0.96);
+  animation: css-sheet-out 360ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 @keyframes css-overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes css-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
 @keyframes css-sheet-in {
   from { opacity: 0; transform: translateY(36px) scale(0.92); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes css-sheet-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(14px) scale(0.94); }
 }
 
 .css-page__glow {

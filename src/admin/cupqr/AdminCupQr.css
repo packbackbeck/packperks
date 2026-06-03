@@ -1,5 +1,5 @@
 .admin-cup-qr {
-  padding: 32px 32px 48px;
+  padding: 20px 28px 40px;
   display: flex;
   flex-direction: column;
 }
@@ -11,22 +11,22 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 .acq-header__text { flex: 1; min-width: 280px; }
 .acq-header__title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: #1A1A1A;
-  margin: 0 0 6px;
+  margin: 0 0 3px;
 }
 .acq-header__sub {
-  font-size: 13px;
+  font-size: 12px;
   color: #7A7166;
   margin: 0;
   max-width: 640px;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 .acq-header__actions {
   display: flex;
@@ -49,18 +49,18 @@
 }
 
 .acq-controls,
-.acq-preview-wrap { display: flex; flex-direction: column; gap: 14px; }
+.acq-preview-wrap { display: flex; flex-direction: column; gap: 12px; }
 
 .acq-preview-wrap { align-items: center; }
 
 /* ── Controls panel ─────────────────────────────────────────────────── */
-.acq-controls { display: flex; flex-direction: column; gap: 14px; }
+.acq-controls { display: flex; flex-direction: column; gap: 12px; }
 
 .acq-card {
   background: #FFFFFF;
   border: 1px solid #E8E6E1;
   border-radius: 16px;
-  padding: 18px 20px;
+  padding: 14px 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
@@ -68,14 +68,14 @@
   font-size: 14px;
   font-weight: 800;
   color: #1A1A1A;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
 }
 
 .acq-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 3px;
+  margin-bottom: 9px;
 }
 
 .acq-field__label {
@@ -160,6 +160,18 @@
 .acq-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .acq-btn--primary { background: #FD6F46; color: white; }
 .acq-btn--primary:hover:not(:disabled) { background: #E55A30; }
+
+/* "Print receipt" — distinct colour from the orange Generate button so the
+   two side-by-side actions are clearly different. */
+.acq-btn--print { background: #1A8737; color: white; }
+.acq-btn--print:hover:not(:disabled) { background: #15702E; }
+
+/* Generate + Print side by side, each filling half the row. */
+.acq-generate-row {
+  display: flex;
+  gap: 8px;
+}
+.acq-generate-row .acq-btn { flex: 1; }
 .acq-btn--ghost {
   background: white;
   color: #4A4540;
@@ -243,9 +255,9 @@
 
 .acq-receipt {
   width: 100%;
-  max-width: 420px;
+  max-width: 380px;
   background: white;
-  padding: 36px 32px;
+  padding: 22px 24px;
   border: 1px solid #E8E6E1;
   border-radius: 8px;
   box-shadow: 0 4px 18px rgba(0,0,0,0.06);
@@ -256,35 +268,35 @@
 }
 
 .acq-receipt__brand {
-  width: 56px;
-  height: 56px;
-  margin-bottom: 18px;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 10px;
 }
 .acq-receipt__brand img {
   width: 100%; height: 100%; object-fit: contain;
 }
 
 .acq-receipt__title {
-  font-size: 26px;
+  font-size: 21px;
   font-weight: 900;
   letter-spacing: -0.01em;
   line-height: 1.05;
   color: #0F0F0F;
-  margin: 0 0 14px;
+  margin: 0 0 8px;
 }
 
 .acq-receipt__lede {
-  font-size: 13px;
+  font-size: 12px;
   color: #3B3833;
-  line-height: 1.5;
-  margin: 0 0 22px;
+  line-height: 1.4;
+  margin: 0 0 12px;
   max-width: 320px;
 }
 
 .acq-receipt__features {
   list-style: none;
   padding: 0;
-  margin: 0 0 26px;
+  margin: 0 0 12px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
@@ -293,41 +305,62 @@
 .acq-receipt__features li {
   border: 1.5px solid #0F0F0F;
   border-radius: 10px;
-  padding: 12px 8px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 92px;
-  font-size: 11px;
+  gap: 4px;
+  min-height: 66px;
+  font-size: 10px;
   font-weight: 600;
   color: #0F0F0F;
   line-height: 1.2;
 }
-.acq-receipt__feature-icon { font-size: 20px; }
+.acq-receipt__feature-icon { font-size: 17px; }
+
+/* Big cup count in the preview (mirrors the printed receipt banner). */
+.acq-receipt__cupcount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+}
+.acq-receipt__cupcount-num {
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1;
+  color: #0F0F0F;
+}
+.acq-receipt__cupcount-label {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #0F0F0F;
+}
 
 .acq-receipt__cta {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 800;
   color: #0F0F0F;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
 }
 
 .acq-receipt__qr {
   background: white;
-  padding: 12px;
+  padding: 8px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 18px;
-  min-height: 320px;
+  margin-bottom: 10px;
+  min-height: 210px;
 }
 .acq-receipt__qr canvas { display: block; }
 .acq-receipt__qr-placeholder {
-  width: 280px;
-  height: 280px;
+  width: 190px;
+  height: 190px;
   border: 2px dashed #C8C4BC;
   border-radius: 8px;
   display: flex;
@@ -337,29 +370,29 @@
   font-size: 12px;
   font-style: italic;
   text-align: center;
-  padding: 24px;
+  padding: 20px;
 }
 
 .acq-receipt__assure {
-  font-size: 13px;
+  font-size: 12px;
   font-style: italic;
   color: #0F0F0F;
-  margin: 0 0 10px;
-  line-height: 1.4;
+  margin: 0 0 6px;
+  line-height: 1.35;
 }
 
 .acq-receipt__note {
-  font-size: 11.5px;
+  font-size: 11px;
   color: #3B3833;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   max-width: 280px;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .acq-receipt__dashed {
   width: 100%;
   border-top: 1px dashed #0F0F0F;
-  margin: 6px 0 12px;
+  margin: 4px 0 8px;
 }
 
 .acq-receipt__footer {
@@ -555,4 +588,20 @@
   background: rgba(220, 38, 38, 0.08);
   color: #B91C1C;
   border: 1px solid rgba(220, 38, 38, 0.35);
+}
+
+.acq-batches__row--selected { background: #FFF6F2; }
+
+/* Recent-batches pagination */
+.acq-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+.acq-pagination__info {
+  font-size: 12px;
+  color: #6C6259;
+  font-weight: 600;
 }

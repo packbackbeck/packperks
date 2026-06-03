@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { toJpeg, toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
-import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches } from '../lib/adminApi';
+import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches, deleteCupBatches } from '../lib/adminApi';
 import { printCupReceipt, getPrinterIp, setPrinterIp, getLogoKeys, setLogoKeys } from '../lib/eposPrint';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import QuickLinks from '../shared/QuickLinks';
+import { useBulkSelection } from '../shared/useBulkSelection';
+import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminCupQr.css';
 
 /* Expiry presets for the batch generation form (P-21).
@@ -48,7 +50,7 @@ const PROD_URL = 'https://packperks-v1.vercel.app/';
  * ───────────────────────────────────────────────────────────────────── */
 export default function AdminCupQr({ onNavigate }) {
   const { activeOrg } = useOrg();
-  const [count, setCount] = useState(3);
+  const [count, setCount] = useState(1);
   const [restaurant, setRestaurant] = useState(
     activeOrg ? `${activeOrg.partner_brand_name || activeOrg.name} — Location` : 'Location 1'
   );
@@ -72,28 +74,31 @@ export default function AdminCupQr({ onNavigate }) {
   /* P-21 — batch ops state. expiryId picks how long the new batch
    * stays valid; recent / loading / revokingId drive the recent-batches
    * panel below the receipt preview. */
-  const [expiryId, setExpiryId] = useState('never');
+  const [expiryId, setExpiryId] = useState('24h');
   const [recent, setRecent] = useState([]);
   const [recentLoading, setRecentLoading] = useState(false);
   const [revokingId, setRevokingId] = useState(null); // batch_id being acted on
   const [revokeModal, setRevokeModal] = useState(null); // { batch_id } | null
+  const [batchPage, setBatchPage] = useState(0); // Recent-batches pagination
 
   /* Pull recent batches on mount and whenever a new one is generated /
    * revoked / unrevoked, so the recent list stays in sync without a
    * manual refresh. */
   async function refreshRecent() {
     setRecentLoading(true);
-    try { setRecent(await listCupBatches({ limit: 30 })); }
+    try { setRecent(await listCupBatches()); }
     catch (e) { console.error('listCupBatches:', e); }
     finally { setRecentLoading(false); }
   }
   useEffect(() => { refreshRecent(); }, []);
+  // Re-pull batches when the admin switches org.
+  useEffect(() => { refreshRecent(); /* eslint-disable-next-line */ }, [activeOrg?.id]);
 
   // Whenever a new batch lands, redraw the QR onto the canvas.
   useEffect(() => {
     if (!batch?.url || !qrCanvasRef.current) return;
     QRCode.toCanvas(qrCanvasRef.current, batch.url, {
-      width: 320,
+      width: 200,
       margin: 1,
       errorCorrectionLevel: 'M',
       color: { dark: '#0F0F0F', light: '#FFFFFF' },
@@ -310,6 +315,30 @@ export default function AdminCupQr({ onNavigate }) {
   const sessionId = batch?.batch_id?.slice(0, 8).toUpperCase() ?? '———';
   const generatedAt = batch?.generatedAt ?? new Date();
 
+  // Multi-select + bulk delete for the Recent batches table. Selection is
+  // keyed on the FULL list, so the header checkbox selects every batch across
+  // all pages (and per-row selections persist while paging).
+  const batchSel = useBulkSelection(recent, (b) => b.batch_id);
+
+  // Client-side pagination of the full batch list.
+  const BATCH_PAGE_SIZE = 12;
+  const batchPageCount = Math.max(1, Math.ceil(recent.length / BATCH_PAGE_SIZE));
+  const safeBatchPage = Math.min(batchPage, batchPageCount - 1);
+  const pageBatches = recent.slice(
+    safeBatchPage * BATCH_PAGE_SIZE,
+    safeBatchPage * BATCH_PAGE_SIZE + BATCH_PAGE_SIZE,
+  );
+
+  async function handleDeleteBatches() {
+    const ids = batchSel.selectedIds;
+    await deleteCupBatches(ids);
+    logAction({ action: 'cup_batch.delete', targetType: 'cup_batch', targetId: ids.join(','), metadata: { count: ids.length } });
+    // If the currently-previewed batch was deleted, clear the preview.
+    if (batch && ids.includes(batch.batch_id)) setBatch(null);
+    batchSel.clear();
+    await refreshRecent();
+  }
+
   return (
     <div className="admin-cup-qr">
       <div className="acq-header">
@@ -356,19 +385,6 @@ export default function AdminCupQr({ onNavigate }) {
               <rect x="6" y="14" width="12" height="8"/>
             </svg>
             Browser print
-          </button>
-          <button
-            className="acq-btn acq-btn--primary"
-            onClick={handleEposPrint}
-            disabled={!batch || printing}
-            title={`Print to the Epson TM-m30III at ${printerIp} over Ethernet (ESC/POS via ePOS-Print)`}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"/>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-              <rect x="6" y="14" width="12" height="8"/>
-            </svg>
-            {printing ? 'Printing…' : 'Print receipt'}
           </button>
         </div>
       </div>
@@ -427,7 +443,7 @@ export default function AdminCupQr({ onNavigate }) {
                 onChange={e => setRestaurant(e.target.value)}
                 placeholder="Burger King — Amsterdam Damrak"
               />
-              <span className="acq-field__hint">Shown on the printed receipt for staff/customer reference — used only for display, not for tracking customers.</span>
+              <span className="acq-field__hint">Shown on the printed receipt.</span>
             </label>
 
             <label className="acq-field">
@@ -441,9 +457,7 @@ export default function AdminCupQr({ onNavigate }) {
                   <option key={p.id} value={p.id}>{p.label}</option>
                 ))}
               </select>
-              <span className="acq-field__hint">
-                After the expiry passes, this QR can't be claimed and customers see a "this receipt has expired" message. Defaults to never-expires for backwards compatibility — set a short window if printing for a single-day event.
-              </span>
+              <span className="acq-field__hint">After expiry the QR can't be claimed. Default: never expires.</span>
             </label>
 
             <label className="acq-field">
@@ -456,9 +470,7 @@ export default function AdminCupQr({ onNavigate }) {
                 onBlur={e => setPrinterIp(e.target.value)}
                 placeholder="192.168.192.168"
               />
-              <span className="acq-field__hint">
-                Default Epson direct-Ethernet IP is 192.168.192.168. Your computer must be on the same subnet (e.g. set its Ethernet IPv4 to 192.168.192.100 / 255.255.255.0). "Print receipt" sends the receipt + a NATIVE QR (2D-symbol command, not a raster image) straight to the printer via ePOS-Print.
-              </span>
+              <span className="acq-field__hint">Epson direct-Ethernet default — your computer must be on the same subnet.</span>
             </label>
 
             {/* div, not label: two inputs inside one label would forward
@@ -481,18 +493,31 @@ export default function AdminCupQr({ onNavigate }) {
                   placeholder="key 2 (e.g. 80)"
                 />
               </div>
-              <span className="acq-field__hint">
-                Leave blank to print the "PackPerks" text wordmark. To print a logo image WITHOUT rasterising it each time: register the logo once into the printer's NV graphics memory (Epson TM Utility → NV graphics) with a 2-byte key code, then enter the same codes here. The receipt then prints the logo by reference (a few bytes) using ePOS-Print's logo command.
-              </span>
+              <span className="acq-field__hint">Blank = text wordmark. Or enter the printer's NV-graphics key codes.</span>
             </div>
 
-            <button
-              className="acq-btn acq-btn--primary"
-              onClick={handleGenerate}
-              disabled={generating}
-            >
-              {generating ? 'Generating…' : `Generate QR for ${count} cup${count !== 1 ? 's' : ''}`}
-            </button>
+            <div className="acq-generate-row">
+              <button
+                className="acq-btn acq-btn--primary"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
+                {generating ? 'Generating…' : `Generate for ${count} cup${count !== 1 ? 's' : ''}`}
+              </button>
+              <button
+                className="acq-btn acq-btn--print"
+                onClick={handleEposPrint}
+                disabled={!batch || printing}
+                title={`Print to the Epson TM-m30III at ${printerIp} over Ethernet (ESC/POS via ePOS-Print)`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"/>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                  <rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                {printing ? 'Printing…' : 'Print receipt'}
+              </button>
+            </div>
 
             {error && <p className="acq-error">{error}</p>}
           </div>
@@ -545,6 +570,11 @@ export default function AdminCupQr({ onNavigate }) {
                 <span>Keep track of your progress</span>
               </li>
             </ul>
+
+            <div className="acq-receipt__cupcount">
+              <span className="acq-receipt__cupcount-num">{batch?.cup_ids?.length ?? count}</span>
+              <span className="acq-receipt__cupcount-label">{(batch?.cup_ids?.length ?? count) === 1 ? 'CUP' : 'CUPS'}</span>
+            </div>
 
             <h3 className="acq-receipt__cta">Scan to start with PackPerks</h3>
 
@@ -616,6 +646,16 @@ export default function AdminCupQr({ onNavigate }) {
           <table className="acq-batches__table">
             <thead>
               <tr>
+                <th className="bulk-check-cell">
+                  <input
+                    type="checkbox"
+                    checked={batchSel.allSelected}
+                    ref={el => { if (el) el.indeterminate = batchSel.someSelected && !batchSel.allSelected; }}
+                    onChange={batchSel.toggleAll}
+                    aria-label="Select all batches across all pages"
+                    title="Select all batches (all pages)"
+                  />
+                </th>
                 <th>Batch</th>
                 <th>Generated</th>
                 <th>Used</th>
@@ -625,7 +665,7 @@ export default function AdminCupQr({ onNavigate }) {
               </tr>
             </thead>
             <tbody>
-              {recent.map(b => {
+              {pageBatches.map(b => {
                 const exp = b.expires_at ? new Date(b.expires_at) : null;
                 const expired = exp ? exp.getTime() <= Date.now() : false;
                 const isRevoked = !!b.revoked_at;
@@ -637,7 +677,15 @@ export default function AdminCupQr({ onNavigate }) {
                 else if (fullyUsed) { statusLabel = 'Fully claimed'; statusTone = 'used'; }
                 const busy = revokingId === b.batch_id;
                 return (
-                  <tr key={b.batch_id}>
+                  <tr key={b.batch_id} className={batchSel.isSelected(b.batch_id) ? 'acq-batches__row--selected' : ''}>
+                    <td className="bulk-check-cell">
+                      <input
+                        type="checkbox"
+                        checked={batchSel.isSelected(b.batch_id)}
+                        onChange={() => batchSel.toggle(b.batch_id)}
+                        aria-label="Select batch"
+                      />
+                    </td>
                     <td>
                       <span className="acq-mono">{b.batch_id.slice(0, 8)}…</span>
                     </td>
@@ -683,7 +731,36 @@ export default function AdminCupQr({ onNavigate }) {
             </tbody>
           </table>
         )}
+
+        {recent.length > BATCH_PAGE_SIZE && (
+          <div className="acq-pagination">
+            <button
+              className="acq-btn acq-btn--ghost"
+              onClick={() => setBatchPage(p => Math.max(0, p - 1))}
+              disabled={safeBatchPage <= 0}
+            >
+              ← Prev
+            </button>
+            <span className="acq-pagination__info">
+              Page {safeBatchPage + 1} of {batchPageCount} · {recent.length} batches
+            </span>
+            <button
+              className="acq-btn acq-btn--ghost"
+              onClick={() => setBatchPage(p => Math.min(batchPageCount - 1, p + 1))}
+              disabled={safeBatchPage >= batchPageCount - 1}
+            >
+              Next →
+            </button>
+          </div>
+        )}
       </section>
+
+      <BulkDeleteBar
+        count={batchSel.count}
+        noun="batches"
+        onClear={batchSel.clear}
+        onDelete={handleDeleteBatches}
+      />
 
       {revokeModal && (
         <RevokeBatchModal

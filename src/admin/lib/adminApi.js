@@ -421,6 +421,90 @@ export async function getStatsMetrics({ fromTs = null, toTs = null } = {}) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
+ * User Action Stats — real behavioural percentages for the active org.
+ * Every number is derived from live rows (cups / cup_scans / claims);
+ * there are no placeholder/dummy values. Returns metrics with 0–100
+ * values, or null when the denominator is 0 (shown as "—" / "no data").
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getUserActionStats() {
+  const cupsQ   = applyOrgFilter(supabase.from('cups').select('id, status'));
+  const scansQ  = applyOrgFilter(supabase.from('cup_scans').select('user_id, status, source'));
+  const claimsQ = applyOrgFilter(supabase.from('claims').select('id, type, cups_redeemed'));
+
+  const [cupsRes, scansRes, claimsRes] = await Promise.all([cupsQ, scansQ, claimsQ]);
+  const cups   = cupsRes.data   || [];
+  const scans  = scansRes.data  || [];
+  const claims = claimsRes.data || [];
+
+  // 1) QR cups actually claimed vs issued. Issued = every cup minted by the
+  //    QR generator for this org; claimed = cups activated by a scan.
+  const cupsIssued  = cups.length;
+  const cupsClaimed = cups.filter(c => c.status === 'activated').length;
+
+  // 2) Returning scanners: of the users who ever successfully claimed a QR
+  //    cup, how many did it a second time (≥2 successful QR scans).
+  const successScans = scans.filter(s => s.source === 'qr' && s.status === 'success' && s.user_id);
+  const scansPerUser = new Map();
+  for (const s of successScans) scansPerUser.set(s.user_id, (scansPerUser.get(s.user_id) || 0) + 1);
+  const usersWithAnyScan = scansPerUser.size;
+  const usersWithSecond  = [...scansPerUser.values()].filter(n => n >= 2).length;
+
+  // 3–5) Claim-type mix across ALL claims (reward + direct refund + donation).
+  const totalClaims = claims.length;
+  const nReward   = claims.filter(c => c.type === 'cashback').length;
+  const nRefund   = claims.filter(c => c.type === 'direct_refund').length;
+  const nDonation = claims.filter(c => c.type === 'donation').length;
+
+  // 6) Cups spent on claims vs all cups users ever claimed (collected).
+  const cupsUsedInClaims = claims.reduce((sum, c) => sum + (Number(c.cups_redeemed) || 0), 0);
+
+  return [
+    {
+      id: 'qr_claimed_rate',
+      label: 'QR cups claimed',
+      value: pct(cupsClaimed, cupsIssued),
+      numerator: cupsClaimed, denominator: cupsIssued,
+      formula: 'Cups claimed (activated) ÷ cups issued by the QR generator',
+    },
+    {
+      id: 'returning_scanners',
+      label: 'Returning scanners (2nd QR)',
+      value: pct(usersWithSecond, usersWithAnyScan),
+      numerator: usersWithSecond, denominator: usersWithAnyScan,
+      formula: 'Users with ≥2 successful QR scans ÷ users with ≥1',
+    },
+    {
+      id: 'claim_mix_reward',
+      label: 'Reward claims',
+      value: pct(nReward, totalClaims),
+      numerator: nReward, denominator: totalClaims,
+      formula: 'Reward (cashback) claims ÷ all claims',
+    },
+    {
+      id: 'claim_mix_refund',
+      label: 'Direct-refund claims',
+      value: pct(nRefund, totalClaims),
+      numerator: nRefund, denominator: totalClaims,
+      formula: 'Direct-refund claims ÷ all claims',
+    },
+    {
+      id: 'claim_mix_donation',
+      label: 'Donation claims',
+      value: pct(nDonation, totalClaims),
+      numerator: nDonation, denominator: totalClaims,
+      formula: 'Donation claims ÷ all claims',
+    },
+    {
+      id: 'cups_used_rate',
+      label: 'Cups spent on claims',
+      value: pct(cupsUsedInClaims, cupsClaimed),
+      numerator: cupsUsedInClaims, denominator: cupsClaimed,
+      formula: 'Cups redeemed across all claims ÷ all cups users claimed',
+    },
+  ];
+}
+
+/* ─────────────────────────────────────────────────────────────────────
  * Rewards Receipt Generator (feasibility test).
  *
  * createGeneratedReceipt mints a unique PackPerks token, persists the
@@ -1016,43 +1100,35 @@ export async function unrevokeBatch(batchId) {
   if (error) throw error;
 }
 
-export async function listCupBatches({ limit = 30 } = {}) {
-  // Bring back every cup row from the most recent N batches and roll
-  // them up client-side. The cups table is small enough (hundreds of
-  // rows) that this is faster than a server-side aggregation query
-  // for the demo. If it ever grows past ~10k cups we'd want a view.
-  const { data, error } = await applyOrgFilter(
-    supabase
-      .from('cups')
-      .select('batch_id, status, expires_at, revoked_at, revoked_reason, created_at')
-      .order('created_at', { ascending: false })
-      .limit(2000)
-  );
+/* DANGER: permanently delete whole QR cup batches from the server. Removes
+ * the batch's cup rows — the batch disappears from Recent batches and the
+ * QR can no longer be claimed (effectively revoked). Admin-gated server-side. */
+export async function deleteCupBatches(batchIds) {
+  const list = (batchIds || []).filter(Boolean);
+  if (list.length === 0) return { deleted_cups: 0, batches: 0 };
+  const { data, error } = await supabase.rpc('admin_delete_cup_batches', { p_batch_ids: list });
+  if (error) throw new Error(error.message);
+  return data; // { deleted_cups, batches }
+}
+
+export async function listCupBatches() {
+  // Server-side aggregation (admin_list_cup_batches) returns EVERY batch
+  // for the active org as one row each — no client-side cup-row fetch, so
+  // older batches are never dropped by PostgREST's row cap. The caller
+  // paginates the full list client-side.
+  const { data, error } = await supabase.rpc('admin_list_cup_batches', {
+    p_org_id: getActiveOrgId(),
+  });
   if (error) throw error;
-  const byBatch = new Map();
-  for (const row of (data || [])) {
-    if (!row.batch_id) continue;
-    let b = byBatch.get(row.batch_id);
-    if (!b) {
-      b = {
-        batch_id: row.batch_id,
-        created_at: row.created_at,
-        expires_at: row.expires_at,
-        revoked_at: row.revoked_at,
-        revoked_reason: row.revoked_reason,
-        total: 0,
-        activated: 0,
-      };
-      byBatch.set(row.batch_id, b);
-    }
-    b.total += 1;
-    if (row.status === 'activated') b.activated += 1;
-    // Earliest created_at wins (cups in a batch share a timestamp anyway).
-    if (row.created_at < b.created_at) b.created_at = row.created_at;
-  }
-  return Array.from(byBatch.values())
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, limit);
+  return (data || []).map(b => ({
+    batch_id: b.batch_id,
+    created_at: b.created_at,
+    expires_at: b.expires_at,
+    revoked_at: b.revoked_at,
+    revoked_reason: b.revoked_reason,
+    total: Number(b.total) || 0,
+    activated: Number(b.activated) || 0,
+  }));
 }
 
 // Generate a short-lived signed URL for a private receipt photo. Admin UI

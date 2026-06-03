@@ -225,6 +225,7 @@ export default function UserPage({
   profile,
   onSaveProfile,
   cupCount,
+  cashbackRate = 1.25,
   history,
   userClaims = [],
   rewards = [],
@@ -429,10 +430,25 @@ export default function UserPage({
               <span className="user-page__name">{profile.displayName}</span>
             </div>
           )}
-          <div className="user-page__cup-badge">
-            <img src={cupIcon} alt="" width="14" height="14" />
-            {cupCount} cup{cupCount !== 1 ? 's' : ''} collected
-          </div>
+        </div>
+      </div>
+
+      {/* ── Cups ⇄ value box ── cups on the left, euro equivalent on the
+            right, with a subtle "≈" between (mirrors the refund compare box). */}
+      <div className="user-page__value-box">
+        <div className="user-page__value-option">
+          <span className="user-page__value-num">
+            <img src={cupIcon} alt="" width="22" height="22" />
+            {cupCount}
+          </span>
+          <span className="user-page__value-label">cup{cupCount !== 1 ? 's' : ''} collected</span>
+        </div>
+        <span className="user-page__value-approx" aria-label="approximately">≈</span>
+        <div className="user-page__value-option user-page__value-option--right">
+          <span className="user-page__value-num user-page__value-num--euro">
+            €{(cupCount * (cashbackRate || 1.25)).toFixed(2)}
+          </span>
+          <span className="user-page__value-label">in cashback</span>
         </div>
       </div>
 

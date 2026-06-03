@@ -3,7 +3,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { getStatsMetrics, purgeOrgRecords } from '../lib/adminApi';
+import { getStatsMetrics, getUserActionStats, purgeOrgRecords } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import './AdminStats.css';
 
@@ -62,6 +62,7 @@ export default function AdminStats() {
   const { activeOrg } = useOrg();
   const [range, setRange] = useState('all');
   const [data, setData] = useState(null);
+  const [actionStats, setActionStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -77,8 +78,13 @@ export default function AdminStats() {
     try {
       const r = RANGES.find(x => x.id === rangeId) || RANGES[0];
       const fromTs = r.days ? Date.now() - r.days * 24 * 60 * 60 * 1000 : null;
-      const result = await getStatsMetrics({ fromTs });
+      // User-action stats are all-time (not range-scoped) — fetched together.
+      const [result, actions] = await Promise.all([
+        getStatsMetrics({ fromTs }),
+        getUserActionStats(),
+      ]);
       setData(result);
+      setActionStats(actions);
     } catch (e) {
       console.error('getStatsMetrics failed', e);
       setError(e?.message || 'Failed to load stats.');
@@ -87,7 +93,7 @@ export default function AdminStats() {
     }
   }, []);
 
-  useEffect(() => { load(range); }, [range, load]);
+  useEffect(() => { load(range); }, [range, load, activeOrg?.id]);
 
   const verdict = data?.verdict || 'na';
   const vMeta = BAND_META[verdict];
@@ -284,6 +290,31 @@ export default function AdminStats() {
           </div>
         </>
       )}
+
+      {/* ── User action stats — real behavioural percentages ── */}
+      <section className="uas">
+        <div className="uas__head">
+          <h2 className="uas__title">User action stats</h2>
+          <p className="uas__sub">
+            Live behavioural rates for {orgName} — every number is computed from real
+            cups, scans, and claims (all-time, not affected by the range filter).
+          </p>
+        </div>
+        <div className="uas__grid">
+          {(actionStats || []).map(m => (
+            <div key={m.id} className="uas__card" title={m.formula}>
+              <div className="uas__value">
+                {m.value == null ? '—' : `${Math.round(m.value)}%`}
+              </div>
+              <div className="uas__label">{m.label}</div>
+              <div className="uas__frac">
+                {m.denominator > 0 ? `${m.numerator} / ${m.denominator}` : 'No data yet'}
+              </div>
+              <div className="uas__formula">{m.formula}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── Danger zone: org-scoped test-data reset ── */}
       <div className="stats-danger">

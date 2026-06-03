@@ -317,3 +317,58 @@
   color: #1A8737;
   font-weight: 600;
 }
+
+/* ── User action stats ── */
+.uas {
+  margin-top: 32px;
+}
+.uas__head { margin-bottom: 14px; }
+.uas__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1A1A1A;
+}
+.uas__sub {
+  margin: 0;
+  font-size: 13px;
+  color: #6C6259;
+  line-height: 1.45;
+  max-width: 640px;
+}
+.uas__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+.uas__card {
+  background: #FFFFFF;
+  border: 1px solid #ECE9E3;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.uas__value {
+  font-size: 30px;
+  font-weight: 800;
+  color: #1A8737;
+  line-height: 1.05;
+}
+.uas__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+.uas__frac {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8A8175;
+}
+.uas__formula {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #A39C92;
+  line-height: 1.4;
+}

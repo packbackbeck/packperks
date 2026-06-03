@@ -660,17 +660,57 @@
   outline: none;
 }
 
-.user-page__cup-badge {
+/* ── Cups ⇄ value box (mirrors the refund-sheet compare box) ── */
+.user-page__value-box {
+  display: flex;
+  align-items: center;
+  /* Equal horizontal gaps: edge→cups = cups→≈ = ≈→€ = €→edge. No side
+     padding so space-evenly owns all the horizontal spacing. */
+  justify-content: space-evenly;
+  width: 330px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4) 0;
+  box-shadow: var(--shadow-screen);
+}
+.user-page__value-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+.user-page__value-option--right {
+  align-items: center;
+  text-align: center;
+}
+.user-page__value-num {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  background: var(--bk-brown);
-  border-radius: 20px;
+  gap: 6px;
   font-family: var(--font-primary);
-  font-weight: var(--fw-medium);
-  font-size: var(--fs-sm);
-  color: var(--white);
+  font-weight: var(--fw-bold);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.user-page__value-num--euro {
+  color: #1A8737;
+}
+.user-page__value-label {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.user-page__value-approx {
+  flex-shrink: 0;
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: var(--text-light);
+  opacity: 0.6;
 }
 
 /* ── Detail rows ── */

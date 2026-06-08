@@ -125,6 +125,84 @@ const UAS_META = {
   },
 };
 
+/* Generic drill-down modal: renders the exact rows behind any metric from
+ * a { summary, labels, columns, rows } detail object. row.state ∈
+ * ok|bad|excluded; defaults to showing only the non-ok ("flagged") rows. */
+const STATE_CLASS = { ok: 'stats-sev--ok', bad: 'stats-sev--warn', excluded: 'stats-sev--muted' };
+
+function InspectModal({ view, showAll, onToggleAll, onClose }) {
+  if (!view) return null;
+  const { label, numerator, denominator, detail } = view;
+  const rows = detail?.rows || [];
+  const cols = detail?.columns || [];
+  const labels = detail?.labels || { ok: 'OK', bad: 'Flagged', excluded: 'Excluded' };
+  const flagged = rows.filter(r => r.state !== 'ok');
+  const hasFlagged = flagged.length > 0;
+  const effectiveAll = showAll || !hasFlagged; // nothing flagged → just show all
+  const visible = effectiveAll ? rows : flagged;
+  const pillText = (s) => (s === 'ok' ? labels.ok : s === 'excluded' ? (labels.excluded || 'Excluded') : labels.bad);
+
+  return (
+    <div className="stats-modal__backdrop" onClick={onClose}>
+      <div className="stats-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="stats-modal__head">
+          <div>
+            <h3 className="stats-modal__title">{label}</h3>
+            <p className="stats-modal__count">
+              {numerator} / {denominator} · {rows.length} row{rows.length !== 1 ? 's' : ''}
+              {!effectiveAll && ` · showing ${flagged.length} flagged`}
+            </p>
+          </div>
+          <button className="stats-modal__close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        {detail?.summary && <div className="stats-modal__summary">{detail.summary}</div>}
+
+        {hasFlagged && (
+          <div className="stats-modal__toolbar">
+            <button className="stats-modal__toggle" onClick={onToggleAll}>
+              {showAll ? `Show only ${flagged.length} flagged` : `Show all ${rows.length} rows`}
+            </button>
+          </div>
+        )}
+
+        <div className="stats-modal__tablewrap">
+          <table className="stats-errtable">
+            <thead>
+              <tr>
+                {cols.map(c => <th key={c.key}>{c.label}</th>)}
+                <th>Result</th>
+                <th>Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.length === 0 ? (
+                <tr><td colSpan={cols.length + 2} className="stats-empty">No rows to show.</td></tr>
+              ) : visible.map(r => (
+                <tr key={r.id} className={r.state === 'bad' ? 'stats-modal__row--bad' : ''}>
+                  {cols.map(c => (
+                    <td key={c.key}>
+                      {c.key === 'batch' || c.key === 'user' || c.key === 'cup' || c.key === 'claim'
+                        ? <code>{r.cells[c.key]}</code>
+                        : r.cells[c.key]}
+                    </td>
+                  ))}
+                  <td>
+                    <span className={`stats-sev ${STATE_CLASS[r.state] || 'stats-sev--warn'}`}>
+                      {pillText(r.state)}
+                    </span>
+                  </td>
+                  <td className="stats-errtable__msg">{r.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminStats() {
   const { activeOrg } = useOrg();
   const [range, setRange] = useState('all');
@@ -132,6 +210,11 @@ export default function AdminStats() {
   const [actionStats, setActionStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Inspect drill-down: holds the view descriptor of the open card (or null).
+  const [inspect, setInspect] = useState(null); // { label, numerator, denominator, detail }
+  const [inspectAll, setInspectAll] = useState(false); // show all rows vs only flagged
+  const openInspect = useCallback((view) => { setInspect(view); setInspectAll(false); }, []);
 
   // Danger-zone: org-scoped test-data purge.
   const [purgeConfirm, setPurgeConfirm] = useState('');
@@ -264,6 +347,18 @@ export default function AdminStats() {
                   <div className="stats-card__formula">{m.formula}</div>
                   <div className="stats-card__threshold">{thresholdText(m)}</div>
                   {m.note && <div className="stats-card__note">{m.note}</div>}
+                  {data.details?.[m.id]?.rows?.length > 0 && (
+                    <button
+                      type="button"
+                      className="stats-card__inspect"
+                      onClick={() => openInspect({
+                        label: m.label, numerator: m.numerator,
+                        denominator: m.denominator, detail: data.details[m.id],
+                      })}
+                    >
+                      Inspect {data.details[m.id].rows.length} rows →
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -388,6 +483,18 @@ export default function AdminStats() {
                       ? `${m.numerator.toLocaleString()} / ${m.denominator.toLocaleString()} ${meta.unit || ''}`.trim()
                       : 'No data yet'}
                   </span>
+                  {m.detail?.rows?.length > 0 && (
+                    <button
+                      type="button"
+                      className="stats-card__inspect uas__inspect"
+                      onClick={() => openInspect({
+                        label: m.label, numerator: m.numerator,
+                        denominator: m.denominator, detail: m.detail,
+                      })}
+                    >
+                      Inspect {m.detail.rows.length} rows →
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -442,6 +549,15 @@ export default function AdminStats() {
           </div>
         )}
       </div>
+
+      {inspect && (
+        <InspectModal
+          view={inspect}
+          showAll={inspectAll}
+          onToggleAll={() => setInspectAll(v => !v)}
+          onClose={() => setInspect(null)}
+        />
+      )}
     </div>
   );
 }

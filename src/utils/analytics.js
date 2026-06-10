@@ -34,22 +34,32 @@ const EVENTS = {
   REWARD_SHOWN:           'reward_shown',
   REWARD_CLAIM_ATTEMPTED: 'reward_claim_attempted',
   REWARD_CLAIM_SUCCESS:   'reward_claim_success',
-  // ── UI events (console-only) ──
+  // ── Behavioural events (persisted to client_events for User Behaviour) ──
+  SCREEN_VIEW:            'screen_view',
   REWARD_SELECTED:        'reward_selected',
-  CUP_ADDED:              'cup_added',
   DIRECT_REFUND_OPENED:   'direct_refund_opened',
   WITHDRAW_ALL_CUPS:      'withdraw_all_cups',
   TERMS_OPENED:           'terms_opened',
   SHARE_CUP:              'share_cup',
+  // ── UI events (console-only) ──
+  CUP_ADDED:              'cup_added',
 };
 
-// Only these hit the database — the funnel the Stats page measures.
+// These hit the database. The first block powers the System Health funnel;
+// the second powers the User Behaviour page (screen drop-off, reward changes,
+// button interactions, shares, and session time from event timestamps).
 const PERSISTED = new Set([
   EVENTS.APP_LOADED,
   EVENTS.SCAN_ATTEMPTED,
   EVENTS.REWARD_SHOWN,
   EVENTS.REWARD_CLAIM_ATTEMPTED,
   EVENTS.REWARD_CLAIM_SUCCESS,
+  EVENTS.SCREEN_VIEW,
+  EVENTS.REWARD_SELECTED,
+  EVENTS.DIRECT_REFUND_OPENED,
+  EVENTS.WITHDRAW_ALL_CUPS,
+  EVENTS.TERMS_OPENED,
+  EVENTS.SHARE_CUP,
 ]);
 
 /**

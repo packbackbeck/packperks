@@ -788,6 +788,259 @@ export async function getUserActionStats() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
+ * User Behaviour — the behavioural funnel for the active org.
+ *
+ * Every measurable rate is computed from live rows (cups / cup_scans /
+ * claims / users). Each rate carries the numerator and denominator (with
+ * human labels) so the UI can show the raw counts the percentage came from.
+ * Metrics that need client-event instrumentation we don't persist yet
+ * (e.g. reward re-selection, per-button clicks, session time) are returned
+ * with measurable:false and a note instead of a faked number.
+ *
+ * Definitions:
+ *   • Receipt   = one generated cup batch (one printed QR).
+ *   • Redeemed  = a generated batch that got ≥1 successful QR scan.
+ *   • Cup spent = cups_redeemed on committed claims (completed + pending).
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getUserBehaviourStats() {
+  const [cupsRes, scansRes, claimsRes, usersRes, cliRes] = await Promise.all([
+    applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source')),
+    applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at')),
+    applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed')),
+    applyOrgFilter(supabase.from('users').select('id, email')),
+    applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props')),
+  ]);
+  const cups   = cupsRes.data   || [];
+  const scans  = scansRes.data  || [];
+  const claims = claimsRes.data || [];
+  const users  = usersRes.data  || [];
+  const ev     = cliRes.data    || [];
+
+  const ok = (s) => s.status === 'success' || s.status === 'partial';
+  const successScans = scans.filter(s => s.source === 'qr' && ok(s));
+  const totalQrScans = scans.filter(s => s.source === 'qr').length;
+
+  // ── Receipts (cup batches) ──
+  const generatedBatches = new Set(cups.map(c => c.batch_id).filter(Boolean));
+  const scannedBatches   = new Set(successScans.map(s => s.batch_id).filter(Boolean));
+  const genReceipts      = generatedBatches.size;
+  const redeemedReceipts = [...generatedBatches].filter(b => scannedBatches.has(b)).length;
+  const ignoredReceipts  = Math.max(0, genReceipts - redeemedReceipts);
+
+  // ── Successful scans per user (for repeat-scan funnel) ──
+  const perUser = new Map();
+  for (const s of successScans) {
+    if (!s.user_id) continue;
+    perUser.set(s.user_id, (perUser.get(s.user_id) || 0) + 1);
+  }
+  const usersWith2 = [...perUser.values()].filter(n => n >= 2).length;
+  const usersWith3 = [...perUser.values()].filter(n => n >= 3).length;
+
+  // ── Average time between a user's 1st and 2nd successful scan ──
+  const tsByUser = new Map();
+  for (const s of successScans) {
+    if (!s.user_id || !s.scanned_at) continue;
+    const t = new Date(s.scanned_at).getTime();
+    if (!Number.isFinite(t)) continue;
+    if (!tsByUser.has(s.user_id)) tsByUser.set(s.user_id, []);
+    tsByUser.get(s.user_id).push(t);
+  }
+  let gapSum = 0, gapUsers = 0;
+  for (const arr of tsByUser.values()) {
+    if (arr.length >= 2) {
+      arr.sort((a, b) => a - b);
+      gapSum += arr[1] - arr[0];
+      gapUsers += 1;
+    }
+  }
+  const avgSecondScanMs = gapUsers > 0 ? gapSum / gapUsers : null;
+  const fmtDuration = (ms) => {
+    if (ms == null) return null;
+    const sec = ms / 1000;
+    if (sec < 90) return `${Math.round(sec)} sec`;
+    const min = sec / 60;
+    if (min < 90) return `${Math.round(min)} min`;
+    const hr = min / 60;
+    if (hr < 48) return `${hr.toFixed(1)} hours`;
+    return `${(hr / 24).toFixed(1)} days`;
+  };
+
+  // ── Cups ──
+  const totalCups     = cups.length;
+  const activatedCups = cups.filter(c => c.status === 'activated').length;
+
+  // ── Claims ──
+  const totalClaims    = claims.length;
+  const cashbackClaims = claims.filter(c => c.type === 'cashback').length;
+  const donationClaims = claims.filter(c => c.type === 'donation').length;
+  const committed      = claims.filter(c => c.status === 'completed' || c.status === 'pending');
+  const cupsSpent      = committed.reduce((s, c) => s + (Number(c.cups_redeemed) || 0), 0);
+  const usersWithClaim = new Set(claims.map(c => c.user_id).filter(Boolean)).size;
+
+  // ── Users ──
+  const totalUsers = users.length;
+  const withEmail  = users.filter(u => u.email && String(u.email).trim()).length;
+
+  // ── Behavioural events (client_events) ──
+  const visitorSessions = new Set(ev.filter(e => e.event === 'app_loaded' && e.session_id).map(e => e.session_id)).size;
+
+  // Reward changes: visits where the customer actively picked/switched a reward.
+  const rewardChangeSessions = new Set(
+    ev.filter(e => e.event === 'reward_selected' && e.session_id).map(e => e.session_id)
+  ).size;
+
+  // Session time: span between a session's first and last recorded event.
+  const sessSpan = new Map();
+  for (const e of ev) {
+    if (!e.session_id || !e.created_at) continue;
+    const t = new Date(e.created_at).getTime();
+    if (!Number.isFinite(t)) continue;
+    const cur = sessSpan.get(e.session_id);
+    if (!cur) sessSpan.set(e.session_id, { min: t, max: t });
+    else { if (t < cur.min) cur.min = t; if (t > cur.max) cur.max = t; }
+  }
+  let spanSum = 0, spanSessions = 0;
+  for (const v of sessSpan.values()) {
+    const d = v.max - v.min;
+    if (d > 0) { spanSum += d; spanSessions += 1; }
+  }
+  const avgSessionMs = spanSessions > 0 ? spanSum / spanSessions : null;
+
+  // Last screen per session (drop-off point).
+  const lastScreen = new Map();
+  for (const e of ev) {
+    if (e.event !== 'screen_view' || !e.session_id) continue;
+    const t = new Date(e.created_at).getTime();
+    const screen = (e.props && e.props.screen) ? String(e.props.screen) : 'unknown';
+    const cur = lastScreen.get(e.session_id);
+    if (!cur || t >= cur.t) lastScreen.set(e.session_id, { screen, t });
+  }
+  const screenCounts = new Map();
+  for (const { screen } of lastScreen.values()) screenCounts.set(screen, (screenCounts.get(screen) || 0) + 1);
+  const screenSessions = lastScreen.size;
+  let topScreen = null, topScreenCount = 0;
+  for (const [s, c] of screenCounts) if (c > topScreenCount) { topScreen = s; topScreenCount = c; }
+
+  // Button interactions, by named action.
+  const ACTION_LABELS = {
+    reward_selected: 'Pick reward',
+    reward_claim_attempted: 'Get cashback',
+    share_cup: 'Share',
+    direct_refund_opened: 'Direct refund',
+    withdraw_all_cups: 'Withdraw cups',
+    terms_opened: 'Terms',
+  };
+  const clickCounts = new Map();
+  for (const e of ev) {
+    if (e.event in ACTION_LABELS) clickCounts.set(e.event, (clickCounts.get(e.event) || 0) + 1);
+  }
+  let totalClicks = 0;
+  for (const c of clickCounts.values()) totalClicks += c;
+  const clickBreakdown = [...clickCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const clicksDesc = totalClicks > 0
+    ? 'Share of clicks: ' + clickBreakdown.map(([k, c]) => `${ACTION_LABELS[k]} ${Math.round((c / totalClicks) * 100)}%`).join(', ') + '.'
+    : 'How many times key buttons are pressed and each one\'s share.';
+
+  // Customers who shared (a cup / their impact).
+  const sharedUsers = new Set(ev.filter(e => e.event === 'share_cup' && e.user_id).map(e => e.user_id)).size;
+
+  const pct = (n, d) => (d > 0 ? (n / d) * 100 : null);
+  const M = (o) => ({ measurable: true, ...o, value: pct(o.numerator, o.denominator) });
+
+  return [
+    // ── Primary ──
+    M({ id: 'qr_scan_receipts', group: 'primary', label: 'QR scan rate (receipts)',
+        numerator: redeemedReceipts, denominator: genReceipts,
+        numLabel: 'Redeemed receipts', denLabel: 'Generated receipts',
+        desc: 'Generated cup QR receipts that were actually scanned. Unscanned (ignored) receipts count in the total.' }),
+    M({ id: 'second_scan', group: 'primary', label: 'Second scan rate',
+        numerator: usersWith2, denominator: redeemedReceipts,
+        numLabel: 'Returned to scan again', denLabel: 'Redeemed receipts',
+        desc: 'People who came back and scanned a second QR receipt, out of all redeemed receipts.' }),
+    (avgSecondScanMs != null
+      ? { measurable: true, id: 'avg_second_scan', group: 'primary', label: 'Avg time to 2nd scan',
+          value: null, valueText: fmtDuration(avgSecondScanMs),
+          numerator: gapUsers, numLabel: 'Returning users measured', denominator: null, denLabel: null,
+          desc: 'Average time between a customer\'s first and second cup scan.' }
+      : { measurable: false, id: 'avg_second_scan', group: 'primary', label: 'Avg time to 2nd scan',
+          value: null, numerator: null, denominator: null,
+          desc: 'Average time between a customer\'s first and second cup scan.',
+          note: 'No customer has a second scan yet, so there is nothing to average.' }),
+    M({ id: 'cup_spent', group: 'primary', label: 'Cup spent rate',
+        numerator: cupsSpent, denominator: activatedCups,
+        numLabel: 'Cups spent', denLabel: 'Cups registered',
+        desc: 'Cups spent on claims out of all cups customers actually scanned in (not just generated).' }),
+    M({ id: 'rewards_claim', group: 'primary', label: 'Rewards claim rate',
+        numerator: usersWithClaim, denominator: totalUsers,
+        numLabel: 'Users who claimed', denLabel: 'Total users',
+        desc: 'Users who made at least one claim, out of everyone who used the app.' }),
+
+    // ── Secondary ──
+    M({ id: 'emails_input', group: 'secondary', label: 'Emails input rate',
+        numerator: withEmail, denominator: totalUsers,
+        numLabel: 'Emails collected', denLabel: 'Total users',
+        desc: 'Customers who linked an email to their balance.' }),
+    M({ id: 'changed_rewards', group: 'secondary', label: 'Changed rewards rate',
+        numerator: rewardChangeSessions, denominator: visitorSessions,
+        numLabel: 'Visits with a reward change', denLabel: 'Total visits',
+        desc: 'Visits where the customer actively picked or switched their reward.' }),
+    M({ id: 'qr_scan_cups', group: 'secondary', label: 'QR scan rate (cups)',
+        numerator: activatedCups, denominator: totalCups,
+        numLabel: 'Redeemed cups', denLabel: 'Generated cups',
+        desc: 'Individual cup tokens that were scanned in, out of all generated.' }),
+    M({ id: 'third_scan', group: 'secondary', label: 'Third scan rate',
+        numerator: usersWith3, denominator: totalQrScans,
+        numLabel: '3rd-time scanners', denLabel: 'Total scans',
+        desc: 'Customers who scanned a third time, against all scan events.' }),
+    M({ id: 'rewards_share', group: 'secondary', label: 'Rewards claims share',
+        numerator: cashbackClaims, denominator: totalClaims,
+        numLabel: 'Reward (cashback) claims', denLabel: 'Total claims',
+        desc: 'Share of all claims that chose a cashback reward.' }),
+    M({ id: 'donation_share', group: 'secondary', label: 'Donation claims share',
+        numerator: donationClaims, denominator: totalClaims,
+        numLabel: 'Donation claims', denLabel: 'Total claims',
+        desc: 'Share of all claims that chose to donate.' }),
+
+    // ── Optional / derived ──
+    M({ id: 'ignored_receipts', group: 'optional', label: 'Ignored receipt rate',
+        numerator: ignoredReceipts, denominator: genReceipts,
+        numLabel: 'Never-scanned receipts', denLabel: 'Generated receipts',
+        desc: 'Generated QR receipts that were never scanned in.' }),
+    (avgSessionMs != null
+      ? { measurable: true, id: 'avg_session', group: 'optional', label: 'Avg session time',
+          value: null, valueText: fmtDuration(avgSessionMs),
+          numerator: spanSessions, numLabel: 'Sessions measured', denominator: null, denLabel: null,
+          desc: 'Average time between a visit\'s first and last recorded action.' }
+      : { measurable: false, id: 'avg_session', group: 'optional', label: 'Avg session time',
+          value: null, numerator: null, denominator: null,
+          desc: 'Average time a customer spends per visit.',
+          note: 'No multi-action sessions recorded yet. Fills in as customers use the app.' }),
+    (totalClicks > 0
+      ? { measurable: true, id: 'button_clicks', group: 'optional', label: 'Button clicks',
+          value: null, valueText: totalClicks.toLocaleString(),
+          numerator: totalClicks, numLabel: 'Tracked interactions', denominator: null, denLabel: null,
+          desc: clicksDesc }
+      : { measurable: false, id: 'button_clicks', group: 'optional', label: 'Button clicks',
+          value: null, numerator: null, denominator: null,
+          desc: clicksDesc,
+          note: 'No button interactions recorded yet. Fills in as customers use the app.' }),
+    (screenSessions > 0
+      ? { measurable: true, id: 'last_screen', group: 'optional', label: 'Most common last screen',
+          value: null, valueText: topScreen,
+          numerator: topScreenCount, numLabel: `Ended on "${topScreen}"`, denominator: screenSessions, denLabel: 'Sessions tracked',
+          desc: 'Where customers most often stop. Use it to spot drop-off points.' }
+      : { measurable: false, id: 'last_screen', group: 'optional', label: 'Most common last screen',
+          value: null, numerator: null, denominator: null,
+          desc: 'Where customers drop off, the last screen they reached.',
+          note: 'No screen views recorded yet. Fills in as customers use the app.' }),
+    M({ id: 'impact_shares', group: 'optional', label: 'Cup share rate',
+        numerator: sharedUsers, denominator: totalUsers,
+        numLabel: 'Users who shared', denLabel: 'Total users',
+        desc: 'Customers who shared a cup or their impact with someone else.' }),
+  ];
+}
+
+/* ─────────────────────────────────────────────────────────────────────
  * Rewards Receipt Generator (feasibility test).
  *
  * createGeneratedReceipt mints a unique PackPerks token, persists the
@@ -1186,6 +1439,50 @@ export async function generateCups(count = 1) {
     throw Object.assign(new Error(payload?.detail || error.message), { detail: payload });
   }
   return data; // { batch_id, cup_ids, count }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Reward budget caps (per org, admin-only).
+ *
+ * Caps the total cashback an org will pay out. Spend is "committed" cashback:
+ * claims of type 'cashback' with status completed or pending. The cap and the
+ * spend live only here and in an admin-only table; the customer app only ever
+ * receives a yes/no "is claiming paused" boolean.
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getRewardBudget(orgId) {
+  const oid = orgId || getActiveOrgId();
+  if (!oid) return { cap: 200, enabled: false, spent: 0, exists: false };
+  const [budgetRes, claimsRes] = await Promise.all([
+    supabase.from('org_reward_budgets').select('cap_eur, enabled').eq('org_id', oid).maybeSingle(),
+    supabase.from('claims').select('payout_amount, type, status').eq('org_id', oid),
+  ]);
+  const budget = budgetRes.data;
+  const spent = (claimsRes.data || [])
+    .filter(c => c.type === 'cashback' && (c.status === 'completed' || c.status === 'pending'))
+    .reduce((s, c) => s + (Number(c.payout_amount) || 0), 0);
+  return {
+    cap: budget ? Number(budget.cap_eur) : 200,
+    enabled: budget ? !!budget.enabled : true,
+    spent,
+    exists: !!budget,
+  };
+}
+
+export async function saveRewardBudget(orgId, { cap, enabled }) {
+  const oid = orgId || getActiveOrgId();
+  if (!oid) throw new Error('no_active_org');
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('org_reward_budgets')
+    .upsert({
+      org_id: oid,
+      cap_eur: Math.max(0, Number(cap) || 0),
+      enabled: !!enabled,
+      updated_at: new Date().toISOString(),
+      updated_by: user?.id ?? null,
+    });
+  if (error) throw error;
+  return true;
 }
 
 /* Upload a reward image to the public reward-images bucket. Returns
@@ -1632,6 +1929,85 @@ export async function createOrganization(payload) {
   }
 
   return { org: orgRow, inviteResults };
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Duplicate an organisation.
+ *
+ * Clones the CONFIG of an existing org into a brand-new one: brand + legal
+ * fields, published app_config (rewards, settings, copy, dashboard blocks),
+ * the reward-budget cap, and locations. It deliberately does NOT copy any
+ * tenant data — users, cup scans, cup transfers, claims, cups, or balances —
+ * so the new org starts with completely clean stats.
+ *
+ * The new org gets a unique "<slug>-copy" slug and a "<name> (Copy)" name.
+ * Returns the new organisation row.
+ * ───────────────────────────────────────────────────────────────────── */
+export async function duplicateOrganization(srcOrgId) {
+  if (!srcOrgId) throw new Error('no_source_org');
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // 1. Read the source org.
+  const { data: src, error: srcErr } = await supabase
+    .from('organizations').select('*').eq('id', srcOrgId).single();
+  if (srcErr) throw srcErr;
+
+  // 2. Pick a free slug ("<slug>-copy", then "-copy-2", ...).
+  const baseSlug = `${src.slug || 'org'}-copy`;
+  const { data: existing } = await supabase
+    .from('organizations').select('slug').ilike('slug', `${baseSlug}%`);
+  const taken = new Set((existing || []).map(o => o.slug));
+  let slug = baseSlug, n = 2;
+  while (taken.has(slug)) slug = `${baseSlug}-${n++}`;
+
+  // 3. Insert the new org, copying every config column but resetting id,
+  //    timestamps, and the soft-delete flag.
+  const { id: _id, created_at: _ca, updated_at: _ua, deleted_at: _da, ...cfg } = src;
+  const newName = `${src.name} (Copy)`;
+  const { data: orgRow, error: orgErr } = await supabase
+    .from('organizations')
+    .insert({
+      ...cfg,
+      name: newName,
+      slug,
+      partner_brand_name: src.partner_brand_name || newName,
+      deleted_at: null,
+      created_by_packperks_admin: user?.id ?? null,
+    })
+    .select('*').single();
+  if (orgErr) throw orgErr;
+  const newId = orgRow.id;
+
+  // 4. Copy the published config (rewards + settings + copy + dashboard blocks).
+  const { data: pub } = await supabase
+    .from('app_config').select('value').eq('key', `published:${srcOrgId}`).maybeSingle();
+  if (pub?.value) {
+    const { error } = await supabase.from('app_config').upsert({
+      key: `published:${newId}`, value: pub.value, updated_at: new Date().toISOString(),
+    });
+    if (error) console.warn('duplicateOrganization: config copy failed', error);
+  }
+
+  // 5. Copy the reward-budget cap.
+  const { data: budget } = await supabase
+    .from('org_reward_budgets').select('cap_eur, enabled').eq('org_id', srcOrgId).maybeSingle();
+  if (budget) {
+    const { error } = await supabase.from('org_reward_budgets').upsert({
+      org_id: newId, cap_eur: budget.cap_eur, enabled: budget.enabled,
+      updated_at: new Date().toISOString(), updated_by: user?.id ?? null,
+    });
+    if (error) console.warn('duplicateOrganization: budget copy failed', error);
+  }
+
+  // 6. Copy locations (config, not stats).
+  const { data: locs } = await supabase.from('locations').select('*').eq('org_id', srcOrgId);
+  if (locs?.length) {
+    const rows = locs.map(({ id: _i, org_id: _o, created_at: _c, updated_at: _u, ...l }) => ({ ...l, org_id: newId }));
+    const { error } = await supabase.from('locations').insert(rows);
+    if (error) console.warn('duplicateOrganization: locations copy failed', error);
+  }
+
+  return orgRow;
 }
 
 /* Soft-delete an organisation. We don't truncate any rows — claims,

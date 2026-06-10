@@ -425,6 +425,32 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
             </div>
           </div>
 
+          {/* How many of this product the customer must buy for the cashback
+           *  receipt to validate. Optional — defaults to 1. Read by the
+           *  verify-receipt function, which sums the matching line-item
+           *  quantities and only passes when the total meets this number. */}
+          <div className="rep__field">
+            <label className="rep__label">Items required on receipt</label>
+            <input
+              className="rep__input"
+              type="number"
+              min="1"
+              max="50"
+              step="1"
+              value={form.requiredQty ?? ''}
+              onChange={e => {
+                const n = parseInt(e.target.value, 10);
+                update('requiredQty', Number.isFinite(n) && n > 0 ? n : 1);
+              }}
+              placeholder="1"
+              title="How many of this product the receipt must show to unlock the reward."
+            />
+            <p className="rep__field-hint">
+              How many of this product the receipt must show to unlock the reward.
+              Leave at 1 for a single item. Set to 2 for a “buy two” offer, and so on.
+            </p>
+          </div>
+
           {/* Economics panel — surfaces the funding-gap math the
            *  external review flagged. Without this, an admin could
            *  publish a €5.49 reward at 3 cups (€3.75 cashback) and not

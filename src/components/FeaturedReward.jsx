@@ -12,6 +12,8 @@ export default function FeaturedReward({
   savedIban,
   onClaim,
   onClaimAttempt,
+  budgetBlocked = false,
+  onBudgetBlocked,
   onResetClaim,
   onOpenTerms,
   onOpenRefund,
@@ -38,6 +40,9 @@ export default function FeaturedReward({
       return;
     }
     onClaimAttempt?.();
+    // Rewards paused for this org (budget cap reached) — explain via popup,
+    // never reveal the amount.
+    if (budgetBlocked) { onBudgetBlocked?.(); return; }
     const toUse = iban.trim().toUpperCase();
     if (!toUse) {
       setError('Please enter your IBAN to continue.');
@@ -151,14 +156,14 @@ export default function FeaturedReward({
                   <button className="featured-reward__info-link" onClick={onOpenRefund}>Get the direct refund</button></>
                 )}
               </p>
-              {isUnlocked && (
+              {isUnlocked && !budgetBlocked && (
                 <label className="featured-reward__claim-label" htmlFor="iban-input">
                   Your IBAN:
                 </label>
               )}
             </div>
 
-            {isUnlocked && (
+            {isUnlocked && !budgetBlocked && (
               <div className="featured-reward__iban-wrap">
                 <input
                   id="iban-input"
@@ -178,13 +183,19 @@ export default function FeaturedReward({
             {error && <p className="featured-reward__error" id="iban-error" role="alert">{error}</p>}
 
             <button
-              className={`featured-reward__claim-btn ${!isUnlocked ? 'featured-reward__claim-btn--locked' : ''}`}
+              className={`featured-reward__claim-btn ${(!isUnlocked || (isUnlocked && budgetBlocked)) ? 'featured-reward__claim-btn--locked' : ''}`}
               type="button"
               onClick={handleClaim}
-              aria-label={`Get €${cashbackAmount} cashback`}
+              aria-label={isUnlocked && budgetBlocked ? 'Rewards paused, try again later' : `Get €${cashbackAmount} cashback`}
             >
-              <img src={cashbackIcon} alt="" className="featured-reward__claim-btn-icon" aria-hidden="true" />
-              Get €{cashbackAmount} cashback
+              {isUnlocked && budgetBlocked ? (
+                'Rewards paused'
+              ) : (
+                <>
+                  <img src={cashbackIcon} alt="" className="featured-reward__claim-btn-icon" aria-hidden="true" />
+                  Get €{cashbackAmount} cashback
+                </>
+              )}
             </button>
 
             {nudgeVisible && !isUnlocked && (

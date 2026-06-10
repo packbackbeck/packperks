@@ -36,7 +36,7 @@ import './SignInSheet.css';
  * form. This is the only place in the user app where signing out is
  * exposed — outside the sheet there's no reason for them to do it.
  */
-export default function SignInSheet({ open, onClose, onLinked }) {
+export default function SignInSheet({ open, onClose, onLinked, requireVerification = true, savedEmail = null, onSaveEmailDirect }) {
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -59,13 +59,20 @@ export default function SignInSheet({ open, onClose, onLinked }) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    // No-verification mode: the email lives on the user row, there's no auth
+    // session to read. Show the saved email (if any) without an OTP round-trip.
+    if (!requireVerification) {
+      if (savedEmail) { setCurrentEmail(savedEmail); setStatus('savedDirect'); }
+      else { setCurrentEmail(null); setStatus('idle'); }
+      return () => { cancelled = true; };
+    }
     getCurrentAuthEmail().then(e => {
       if (cancelled) return;
       if (e) { setCurrentEmail(e); setStatus('signedIn'); }
       else   { setCurrentEmail(null); setStatus('idle'); }
     });
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, requireVerification, savedEmail]);
 
   // Auto-focus the email input (save mode or first step of restore)
   // or the OTP input (restore code-entry step) when the sheet opens.
@@ -100,6 +107,26 @@ export default function SignInSheet({ open, onClose, onLinked }) {
     e.preventDefault();
     if (!email.trim()) return;
     setError(null);
+
+    // No-verification mode: store the email straight onto the user row.
+    if (!requireVerification) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        setError("That email doesn't look quite right — try again.");
+        setStatus('error');
+        return;
+      }
+      setStatus('sending');
+      try {
+        await onSaveEmailDirect?.(email.trim());
+        setCurrentEmail(email.trim());
+        setStatus('savedDirect');
+      } catch (err) {
+        setError(err?.message || 'Could not save your email. Please try again.');
+        setStatus('error');
+      }
+      return;
+    }
+
     setStatus('sending');
     try {
       await sendMagicLink(email);
@@ -235,6 +262,27 @@ export default function SignInSheet({ open, onClose, onLinked }) {
       <div className="signin-sheet" onClick={e => e.stopPropagation()}>
         <button className="signin-close" onClick={onClose} aria-label="Close">×</button>
 
+        {/* Email saved without verification (verification toggle is off) */}
+        {status === 'savedDirect' && (
+          <div className="signin-state">
+            <div className="signin-art signin-art--ok">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <h2 className="signin-title">Email saved</h2>
+            <p className="signin-sub">
+              Your balance is linked to <strong>{currentEmail}</strong>. You can update it any time.
+            </p>
+            <button
+              className="signin-btn signin-btn--ghost"
+              onClick={() => { setEmail(''); setError(null); setStatus('idle'); }}
+            >
+              Change email
+            </button>
+          </div>
+        )}
+
         {/* Already signed in */}
         {status === 'signedIn' && (
           <div className="signin-state">
@@ -321,8 +369,9 @@ export default function SignInSheet({ open, onClose, onLinked }) {
             </div>
             <h2 className="signin-title">Save your cups across devices</h2>
             <p className="signin-sub">
-              Link your balance to an email so you can pick up where you
-              left off — even after switching phones or clearing your browser.
+              {requireVerification
+                ? <>Link your balance to an email so you can pick up where you left off — even after switching phones or clearing your browser.</>
+                : <>Add an email to your balance so you can recover it later. No code needed — it's saved right away.</>}
             </p>
 
             <label className="signin-label" htmlFor="signin-email">Email</label>
@@ -347,7 +396,9 @@ export default function SignInSheet({ open, onClose, onLinked }) {
               className="signin-btn signin-btn--primary"
               disabled={status === 'sending' || !email.trim()}
             >
-              {status === 'sending' ? 'Sending…' : 'Send me a sign-in link'}
+              {requireVerification
+                ? (status === 'sending' ? 'Sending…' : 'Send me a sign-in link')
+                : (status === 'sending' ? 'Saving…' : 'Save email')}
             </button>
 
             <p className="signin-fine">

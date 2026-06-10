@@ -1151,3 +1151,6 @@
 }
 .ov-range-pop__btn--primary:hover:not(:disabled) { background: #42298B; }
 .ov-range-pop__btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Reward budget monitor block */
+.ov-budget-block { margin: 4px 0 20px; }

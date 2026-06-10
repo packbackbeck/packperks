@@ -164,6 +164,16 @@
   margin-top: 1px;
 }
 
+.receipt-page__req-icon--no { color: #DC2626; }
+
+.receipt-page__req-note {
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: var(--text-light);
+  line-height: 1.45;
+  margin: 2px 0 0;
+}
+
 /* ── Camera viewfinder ── */
 .receipt-page__viewfinder {
   width: 330px;

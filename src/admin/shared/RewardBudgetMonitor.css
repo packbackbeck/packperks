@@ -1,0 +1,78 @@
+.rbm {
+  border: 1px solid #ECE7DE;
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: #FCFAF6;
+}
+.rbm__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.rbm__title { font-size: 13.5px; font-weight: 800; color: #2A2724; }
+.rbm__pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.rbm__loading { font-size: 13px; color: #8A8175; padding: 6px 0; }
+.rbm__bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #ECE7DE;
+  overflow: hidden;
+}
+.rbm__fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.rbm__figures {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: #6C6259;
+  font-variant-numeric: tabular-nums;
+}
+.rbm__figures strong { color: #1D1D1D; font-size: 15px; font-weight: 800; }
+.rbm__note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #8A8175;
+}
+
+/* Tones */
+.rbm--ok .rbm__fill { background: #1A8737; }
+.rbm--ok .rbm__pill { color: #1A8737; background: rgba(26,135,55,0.10); }
+.rbm--warn .rbm__fill { background: #E8910C; }
+.rbm--warn .rbm__pill { color: #B26A00; background: rgba(232,145,12,0.14); }
+.rbm--blocked { border-color: #F0C3C3; background: #FDF5F5; }
+.rbm--blocked .rbm__fill { background: #DC2626; }
+.rbm--blocked .rbm__pill { color: #fff; background: #DC2626; }
+.rbm--off { opacity: 0.9; }
+.rbm--off .rbm__fill { background: #BDB7AC; }
+.rbm--off .rbm__pill { color: #6C6259; background: rgba(108,98,89,0.12); }
+
+.rbm__manage {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #E4DFD6;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1D1D1D;
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rbm__manage:hover { background: #F7F4EF; }

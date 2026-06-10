@@ -599,6 +599,23 @@ export async function getOrgBySlug(slug) {
   }
 }
 
+// Whether reward claiming is paused for this org because its cashback budget
+// cap has been reached. Calls a boolean-only RPC: the cap amount and spend
+// stay server-side and are never exposed to the customer. Fails open (returns
+// false) so a transient error never blocks a genuine claim — the DB trigger
+// is the hard guard.
+export async function isRewardBudgetBlocked(orgId) {
+  if (!orgId) return false
+  try {
+    const { data, error } = await supabase.rpc('reward_budget_status', { p_org_id: orgId })
+    if (error) { console.warn('reward_budget_status failed:', error.message); return false }
+    return data === true
+  } catch (e) {
+    console.warn('reward_budget_status threw:', e)
+    return false
+  }
+}
+
 // Fetch an organisation row by id. Used after a deep-link cup scan to
 // resolve which org the scanned batch belongs to (in case the user
 // arrived via QR rather than the slug).

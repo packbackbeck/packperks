@@ -84,6 +84,16 @@
   font-size: 13px;
 }
 
+.ao-notice {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #E7F6EC;
+  border: 1px solid #A9DCBC;
+  border-radius: 8px;
+  color: #1A6B38;
+  font-size: 13px;
+}
+
 .ao-skeleton {
   padding: 24px;
   text-align: center;

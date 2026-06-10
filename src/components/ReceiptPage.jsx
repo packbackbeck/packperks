@@ -40,6 +40,7 @@ const STEPS = [
 
 export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
   const brand = orgName || 'the restaurant';
+  const itemName = reward?.name || 'item';
   const videoRef = useRef(null);
   const fileRef = useRef(null);
   const [cameraError, setCameraError] = useState(null);
@@ -118,9 +119,9 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
 
       {/* ── Title ── */}
       <div className="receipt-page__header">
-        <h1 className="receipt-page__title">Take a photo of your receipt</h1>
+        <h1 className="receipt-page__title">Take a photo of your store receipt</h1>
         <p className="receipt-page__subtitle">
-          Snap the receipt from your {brand} visit so we can verify your purchase and send your cashback.
+          Use the printed receipt from buying your {itemName}. This is the till receipt from the shop, not your cup-return ticket.
         </p>
       </div>
 
@@ -130,21 +131,44 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
         <ul className="receipt-page__req-list">
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span>Shows the <strong>correct menu item</strong> you're claiming</span>
+            <span>The <strong>printed store receipt</strong> from your purchase, not the cup-return ticket</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span><strong>Fully readable</strong> — no blur, glare, or cropped edges</span>
+            <span>Clearly listing the <strong>{itemName}</strong> you're claiming</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span>From a <strong>{brand}</strong> location</span>
+            <span><strong>Fully readable</strong>, with no blur, glare, or cropped edges</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span><strong>Dated after</strong> your SmartBin cup return ticket</span>
+            <span><strong>Dated after</strong> your cup return</span>
           </li>
         </ul>
+      </div>
+
+      {/* ── What does NOT count (clears up the most common questions) ── */}
+      <div className="receipt-page__requirements">
+        <p className="receipt-page__req-label">Not accepted</p>
+        <ul className="receipt-page__req-list">
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            <span>Your <strong>cup-return ticket</strong> (the QR receipt from the bin) — that one only adds cups</span>
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            <span>A <strong>bank app</strong> or online-order receipt, or any screenshot</span>
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            <span>A <strong>photo of the checkout screen</strong> at a self-service till</span>
+          </li>
+        </ul>
+        <p className="receipt-page__req-note">
+          A short till receipt works as long as it lists your item. If it does not show the item,
+          ask the cashier for the full receipt, otherwise the claim may be rejected.
+        </p>
       </div>
 
       {/* ── Camera viewfinder ── */}

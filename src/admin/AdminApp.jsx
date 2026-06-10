@@ -15,6 +15,7 @@ import AdminSettings from './settings/AdminSettings';
 import AdminHistory from './history/AdminHistory';
 import AdminReports from './reports/AdminReports';
 import AdminStats from './stats/AdminStats';
+import AdminUserBehaviour from './behaviour/AdminUserBehaviour';
 import AdminReceiptCheck from './receipts/AdminReceiptCheck';
 import AdminReceiptGenerator from './cupqr/AdminReceiptGenerator';
 import AdminTransactions from './transactions/AdminTransactions';
@@ -63,7 +64,7 @@ export default function AdminApp() {
 const VALID_PAGES = new Set([
   'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
   'transactions', 'donations', 'org', 'organizations', 'settings',
-  'history', 'reports', 'stats', 'support', 'receipts',
+  'history', 'reports', 'stats', 'behaviour', 'support', 'receipts',
 ]);
 const DEFAULT_PAGE = 'overview';
 
@@ -199,6 +200,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="stats">
             <AdminStats onNavigate={setPage} />
+          </KeepAlive>
+          <KeepAlive id="behaviour">
+            <AdminUserBehaviour onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="donations">
             <AdminDonations onNavigate={setPage} draftState={draftState} />

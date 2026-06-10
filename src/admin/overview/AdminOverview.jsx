@@ -3,7 +3,9 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { getAdminStats } from '../lib/adminApi';
+import { getAdminStats, getRewardBudget } from '../lib/adminApi';
+import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
+import { useOrg } from '../context/OrgContext';
 import PiiMask from '../shared/PiiMask';
 import QuickLinks from '../shared/QuickLinks';
 import { useReorder } from './useReorder';
@@ -424,8 +426,11 @@ export default function AdminOverview({ draftState, onNavigate }) {
   const { draft, updateDraft } = draftState;
   const blocks = draft.dashboardBlocks;
 
+  const { activeOrg } = useOrg();
   const [stats, setStats]       = useState(null);
   const [loading, setLoading]   = useState(true);
+  const [budget, setBudget]     = useState(null);
+  const [budgetLoading, setBudgetLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [period, setPeriod]     = useState(30);
   const [focusedStat, setFocusedStat] = useState(null);
@@ -463,6 +468,16 @@ export default function AdminOverview({ draftState, onNavigate }) {
   }
 
   useEffect(() => { loadStats(); }, []);
+
+  // Reward-budget monitor — refetched when the active org changes.
+  useEffect(() => {
+    let alive = true;
+    setBudgetLoading(true);
+    getRewardBudget()
+      .then(b => { if (alive) { setBudget(b); setBudgetLoading(false); } })
+      .catch(() => { if (alive) setBudgetLoading(false); });
+    return () => { alive = false; };
+  }, [activeOrg?.id]);
 
   function toggleBlock(id) {
     updateDraft(prev => ({
@@ -788,6 +803,20 @@ export default function AdminOverview({ draftState, onNavigate }) {
           </div>
         );
       })()}
+
+      {/* Reward budget monitor — read-only here, edit on the Settings page. */}
+      {budget && (
+        <div className="ov-budget-block">
+          <RewardBudgetMonitor
+            cap={budget.cap}
+            enabled={budget.enabled}
+            spent={budget.spent}
+            loading={budgetLoading}
+            title="Reward budget"
+            onManage={() => onNavigate?.('settings')}
+          />
+        </div>
+      )}
 
       {/* Charts grid — 2-column layout */}
       <div className="ov-charts-grid">

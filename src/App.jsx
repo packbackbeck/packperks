@@ -52,7 +52,9 @@ import {
   getCurrentAuthEmail,
   getOrgBySlug,
   getDefaultOrg,
+  isRewardBudgetBlocked,
 } from './lib/api';
+import BudgetPausedModal from './components/BudgetPausedModal';
 import './App.css';
 
 /* Best-effort device fingerprint from the user agent. Falls back to a
@@ -199,6 +201,10 @@ export default function App() {
    *   • Brand color (org.brand_color exposed to CSS variables / chips)
    */
   const [activeOrg, setActiveOrg] = useState(null);
+  // Reward-budget gate: true when this org has reached its cashback cap.
+  // The amount is never sent to the client — only this boolean.
+  const [rewardBudgetBlocked, setRewardBudgetBlocked] = useState(false);
+  const [budgetPausedOpen, setBudgetPausedOpen] = useState(false);
   // Always-current active org id for callbacks that live outside the
   // render closure (e.g. the onAuthStateChange listener). Passing this to
   // getOrCreateUser keeps a signed-in user bound to THEIR org's row —
@@ -206,6 +212,19 @@ export default function App() {
   // rows and mint a fresh (orphan) user, fragmenting the cup balance.
   const activeOrgIdRef = useRef(null);
   useEffect(() => { activeOrgIdRef.current = activeOrg?.id || null; }, [activeOrg]);
+
+  // Resolve whether reward claiming is paused for this org (cashback cap
+  // reached). Fail-open: a transient error never blocks a real claim, since
+  // the DB trigger is the hard guard.
+  useEffect(() => {
+    let alive = true;
+    if (activeOrg?.id) {
+      isRewardBudgetBlocked(activeOrg.id).then(b => { if (alive) setRewardBudgetBlocked(b); });
+    } else {
+      setRewardBudgetBlocked(false);
+    }
+    return () => { alive = false; };
+  }, [activeOrg?.id]);
 
   /* ── UI preferences ── */
   const [selectedRewardId, setSelectedRewardId] = useState(''); // set from the active org's rewards on load (see effect below)
@@ -225,6 +244,12 @@ export default function App() {
 
   /* ── Navigation ── */
   const [page, setPage] = useState('home');
+
+  // Behavioural analytics: log which screen the user is on whenever it
+  // changes. Powers the "Last screen / drop-off" metric. Fire-and-forget.
+  useEffect(() => {
+    track(EVENTS.SCREEN_VIEW, { screen: page });
+  }, [page]);
 
   /* ── Transient claim state ── */
   const [claimedIban, setClaimedIban] = useState('');
@@ -588,8 +613,20 @@ export default function App() {
     }
   };
 
+  /* ── Reward-budget gate ── */
+  const handleBudgetBlocked = () => setBudgetPausedOpen(true);
+  // Fresh server check before committing to a cashback claim. Returns false
+  // and opens the paused popup when the org has hit its budget cap.
+  const ensureRewardBudgetOk = async () => {
+    const blocked = await isRewardBudgetBlocked(activeOrg?.id);
+    setRewardBudgetBlocked(blocked);
+    if (blocked) { setBudgetPausedOpen(true); return false; }
+    return true;
+  };
+
   /* ── Cashback claim ── */
-  const handleClaim = (iban) => {
+  const handleClaim = async (iban) => {
+    if (!(await ensureRewardBudgetOk())) return;
     track(EVENTS.REWARD_CLAIM_ATTEMPTED, {
       reward_id: selectedRewardId,
       reward_name: selectedReward.name,
@@ -693,6 +730,15 @@ export default function App() {
       setPage('success');
     } catch (err) {
       console.error('Receipt verification failed:', err);
+      // Budget cap reached at insert time (DB trigger) — show the paused
+      // popup rather than a scary error, and never mention the amount.
+      const errText = `${err?.message || ''} ${err?.detail || ''} ${err?.code || ''}`;
+      if (/reward_budget_exceeded/i.test(errText)) {
+        setRewardBudgetBlocked(true);
+        setBudgetPausedOpen(true);
+        setPage('home');
+        return;
+      }
       // Real failure (network, function down, RLS). Show an explicit
       // system-error state on the rejected page (no fake check ticks)
       // and DO NOT deduct cups — the claim row still exists for admin
@@ -739,7 +785,8 @@ export default function App() {
 
   /* ── Detail sheet ── */
   const handleViewDetail = (reward) => setDetailReward(reward);
-  const handleClaimFromDetail = () => {
+  const handleClaimFromDetail = async () => {
+    if (!(await ensureRewardBudgetOk())) return;
     setDetailReward(null);
     setPage('receipt');
   };
@@ -995,6 +1042,13 @@ export default function App() {
               setUserId(refreshed.id);
             } catch (e) { console.error(e); }
           }}
+          requireVerification={liveSettings?.requireEmailVerification !== false}
+          savedEmail={profile?.email || authEmail || null}
+          onSaveEmailDirect={async (em) => {
+            if (!userId) throw new Error('no_user');
+            await updateUserProfile(userId, { email: em });
+            setProfile(p => (p ? { ...p, email: em } : p));
+          }}
         />
         {liveSettings.featureDirectRefunds && (
           <DirectRefundSheet
@@ -1111,6 +1165,8 @@ export default function App() {
         savedIban={profile?.iban}
         onClaim={handleClaim}
         onClaimAttempt={handleClaimAttempt}
+        budgetBlocked={rewardBudgetBlocked}
+        onBudgetBlocked={handleBudgetBlocked}
         onResetClaim={handleResetClaim}
         onOpenTerms={handleOpenTerms}
         onOpenRefund={showRefund ? handleOpenRefund : null}
@@ -1133,11 +1189,20 @@ export default function App() {
           cupCount={cupCount}
           onPick={(id) => { handlePickReward(id); }}
           onClaim={handleClaimFromDetail}
+          budgetBlocked={rewardBudgetBlocked}
+          onBudgetBlocked={handleBudgetBlocked}
           onClose={() => setDetailReward(null)}
           orgName={activeOrg?.partner_brand_name || activeOrg?.name}
           showCashbackStep={!!liveSettings?.featureDirectRefunds}
         />
       )}
+
+      <BudgetPausedModal
+        open={budgetPausedOpen}
+        onClose={() => setBudgetPausedOpen(false)}
+        title={liveSettings?.budgetPausedTitle}
+        body={liveSettings?.budgetPausedBody}
+      />
 
       <Modal open={termsOpen} onClose={() => setTermsOpen(false)} title="Voucher Terms">
         <p><strong>How it works:</strong> Return your reusable PackBack cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} location. Each returned cup adds to your balance.</p>

@@ -1,0 +1,88 @@
+.bpm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(28, 24, 20, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: bpm-fade 0.18s ease-out;
+}
+
+.bpm-card {
+  width: 100%;
+  max-width: 360px;
+  background: #fff;
+  border-radius: 22px;
+  padding: 28px 24px 22px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  animation: bpm-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bpm-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #B26A00;
+  background: rgba(232, 145, 12, 0.12);
+}
+
+.bpm-title {
+  margin: 0 0 8px;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #1D1D1D;
+}
+
+.bpm-body {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #5A524A;
+}
+
+.bpm-reassure {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #1A8737;
+  font-weight: 600;
+}
+
+.bpm-btn {
+  width: 100%;
+  border: none;
+  border-radius: 13px;
+  padding: 14px 16px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: #1D1D1D;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+.bpm-btn:hover { background: #000; }
+.bpm-btn:active { transform: scale(0.98); }
+
+@keyframes bpm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes bpm-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bpm-backdrop, .bpm-card { animation: none; }
+}

@@ -11,14 +11,14 @@ import AdminRewards from './rewards/AdminRewards';
 import AdminUsers from './users/AdminUsers';
 import AdminClaims from './claims/AdminClaims';
 import AdminCupScans from './cupscans/AdminCupScans';
-import AdminSettings from './settings/AdminSettings';
+import AdminWorkspace from './settings/AdminWorkspace';
 import AdminHistory from './history/AdminHistory';
 import AdminReports from './reports/AdminReports';
 import AdminStats from './stats/AdminStats';
+import AdminUserBehaviour from './behaviour/AdminUserBehaviour';
 import AdminReceiptCheck from './receipts/AdminReceiptCheck';
 import AdminReceiptGenerator from './cupqr/AdminReceiptGenerator';
 import AdminTransactions from './transactions/AdminTransactions';
-import AdminOrg from './organization/AdminOrg';
 import AdminActivityLog from './activity/AdminActivityLog';
 import AdminSupport from './support/AdminSupport';
 import AdminDonations from './donations/AdminDonations';
@@ -63,14 +63,16 @@ export default function AdminApp() {
 const VALID_PAGES = new Set([
   'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
   'transactions', 'donations', 'org', 'organizations', 'settings',
-  'history', 'reports', 'stats', 'support', 'receipts',
+  'history', 'reports', 'stats', 'behaviour', 'support', 'receipts',
 ]);
 const DEFAULT_PAGE = 'overview';
 
 function readHashPage() {
   if (typeof window === 'undefined') return DEFAULT_PAGE;
   const raw = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim();
-  return VALID_PAGES.has(raw) ? raw : DEFAULT_PAGE;
+  const resolved = VALID_PAGES.has(raw) ? raw : DEFAULT_PAGE;
+  // Settings and Organisation are now one merged page; #org redirects to it.
+  return resolved === 'org' ? 'settings' : resolved;
 }
 
 function AdminShell() {
@@ -87,6 +89,7 @@ function AdminShell() {
 
   /* Wrap setPage so URL hash and visited-set stay in sync. */
   function setPage(next) {
+    if (next === 'org') next = 'settings'; // merged page
     if (!VALID_PAGES.has(next)) return;
     setPageState(next);
     setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
@@ -182,14 +185,11 @@ function AdminShell() {
           <KeepAlive id="transactions">
             <AdminTransactions onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="org">
-            <AdminOrg onNavigate={setPage} />
-          </KeepAlive>
           <KeepAlive id="organizations">
             <AdminOrganizations onNavigate={setPage} onAddOrg={() => setWizardOpen(true)} />
           </KeepAlive>
           <KeepAlive id="settings">
-            <AdminSettings draftState={draftState} onNavigate={setPage} />
+            <AdminWorkspace draftState={draftState} onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="history">
             <AdminHistory draftState={draftState} onNavigate={setPage} />
@@ -199,6 +199,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="stats">
             <AdminStats onNavigate={setPage} />
+          </KeepAlive>
+          <KeepAlive id="behaviour">
+            <AdminUserBehaviour onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="donations">
             <AdminDonations onNavigate={setPage} draftState={draftState} />

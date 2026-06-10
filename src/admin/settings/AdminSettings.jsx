@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useOrg } from '../context/OrgContext';
+import { getRewardBudget, saveRewardBudget } from '../lib/adminApi';
+import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminSettings.css';
 
@@ -27,7 +30,7 @@ import './AdminSettings.css';
  * a small status pill near the header confirms that with "Auto-saved".
  */
 
-const SECTIONS = [
+export const SECTIONS = [
   {
     id: 'rates',
     title: 'Payout rates',
@@ -86,6 +89,18 @@ const SECTIONS = [
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
         <polyline points="14 2 14 8 20 8" />
+      </svg>
+    ),
+  },
+  {
+    id: 'budget',
+    title: 'Reward budget',
+    desc: 'Cap how much cashback this organisation pays out. Customers never see the amount.',
+    tone: 'orange',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" />
+        <path d="M12 6v6l4 2" />
       </svg>
     ),
   },
@@ -157,7 +172,92 @@ function SectionCard({ section, children }) {
 
 /* ── Page ────────────────────────────────────────────────────────── */
 
-export default function AdminSettings({ draftState, onNavigate }) {
+/* Reward budget control + monitor. Self-contained: reads and writes the
+ * admin-only org_reward_budgets table directly (not the draft config), so the
+ * cap takes effect immediately and the amount never ships to the customer. */
+function RewardBudgetSection() {
+  const { activeOrg } = useOrg();
+  const orgId = activeOrg?.id;
+  const [loading, setLoading] = useState(true);
+  const [enabled, setEnabled] = useState(true);
+  const [cap, setCap] = useState('200');
+  const [spent, setSpent] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (!orgId) { setLoading(false); return; }
+    setLoading(true);
+    getRewardBudget(orgId)
+      .then(b => {
+        if (!alive) return;
+        setEnabled(b.enabled);
+        setCap(String(b.cap));
+        setSpent(b.spent);
+        setLoading(false);
+      })
+      .catch(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [orgId]);
+
+  const capNum = Math.max(0, parseFloat(cap) || 0);
+
+  async function handleSave() {
+    if (!orgId) return;
+    setSaving(true); setError(null); setSavedOk(false);
+    try {
+      await saveRewardBudget(orgId, { cap: capNum, enabled });
+      const fresh = await getRewardBudget(orgId);
+      setSpent(fresh.spent);
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2500);
+    } catch (e) {
+      setError(e?.message || 'Could not save the budget.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <p className="as-budget__loading">Loading budget…</p>;
+
+  return (
+    <>
+      <Field
+        label="Cap reward spending"
+        hint="When the cap is reached, customers cannot claim cashback. They see a neutral “rewards paused” message and never see any figure."
+      >
+        <ToggleSwitch checked={enabled} onChange={setEnabled} ariaLabel="Enable reward budget cap" />
+      </Field>
+
+      <Field label="Budget cap (€)" hint="Total cashback this organisation will pay out before claiming pauses.">
+        <input
+          className="as-input"
+          type="number"
+          min="0"
+          step="10"
+          value={cap}
+          onChange={e => setCap(e.target.value)}
+          disabled={!enabled}
+          placeholder="200"
+        />
+      </Field>
+
+      <RewardBudgetMonitor cap={capNum} enabled={enabled} spent={spent} title="Budget monitor" />
+
+      <div className="as-budget__actions">
+        <button className="as-budget__save" type="button" onClick={handleSave} disabled={saving || !orgId}>
+          {saving ? 'Saving…' : 'Save budget'}
+        </button>
+        {savedOk && <span className="as-budget__ok">Saved</span>}
+        {error && <span className="as-budget__err">{error}</span>}
+      </div>
+    </>
+  );
+}
+
+export default function AdminSettings({ draftState, onNavigate, embedded = false }) {
   const { draft, updateDraft, statusLabel, published } = draftState;
   const settings = draft.settings;
 
@@ -253,8 +353,9 @@ export default function AdminSettings({ draftState, onNavigate }) {
   }
 
   return (
-    <div className="admin-settings">
+    <div className={`admin-settings${embedded ? ' admin-settings--embedded' : ''}`}>
       {/* Page header */}
+      {!embedded && (
       <header className="as-header">
         <div className="as-header__text">
           <span className="as-header__eyebrow">Configuration</span>
@@ -272,9 +373,12 @@ export default function AdminSettings({ draftState, onNavigate }) {
           </span>
         </div>
       </header>
+      )}
 
       <div className="as-layout">
-        {/* Sticky TOC */}
+        {/* Sticky TOC — hidden when embedded in the merged workspace, which
+            provides a shared horizontal table of contents instead. */}
+        {!embedded && (
         <nav className="as-toc" aria-label="Settings sections">
           {SECTIONS.map(s => (
             <button
@@ -288,6 +392,7 @@ export default function AdminSettings({ draftState, onNavigate }) {
             </button>
           ))}
         </nav>
+        )}
 
         {/* Section stack */}
         <div className="as-content">
@@ -453,6 +558,22 @@ export default function AdminSettings({ draftState, onNavigate }) {
                   />
                 </label>
               ))}
+
+              <label className="as-flag-row">
+                <div className="as-flag-row__info">
+                  <div className="as-flag-row__label">Require email verification</div>
+                  <div className="as-flag-row__desc">
+                    On: customers confirm a code the first time they add an email (current behaviour).
+                    Off: any email is saved instantly with no code, and customers can change it freely.
+                    Restoring an account on a new device always requires a code.
+                  </div>
+                </div>
+                <ToggleSwitch
+                  checked={settings.requireEmailVerification !== false}
+                  onChange={v => updateSetting('requireEmailVerification', v, 'email verification')}
+                  ariaLabel="Require email verification toggle"
+                />
+              </label>
             </div>
 
             {/* Maintenance mode lives in its own block — disruptive switch. */}
@@ -499,10 +620,40 @@ export default function AdminSettings({ draftState, onNavigate }) {
               <input className="as-input as-input--mono" value={settings.cookieUrl} onChange={e => updateSetting('cookieUrl', e.target.value)} placeholder="https://packperks.nl/cookies" />
             </Field>
           </SectionCard>
+
+          {/* ── Reward budget ── */}
+          <SectionCard section={SECTIONS[5]}>
+            <RewardBudgetSection />
+
+            <div className="as-budget-copy">
+              <p className="as-budget-copy__head">Message shown when the cap is reached</p>
+              <p className="as-budget-copy__hint">
+                Shown to customers when claiming is paused. It never reveals the amount or that a
+                budget exists. This text follows the normal Publish flow (Save draft, then Publish).
+              </p>
+              <Field label="Title">
+                <input
+                  className="as-input"
+                  value={settings.budgetPausedTitle || ''}
+                  onChange={e => updateSetting('budgetPausedTitle', e.target.value, 'paused message title')}
+                  placeholder="Rewards are paused for a moment"
+                />
+              </Field>
+              <Field label="Body">
+                <textarea
+                  className="as-input as-input--textarea"
+                  rows={3}
+                  value={settings.budgetPausedBody || ''}
+                  onChange={e => updateSetting('budgetPausedBody', e.target.value, 'paused message body')}
+                  placeholder="We're handling a high number of reward claims right now, so claiming is briefly unavailable. Please try again a little later."
+                />
+              </Field>
+            </div>
+          </SectionCard>
         </div>
       </div>
 
-      <QuickLinks currentPage="settings" onNavigate={onNavigate} />
+      {!embedded && <QuickLinks currentPage="settings" onNavigate={onNavigate} />}
 
       {/* Auto-save confirmation toast — fades after the most-recent
        *  edit, keyed on `ts` so quick successive saves re-trigger the

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listAllOrganizations, softDeleteOrganization, restoreOrganization } from '../lib/adminApi';
+import { listAllOrganizations, softDeleteOrganization, restoreOrganization, duplicateOrganization } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import './AdminOrganizations.css';
 
@@ -43,6 +43,8 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // {id, name}
+  const [duplicatingId, setDuplicatingId] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +87,27 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
     switchOrg(id);
   }
 
+  /* Clone an org's config (brand, settings, copy, rewards, budget cap,
+   * locations) into a fresh org. No users / scans / transfers / claims are
+   * copied, so the duplicate starts with clean stats. */
+  async function handleDuplicate(id) {
+    setDuplicatingId(id);
+    setError(null);
+    setNotice(null);
+    try {
+      const newOrg = await duplicateOrganization(id);
+      await load();
+      await refresh();
+      setNotice(`Created “${newOrg.name}” (slug: ${newOrg.slug}). Settings and rewards copied; users, scans, transfers, and claims start empty.`);
+      setTimeout(() => setNotice(null), 6000);
+    } catch (e) {
+      console.error('duplicate org failed', e);
+      setError(e.message || 'Could not duplicate the organisation.');
+    } finally {
+      setDuplicatingId(null);
+    }
+  }
+
   /* Click-through to the per-org settings page. Switches to the org
    * first (so the AdminOrg page loads that org's bundle), then
    * navigates to the 'org' tab — same destination as the OrgBadge /
@@ -116,6 +139,7 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
       </header>
 
       {error && <div className="ao-error">{error}</div>}
+      {notice && <div className="ao-notice">{notice}</div>}
 
       {loading ? (
         <div className="ao-skeleton">Loading…</div>
@@ -194,6 +218,16 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                         )}
                         {!isDeleted && !isActive && (
                           <button className="ao-action" onClick={() => handleSwitch(org.id)}>Switch to</button>
+                        )}
+                        {!isDeleted && (
+                          <button
+                            className="ao-action"
+                            onClick={() => handleDuplicate(org.id)}
+                            disabled={duplicatingId === org.id}
+                            title="Create a new org with this org's settings, copy, and rewards. Stats start empty."
+                          >
+                            {duplicatingId === org.id ? 'Duplicating…' : 'Duplicate'}
+                          </button>
                         )}
                         {!isDeleted && (
                           <button

@@ -18,6 +18,11 @@
   flex-direction: column;
 }
 
+/* Embedded in the merged Settings + Organisation workspace: no own padding,
+   no TOC column — the workspace supplies the shared horizontal TOC. */
+.admin-settings--embedded { padding: 0; min-height: 0; }
+.admin-settings--embedded .as-layout { grid-template-columns: 1fr; }
+
 /* ── Header ──────────────────────────────────────────────────────── */
 
 .as-header {
@@ -502,3 +507,102 @@
 .as-rate-warn svg { flex-shrink: 0; margin-top: 2px; color: #D69500; }
 .as-rate-warn strong { font-weight: 700; }
 .as-rate-warn p { margin: 4px 0 0; font-size: 12.5px; }
+
+/* ── Reward budget monitor ───────────────────────────────────────── */
+.as-budget__loading { font-size: 13px; color: #8A8175; padding: 8px 0; }
+
+.as-budget {
+  margin-top: 6px;
+  border: 1px solid #ECE7DE;
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: #FCFAF6;
+}
+.as-budget__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.as-budget__title { font-size: 13.5px; font-weight: 800; color: #2A2724; }
+.as-budget__pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.as-budget__bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #ECE7DE;
+  overflow: hidden;
+}
+.as-budget__fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.as-budget__figures {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: #6C6259;
+  font-variant-numeric: tabular-nums;
+}
+.as-budget__figures strong { color: #1D1D1D; font-size: 15px; font-weight: 800; }
+.as-budget__note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #8A8175;
+}
+
+/* Tones */
+.as-budget--ok .as-budget__fill { background: #1A8737; }
+.as-budget--ok .as-budget__pill { color: #1A8737; background: rgba(26,135,55,0.10); }
+.as-budget--warn .as-budget__fill { background: #E8910C; }
+.as-budget--warn .as-budget__pill { color: #B26A00; background: rgba(232,145,12,0.14); }
+.as-budget--blocked { border-color: #F0C3C3; background: #FDF5F5; }
+.as-budget--blocked .as-budget__fill { background: #DC2626; }
+.as-budget--blocked .as-budget__pill { color: #fff; background: #DC2626; }
+.as-budget--off { opacity: 0.85; }
+.as-budget--off .as-budget__fill { background: #BDB7AC; }
+.as-budget--off .as-budget__pill { color: #6C6259; background: rgba(108,98,89,0.12); }
+
+.as-budget__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.as-budget__save {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  background: #1D1D1D;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.as-budget__save:hover:not(:disabled) { background: #000; }
+.as-budget__save:disabled { opacity: 0.5; cursor: default; }
+.as-budget__ok { font-size: 13px; font-weight: 700; color: #1A8737; }
+.as-budget__err { font-size: 13px; font-weight: 600; color: #B42318; }
+
+/* ── Budget paused-message copy block ── */
+.as-budget-copy {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed #ECE7DE;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.as-budget-copy__head { margin: 0; font-size: 13.5px; font-weight: 800; color: #2A2724; }
+.as-budget-copy__hint { margin: 0 0 2px; font-size: 11.5px; line-height: 1.45; color: #8A8175; }

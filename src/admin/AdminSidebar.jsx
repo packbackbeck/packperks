@@ -141,12 +141,25 @@ const NAV_ITEMS = [
   },
   {
     id: 'stats',
-    label: 'Stats',
+    label: 'System Health',
     /* Activity/pulse glyph — distinct from the bar-chart "Reports" icon.
      * This is the feasibility-test go/no-go dashboard. */
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    ),
+  },
+  {
+    id: 'behaviour',
+    label: 'User Behaviour',
+    /* People glyph — behavioural funnel metrics, separate from System Health. */
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
   },
@@ -160,12 +173,6 @@ const NAV_ITEMS = [
  * having it one click away in the always-visible sidebar was a footgun
  * (the confirm modal helped, but customers shouldn't be one stray
  * click from being locked out). */
-const TOGGLES = [
-  { key: 'featureCupSharing',    label: 'Cup Sharing' },
-  { key: 'featureDonations',     label: 'Donations' },
-  { key: 'featureDirectRefunds', label: 'Direct Refunds' },
-];
-
 /* Which tabs each role can SEE. Matches the permission matrix in
  * AuthContext — the sidebar is the visual mirror of those rules. */
 const ROLE_VISIBLE_TABS = {
@@ -174,8 +181,8 @@ const ROLE_VISIBLE_TABS = {
   // Manager + Checker also see the Org tab (read-only) so they know
   // where they work; the editing controls inside are gated by
   // PermissionGate so they're disabled.
-  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'reports', 'stats']),
-  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'reports', 'stats']),
+  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'reports', 'stats', 'behaviour']),
+  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'reports', 'stats', 'behaviour']),
 };
 
 export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState, role, onAddOrg }) {
@@ -187,28 +194,6 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
   // routes through a confirm step. Other toggles fire immediately.
   const [maintenanceConfirm, setMaintenanceConfirm] = useState(null);
   // null when closed; { nextValue: true|false } when open.
-
-  function handleToggleClick(t) {
-    if (t.key === 'maintenanceMode') {
-      // Maintenance toggle was removed from the sidebar — kept this
-      // branch as a no-op for safety in case a stray entry creeps back
-      // into TOGGLES. Maintenance now lives only on the Settings page.
-      return;
-    }
-    // Quick toggles actually toggle. Auto-save still kicks in via
-    // draftState (every updateDraft persists to localStorage + pushes
-    // to Supabase), so this matches the Publish-driven workflow the
-    // Settings page uses, just with a faster keyboard.
-    toggleFeature?.(t.key);
-    logAction({
-      action: 'settings.feature_toggle',
-      targetType: 'settings',
-      targetId: t.key,
-      before: { [t.key]: !!settings[t.key] },
-      after:  { [t.key]: !settings[t.key] },
-      metadata: { surface: 'sidebar_quick_toggle' },
-    });
-  }
 
   function confirmMaintenance() {
     if (!maintenanceConfirm) return;
@@ -261,19 +246,6 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
       </nav>
 
       <div className="admin-sidebar__toggles">
-        <button
-          type="button"
-          className="admin-sidebar__toggles-label admin-sidebar__toggles-label--link"
-          onClick={() => onNavigate('settings')}
-          title="Open the full Settings page"
-        >
-          Quick Settings
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg>
-        </button>
-
         <div className="admin-sidebar__rates" onClick={() => onNavigate('settings')}>
           <div className="admin-sidebar__rate-item">
             <span className="admin-sidebar__rate-label">Cashback</span>
@@ -284,26 +256,6 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
             <span className="admin-sidebar__rate-val">€{(settings.refundRatePerCup || 1.00).toFixed(2)}/cup</span>
           </div>
         </div>
-
-        {TOGGLES.map(t => (
-          <div
-            key={t.key}
-            className="admin-sidebar__toggle-row"
-            onClick={() => handleToggleClick(t)}
-            title={
-              t.key === 'maintenanceMode'
-                ? 'Click to confirm + flip — maintenance affects customers immediately.'
-                : `${t.label} is ${settings[t.key] ? 'on' : 'off'}. Click to flip — auto-saved to draft. Hit Publish to push live.`
-            }
-          >
-            <span className={`admin-sidebar__toggle-name${t.warn && settings[t.key] ? ' admin-sidebar__toggle-name--warn' : ''}`}>
-              {t.label}
-            </span>
-            <span className={`admin-sidebar__toggle-pill${settings[t.key] ? (t.warn ? ' admin-sidebar__toggle-pill--warn' : ' admin-sidebar__toggle-pill--on') : ' admin-sidebar__toggle-pill--off'}`}>
-              {settings[t.key] ? 'On' : 'Off'}
-            </span>
-          </div>
-        ))}
       </div>
 
       {maintenanceConfirm && (

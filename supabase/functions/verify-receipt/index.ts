@@ -194,7 +194,16 @@ const VERIFY_TOOL = {
   },
 };
 
-function buildSystemPrompt(requiredItem: string) {
+function buildSystemPrompt(requiredItem: string, requiredQty = 1) {
+  const qtyClause = requiredQty > 1
+    ? `
+
+QUANTITY REQUIREMENT: the customer must have bought AT LEAST ${requiredQty} of this item. Add up the qty of every matching line item. PASS only when the total matched quantity is ${requiredQty} or more. If fewer are present, FAIL this check and state how many you found (for example "found 1, requires ${requiredQty}").`
+    : "";
+  return _buildSystemPrompt(requiredItem, qtyClause);
+}
+
+function _buildSystemPrompt(requiredItem: string, qtyClause: string) {
   return `You are a receipt verification assistant for PackPerks, a reusable-cup rewards program in the Netherlands. Customers return reusable cups at a partner venue, collect cups, and submit a purchase receipt to claim a reward.
 
 You will receive ONE image. Run THREE checks SEQUENTIALLY with short-circuit logic and return the verdict via the record_receipt_verdict tool.
@@ -224,7 +233,7 @@ CHECK 2 — is_authentic_burger_king: Is it a LEGITIMATE printed retail receipt 
 
 CHECK 3 — contains_required_item: The user is claiming a reward for this specific item:
 
-  REQUIRED ITEM: "${requiredItem}"
+  REQUIRED ITEM: "${requiredItem}"${qtyClause}
 
 PASS: receipt contains a line item that is unambiguously the required item OR a clear synonym / abbreviated variant. Be slightly generous on abbreviations (receipts often truncate names) but conservative on different variants/sizes. In the reason field, name the exact line item you matched (or say "not found"). FAIL: required item not on the receipt, or only a different variant.
 
@@ -300,8 +309,16 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(bin);
 }
 
-async function lookupRequiredItem(rewardId: string | null, orgId: string | null): Promise<string> {
-  if (!rewardId) return "(no specific item — generic claim)";
+interface RequiredItem { name: string; requiredQty: number }
+
+// Coerce an admin-entered requiredQty into a safe positive integer (>=1).
+function normQty(v: unknown): number {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+async function lookupRequiredItem(rewardId: string | null, orgId: string | null): Promise<RequiredItem> {
+  if (!rewardId) return { name: "(no specific item — generic claim)", requiredQty: 1 };
   try {
     // Per-org config lives under `published:<orgId>`; fall back to the
     // legacy unsuffixed `published` key for the original demo org.
@@ -314,7 +331,7 @@ async function lookupRequiredItem(rewardId: string | null, orgId: string | null)
     const liveRewards = data?.value?.rewards;
     if (Array.isArray(liveRewards)) {
       const found = liveRewards.find((r: { id?: string }) => r?.id === rewardId);
-      if (found?.name) return String(found.name);
+      if (found?.name) return { name: String(found.name), requiredQty: normQty(found.requiredQty) };
     }
   } catch {
     // fall through to static fallback below
@@ -326,7 +343,25 @@ async function lookupRequiredItem(rewardId: string | null, orgId: string | null)
     "veggie-hamburger": "Veggie Hamburger",
     "oreo-king-fusion": "Oreo King Fusion",
   };
-  return FALLBACK[rewardId] ?? `Reward "${rewardId}"`;
+  return { name: FALLBACK[rewardId] ?? `Reward "${rewardId}"`, requiredQty: 1 };
+}
+
+// Sum the quantity of receipt line items that match the required item name
+// (same loose substring match the prompt uses). Used to enforce a minimum
+// purchase quantity for "buy N" rewards.
+function matchedItemQty(items: unknown, requiredItem: string): number {
+  if (!Array.isArray(items)) return 0;
+  const req = requiredItem.toLowerCase();
+  let total = 0;
+  for (const it of items) {
+    const name = String((it as { name?: string })?.name || "").toLowerCase();
+    if (!name) continue;
+    if (name.includes(req) || req.includes(name)) {
+      const qty = Number((it as { qty?: number })?.qty);
+      total += Number.isFinite(qty) && qty > 0 ? qty : 1;
+    }
+  }
+  return total;
 }
 
 async function rateLimit(key: string, windowSecs: number, maxCalls: number): Promise<boolean> {
@@ -374,7 +409,7 @@ Deno.serve(async (req) => {
   if (!userOk)
     return jsonResponse({ error: "rate_limited", detail: "Too many receipt verifications today. Try again tomorrow." }, 429);
 
-  const requiredItem = await lookupRequiredItem(claim.reward_id, claim.org_id);
+  const { name: requiredItem, requiredQty } = await lookupRequiredItem(claim.reward_id, claim.org_id);
 
   const { data: photoBlob, error: dlErr } = await supabase.storage
     .from("receipts")
@@ -452,7 +487,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 1024,
-        system: buildSystemPrompt(requiredItem),
+        system: buildSystemPrompt(requiredItem, requiredQty),
         tools: [VERIFY_TOOL],
         tool_choice: { type: "tool", name: "record_receipt_verdict" },
         messages: [
@@ -493,6 +528,25 @@ Deno.serve(async (req) => {
   }
   const verdict = toolUse.input as ThreeCheckVerdict;
 
+  // Quantity enforcement (server-side backstop on top of the prompt). If the
+  // reward requires buying N>1 of the item, the AI's "contains required item"
+  // pass only holds when the summed quantity of matching line items meets N.
+  // Flip the check to failed and cap confidence so a partial buy can't
+  // auto-complete.
+  let matchedQty: number | null = null;
+  if (requiredQty > 1 && verdict.check_contains_required_item?.passed === true) {
+    matchedQty = matchedItemQty(verdict.items, requiredItem);
+    if (matchedQty < requiredQty) {
+      verdict.check_contains_required_item = {
+        passed: false,
+        reason: `Requires ${requiredQty}x "${requiredItem}", but the receipt shows only ${matchedQty}.`,
+      };
+      if (typeof verdict.confidence !== "number" || verdict.confidence > 0.4) {
+        verdict.confidence = 0.4;
+      }
+    }
+  }
+
   let { status, failureChecks, skippedChecks } = decideStatus(verdict);
   let postAiReason: string | null = null;
 
@@ -517,18 +571,27 @@ Deno.serve(async (req) => {
       const itemPresent =
         !claim.reward_id ||
         names.some((n) => n && (n.includes(req) || req.includes(n)));
+      const genQty = matchedItemQty(gen.items, requiredItem);
+      const qtyOk = requiredQty <= 1 || !claim.reward_id || genQty >= requiredQty;
+      const passed = itemPresent && qtyOk;
       verdict.check_is_receipt = { passed: true, reason: "PackPerks test receipt" };
       verdict.check_is_authentic_burger_king = { passed: true, reason: "PackPerks verified test receipt" };
       verdict.check_contains_required_item = {
-        passed: itemPresent,
-        reason: itemPresent ? "Required item present on test receipt." : "Required item not listed on the test receipt.",
+        passed,
+        reason: !itemPresent
+          ? "Required item not listed on the test receipt."
+          : !qtyOk
+            ? `Requires ${requiredQty}x "${requiredItem}", but the test receipt shows only ${genQty}.`
+            : "Required item present on test receipt.",
       };
-      failureChecks = itemPresent ? [] : ["contains_required_item"];
+      failureChecks = passed ? [] : ["contains_required_item"];
       skippedChecks = [];
-      status = itemPresent ? "completed" : "pending";
-      postAiReason = itemPresent
+      status = passed ? "completed" : "pending";
+      postAiReason = passed
         ? "Accepted: PackPerks verified test receipt."
-        : "PackPerks test receipt, but the claimed reward isn't on it — sent to review.";
+        : !itemPresent
+          ? "PackPerks test receipt, but the claimed reward isn't on it — sent to review."
+          : `PackPerks test receipt shows only ${genQty} of ${requiredQty} required ${requiredItem} — sent to review.`;
     }
   }
 
@@ -598,7 +661,7 @@ Deno.serve(async (req) => {
   const { error: upErr } = await supabase
     .from("claims")
     .update({
-      ai_verdict: { ...verdict, packperks_test: packperksTest },
+      ai_verdict: { ...verdict, packperks_test: packperksTest, required_qty: requiredQty, matched_qty: matchedQty },
       ai_confidence: packperksTest ? 1 : confidenceNumber,
       ai_is_receipt: verdict.check_is_receipt?.passed ?? null,
       ai_is_burger_king: verdict.check_is_authentic_burger_king?.passed ?? null,

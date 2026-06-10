@@ -25,7 +25,7 @@ const InfoIcon = () => (
   </svg>
 );
 
-export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, showCashbackStep = true }) {
+export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, showCashbackStep = true, budgetBlocked = false, onBudgetBlocked }) {
   if (!reward) return null;
 
   const isUnlocked = cupCount >= reward.cupsNeeded;
@@ -103,7 +103,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                   <li className="rds-step">
                     <span className="rds-step__num">2</span>
                     <span className="rds-step__text">
-                      Photograph your <strong>{brand} purchase receipt</strong> — you'll upload it when you claim. <em>Keep it safe; it can't be added later.</em>
+                      Photograph the <strong>store receipt from buying your {reward.name}</strong>. This is the printed till receipt from the shop, not your cup-return ticket. You'll upload it when you claim. <em>Keep it; it can't be added later.</em>
                     </span>
                   </li>
                   <li className="rds-step">
@@ -125,7 +125,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
             {showCashbackStep && (
               <div className="rds-receipt-tip">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                Save your receipt before you start collecting — it's required to complete your cashback claim.
+                Keep the printed store receipt that lists your item. It is required for cashback, and it is not the same as your cup-return ticket.
               </div>
             )}
           </div>
@@ -156,18 +156,20 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
           {isSelected ? (
             /* Already selected — show locked/unlocked cashback CTA */
             <button
-              className={`rds-btn rds-btn--primary ${!isUnlocked ? 'rds-btn--locked' : ''}`}
-              onClick={isUnlocked ? onClaim : undefined}
+              className={`rds-btn rds-btn--primary ${(!isUnlocked || budgetBlocked) ? 'rds-btn--locked' : ''}`}
+              onClick={!isUnlocked ? undefined : (budgetBlocked ? onBudgetBlocked : onClaim)}
               disabled={!isUnlocked}
             >
-              {isUnlocked
-                ? 'Get cashback'
-                : `${cupsRemaining} more cup${cupsRemaining !== 1 ? 's' : ''} needed`}
+              {!isUnlocked
+                ? `${cupsRemaining} more cup${cupsRemaining !== 1 ? 's' : ''} needed`
+                : budgetBlocked
+                  ? 'Rewards paused'
+                  : 'Get cashback'}
             </button>
           ) : (
             <>
               <button className="rds-btn rds-btn--primary" onClick={() => { onPick(reward.id); onClose(); }}>
-                Pick it
+                Choose this reward
               </button>
             </>
           )}

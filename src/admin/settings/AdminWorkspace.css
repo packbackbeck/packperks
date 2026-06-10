@@ -1,7 +1,8 @@
 .ws-page {
-  padding: 28px 32px 64px;
-  max-width: 1100px;
+  padding: 24px 32px 64px;
+  max-width: 1040px;
   margin: 0 auto;
+  min-width: 0;
 }
 
 /* ── Header ── */
@@ -31,12 +32,10 @@
 .ws-toc {
   position: sticky;
   top: 0;
-  z-index: 20;
-  margin: 0 -32px 22px;
-  padding: 10px 32px;
-  background: rgba(252, 250, 246, 0.92);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  z-index: 30;
+  margin: 0 0 20px;
+  padding: 10px 0;
+  background: var(--bk-bg, #FBF7F0);
   border-bottom: 1px solid #EBE5DA;
 }
 .ws-toc__inner {
@@ -45,8 +44,6 @@
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  max-width: 1100px;
-  margin: 0 auto;
 }
 .ws-toc__inner::-webkit-scrollbar { display: none; }
 .ws-toc__cell { display: inline-flex; align-items: center; gap: 6px; }
@@ -103,8 +100,55 @@
 .ws-toc__item--active .ws-toc__icon--slate  { background: #475569; }
 
 /* ── Section anchors: clear the sticky topbar + TOC bar on jump ── */
-.ws-content [id^="s-"] { scroll-margin-top: 92px; }
+.ws-content [id^="s-"] { scroll-margin-top: 84px; }
 .ws-anchor { display: block; }
 
-/* Embedded org sections sit flush; the workspace owns page padding. */
-.org-page--embedded { padding: 0; }
+/* ── One cohesive single column ───────────────────────────────────
+ * The two embedded pages (org + settings) are stacked here. Force a
+ * clean vertical stack and normalise their internal layout so neither
+ * page's own grid/min-height can break the merged view. */
+.ws-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ws-content > * { min-width: 0; width: 100%; }
+
+/* Embedded org sections: flush, vertical stack. */
+.org-page--embedded { padding: 0; gap: 14px; min-height: 0; }
+
+/* Embedded settings: drop its own padding/min-height and, crucially,
+ * collapse its 2-column TOC+content grid to a single full-width column. */
+.ws-content .admin-settings--embedded { padding: 0; min-height: 0; }
+.ws-content .admin-settings--embedded .as-layout { display: block; }
+.ws-content .as-content { gap: 14px; }
+
+/* Unify the two card families to one look (consistent border + soft shadow). */
+.ws-content .org-card,
+.ws-content .as-card {
+  border: 1px solid #E7E1D4;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Group labels that orient the user between the two halves ── */
+.ws-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 2px 0;
+}
+.ws-group:not(:first-child) { margin-top: 16px; }
+.ws-group__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9A8F7E;
+  white-space: nowrap;
+}
+.ws-group__rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, #E7E1D4, transparent);
+}

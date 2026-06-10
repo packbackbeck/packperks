@@ -43,13 +43,14 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="org-page"><Spinner label="Loading organisation…" /></div>;
-  if (error)   return <div className="org-page"><p className="org-err">{error}</p><QuickLinks currentPage="org" onNavigate={onNavigate} /></div>;
+  const pageCls = `org-page${embedded ? ' org-page--embedded' : ''}`;
+  if (loading) return <div className={pageCls}><Spinner label="Loading organisation…" /></div>;
+  if (error)   return <div className={pageCls}><p className="org-err">{error}</p>{!embedded && <QuickLinks currentPage="org" onNavigate={onNavigate} />}</div>;
   if (!bundle?.org) {
     return (
-      <div className="org-page">
+      <div className={pageCls}>
         <p className="org-err">No organisation linked to your account. Ask an owner to invite you.</p>
-        <QuickLinks currentPage="org" onNavigate={onNavigate} />
+        {!embedded && <QuickLinks currentPage="org" onNavigate={onNavigate} />}
       </div>
     );
   }

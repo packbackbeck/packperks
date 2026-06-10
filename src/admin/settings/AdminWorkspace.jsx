@@ -126,7 +126,16 @@ export default function AdminWorkspace({ draftState, onNavigate }) {
       </nav>
 
       <div className="ws-content">
+        <div className="ws-group">
+          <span className="ws-group__label">Organisation</span>
+          <span className="ws-group__rule" aria-hidden="true" />
+        </div>
         <AdminOrg embedded onNavigate={onNavigate} />
+
+        <div className="ws-group">
+          <span className="ws-group__label">App settings</span>
+          <span className="ws-group__rule" aria-hidden="true" />
+        </div>
         <AdminSettings embedded draftState={draftState} onNavigate={onNavigate} />
       </div>
 

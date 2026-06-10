@@ -30,7 +30,7 @@ import './AdminSettings.css';
  * a small status pill near the header confirms that with "Auto-saved".
  */
 
-const SECTIONS = [
+export const SECTIONS = [
   {
     id: 'rates',
     title: 'Payout rates',
@@ -257,7 +257,7 @@ function RewardBudgetSection() {
   );
 }
 
-export default function AdminSettings({ draftState, onNavigate }) {
+export default function AdminSettings({ draftState, onNavigate, embedded = false }) {
   const { draft, updateDraft, statusLabel, published } = draftState;
   const settings = draft.settings;
 
@@ -353,8 +353,9 @@ export default function AdminSettings({ draftState, onNavigate }) {
   }
 
   return (
-    <div className="admin-settings">
+    <div className={`admin-settings${embedded ? ' admin-settings--embedded' : ''}`}>
       {/* Page header */}
+      {!embedded && (
       <header className="as-header">
         <div className="as-header__text">
           <span className="as-header__eyebrow">Configuration</span>
@@ -372,9 +373,12 @@ export default function AdminSettings({ draftState, onNavigate }) {
           </span>
         </div>
       </header>
+      )}
 
       <div className="as-layout">
-        {/* Sticky TOC */}
+        {/* Sticky TOC — hidden when embedded in the merged workspace, which
+            provides a shared horizontal table of contents instead. */}
+        {!embedded && (
         <nav className="as-toc" aria-label="Settings sections">
           {SECTIONS.map(s => (
             <button
@@ -388,6 +392,7 @@ export default function AdminSettings({ draftState, onNavigate }) {
             </button>
           ))}
         </nav>
+        )}
 
         {/* Section stack */}
         <div className="as-content">
@@ -648,7 +653,7 @@ export default function AdminSettings({ draftState, onNavigate }) {
         </div>
       </div>
 
-      <QuickLinks currentPage="settings" onNavigate={onNavigate} />
+      {!embedded && <QuickLinks currentPage="settings" onNavigate={onNavigate} />}
 
       {/* Auto-save confirmation toast — fades after the most-recent
        *  edit, keyed on `ts` so quick successive saves re-trigger the

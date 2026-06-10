@@ -30,7 +30,7 @@ const ROLE_LABELS = {
   checker: { label: 'Checker', color: '#7A7166', desc: 'Read-only + exports' },
 };
 
-export default function AdminOrg({ onNavigate }) {
+export default function AdminOrg({ onNavigate, embedded = false }) {
   const { profile } = useAuth();
   const [bundle, setBundle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,45 +58,55 @@ export default function AdminOrg({ onNavigate }) {
   const canManage   = hasPermission(profile.role, 'team.invite');
 
   return (
-    <div className="org-page">
-      <header className="org-header">
-        <h1 className="org-header__title">Organisation</h1>
-        <p className="org-header__sub">Profile, locations, and the team that operates this PackPerks programme.</p>
-      </header>
+    <div className={`org-page${embedded ? ' org-page--embedded' : ''}`}>
+      {!embedded && (
+        <header className="org-header">
+          <h1 className="org-header__title">Organisation</h1>
+          <p className="org-header__sub">Profile, locations, and the team that operates this PackPerks programme.</p>
+        </header>
+      )}
 
-      <OrgInfoCard
-        org={bundle.org}
-        canEdit={canEditOrg}
-        onSaved={updated => setBundle(b => ({ ...b, org: updated }))}
-      />
+      <div id="s-org-profile" className="ws-anchor">
+        <OrgInfoCard
+          org={bundle.org}
+          canEdit={canEditOrg}
+          onSaved={updated => setBundle(b => ({ ...b, org: updated }))}
+        />
+      </div>
 
-      <LocationsSection
-        org={bundle.org}
-        locations={bundle.locations}
-        canEdit={canEditOrg}
-        onChange={locations => setBundle(b => ({ ...b, locations }))}
-      />
+      <div id="s-org-locations" className="ws-anchor">
+        <LocationsSection
+          org={bundle.org}
+          locations={bundle.locations}
+          canEdit={canEditOrg}
+          onChange={locations => setBundle(b => ({ ...b, locations }))}
+        />
+      </div>
 
-      <TeamSection
-        org={bundle.org}
-        team={bundle.team}
-        invitations={bundle.invitations}
-        canManage={canManage}
-        currentRole={profile.role}
-        currentUserId={profile.id}
-        onTeamChange={team => setBundle(b => ({ ...b, team }))}
-        onInvitationsChange={invitations => setBundle(b => ({ ...b, invitations }))}
-      />
+      <div id="s-org-team" className="ws-anchor">
+        <TeamSection
+          org={bundle.org}
+          team={bundle.team}
+          invitations={bundle.invitations}
+          canManage={canManage}
+          currentRole={profile.role}
+          currentUserId={profile.id}
+          onTeamChange={team => setBundle(b => ({ ...b, team }))}
+          onInvitationsChange={invitations => setBundle(b => ({ ...b, invitations }))}
+        />
+      </div>
 
-      {/* Activity log lives at the bottom of the Org page so the
+      {/* Activity log lives at the bottom of the Org section so the
        * who-did-what trail sits alongside the team it describes. Owners
        * + admins see every event; lower roles see only their own
        * (RLS-enforced inside AdminActivityLog itself). */}
-      <section className="org-card org-card--no-padding">
-        <AdminActivityLog embedded />
-      </section>
+      <div id="s-org-activity" className="ws-anchor">
+        <section className="org-card org-card--no-padding">
+          <AdminActivityLog embedded />
+        </section>
+      </div>
 
-      <QuickLinks currentPage="org" onNavigate={onNavigate} />
+      {!embedded && <QuickLinks currentPage="org" onNavigate={onNavigate} />}
     </div>
   );
 }

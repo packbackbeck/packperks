@@ -18,6 +18,11 @@
   flex-direction: column;
 }
 
+/* Embedded in the merged Settings + Organisation workspace: no own padding,
+   no TOC column — the workspace supplies the shared horizontal TOC. */
+.admin-settings--embedded { padding: 0; min-height: 0; }
+.admin-settings--embedded .as-layout { grid-template-columns: 1fr; }
+
 /* ── Header ──────────────────────────────────────────────────────── */
 
 .as-header {

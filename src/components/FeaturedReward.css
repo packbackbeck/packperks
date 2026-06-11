@@ -57,9 +57,8 @@
 
 .featured-reward__image-wrap {
   width: 130px;
-  height: auto;
-  align-self: stretch;
-  min-height: 130px;
+  height: 130px;
+  align-self: center;
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -108,7 +107,7 @@
 
 .featured-reward__tags {
   display: flex;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 
@@ -117,7 +116,7 @@
   align-items: center;
   justify-content: center;
   padding: 5px 10px;
-  background: var(--bk-brown);
+  background: #2525254d;
   border-radius: var(--radius-sm);
   font-family: var(--font-primary);
   font-weight: var(--fw-regular);

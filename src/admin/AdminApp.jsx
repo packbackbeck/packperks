@@ -26,6 +26,20 @@ import AdminAppDesign from './appdesign/AdminAppDesign';
 import { useAdminDraft } from './hooks/useAdminDraft';
 import './AdminApp.css';
 
+/* Keep-alive page wrapper.
+ *
+ * MUST live at module scope (not inside AdminApp): a component defined inside
+ * another component's render gets a new function identity on every render, so
+ * React would unmount + remount the whole page subtree on every AdminApp
+ * re-render — wiping in-page state such as the selected reward, scroll, and
+ * filters. With a stable identity here, a visited page stays mounted and just
+ * toggles `hidden`, which is the whole point of keep-alive.
+ */
+function KeepAlive({ id, activeId, visited, children }) {
+  if (!visited.has(id)) return null;
+  return <div hidden={activeId !== id}>{children}</div>;
+}
+
 export default function AdminApp() {
   return (
     <AuthProvider>
@@ -127,18 +141,6 @@ function AdminShell() {
     window.open(slug ? `/${slug}/` : '/', '_blank');
   }
 
-  /* Keep-alive page wrapper.
-   *
-   * Once a page has been visited it stays mounted with `hidden` toggled
-   * — so filters, scroll, in-memory state survive tab switches. Pages
-   * that haven't been visited yet stay unmounted, preserving the
-   * lazy-first-load behaviour. */
-  function KeepAlive({ id, children }) {
-    const isActive = page === id;
-    const wasVisited = visited.has(id);
-    if (!wasVisited) return null;
-    return <div hidden={!isActive}>{isActive ? children : children}</div>;
-  }
 
   return (
     <div className="admin-app">
@@ -161,59 +163,59 @@ function AdminShell() {
             top-level shell (topbar, sidebar) stays mounted so the
             switch feels instant and doesn't lose hash routing. */}
         <main className="admin-app__main" key={activeOrgId || 'bootstrap'}>
-          <KeepAlive id="overview">
+          <KeepAlive id="overview" activeId={page} visited={visited}>
             <AdminOverview draftState={draftState} onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="rewards">
+          <KeepAlive id="rewards" activeId={page} visited={visited}>
             <AdminRewards draftState={draftState} onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="appdesign">
+          <KeepAlive id="appdesign" activeId={page} visited={visited}>
             <AdminAppDesign draftState={draftState} />
           </KeepAlive>
-          <KeepAlive id="users">
+          <KeepAlive id="users" activeId={page} visited={visited}>
             <AdminUsers onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="claims">
+          <KeepAlive id="claims" activeId={page} visited={visited}>
             <AdminClaims onNavigate={setPage} draftState={draftState} />
           </KeepAlive>
-          <KeepAlive id="cupscans">
+          <KeepAlive id="cupscans" activeId={page} visited={visited}>
             <AdminCupScans onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="cupqr">
+          <KeepAlive id="cupqr" activeId={page} visited={visited}>
             <AdminReceiptGenerator onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="transactions">
+          <KeepAlive id="transactions" activeId={page} visited={visited}>
             <AdminTransactions onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="organizations">
+          <KeepAlive id="organizations" activeId={page} visited={visited}>
             <AdminOrganizations onNavigate={setPage} onAddOrg={() => setWizardOpen(true)} />
           </KeepAlive>
-          <KeepAlive id="settings">
+          <KeepAlive id="settings" activeId={page} visited={visited}>
             <AdminWorkspace draftState={draftState} onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="history">
+          <KeepAlive id="history" activeId={page} visited={visited}>
             <AdminHistory draftState={draftState} onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="reports">
+          <KeepAlive id="reports" activeId={page} visited={visited}>
             <AdminReports onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="stats">
+          <KeepAlive id="stats" activeId={page} visited={visited}>
             <AdminStats onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="behaviour">
+          <KeepAlive id="behaviour" activeId={page} visited={visited}>
             <AdminUserBehaviour onNavigate={setPage} />
           </KeepAlive>
-          <KeepAlive id="donations">
+          <KeepAlive id="donations" activeId={page} visited={visited}>
             <AdminDonations onNavigate={setPage} draftState={draftState} />
           </KeepAlive>
-          <KeepAlive id="support">
+          <KeepAlive id="support" activeId={page} visited={visited}>
             <AdminSupport onNavigate={setPage} />
           </KeepAlive>
           {/* `receipts` was the old standalone Receipt Check tab — it
            *  redirects to Claims (which now has a "Review" view mode
            *  covering the same workflow). Keep it as its own keep-alive
            *  slot in case the URL hash has #receipts from old bookmarks. */}
-          <KeepAlive id="receipts">
+          <KeepAlive id="receipts" activeId={page} visited={visited}>
             <AdminClaims onNavigate={setPage} draftState={draftState} />
           </KeepAlive>
         </main>

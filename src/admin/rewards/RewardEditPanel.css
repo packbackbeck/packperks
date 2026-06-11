@@ -346,10 +346,12 @@
 }
 
 /* Square preview — shows the exact framing the customer app will render */
+/* Matches the customer featured card image box exactly (130x130, 1:1) so the
+   framing the admin sets is what the featured reward shows. */
 .rep__image-preview {
   flex: 0 0 auto;
-  width: 150px;
-  height: 150px;
+  width: 130px;
+  height: 130px;
   border-radius: 10px;
   overflow: hidden;
   background: #F8F4EC;
@@ -358,6 +360,8 @@
 .rep__image-preview img {
   width: 100%;
   height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
   object-fit: contain;
 }
 
@@ -693,7 +697,7 @@
   font-size: 12.5px;
   color: #6C6259;
 }
-.rep__save-bar--dirty {
+.rep__save-bar--saving {
   background: rgba(83, 51, 165, 0.06);
   border-bottom-color: rgba(83, 51, 165, 0.20);
   color: #2A2724;

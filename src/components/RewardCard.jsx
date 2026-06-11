@@ -47,8 +47,13 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
         </div>
         <div className="reward-card__info">
           <h3 className="reward-card__name">{reward.name}</h3>
-          {/* Chips row */}
+          {/* Chips row — product tags (styled like the featured card) then
+              the value/cups chip. "FREE" is hidden since the value chip
+              already says what the reward is worth. */}
           <div className="reward-card__chips">
+            {(reward.tags || []).filter(t => t && t.toUpperCase() !== 'FREE').map(tag => (
+              <span key={tag} className="reward-card__chip reward-card__chip--tag">{tag}</span>
+            ))}
             <span className="reward-card__chip reward-card__chip--cups">
               €{euroValue} for
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#502314" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

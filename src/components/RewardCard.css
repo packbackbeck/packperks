@@ -74,7 +74,7 @@
 /* ── Chips row ── */
 .reward-card__chips {
   display: flex;
-  gap: 5px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 
@@ -99,6 +99,20 @@
   background: #FFF3D6;
   color: var(--bk-brown);
   border: 1px solid #FEA01E;
+}
+
+/* Product tags — mirror the featured card's tag chips (shape, padding, font).
+   The featured card uses #2525254d over its dark background; on this white
+   card that translucent value renders too light, so we use the opaque
+   equivalent to keep the white label readable. */
+.reward-card__chip--tag {
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: #252525;
+  color: var(--white);
+  font-size: var(--fs-xs);
+  line-height: 1.1;
 }
 
 /* ── Progress bar footer ── */

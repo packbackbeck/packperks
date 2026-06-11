@@ -2,8 +2,8 @@ import './RewardCard.css';
 import cupIconWhite from '../assets/images/cup-icon-white.svg';
 import { rewardImageStyle } from '../utils/imageTransform';
 
-// Pick a legible label colour for a given background: dark on light colours,
-// white on dark ones. Keeps the product-coloured tag readable on every card.
+// Tag label colour: white by default, switching to dark only when the
+// background is very light or yellowish (where white would be unreadable).
 function contrastText(hex) {
   if (typeof hex !== 'string') return '#2A2A2A';
   let h = hex.replace('#', '').trim();
@@ -13,7 +13,9 @@ function contrastText(hex) {
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.62 ? '#2A2A2A' : '#FFFFFF';
+  const tooLight = luminance > 0.72;
+  const yellowish = r > 190 && g > 170 && b < 150;
+  return (tooLight || yellowish) ? '#2A2A2A' : '#FFFFFF';
 }
 
 export default function RewardCard({ reward, cupCount, onSelect, onViewDetail }) {

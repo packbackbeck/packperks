@@ -52,7 +52,7 @@ export default function ClaimPanel({
           <h3 className="claim-panel__success-title">Reward claimed!</h3>
           <p className="claim-panel__success-desc">
             Your <strong>{rewardName}</strong> voucher is on its way.
-            Cashback will arrive in your account within 3 business days.
+            Cashback will arrive in your account within 1 to 2 business days.
           </p>
           <button className="claim-panel__reset-btn" onClick={onResetClaim}>
             Claim another reward

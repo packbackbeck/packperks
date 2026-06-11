@@ -1,0 +1,193 @@
+/* ── How it works (Stories-style full-screen guide) ── */
+.hiw {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  color: #1A1A1A;
+  font-family: var(--font-primary, system-ui, sans-serif);
+  transition: background 0.45s ease;
+  animation: hiw-fade 0.28s ease both;
+  overflow: hidden;
+  /* Centre the column on large screens so it reads like a phone story. */
+  margin: 0 auto;
+}
+@keyframes hiw-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Tap zones: full height, behind the content. */
+.hiw__tap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hiw__tap--prev { left: 0; width: 32%; }
+.hiw__tap--next { right: 0; width: 68%; }
+
+/* Progress bars */
+.hiw__bars {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 5px;
+}
+.hiw__bar {
+  flex: 1;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+.hiw__bar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #1A1A1A;
+  border-radius: 3px;
+  transition: width 0.08s linear;
+}
+
+/* Header */
+.hiw__head {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+.hiw__brand {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  opacity: 0.75;
+}
+.hiw__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.hiw__close:hover { background: rgba(0, 0, 0, 0.1); }
+
+/* Content (click-through so taps reach the zones) */
+.hiw__content {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.hiw__art {
+  position: relative;
+  width: min(74vw, 300px);
+  aspect-ratio: 1 / 1;
+  border-radius: 28px;
+  background: #FFFFFF;
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.13), 0 4px 14px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 30px;
+  animation: hiw-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes hiw-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.hiw__art-fallback { color: rgba(26, 26, 26, 0.16); }
+.hiw__art-fallback svg { width: 92px; height: 92px; }
+.hiw__art-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hiw__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, 0.06);
+  margin-bottom: 14px;
+}
+.hiw__chip svg { width: 22px; height: 22px; }
+
+.hiw__title {
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.2px;
+  margin: 0 0 10px;
+  max-width: 320px;
+}
+.hiw__text {
+  font-size: 15px;
+  line-height: 1.5;
+  opacity: 0.78;
+  margin: 0;
+  max-width: 300px;
+}
+
+/* Footer */
+.hiw__foot {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 18px;
+}
+.hiw__count {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+.hiw__cta {
+  flex: 0 0 auto;
+  min-width: 130px;
+  padding: 13px 22px;
+  border-radius: 14px;
+  border: none;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.hiw__cta:hover { opacity: 0.92; }
+.hiw__cta:active { transform: scale(0.97); }
+
+/* Tablet / desktop: keep the story phone-width and centered. */
+@media (min-width: 560px) {
+  .hiw { max-width: 460px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5); }
+}

@@ -67,7 +67,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
         </header>
       )}
 
-      <div id="s-org-profile" className="ws-anchor">
+      <div id="s-org-profile" className="wkspace-anchor">
         <OrgInfoCard
           org={bundle.org}
           canEdit={canEditOrg}
@@ -75,7 +75,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
         />
       </div>
 
-      <div id="s-org-locations" className="ws-anchor">
+      <div id="s-org-locations" className="wkspace-anchor">
         <LocationsSection
           org={bundle.org}
           locations={bundle.locations}
@@ -84,7 +84,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
         />
       </div>
 
-      <div id="s-org-team" className="ws-anchor">
+      <div id="s-org-team" className="wkspace-anchor">
         <TeamSection
           org={bundle.org}
           team={bundle.team}
@@ -101,7 +101,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
        * who-did-what trail sits alongside the team it describes. Owners
        * + admins see every event; lower roles see only their own
        * (RLS-enforced inside AdminActivityLog itself). */}
-      <div id="s-org-activity" className="ws-anchor">
+      <div id="s-org-activity" className="wkspace-anchor">
         <section className="org-card org-card--no-padding">
           <AdminActivityLog embedded />
         </section>

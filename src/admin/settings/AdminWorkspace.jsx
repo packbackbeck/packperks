@@ -92,32 +92,32 @@ export default function AdminWorkspace({ draftState, onNavigate }) {
   }
 
   return (
-    <div className="ws-page">
-      <header className="ws-header">
-        <span className="ws-header__eyebrow">Configuration</span>
-        <h1 className="ws-header__title">Settings &amp; Organisation</h1>
-        <p className="ws-header__sub">
+    <div className="wkspace-page">
+      <header className="wkspace-header">
+        <span className="wkspace-header__eyebrow">Configuration</span>
+        <h1 className="wkspace-header__title">Settings &amp; Organisation</h1>
+        <p className="wkspace-header__sub">
           Everything for this organisation in one place: profile, locations, team, payout rates,
           app copy, and policies. App settings auto-save to your draft — hit <strong>Publish</strong>{' '}
           in the top bar to push them live.
         </p>
       </header>
 
-      <nav className="ws-toc" aria-label="Settings and organisation sections">
-        <div className="ws-toc__inner">
+      <nav className="wkspace-toc" aria-label="Settings and organisation sections">
+        <div className="wkspace-toc__inner">
           {tocSections.map((s, i) => {
             const prev = tocSections[i - 1];
             const groupBreak = i > 0 && isOrg(prev.id) !== isOrg(s.id);
             return (
-              <span key={s.id} className="ws-toc__cell">
-                {groupBreak && <span className="ws-toc__divider" aria-hidden="true" />}
+              <span key={s.id} className="wkspace-toc__cell">
+                {groupBreak && <span className="wkspace-toc__divider" aria-hidden="true" />}
                 <button
                   type="button"
-                  className={`ws-toc__item${activeId === s.id ? ' ws-toc__item--active' : ''}`}
+                  className={`wkspace-toc__item${activeId === s.id ? ' wkspace-toc__item--active' : ''}`}
                   onClick={() => jumpTo(s.id)}
                 >
-                  <span className={`ws-toc__icon ws-toc__icon--${s.tone || 'slate'}`}>{s.icon}</span>
-                  <span className="ws-toc__label">{s.title}</span>
+                  <span className={`wkspace-toc__icon wkspace-toc__icon--${s.tone || 'slate'}`}>{s.icon}</span>
+                  <span className="wkspace-toc__label">{s.title}</span>
                 </button>
               </span>
             );
@@ -125,16 +125,16 @@ export default function AdminWorkspace({ draftState, onNavigate }) {
         </div>
       </nav>
 
-      <div className="ws-content">
-        <div className="ws-group">
-          <span className="ws-group__label">Organisation</span>
-          <span className="ws-group__rule" aria-hidden="true" />
+      <div className="wkspace-content">
+        <div className="wkspace-group">
+          <span className="wkspace-group__label">Organisation</span>
+          <span className="wkspace-group__rule" aria-hidden="true" />
         </div>
         <AdminOrg embedded onNavigate={onNavigate} />
 
-        <div className="ws-group">
-          <span className="ws-group__label">App settings</span>
-          <span className="ws-group__rule" aria-hidden="true" />
+        <div className="wkspace-group">
+          <span className="wkspace-group__label">App settings</span>
+          <span className="wkspace-group__rule" aria-hidden="true" />
         </div>
         <AdminSettings embedded draftState={draftState} onNavigate={onNavigate} />
       </div>

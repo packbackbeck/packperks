@@ -605,3 +605,53 @@
   color: #6C6259;
   font-weight: 600;
 }
+
+/* ── Quick print (unfoldable round buttons) ── */
+.acq-quick__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.acq-quick__chevron { color: #8A8175; transition: transform 0.2s ease; }
+.acq-quick__chevron--open { transform: rotate(180deg); }
+
+.acq-quick__body { margin-top: 12px; }
+.acq-quick__row {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.acq-quick__btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1.5px solid #E2DAC9;
+  background: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1D1D1D;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.08s;
+}
+.acq-quick__btn:hover:not(:disabled) { background: #FD6F46; border-color: #FD6F46; color: #fff; }
+.acq-quick__btn:active:not(:disabled) { transform: scale(0.94); }
+.acq-quick__btn:disabled { opacity: 0.5; cursor: default; }
+.acq-quick__spin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  border-top-color: #FD6F46;
+  border-radius: 50%;
+  animation: acq-quick-spin 0.7s linear infinite;
+}
+@keyframes acq-quick-spin { to { transform: rotate(360deg); } }

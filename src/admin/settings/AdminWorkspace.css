@@ -1,25 +1,26 @@
-.ws-page {
-  padding: 28px 32px 64px;
-  max-width: 1100px;
+.wkspace-page {
+  padding: 24px 32px 64px;
+  max-width: 1040px;
   margin: 0 auto;
+  min-width: 0;
 }
 
 /* ── Header ── */
-.ws-header { margin-bottom: 16px; }
-.ws-header__eyebrow {
+.wkspace-header { margin-bottom: 16px; }
+.wkspace-header__eyebrow {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #B26A00;
 }
-.ws-header__title {
+.wkspace-header__title {
   font-size: 24px;
   font-weight: 800;
   color: #1D1D1D;
   margin: 4px 0 6px;
 }
-.ws-header__sub {
+.wkspace-header__sub {
   font-size: 13px;
   color: #6C6259;
   margin: 0;
@@ -28,30 +29,26 @@
 }
 
 /* ── Sticky horizontal TOC ── */
-.ws-toc {
+.wkspace-toc {
   position: sticky;
   top: 0;
-  z-index: 20;
-  margin: 0 -32px 22px;
-  padding: 10px 32px;
-  background: rgba(252, 250, 246, 0.92);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  z-index: 30;
+  margin: 0 0 20px;
+  padding: 10px 0;
+  background: var(--bk-bg, #FBF7F0);
   border-bottom: 1px solid #EBE5DA;
 }
-.ws-toc__inner {
+.wkspace-toc__inner {
   display: flex;
   align-items: center;
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  max-width: 1100px;
-  margin: 0 auto;
 }
-.ws-toc__inner::-webkit-scrollbar { display: none; }
-.ws-toc__cell { display: inline-flex; align-items: center; gap: 6px; }
+.wkspace-toc__inner::-webkit-scrollbar { display: none; }
+.wkspace-toc__cell { display: inline-flex; align-items: center; gap: 6px; }
 
-.ws-toc__divider {
+.wkspace-toc__divider {
   width: 1px;
   height: 22px;
   background: #DED7C9;
@@ -59,7 +56,7 @@
   flex-shrink: 0;
 }
 
-.ws-toc__item {
+.wkspace-toc__item {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -75,15 +72,15 @@
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.ws-toc__item:hover { background: #F2ECE1; color: #2A2724; }
-.ws-toc__item--active {
+.wkspace-toc__item:hover { background: #F2ECE1; color: #2A2724; }
+.wkspace-toc__item--active {
   background: #fff;
   color: #1D1D1D;
   border-color: #E2DAC9;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.ws-toc__icon {
+.wkspace-toc__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -92,19 +89,66 @@
   border-radius: 7px;
   flex-shrink: 0;
 }
-.ws-toc__item--active .ws-toc__icon { color: #fff; }
-.ws-toc__icon--orange { background: rgba(232, 145, 12, 0.14); color: #B26A00; }
-.ws-toc__icon--purple { background: rgba(124, 58, 237, 0.13); color: #6D28D9; }
-.ws-toc__icon--cream  { background: rgba(180, 140, 40, 0.14); color: #8A6D1F; }
-.ws-toc__icon--slate  { background: rgba(71, 85, 105, 0.13); color: #475569; }
-.ws-toc__item--active .ws-toc__icon--orange { background: #E8910C; }
-.ws-toc__item--active .ws-toc__icon--purple { background: #7C3AED; }
-.ws-toc__item--active .ws-toc__icon--cream  { background: #B48C28; }
-.ws-toc__item--active .ws-toc__icon--slate  { background: #475569; }
+.wkspace-toc__item--active .wkspace-toc__icon { color: #fff; }
+.wkspace-toc__icon--orange { background: rgba(232, 145, 12, 0.14); color: #B26A00; }
+.wkspace-toc__icon--purple { background: rgba(124, 58, 237, 0.13); color: #6D28D9; }
+.wkspace-toc__icon--cream  { background: rgba(180, 140, 40, 0.14); color: #8A6D1F; }
+.wkspace-toc__icon--slate  { background: rgba(71, 85, 105, 0.13); color: #475569; }
+.wkspace-toc__item--active .wkspace-toc__icon--orange { background: #E8910C; }
+.wkspace-toc__item--active .wkspace-toc__icon--purple { background: #7C3AED; }
+.wkspace-toc__item--active .wkspace-toc__icon--cream  { background: #B48C28; }
+.wkspace-toc__item--active .wkspace-toc__icon--slate  { background: #475569; }
 
 /* ── Section anchors: clear the sticky topbar + TOC bar on jump ── */
-.ws-content [id^="s-"] { scroll-margin-top: 92px; }
-.ws-anchor { display: block; }
+.wkspace-content [id^="s-"] { scroll-margin-top: 84px; }
+.wkspace-anchor { display: block; }
 
-/* Embedded org sections sit flush; the workspace owns page padding. */
-.org-page--embedded { padding: 0; }
+/* ── One cohesive single column ───────────────────────────────────
+ * The two embedded pages (org + settings) are stacked here. Force a
+ * clean vertical stack and normalise their internal layout so neither
+ * page's own grid/min-height can break the merged view. */
+.wkspace-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wkspace-content > * { min-width: 0; width: 100%; }
+
+/* Embedded org sections: flush, vertical stack. */
+.org-page--embedded { padding: 0; gap: 14px; min-height: 0; }
+
+/* Embedded settings: drop its own padding/min-height and, crucially,
+ * collapse its 2-column TOC+content grid to a single full-width column. */
+.wkspace-content .admin-settings--embedded { padding: 0; min-height: 0; }
+.wkspace-content .admin-settings--embedded .as-layout { display: block; }
+.wkspace-content .as-content { gap: 14px; }
+
+/* Unify the two card families to one look (consistent border + soft shadow). */
+.wkspace-content .org-card,
+.wkspace-content .as-card {
+  border: 1px solid #E7E1D4;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Group labels that orient the user between the two halves ── */
+.wkspace-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 2px 0;
+}
+.wkspace-group:not(:first-child) { margin-top: 16px; }
+.wkspace-group__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9A8F7E;
+  white-space: nowrap;
+}
+.wkspace-group__rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, #E7E1D4, transparent);
+}

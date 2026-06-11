@@ -43,13 +43,14 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="org-page"><Spinner label="Loading organisation…" /></div>;
-  if (error)   return <div className="org-page"><p className="org-err">{error}</p><QuickLinks currentPage="org" onNavigate={onNavigate} /></div>;
+  const pageCls = `org-page${embedded ? ' org-page--embedded' : ''}`;
+  if (loading) return <div className={pageCls}><Spinner label="Loading organisation…" /></div>;
+  if (error)   return <div className={pageCls}><p className="org-err">{error}</p>{!embedded && <QuickLinks currentPage="org" onNavigate={onNavigate} />}</div>;
   if (!bundle?.org) {
     return (
-      <div className="org-page">
+      <div className={pageCls}>
         <p className="org-err">No organisation linked to your account. Ask an owner to invite you.</p>
-        <QuickLinks currentPage="org" onNavigate={onNavigate} />
+        {!embedded && <QuickLinks currentPage="org" onNavigate={onNavigate} />}
       </div>
     );
   }
@@ -66,7 +67,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
         </header>
       )}
 
-      <div id="s-org-profile" className="ws-anchor">
+      <div id="s-org-profile" className="wkspace-anchor">
         <OrgInfoCard
           org={bundle.org}
           canEdit={canEditOrg}
@@ -74,7 +75,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
         />
       </div>
 
-      <div id="s-org-locations" className="ws-anchor">
+      <div id="s-org-locations" className="wkspace-anchor">
         <LocationsSection
           org={bundle.org}
           locations={bundle.locations}
@@ -83,7 +84,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
         />
       </div>
 
-      <div id="s-org-team" className="ws-anchor">
+      <div id="s-org-team" className="wkspace-anchor">
         <TeamSection
           org={bundle.org}
           team={bundle.team}
@@ -100,7 +101,7 @@ export default function AdminOrg({ onNavigate, embedded = false }) {
        * who-did-what trail sits alongside the team it describes. Owners
        * + admins see every event; lower roles see only their own
        * (RLS-enforced inside AdminActivityLog itself). */}
-      <div id="s-org-activity" className="ws-anchor">
+      <div id="s-org-activity" className="wkspace-anchor">
         <section className="org-card org-card--no-padding">
           <AdminActivityLog embedded />
         </section>

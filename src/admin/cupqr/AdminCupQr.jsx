@@ -66,6 +66,9 @@ export default function AdminCupQr({ onNavigate }) {
   const [printerIp, setPrinterIpState] = useState(getPrinterIp());
   const [printing, setPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState(null); // { ok, text } | null
+  // Quick print: one tap generates + prints a batch of N cups.
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickN, setQuickN] = useState(null); // the N currently generating/printing
   // Optional NV-graphics logo key codes (print logo by reference, no raster).
   const initialLogo = getLogoKeys();
   const [logoKey1, setLogoKey1] = useState(initialLogo ? String(initialLogo.key1) : '');
@@ -238,6 +241,55 @@ export default function AdminCupQr({ onNavigate }) {
       setPrintStatus({ ok: false, text: err.message || 'Print failed.' });
     } finally {
       setPrinting(false);
+    }
+  }
+
+  /* Quick print: mint a fresh batch of `n` cups and send it straight to the
+   * Epson printer in one tap. Mirrors handleGenerate + handleEposPrint but
+   * uses the freshly minted batch directly (no waiting on async state). */
+  async function handleQuickPrint(n) {
+    if (quickN !== null) return;
+    setQuickN(n);
+    setError(null);
+    setPrintStatus(null);
+    try {
+      const res = await generateCups(n);
+      const orgSlug = res.slug || activeOrg?.slug || '';
+      const slugPath = orgSlug ? `${orgSlug}/` : '';
+      const url = `${PROD_URL}${slugPath}?batch=${res.batch_id}`;
+      const preset = EXPIRY_PRESETS.find(p => p.id === expiryId);
+      let expiresAt = null;
+      if (preset?.ms) {
+        expiresAt = new Date(Date.now() + preset.ms).toISOString();
+        try { await setBatchExpiry(res.batch_id, expiresAt); }
+        catch (e) { console.error('setBatchExpiry failed (continuing):', e); }
+      }
+      const newBatch = { batch_id: res.batch_id, cup_ids: res.cup_ids, url, generatedAt: new Date(), expires_at: expiresAt };
+      setBatch(newBatch);
+      setCount(n);
+      logAction({
+        action: 'cup_batch.generate',
+        targetType: 'cup_batch',
+        targetId: res.batch_id,
+        metadata: { count: res.count, expires_at: expiresAt, restaurant, quick_print: true },
+      });
+      refreshRecent();
+      await printCupReceipt({
+        url,
+        restaurant,
+        generatedAt: newBatch.generatedAt,
+        totalAmount: (n * 1.0).toFixed(2),
+        sessionId: res.batch_id.slice(0, 8).toUpperCase(),
+        cups: res.cup_ids?.length ?? n,
+      }, printerIp);
+      setPrintStatus({ ok: true, text: `Quick-printed ${n} cup${n !== 1 ? 's' : ''} to ${printerIp} ✓` });
+    } catch (err) {
+      console.error('quick print failed:', err);
+      const msg = err.message || 'Quick print failed.';
+      setError(msg);
+      setPrintStatus({ ok: false, text: msg });
+    } finally {
+      setQuickN(null);
     }
   }
 
@@ -520,6 +572,49 @@ export default function AdminCupQr({ onNavigate }) {
             </div>
 
             {error && <p className="acq-error">{error}</p>}
+          </div>
+
+          {/* Quick print — unfolds 5 round buttons; each one generates a fresh
+              batch of that many cups and prints it in a single tap. */}
+          <div className="acq-card acq-quick">
+            <button
+              type="button"
+              className="acq-quick__toggle"
+              onClick={() => setQuickOpen(o => !o)}
+              aria-expanded={quickOpen}
+            >
+              <span className="acq-card__title">Quick print</span>
+              <svg
+                className={`acq-quick__chevron${quickOpen ? ' acq-quick__chevron--open' : ''}`}
+                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {quickOpen && (
+              <div className="acq-quick__body">
+                <p className="acq-field__hint">
+                  One tap mints a fresh batch and prints it to {printerIp}.
+                </p>
+                <div className="acq-quick__row">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      className="acq-quick__btn"
+                      onClick={() => handleQuickPrint(n)}
+                      disabled={quickN !== null}
+                      aria-label={`Generate and print ${n} cup${n !== 1 ? 's' : ''}`}
+                      title={`Generate + print ${n} cup${n !== 1 ? 's' : ''}`}
+                    >
+                      {quickN === n ? <span className="acq-quick__spin" /> : n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {batch && (

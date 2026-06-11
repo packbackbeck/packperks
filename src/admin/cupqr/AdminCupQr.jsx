@@ -67,7 +67,6 @@ export default function AdminCupQr({ onNavigate }) {
   const [printing, setPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState(null); // { ok, text } | null
   // Quick print: one tap generates + prints a batch of N cups.
-  const [quickOpen, setQuickOpen] = useState(false);
   const [quickN, setQuickN] = useState(null); // the N currently generating/printing
   // Optional NV-graphics logo key codes (print logo by reference, no raster).
   const initialLogo = getLogoKeys();
@@ -450,6 +449,29 @@ export default function AdminCupQr({ onNavigate }) {
       {/* ── Left: generation controls ────────────────────────────────── */}
       <div className="acq-layout">
         <div className="acq-controls">
+          {/* Quick print — one tap mints a fresh batch of N cups and prints it. */}
+          <div className="acq-card acq-quick">
+            <h2 className="acq-card__title">Quick print</h2>
+            <p className="acq-field__hint">
+              One tap mints a fresh batch and prints it to {printerIp}.
+            </p>
+            <div className="acq-quick__row">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  className="acq-quick__btn"
+                  onClick={() => handleQuickPrint(n)}
+                  disabled={quickN !== null}
+                  aria-label={`Generate and print ${n} cup${n !== 1 ? 's' : ''}`}
+                  title={`Generate + print ${n} cup${n !== 1 ? 's' : ''}`}
+                >
+                  {quickN === n ? <span className="acq-quick__spin" /> : n}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="acq-card">
             <h2 className="acq-card__title">New batch</h2>
 
@@ -572,49 +594,6 @@ export default function AdminCupQr({ onNavigate }) {
             </div>
 
             {error && <p className="acq-error">{error}</p>}
-          </div>
-
-          {/* Quick print — unfolds 5 round buttons; each one generates a fresh
-              batch of that many cups and prints it in a single tap. */}
-          <div className="acq-card acq-quick">
-            <button
-              type="button"
-              className="acq-quick__toggle"
-              onClick={() => setQuickOpen(o => !o)}
-              aria-expanded={quickOpen}
-            >
-              <span className="acq-card__title">Quick print</span>
-              <svg
-                className={`acq-quick__chevron${quickOpen ? ' acq-quick__chevron--open' : ''}`}
-                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-
-            {quickOpen && (
-              <div className="acq-quick__body">
-                <p className="acq-field__hint">
-                  One tap mints a fresh batch and prints it to {printerIp}.
-                </p>
-                <div className="acq-quick__row">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      className="acq-quick__btn"
-                      onClick={() => handleQuickPrint(n)}
-                      disabled={quickN !== null}
-                      aria-label={`Generate and print ${n} cup${n !== 1 ? 's' : ''}`}
-                      title={`Generate + print ${n} cup${n !== 1 ? 's' : ''}`}
-                    >
-                      {quickN === n ? <span className="acq-quick__spin" /> : n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {batch && (

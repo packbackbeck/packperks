@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadRewardImage } from '../lib/adminApi';
+import { rewardImageStyle, DEFAULT_IMAGE_FRAMING } from '../../utils/imageTransform';
 import './RewardEditPanel.css';
 
 const AVAILABLE_TAGS = ['FREE', 'PLANT-BASED', 'NEW', 'LIMITED', 'POPULAR'];
@@ -85,12 +86,60 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
   const [savedFlash, setSavedFlash] = useState(false);
   const [newTag, setNewTag] = useState('');
 
+  /* ── Auto-save ───────────────────────────────────────────────────────
+   * The form is still an internal buffer (so typing doesn't thrash the
+   * parent list on every keystroke), but we now auto-commit it up to the
+   * draft so edits are never lost. The commit is debounced while the admin
+   * is actively typing, and flushed immediately whenever the buffer is about
+   * to disappear: switching to another reward, the panel unmounting, or the
+   * browser tab being hidden. Refs keep the flush closure from going stale. */
+  const formRef = useRef(form);
+  const dirtyRef = useRef(dirty);
+  const onChangeRef = useRef(onChange);
+  // Sync the refs after each commit (not during render) so the stable flush
+  // closure always sees the latest values. flush only ever runs post-commit
+  // (timeouts, listeners, effect cleanup), so the one-render lag is harmless.
+  useEffect(() => {
+    formRef.current = form;
+    dirtyRef.current = dirty;
+    onChangeRef.current = onChange;
+  });
+
+  const flush = useCallback(() => {
+    if (!dirtyRef.current) return;
+    onChangeRef.current(formRef.current);
+    dirtyRef.current = false;
+    setDirty(false);
+  }, []);
+
   useEffect(() => {
     setForm(reward);
     setActiveTab('setup');
     setDirty(false);
     setNewTag('');
-  }, [reward.id]);
+    // Leaving this reward (selection change or unmount): commit its pending
+    // edits first so nothing is dropped.
+    return () => { flush(); };
+  }, [reward.id, flush]);
+
+  // Debounced auto-commit while staying on the same reward.
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const t = setTimeout(flush, 600);
+    return () => clearTimeout(t);
+  }, [form, dirty, flush]);
+
+  // Commit the moment the tab is hidden / the page is being unloaded, so a
+  // tab switch or accidental close can't strand unsaved edits.
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [flush]);
 
   function update(field, value) {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -232,7 +281,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
       <div className="rep__header">
         <div className="rep__header-left">
           <div className="rep__thumb" style={{ background: form.bgColor || '#F8F4EC' }}>
-            {form.image && <img src={typeof form.image === 'string' ? form.image : ''} alt={form.name} />}
+            {form.image && <img src={typeof form.image === 'string' ? form.image : ''} alt={form.name} style={rewardImageStyle(form)} />}
           </div>
           <div>
             <div className="rep__reward-name">{form.name || 'Untitled Reward'}</div>
@@ -507,8 +556,59 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
             </div>
             {imageError && <span className="rep__image-err">{imageError}</span>}
             {form.image && typeof form.image === 'string' && form.image.length > 0 && (
-              <div className="rep__image-preview">
-                <img src={form.image} alt="preview" onError={e => e.target.style.display = 'none'} />
+              <div className="rep__image-adjust">
+                {/* Sliders on the left control how the picture sits inside its
+                    box; the square preview on the right is exactly what the
+                    customer app shows. Values persist on the reward. */}
+                <div className="rep__image-controls">
+                  <div className="rep__slider">
+                    <div className="rep__slider-head">
+                      <label className="rep__slider-label" htmlFor="img-size">Size</label>
+                      <span className="rep__slider-val">{Math.round((form.imageScale ?? 1) * 100)}%</span>
+                    </div>
+                    <input
+                      id="img-size"
+                      type="range" min="0.5" max="3" step="0.05"
+                      value={form.imageScale ?? 1}
+                      onChange={e => update('imageScale', parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div className="rep__slider">
+                    <div className="rep__slider-head">
+                      <label className="rep__slider-label" htmlFor="img-x">Move X</label>
+                      <span className="rep__slider-val">{form.imageX ?? 0}%</span>
+                    </div>
+                    <input
+                      id="img-x"
+                      type="range" min="-100" max="100" step="1"
+                      value={form.imageX ?? 0}
+                      onChange={e => update('imageX', parseInt(e.target.value, 10))}
+                    />
+                  </div>
+                  <div className="rep__slider">
+                    <div className="rep__slider-head">
+                      <label className="rep__slider-label" htmlFor="img-y">Move Y</label>
+                      <span className="rep__slider-val">{form.imageY ?? 0}%</span>
+                    </div>
+                    <input
+                      id="img-y"
+                      type="range" min="-100" max="100" step="1"
+                      value={form.imageY ?? 0}
+                      onChange={e => update('imageY', parseInt(e.target.value, 10))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="rep__image-reset"
+                    onClick={() => { setForm(prev => ({ ...prev, ...DEFAULT_IMAGE_FRAMING })); setDirty(true); }}
+                    disabled={(form.imageScale ?? 1) === 1 && (form.imageX ?? 0) === 0 && (form.imageY ?? 0) === 0}
+                  >
+                    Reset framing
+                  </button>
+                </div>
+                <div className="rep__image-preview" style={{ background: form.bgColor || '#F8F4EC' }}>
+                  <img src={form.image} alt="preview" style={rewardImageStyle(form)} onError={e => e.target.style.display = 'none'} />
+                </div>
               </div>
             )}
           </div>

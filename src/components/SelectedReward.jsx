@@ -1,4 +1,5 @@
 import './SelectedReward.css';
+import { rewardImageStyle } from '../utils/imageTransform';
 
 export default function SelectedReward({ reward, isUnlocked, claimed }) {
   return (
@@ -15,6 +16,7 @@ export default function SelectedReward({ reward, isUnlocked, claimed }) {
           src={reward.image}
           alt={reward.name}
           className="selected-reward__image"
+          style={rewardImageStyle(reward)}
           loading="eager"
         />
         {isUnlocked && (

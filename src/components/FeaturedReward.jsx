@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './FeaturedReward.css';
 import zigzagImg from '../assets/images/zigzag.svg';
 import cashbackIcon from '../assets/images/cashback-icon.png';
+import { rewardImageStyle } from '../utils/imageTransform';
 
 export default function FeaturedReward({
   reward,
@@ -90,6 +91,7 @@ export default function FeaturedReward({
                   ? ' featured-reward__image--uploaded'
                   : '')
               }
+              style={rewardImageStyle(reward)}
             />
           </div>
           <div className="featured-reward__info">

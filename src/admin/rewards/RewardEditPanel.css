@@ -254,11 +254,102 @@
   flex-shrink: 0;
 }
 
-/* Image preview */
-.rep__image-preview {
-  margin-top: 10px;
+/* Image framing: sliders on the left, square live preview on the right */
+.rep__image-adjust {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: stretch;
+}
+.rep__image-controls {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 13px;
+}
+.rep__slider {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rep__slider-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.rep__slider-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #4A443D;
+}
+.rep__slider-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8C8276;
+  font-variant-numeric: tabular-nums;
+}
+.rep__slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  height: 100px;
+  height: 4px;
+  border-radius: 3px;
+  background: #E8E6E1;
+  outline: none;
+  cursor: pointer;
+  accent-color: #FD6F46;
+}
+.rep__slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FD6F46;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+.rep__slider input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FD6F46;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+.rep__image-reset {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #6C6259;
+  background: #FFFFFF;
+  border: 1px solid #E8E6E1;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rep__image-reset:hover:not(:disabled) {
+  border-color: #FD6F46;
+  color: #FD6F46;
+}
+.rep__image-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Square preview — shows the exact framing the customer app will render */
+.rep__image-preview {
+  flex: 0 0 auto;
+  width: 150px;
+  height: 150px;
   border-radius: 10px;
   overflow: hidden;
   background: #F8F4EC;

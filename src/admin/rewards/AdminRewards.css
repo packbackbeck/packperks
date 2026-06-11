@@ -269,6 +269,96 @@
   color: #FFC52F;
 }
 
+/* ── Drag-to-reorder ── */
+.rew-card-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.rew-card-wrap .rew-card {
+  flex: 1;
+  min-width: 0;
+}
+/* In reorder mode the whole row is a drag handle: the inner button stops
+   intercepting pointer events so dragging is smooth and clicks don't fire. */
+.rew-card-wrap--reorder {
+  cursor: grab;
+}
+.rew-card-wrap--reorder:active {
+  cursor: grabbing;
+}
+.rew-card-wrap--reorder .rew-card {
+  pointer-events: none;
+}
+.rew-card-wrap--dragging {
+  opacity: 0.45;
+}
+/* Insertion indicator on the drop target. */
+.rew-card-wrap--dragover .rew-card {
+  border-color: #FD6F46;
+  box-shadow: 0 0 0 2px rgba(253,111,70,0.18);
+}
+.rew-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  flex-shrink: 0;
+  color: #B6ADA2;
+}
+.rew-card-wrap--reorder:hover .rew-grip {
+  color: #FD6F46;
+}
+
+/* Rearrange toggle button (in the list controls) */
+.rew-reorder-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4A443D;
+  background: #FFFFFF;
+  border: 1.5px solid #E8E6E1;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rew-reorder-toggle:hover {
+  border-color: #D5D1CB;
+  background: #FBFAF8;
+}
+.rew-reorder-toggle--active {
+  color: #FFFFFF;
+  background: #FD6F46;
+  border-color: #FD6F46;
+}
+.rew-reorder-toggle--active:hover {
+  background: #ED5F38;
+  border-color: #ED5F38;
+}
+
+.rew-list__reorder-hint {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: #8C8276;
+  margin: -2px 0 6px;
+  padding: 0 2px;
+}
+.rew-list__reorder-hint--active {
+  color: #C2531F;
+  background: #FFF4EF;
+  border: 1px solid #FBD9CB;
+  border-radius: 7px;
+  padding: 7px 9px;
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
 .rew-list__empty {
   padding: 24px 0;
   text-align: center;

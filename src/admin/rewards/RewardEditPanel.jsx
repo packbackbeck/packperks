@@ -64,26 +64,16 @@ function fromLocalDatetimeValue(local) {
 }
 
 export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArchive, cashbackRate = 1.25 }) {
-  /* Edit-buffer pattern: the form holds its own internal draft and
-   * does NOT propagate every keystroke up to the parent. That fixes
-   * two bugs the previous live-save version had:
-   *
-   *   1. Every keystroke triggered an `updateDraft` in the parent,
-   *      which re-sorted the rewards list, which re-rendered the
-   *      whole edit panel — losing the user's scroll position + tab
-   *      state, and on some flows snapping them back to the first
-   *      reward in the list.
-   *   2. There was no way to bail out of an edit. Once you typed, it
-   *      was saved.
-   *
-   * The form now stays internal. `dirty` tracks whether anything has
-   * been changed since the last commit, and Save / Reset commit or
-   * discard the in-flight changes. The parent's `onChange` is called
-   * exactly once per Save click. */
+  /* Edit-buffer pattern: the form holds its own internal draft so a
+   * keystroke doesn't push an update to the parent on every character
+   * (which would re-sort the list and thrash this panel). Instead the
+   * buffer is auto-committed to the parent draft on a short debounce and
+   * flushed on reward switch / tab hide / unmount (see the auto-save block
+   * below). `dirty` tracks whether the buffer is ahead of the last commit.
+   * There is no manual Save button — everything saves automatically. */
   const [form, setForm] = useState(reward);
   const [activeTab, setActiveTab] = useState('setup');
   const [dirty, setDirty] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
   const [newTag, setNewTag] = useState('');
 
   /* ── Auto-save ───────────────────────────────────────────────────────
@@ -224,18 +214,6 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
     setDirty(true);
   }
 
-  function handleSave() {
-    onChange(form);
-    setDirty(false);
-    setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 1600);
-  }
-
-  function handleReset() {
-    setForm(reward);
-    setDirty(false);
-  }
-
   /* Image upload from the user's device. Uploads to the public
    * reward-images bucket and writes the resulting public URL into
    * the form's `image` field. Loading state lives inline rather than
@@ -315,39 +293,18 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
         </div>
       </div>
 
-      {/* Save bar — explicit commit replaces the previous live-save
-       *  behaviour. Sits between the header and the tab strip so
-       *  pending changes get a constant reminder. When clean it
-       *  collapses to a calm "Saved" or "Up to date" line. */}
-      <div className={`rep__save-bar${dirty ? ' rep__save-bar--dirty' : ''}`}>
-        {dirty ? (
-          <>
-            <span className="rep__save-bar__msg">
-              <span className="rep__save-bar__dot" />
-              You have unsaved changes
-            </span>
-            <div className="rep__save-bar__actions">
-              <button
-                type="button"
-                className="rep__btn rep__btn--ghost rep__save-bar__discard"
-                onClick={handleReset}
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                className="rep__btn rep__btn--primary"
-                onClick={handleSave}
-              >
-                Save changes
-              </button>
-            </div>
-          </>
-        ) : (
-          <span className="rep__save-bar__msg rep__save-bar__msg--clean">
-            {savedFlash ? '✓ Saved — remember to hit Publish to push live.' : 'No unsaved changes.'}
-          </span>
-        )}
+      {/* Auto-save status. Every edit is committed to the draft on its own
+       *  (debounced, and flushed on tab switch / unmount), so there is no
+       *  manual Save button. This just shows the live state and reminds the
+       *  admin that going live still needs Publish. */}
+      <div className={`rep__save-bar${dirty ? ' rep__save-bar--saving' : ''}`}>
+        <span className="rep__save-bar__msg rep__save-bar__msg--clean">
+          {dirty ? (
+            <><span className="rep__save-bar__dot" /> Saving…</>
+          ) : (
+            '✓ All changes saved. Hit Publish to push them live.'
+          )}
+        </span>
       </div>
 
       {/* P-44: tab strip — sits between the header and the body so
@@ -433,7 +390,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
             )}
             {form.expiresAt && new Date(form.expiresAt) < new Date() && form.status !== 'expired' && form.status !== 'archived' && (
               <p className="rep__schedule-hint rep__schedule-hint--warn">
-                This reward's expiry date has passed. Save changes to auto-flip it to <strong>Expired</strong>.
+                This reward's expiry date has passed. It will auto-flip to <strong>Expired</strong>.
               </p>
             )}
           </div>
@@ -597,11 +554,23 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
                       onChange={e => update('imageY', parseInt(e.target.value, 10))}
                     />
                   </div>
+                  <div className="rep__slider">
+                    <div className="rep__slider-head">
+                      <label className="rep__slider-label" htmlFor="img-rotate">Rotate</label>
+                      <span className="rep__slider-val">{form.imageRotate ?? 0}°</span>
+                    </div>
+                    <input
+                      id="img-rotate"
+                      type="range" min="-180" max="180" step="1"
+                      value={form.imageRotate ?? 0}
+                      onChange={e => update('imageRotate', parseInt(e.target.value, 10))}
+                    />
+                  </div>
                   <button
                     type="button"
                     className="rep__image-reset"
                     onClick={() => { setForm(prev => ({ ...prev, ...DEFAULT_IMAGE_FRAMING })); setDirty(true); }}
-                    disabled={(form.imageScale ?? 1) === 1 && (form.imageX ?? 0) === 0 && (form.imageY ?? 0) === 0}
+                    disabled={(form.imageScale ?? 1) === 1 && (form.imageX ?? 0) === 0 && (form.imageY ?? 0) === 0 && (form.imageRotate ?? 0) === 0}
                   >
                     Reset framing
                   </button>

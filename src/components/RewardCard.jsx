@@ -1,5 +1,6 @@
 import './RewardCard.css';
 import cupIconWhite from '../assets/images/cup-icon-white.svg';
+import { rewardImageStyle } from '../utils/imageTransform';
 
 export default function RewardCard({ reward, cupCount, onSelect, onViewDetail }) {
   const isUnlocked = cupCount >= reward.cupsNeeded;
@@ -40,6 +41,7 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
                 ? ' reward-card__image--uploaded'
                 : '')
             }
+            style={rewardImageStyle(reward)}
             loading="lazy"
           />
         </div>

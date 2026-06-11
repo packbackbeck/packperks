@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { bootstrapAdmin, signOut } from './authApi';
 
@@ -27,19 +27,33 @@ export function AuthProvider({ children }) {
   const [status, setStatus]   = useState('loading');
   const [error, setError]     = useState(null);
 
+  // Tracks the user id behind the current session so we can tell a genuine
+  // account change (sign-in/out, switch user) apart from a token refresh.
+  const lastUserIdRef = useRef(null);
+
   // Track the initial session + listen for future auth events.
   useEffect(() => {
     let cancelled = false;
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
+      lastUserIdRef.current = data.session?.user?.id ?? null;
       setSession(data.session ?? null);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+      const nextUserId = sess?.user?.id ?? null;
       setSession(sess ?? null);
-      // Any session change invalidates the cached profile.
-      setProfile(null);
+      // Only invalidate the cached profile when the actual signed-in user
+      // changes (sign-out, or a different account signs in). Supabase fires
+      // TOKEN_REFRESHED every time the browser tab regains focus; that keeps
+      // the same user, so clearing the profile there would flip status to
+      // 'loading', unmount the whole admin tree, and wipe any unpublished
+      // in-progress edits. Keeping the profile avoids that churn entirely.
+      if (nextUserId !== lastUserIdRef.current) {
+        lastUserIdRef.current = nextUserId;
+        setProfile(null);
+      }
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
   }, []);

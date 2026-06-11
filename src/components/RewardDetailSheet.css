@@ -58,6 +58,7 @@
   height: 220px;
   background: var(--bk-orange);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .rds-image {

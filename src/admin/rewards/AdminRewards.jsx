@@ -16,32 +16,61 @@ const STATUS_COLORS = {
   hidden:    { bg: 'rgba(253,111,70,0.12)',  text: '#C84A26' },
 };
 
-function RewardListCard({ reward, isSelected, onSelect, claimCount }) {
+function RewardListCard({
+  reward, isSelected, onSelect, claimCount,
+  reorderMode = false, isDragging = false, isDragOver = false,
+  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+}) {
   const sc = STATUS_COLORS[reward.status] || STATUS_COLORS.draft;
   return (
-    <button
-      className={`rew-card ${isSelected ? 'rew-card--active' : ''} ${reward.status === 'hidden' ? 'rew-card--hidden' : ''}`}
-      onClick={onSelect}
+    <div
+      className={
+        'rew-card-wrap' +
+        (reorderMode ? ' rew-card-wrap--reorder' : '') +
+        (isDragging ? ' rew-card-wrap--dragging' : '') +
+        (isDragOver ? ' rew-card-wrap--dragover' : '')
+      }
+      draggable={reorderMode}
+      onDragStart={reorderMode ? onDragStart : undefined}
+      onDragOver={reorderMode ? onDragOver : undefined}
+      onDragLeave={reorderMode ? onDragLeave : undefined}
+      onDrop={reorderMode ? onDrop : undefined}
+      onDragEnd={reorderMode ? onDragEnd : undefined}
     >
-      <div className="rew-card__thumb" style={{ background: reward.bgColor || '#F8F4EC' }}>
-        {reward.image && <img src={typeof reward.image === 'string' ? reward.image : ''} alt={reward.name} />}
-      </div>
-      <div className="rew-card__body">
-        <div className="rew-card__name">{reward.name}</div>
-        <div className="rew-card__meta">
-          <span>€{reward.euros?.toFixed(2)}</span>
-          <span>·</span>
-          <span>{reward.cupsNeeded} cups</span>
-          {claimCount > 0 && <><span>·</span><span className="rew-card__claims">{claimCount} claims</span></>}
+      {reorderMode && (
+        <div className="rew-grip" aria-hidden="true" title="Drag to reorder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>
+            <circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>
+            <circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/>
+          </svg>
         </div>
-      </div>
-      <div className="rew-card__right">
-        <span className="rew-card__status" style={{ background: sc.bg, color: sc.text }}>
-          {reward.status}
-        </span>
-        {reward.featured && <span className="rew-card__featured" title="Featured">★</span>}
-      </div>
-    </button>
+      )}
+      <button
+        className={`rew-card ${isSelected ? 'rew-card--active' : ''} ${reward.status === 'hidden' ? 'rew-card--hidden' : ''}`}
+        onClick={onSelect}
+        tabIndex={reorderMode ? -1 : undefined}
+      >
+        <div className="rew-card__thumb" style={{ background: reward.bgColor || '#F8F4EC' }}>
+          {reward.image && <img src={typeof reward.image === 'string' ? reward.image : ''} alt={reward.name} />}
+        </div>
+        <div className="rew-card__body">
+          <div className="rew-card__name">{reward.name}</div>
+          <div className="rew-card__meta">
+            <span>€{reward.euros?.toFixed(2)}</span>
+            <span>·</span>
+            <span>{reward.cupsNeeded} cups</span>
+            {claimCount > 0 && <><span>·</span><span className="rew-card__claims">{claimCount} claims</span></>}
+          </div>
+        </div>
+        <div className="rew-card__right">
+          <span className="rew-card__status" style={{ background: sc.bg, color: sc.text }}>
+            {reward.status}
+          </span>
+          {reward.featured && <span className="rew-card__featured" title="Featured">★</span>}
+        </div>
+      </button>
+    </div>
   );
 }
 
@@ -81,6 +110,12 @@ export default function AdminRewards({ draftState, onNavigate }) {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('order');
   const [filterStatus, setFilterStatus] = useState('all');
+  // Drag-to-reorder mode: a deliberate toggle so normal clicks still select a
+  // reward to edit. dragId = the card being dragged, dragOverId = the card it
+  // is currently hovering over (the drop target).
+  const [reorderMode, setReorderMode] = useState(false);
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
   const fileInputRef = useRef(null);
 
   const selectedReward = rewards.find(r => r.id === selectedId) || null;
@@ -155,6 +190,71 @@ export default function AdminRewards({ draftState, onNavigate }) {
       ...prev,
       rewards: prev.rewards.map(r => r.id === updatedReward.id ? updatedReward : r),
     }));
+  }
+
+  // Move a reward to another reward's slot in the catalog order (drag → drop).
+  // We reorder the actual rewards array AND renormalise every reward's `order`
+  // to a contiguous 0..n-1 sequence, because the two must never drift: the
+  // admin list sorts by `order`, but the customer app renders rewards in array
+  // order. Reordering both keeps every view consistent (and is resilient to
+  // pre-existing gaps or duplicate order values). Persisted through the same
+  // draft flow as every other edit — and auto-saved — so it survives reloads
+  // and goes live for customers when the admin publishes.
+  function moveReward(fromId, toId) {
+    if (!fromId || !toId || fromId === toId) return;
+    updateDraft(prev => {
+      const ordered = [...prev.rewards].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const from = ordered.findIndex(r => r.id === fromId);
+      const to = ordered.findIndex(r => r.id === toId);
+      if (from < 0 || to < 0 || from === to) return prev;
+      const [moved] = ordered.splice(from, 1);
+      ordered.splice(to, 0, moved);
+      return { ...prev, rewards: ordered.map((r, i) => ({ ...r, order: i })) };
+    });
+  }
+
+  // Entering reorder mode forces the list into its true saved order with no
+  // search/filter, so dragging is unambiguous. Exiting just clears the mode.
+  function enterReorderMode() {
+    setSearch('');
+    setFilterStatus('all');
+    setSortBy('order');
+    setReorderMode(true);
+  }
+  function exitReorderMode() {
+    setReorderMode(false);
+    setDragId(null);
+    setDragOverId(null);
+  }
+
+  function handleDragStart(e, id) {
+    setDragId(id);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', id); } catch { /* some browsers */ }
+    }
+  }
+  function handleDragOver(e, overId) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (overId !== dragOverId) setDragOverId(overId);
+  }
+  function handleDragLeave(overId) {
+    setDragOverId(prev => (prev === overId ? null : prev));
+  }
+  function handleDrop(e, targetId) {
+    e.preventDefault();
+    let sourceId = dragId;
+    if (!sourceId && e.dataTransfer) {
+      try { sourceId = e.dataTransfer.getData('text/plain'); } catch { sourceId = null; }
+    }
+    moveReward(sourceId, targetId);
+    setDragId(null);
+    setDragOverId(null);
+  }
+  function handleDragEnd() {
+    setDragId(null);
+    setDragOverId(null);
   }
 
   function handleSetFeatured(rewardId) {
@@ -372,10 +472,11 @@ export default function AdminRewards({ draftState, onNavigate }) {
                 placeholder="Search rewards…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                disabled={reorderMode}
               />
             </div>
             <div className="rew-list__filter-row">
-              <select className="rew-list__select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <select className="rew-list__select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} disabled={reorderMode}>
                 <option value="all">All status</option>
                 <option value="draft">Draft</option>
                 <option value="scheduled">Scheduled</option>
@@ -384,19 +485,47 @@ export default function AdminRewards({ draftState, onNavigate }) {
                 <option value="expired">Expired</option>
                 <option value="archived">Archived</option>
               </select>
-              <select className="rew-list__select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              <select className="rew-list__select" value={sortBy} onChange={e => setSortBy(e.target.value)} disabled={reorderMode}>
                 <option value="order">Default order</option>
                 <option value="name">Name A–Z</option>
                 <option value="price">Price ↓</option>
                 <option value="popularity">Most claimed</option>
               </select>
             </div>
+            {rewards.length > 1 && (
+              <button
+                type="button"
+                className={'rew-reorder-toggle' + (reorderMode ? ' rew-reorder-toggle--active' : '')}
+                onClick={reorderMode ? exitReorderMode : enterReorderMode}
+              >
+                {reorderMode ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Done reordering
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 6 12 2 16 6"/><polyline points="8 18 12 22 16 18"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+                    Rearrange order
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="rew-list__inner">
             <div className="rew-list__label">
               CATALOG ({displayRewards.length}/{rewards.length})
             </div>
+            {reorderMode ? (
+              <div className="rew-list__reorder-hint rew-list__reorder-hint--active">
+                Drag the products into the order you want. Changes auto-save; Publish to push them live.
+              </div>
+            ) : rewards.length > 1 ? (
+              <div className="rew-list__reorder-hint">
+                Tip: press “Rearrange order” to drag products into the order customers see.
+              </div>
+            ) : null}
             {displayRewards.map(reward => (
               <RewardListCard
                 key={reward.id}
@@ -404,6 +533,14 @@ export default function AdminRewards({ draftState, onNavigate }) {
                 isSelected={reward.id === selectedId}
                 onSelect={() => setSelectedId(reward.id)}
                 claimCount={claimCounts[reward.id] || 0}
+                reorderMode={reorderMode}
+                isDragging={dragId === reward.id}
+                isDragOver={dragOverId === reward.id && dragId !== reward.id}
+                onDragStart={(e) => handleDragStart(e, reward.id)}
+                onDragOver={(e) => handleDragOver(e, reward.id)}
+                onDragLeave={() => handleDragLeave(reward.id)}
+                onDrop={(e) => handleDrop(e, reward.id)}
+                onDragEnd={handleDragEnd}
               />
             ))}
             {displayRewards.length === 0 && (

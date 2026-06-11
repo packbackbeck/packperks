@@ -1,4 +1,5 @@
 import './RewardDetailSheet.css';
+import { rewardImageStyle } from '../utils/imageTransform';
 
 const CupIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -59,6 +60,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                 ? ' rds-image--uploaded'
                 : '')
             }
+            style={rewardImageStyle(reward)}
           />
         </div>
 

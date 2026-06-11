@@ -187,30 +187,51 @@ export function useAdminDraft() {
     getAppConfig(activeOrgId).then(config => {
       if (cancelled) return;
       const hasPublished = config && (Array.isArray(config.rewards) || config.settings);
+
+      // The org's last working copy from THIS browser. We resume it only when
+      // it carries genuinely unpublished edits (_dirty). That is what lets a
+      // tab switch, reload, or org switch pick up in-progress work instead of
+      // snapping back to the last published snapshot. It is keyed per org and
+      // the legacy cross-tenant copy path is gone, so preferring it is safe.
+      const local = loadFromStorage(draftKey(activeOrgId), null);
+      const localHasUnpublishedEdits =
+        !!local && local._dirty === true && Array.isArray(local.rewards);
+
+      // Strip persistence-only keys (_savedAt/_dirty) and normalise shape.
+      const cleanDraft = (src) => ({
+        rewards: Array.isArray(src?.rewards)
+          ? src.rewards.map((r, i) => ({ ...r, order: r.order ?? i }))
+          : [],
+        settings: { ...DEFAULT_SETTINGS, ...(src?.settings || {}) },
+        dashboardBlocks: Array.isArray(src?.dashboardBlocks)
+          ? src.dashboardBlocks.map(b => ({ ...b }))
+          : DEFAULT_DASHBOARD_BLOCKS.map(b => ({ ...b })),
+      });
+
       if (hasPublished) {
-        const next = {
-          rewards: Array.isArray(config.rewards)
-            ? config.rewards.map((r, i) => ({ ...r, order: r.order ?? i }))
-            : [],
-          settings: { ...DEFAULT_SETTINGS, ...(config.settings || {}) },
-          dashboardBlocks: DEFAULT_DASHBOARD_BLOCKS.map(b => ({ ...b })),
-        };
-        setDraft(next);
-        setPublished({ ...next, _publishedAt: Date.now() });
-        // Overwrite the local working copy with the published truth so a
-        // stale draft can never resurface on the next load.
-        try {
-          localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: Date.now() }));
-        } catch { /* quota / private-mode — fine, state is already set */ }
+        const serverDraft = cleanDraft(config);
+        // Server stays the source of truth for the PUBLISHED baseline...
+        setPublished({ ...serverDraft, _publishedAt: Date.now() });
+        if (localHasUnpublishedEdits) {
+          // ...but the working draft resumes the in-progress local edits so
+          // they survive remounts / reloads until published or discarded.
+          setDraft(cleanDraft(local));
+        } else {
+          setDraft(serverDraft);
+          // Overwrite the local working copy with the published truth so a
+          // stale draft can never resurface, and mark it clean.
+          try {
+            localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...serverDraft, _savedAt: Date.now(), _dirty: false }));
+          } catch { /* quota / private-mode — fine, state is already set */ }
+        }
       } else {
         // Brand-new org with nothing published yet — use any local
         // in-progress draft (wizard), else an empty draft.
-        const local = loadFromStorage(draftKey(activeOrgId), null);
-        setDraft(local || buildEmptyDraft());
+        setDraft(local ? cleanDraft(local) : buildEmptyDraft());
       }
       setVersions(loadFromStorage(versionsKey(activeOrgId), []));
-      setIsDirty(false);
-      setLastSaved(null);
+      setIsDirty(localHasUnpublishedEdits);
+      setLastSaved(localHasUnpublishedEdits && local?._savedAt ? local._savedAt : null);
       setPublishNote('');
       setPublishError(null);
       hydratedForOrgRef.current = activeOrgId;
@@ -232,7 +253,10 @@ export function useAdminDraft() {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
       const ts = Date.now();
       try {
-        localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: ts }));
+        // _dirty marks the local copy as carrying unpublished edits so the
+        // hydration effect resumes it (instead of the server snapshot) after
+        // a reload / tab switch.
+        localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: ts, _dirty: true }));
       } catch {
         /* quota / private-mode failure — fall through, state still updates */
       }
@@ -244,7 +268,9 @@ export function useAdminDraft() {
 
   const saveDraft = useCallback(() => {
     const ts = Date.now();
-    const toSave = { ...draft, _savedAt: ts };
+    // An explicit save of the working copy — still unpublished, so it stays
+    // _dirty and will be resumed on the next load.
+    const toSave = { ...draft, _savedAt: ts, _dirty: true };
     localStorage.setItem(draftKey(activeOrgId), JSON.stringify(toSave));
     setIsDirty(false);
     setLastSaved(ts);
@@ -271,7 +297,9 @@ export function useAdminDraft() {
 
     localStorage.setItem(versionsKey(activeOrgId), JSON.stringify(newVersions));
     localStorage.setItem(publishedKey(activeOrgId), JSON.stringify(newPublished));
-    localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...draft, _savedAt: ts }));
+    // Published == draft now, so the local copy is clean: a later reload
+    // should hydrate from the server snapshot, not resume this as a draft.
+    localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...draft, _savedAt: ts, _dirty: false }));
 
     // Push to Supabase — pass orgId so each org has its own
     // `published:<orgId>` row in app_config.
@@ -307,7 +335,9 @@ export function useAdminDraft() {
     setDraft(prev => {
       const newSettings = { ...prev.settings, [key]: !prev.settings[key] };
       const next = { ...prev, settings: newSettings };
-      localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: Date.now() }));
+      // Toggling a feature pushes the whole current draft to the server below,
+      // so the local copy matches the server afterwards → clean.
+      localStorage.setItem(draftKey(activeOrgId), JSON.stringify({ ...next, _savedAt: Date.now(), _dirty: false }));
       saveAppConfig({ rewards: next.rewards, settings: newSettings }, activeOrgId).catch(err => {
         console.error('toggleFeature failed:', err);
         setPublishError(err?.message || 'Could not save feature toggle to Supabase.');

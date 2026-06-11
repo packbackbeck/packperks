@@ -72,45 +72,55 @@
 }
 
 /* ── Chips row ── */
-.reward-card__chips {
+/* Tags and price are deliberately separate blocks, stacked under the name. */
+.reward-card__meta {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--sp-2);
-  flex-wrap: wrap;
 }
 
-.reward-card__chip {
+.reward-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* Single product tag — light-grey fill, dark-grey label, its own 11px size. */
+.reward-card__tag {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px 8px;
-  border-radius: 20px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  /* background + text colour are set inline per product (reward.bgColor)
+     with a contrast-aware label; these are fallbacks only. */
+  background: #E9E9E9;
+  color: #3C3C3C;
   font-family: var(--font-primary);
-  font-weight: var(--fw-regular);
-  font-size: 12px;
-  letter-spacing: 0.3px;
+  font-weight: var(--fw-bold);
+  font-size: 11px;
+  line-height: 1.1;
 }
 
-.reward-card__chip--free {
-  background: var(--bk-brown);
-  color: var(--white);
+.reward-card__price {
+  display: flex;
 }
 
-.reward-card__chip--cups {
-  background: #FFF3D6;
-  color: var(--bk-brown);
-  border: 1px solid #FEA01E;
-}
-
-/* Product tags — mirror the featured card's tag chips (shape, padding, font).
-   The featured card uses #2525254d over its dark background; on this white
-   card that translucent value renders too light, so we use the opaque
-   equivalent to keep the white label readable. */
-.reward-card__chip--tag {
+/* Price/value chip — mirrors the featured card's frosted cups chip
+   (featured-reward__tag--cups), inverted for this light background: a subtle
+   translucent-dark fill + hairline dark border + dark label. */
+.reward-card__price-chip {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  gap: 4px;
   padding: 5px 10px;
   border-radius: var(--radius-sm);
-  background: #252525;
-  color: var(--white);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  color: #2D2A26;
+  font-family: var(--font-primary);
+  font-weight: var(--fw-regular);
   font-size: var(--fs-xs);
   line-height: 1.1;
 }

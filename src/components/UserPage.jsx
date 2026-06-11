@@ -244,6 +244,7 @@ export default function UserPage({
   copy = {},
   onRefreshClaims,
   onClose,
+  onOpenHowItWorks,
 }) {
   // Refresh claim status when the user enters this page — admin approvals
   // that happened while the user wasn't looking get pulled in automatically.
@@ -451,6 +452,25 @@ export default function UserPage({
           <span className="user-page__value-label">in cashback</span>
         </div>
       </div>
+
+      {/* ── How it works ── opens the full-screen Stories-style guide ── */}
+      {onOpenHowItWorks && (
+        <button type="button" className="user-page__howto" onClick={onOpenHowItWorks}>
+          <span className="user-page__howto-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span className="user-page__howto-text">
+            <span className="user-page__howto-title">How does it work?</span>
+            <span className="user-page__howto-sub">A quick walkthrough of cups, rewards and cashback</span>
+          </span>
+          <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="9 6 15 12 9 18" />
+          </svg>
+        </button>
+      )}
 
       {/* ── Save-your-cups banner ── persistent reminder for users with
             ≥1 cup who haven't linked an email. Dismissible for 14 days. */}

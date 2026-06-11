@@ -22,6 +22,7 @@ import CupClaimErrorPage from './components/CupClaimErrorPage';
 import AppErrorScreen from './components/AppErrorScreen';
 import SignInSheet from './components/SignInSheet';
 import HomeSkeleton from './components/HomeSkeleton';
+import HowItWorks from './components/HowItWorks';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
 import { track, EVENTS, setAnalyticsContext } from './utils/analytics';
@@ -264,6 +265,10 @@ export default function App() {
 
   /* ── Modal state ── */
   const [termsOpen, setTermsOpen] = useState(false);
+  // "How it works" walkthrough. The intro button shows until the guide has
+  // been opened once (first-time users), then stays out of the way.
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [hiwSeen, setHiwSeen] = usePersistedState('hiw_seen', false);
   const [directRefundOpen, setDirectRefundOpen] = useState(false);
   const [refundIban, setRefundIban] = useState('');
   const [refundCupCount, setRefundCupCount] = useState(0);
@@ -1029,6 +1034,7 @@ export default function App() {
             }
           }}
           onClose={() => setPage('home')}
+          onOpenHowItWorks={() => setHowItWorksOpen(true)}
         />
         <SignInSheet
           open={showSignIn}
@@ -1119,6 +1125,7 @@ export default function App() {
             cupCount={cupCount}
           />
         )}
+        {howItWorksOpen && <HowItWorks onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
       </div>
     );
   }
@@ -1147,6 +1154,27 @@ export default function App() {
       <section className="app__hero">
         <h1 className="app__headline">{liveSettings.heroHeadline}</h1>
         <p className="app__subtext">{liveSettings.heroSubtext}</p>
+        {!hiwSeen && (
+          <button
+            type="button"
+            className="app__how-box"
+            onClick={() => setHowItWorksOpen(true)}
+          >
+            <span className="app__how-box-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            <span className="app__how-box-text">
+              <span className="app__how-box-title">How does it work?</span>
+              <span className="app__how-box-sub">See how cups turn into cashback</span>
+            </span>
+            <svg className="app__how-box-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          </button>
+        )}
       </section>
 
       <CupProgress
@@ -1193,9 +1221,10 @@ export default function App() {
           onBudgetBlocked={handleBudgetBlocked}
           onClose={() => setDetailReward(null)}
           orgName={activeOrg?.partner_brand_name || activeOrg?.name}
-          showCashbackStep={!!liveSettings?.featureDirectRefunds}
         />
       )}
+
+      {howItWorksOpen && <HowItWorks onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
 
       <BudgetPausedModal
         open={budgetPausedOpen}
@@ -1211,7 +1240,7 @@ export default function App() {
           <li>One reward can be claimed per cup cycle.</li>
           <li>Vouchers are valid for 30 days after claiming.</li>
           {liveSettings?.featureDirectRefunds && (
-            <li>Cashback is sent to your IBAN within 3 business days.</li>
+            <li>Cashback is sent to your IBAN within 1 to 2 business days.</li>
           )}
           <li>You can switch your reward goal at any time before claiming.</li>
         </ul>

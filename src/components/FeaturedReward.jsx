@@ -110,7 +110,7 @@ export default function FeaturedReward({
                 <span key={tag} className="featured-reward__tag">{tag}</span>
               ))}
               <span className="featured-reward__tag featured-reward__tag--cups">
-                €{Math.round(Number(cashbackAmount))} for
+                €{cashbackAmount} for
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
                   <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
@@ -137,7 +137,7 @@ export default function FeaturedReward({
             <h3 className="featured-reward__success-title">Reward claimed!</h3>
             <p className="featured-reward__success-desc">
               Your <strong>{reward.name}</strong> voucher is on its way.
-              Cashback will arrive within 3 business days.
+              Cashback will arrive within 1 to 2 business days.
             </p>
             <button className="featured-reward__success-btn" onClick={onResetClaim}>
               Claim another reward

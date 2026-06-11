@@ -1229,3 +1229,59 @@
   width: 100%;
   margin-top: 6px;
 }
+
+/* ── "How does it work?" row (opens the Stories guide) ── */
+.user-page__howto {
+  width: 330px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: var(--white);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-screen);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-primary);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.user-page__howto:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
+}
+.user-page__howto:active { transform: translateY(0); }
+
+.user-page__howto-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #FFF3E9;
+  color: var(--bk-orange, #FD6F46);
+}
+.user-page__howto-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.user-page__howto-title {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
+  color: var(--black);
+}
+.user-page__howto-sub {
+  font-size: 12.5px;
+  color: var(--text-light);
+  line-height: 1.35;
+}
+.user-page__howto-arrow {
+  flex-shrink: 0;
+  color: var(--text-light);
+}

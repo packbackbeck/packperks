@@ -34,6 +34,65 @@
   max-width: 280px;
 }
 
+/* "How does it work?" card — styled like the user-page value box (white,
+   rounded, soft shadow). Shown to every user until they open it once. */
+.app__how-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: var(--sp-3);
+  padding: 14px 16px;
+  background: var(--white, #FFFFFF);
+  border: none;
+  border-radius: var(--radius-lg, 18px);
+  box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-primary);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.app__how-box:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.1);
+}
+.app__how-box:active { transform: translateY(0); }
+.app__how-box-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #FFF3E9;
+  color: var(--bk-orange, #FD6F46);
+}
+.app__how-box-icon svg { width: 20px; height: 20px; }
+.app__how-box-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.app__how-box-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--black, #1A1A1A);
+}
+.app__how-box-sub {
+  font-size: 12.5px;
+  color: var(--text-light);
+  line-height: 1.35;
+}
+.app__how-box-arrow {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--text-light);
+}
+
 /* Info links row */
 .app__info-links {
   display: flex;

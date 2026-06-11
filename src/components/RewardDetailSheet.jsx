@@ -26,7 +26,7 @@ const InfoIcon = () => (
   </svg>
 );
 
-export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, showCashbackStep = true, budgetBlocked = false, onBudgetBlocked }) {
+export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked }) {
   if (!reward) return null;
 
   const isUnlocked = cupCount >= reward.cupsNeeded;
@@ -97,39 +97,32 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               <li className="rds-step">
                 <span className="rds-step__num">1</span>
                 <span className="rds-step__text">
-                  Return <strong>{reward.cupsNeeded} reusable cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> at {brand} to earn your cups balance.
+                  Collect <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> to unlock this reward by returning your reusable cups at {brand}.
                 </span>
               </li>
-              {showCashbackStep ? (
-                <>
-                  <li className="rds-step">
-                    <span className="rds-step__num">2</span>
-                    <span className="rds-step__text">
-                      Photograph the <strong>store receipt from buying your {reward.name}</strong>. This is the printed till receipt from the shop, not your cup-return ticket. You'll upload it when you claim. <em>Keep it; it can't be added later.</em>
-                    </span>
-                  </li>
-                  <li className="rds-step">
-                    <span className="rds-step__num">3</span>
-                    <span className="rds-step__text">
-                      Enter your IBAN and receive <strong>€{reward.euros?.toFixed(2)} cashback</strong> within 3 business days after verification.
-                    </span>
-                  </li>
-                </>
-              ) : (
-                <li className="rds-step">
-                  <span className="rds-step__num">2</span>
-                  <span className="rds-step__text">
-                    Show the unlocked reward screen at the {brand} counter to collect your <strong>{reward.name}</strong>.
-                  </span>
-                </li>
-              )}
+              <li className="rds-step">
+                <span className="rds-step__num">2</span>
+                <span className="rds-step__text">
+                  Buy your <strong>{reward.name}</strong> at any supermarket or grocery store in the Netherlands, and keep the printed receipt. <em>Keep it; it can't be added later.</em>
+                </span>
+              </li>
+              <li className="rds-step">
+                <span className="rds-step__num">3</span>
+                <span className="rds-step__text">
+                  Enter your IBAN and upload a <strong>photo of the receipt</strong> to verify your purchase.
+                </span>
+              </li>
+              <li className="rds-step">
+                <span className="rds-step__num">4</span>
+                <span className="rds-step__text">
+                  Once verified, you receive <strong>€{reward.euros?.toFixed(2)} cashback</strong> in your account within <strong>1 to 2 business days</strong>.
+                </span>
+              </li>
             </ol>
-            {showCashbackStep && (
-              <div className="rds-receipt-tip">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                Keep the printed store receipt that lists your item. It is required for cashback, and it is not the same as your cup-return ticket.
-              </div>
-            )}
+            <div className="rds-receipt-tip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              Keep the printed store receipt that lists your item. It is required for cashback, and it is not the same as your cup-return ticket.
+            </div>
           </div>
 
           {/* Nutrition table */}

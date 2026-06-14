@@ -8,13 +8,22 @@
 //      we're done — return it.
 //   2. Otherwise, decide what role to grant:
 //        a. If a pending admin_invitations row matches their email,
-//           consume it: role = invitation.role, org = invitation.org.
-//        b. Else if NO admin yet exists in the default org, this user
-//           becomes the founding 'owner' of Burger King Netherlands.
-//        c. Else default to 'checker' so unsolicited signups can't
+//           consume it for the ROLE (org is ignored — admins are global).
+//        b. Else if NO admin exists yet at all, this user becomes the
+//           founding 'owner'.
+//        c. Else if their email is on a trusted internal domain
+//           (TRUSTED_ADMIN_DOMAINS, e.g. @packback.network), grant 'admin'
+//           so staff can self-register with working access — no invite
+//           needed.
+//        d. Else default to 'checker' so unsolicited signups can't
 //           accidentally see private data; an owner can promote later.
-//   3. Insert the profile, write a `user.signup` audit log entry,
+//   3. Insert the profile with org_id = NULL (global: every admin sees
+//      and controls all orgs), write a `user.signup` audit log entry,
 //      record the first login in `admin_login_history`, and return.
+//
+// Admins are intentionally NOT tied to an org. org_id is left NULL so the
+// org-admin RLS policies ("... OR ap.org_id IS NULL") grant access to all
+// orgs' data.
 //
 // All writes use the service role since admin_profiles has RLS enabled.
 // The caller authenticates with their JWT (verify_jwt = true on this fn)
@@ -26,7 +35,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const DEFAULT_ORG_ID = "b06ed000-0000-4000-8000-000000000001"; // Burger King NL seed
+// Email domains whose users may self-register straight into a working
+// 'admin' role (no invitation required). Compared case-insensitively
+// against the part after the "@". Keep this list short and trusted —
+// every address on these domains gets full admin access on first login.
+const TRUSTED_ADMIN_DOMAINS = ["packback.network"];
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -44,6 +57,16 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { ...CORS_HEADERS, "content-type": "application/json" },
   });
+}
+
+// True when the email's domain is one we trust for self-service admin
+// registration. Defensive about malformed addresses (no "@", trailing
+// dots, mixed case, surrounding whitespace).
+function isTrustedAdminEmail(email: string): boolean {
+  const at = email.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = email.slice(at + 1).trim().toLowerCase().replace(/\.$/, "");
+  return TRUSTED_ADMIN_DOMAINS.includes(domain);
 }
 
 Deno.serve(async (req) => {
@@ -85,9 +108,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ profile: existing, justCreated: false });
   }
 
-  // ── 2. Decide the role: invitation → founder → checker.
+  // ── 2. Decide the role: invitation → founder → trusted domain → checker.
+  //    org_id stays NULL in every case — admins are global.
   let role: "owner" | "admin" | "manager" | "checker" = "checker";
-  let orgId: string = DEFAULT_ORG_ID;
   let invitedBy: string | null = null;
   let consumedInvitationId: string | null = null;
 
@@ -102,26 +125,27 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (invitation) {
+    // Honour the invited role; org scoping is ignored (admins are global).
     role = invitation.role as typeof role;
-    orgId = invitation.org_id;
     invitedBy = invitation.invited_by;
     consumedInvitationId = invitation.id;
   } else {
-    // No invitation. If the default org has no admins yet, this user is
-    // the founding owner. Otherwise drop in as 'checker' — safe default.
+    // No invitation. If there are no admins at all yet, this user is the
+    // founding owner. Otherwise, trusted-domain staff self-register as
+    // 'admin'; everyone else drops in as 'checker' — safe default.
     const { count } = await supabase
       .from("admin_profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", DEFAULT_ORG_ID);
+      .select("id", { count: "exact", head: true });
     if ((count ?? 0) === 0) role = "owner";
+    else if (isTrustedAdminEmail(email)) role = "admin";
   }
 
-  // ── 3. Insert the profile.
+  // ── 3. Insert the profile (org_id = NULL → global admin).
   const { data: profile, error: insertErr } = await supabase
     .from("admin_profiles")
     .insert({
       id: userId,
-      org_id: orgId,
+      org_id: null,
       email,
       display_name: (user.user_metadata?.full_name as string) || null,
       avatar_url: (user.user_metadata?.avatar_url as string) || null,
@@ -146,7 +170,7 @@ Deno.serve(async (req) => {
   await supabase.from("admin_action_log").insert({
     actor_id: userId,
     actor_email: email,
-    org_id: orgId,
+    org_id: null,
     action: "admin.signup",
     target_type: "admin_profile",
     target_id: userId,

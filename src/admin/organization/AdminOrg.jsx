@@ -615,6 +615,7 @@ function TeamSection({ org, team, invitations, canManage, currentRole, currentUs
 
       {inviteOpen && (
         <InviteModal
+          org={org}
           onClose={() => setInviteOpen(false)}
           onInvited={(inv) => {
             // Always push the new invitation into the pending list so
@@ -674,7 +675,7 @@ function RoleIcon({ role, size = 28 }) {
   );
 }
 
-function InviteModal({ onClose, onInvited, allowAdmin }) {
+function InviteModal({ onClose, onInvited, allowAdmin, org }) {
   const [method, setMethod] = useState('email'); // 'email' | 'link'
   const [email, setEmail]   = useState('');
   const [role, setRole]     = useState('checker');

@@ -251,8 +251,15 @@ export default function AdminCupQr({ onNavigate }) {
     setQuickN(n);
     setError(null);
     setPrintStatus(null);
+    // A quick-print batch only "counts" if it actually prints. We mint it
+    // first (the QR codes have to exist before we can print them), then print,
+    // and only record it (latest-batch card, audit log, recent list) once the
+    // printer confirms. If printing fails, we roll the batch back with
+    // deleteCupBatches so it never lands in the records.
+    let pendingBatchId = null;
     try {
       const res = await generateCups(n);
+      pendingBatchId = res.batch_id;
       const orgSlug = res.slug || activeOrg?.slug || '';
       const slugPath = orgSlug ? `${orgSlug}/` : '';
       const url = `${PROD_URL}${slugPath}?batch=${res.batch_id}`;
@@ -264,15 +271,9 @@ export default function AdminCupQr({ onNavigate }) {
         catch (e) { console.error('setBatchExpiry failed (continuing):', e); }
       }
       const newBatch = { batch_id: res.batch_id, cup_ids: res.cup_ids, url, generatedAt: new Date(), expires_at: expiresAt };
-      setBatch(newBatch);
-      setCount(n);
-      logAction({
-        action: 'cup_batch.generate',
-        targetType: 'cup_batch',
-        targetId: res.batch_id,
-        metadata: { count: res.count, expires_at: expiresAt, restaurant, quick_print: true },
-      });
-      refreshRecent();
+
+      // Print BEFORE recording. This is what throws if the printer is
+      // unreachable, sending us to the catch block where we roll back.
       await printCupReceipt({
         url,
         restaurant,
@@ -281,9 +282,26 @@ export default function AdminCupQr({ onNavigate }) {
         sessionId: res.batch_id.slice(0, 8).toUpperCase(),
         cups: res.cup_ids?.length ?? n,
       }, printerIp);
+
+      // Printed OK → commit it to the records.
+      pendingBatchId = null;
+      setBatch(newBatch);
+      setCount(n);
       setPrintStatus({ ok: true, text: `Quick-printed ${n} cup${n !== 1 ? 's' : ''} to ${printerIp} ✓` });
+      logAction({
+        action: 'cup_batch.generate',
+        targetType: 'cup_batch',
+        targetId: res.batch_id,
+        metadata: { count: res.count, expires_at: expiresAt, restaurant, quick_print: true },
+      });
+      refreshRecent();
     } catch (err) {
       console.error('quick print failed:', err);
+      // Roll back the minted-but-unprinted batch so it is never recorded.
+      if (pendingBatchId) {
+        try { await deleteCupBatches([pendingBatchId]); }
+        catch (rbErr) { console.error('rollback (deleteCupBatches) failed:', rbErr); }
+      }
       const msg = err.message || 'Quick print failed.';
       setError(msg);
       setPrintStatus({ ok: false, text: msg });

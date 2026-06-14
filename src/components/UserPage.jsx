@@ -459,7 +459,8 @@ export default function UserPage({
           <span className="user-page__howto-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />
-              <path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor" stroke="none" />
+              <path d="M9.3 9.2a2.8 2.8 0 0 1 5.3 1c0 1.9-2.6 2.2-2.6 3.6" />
+              <line x1="12" y1="17.4" x2="12.01" y2="17.4" />
             </svg>
           </span>
           <span className="user-page__howto-text">

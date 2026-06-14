@@ -49,6 +49,7 @@ const STEPS = [
     text: 'Bring your reusable cups back to any participating spot. Every cup you return adds to your balance.',
     image: '/how-it-works/step-1.png',
     bg: 'linear-gradient(165deg, #FDF1E6 0%, #F9DFCB 100%)',
+    accent: '#E08A53',
     Icon: CupIcon,
   },
   {
@@ -57,14 +58,18 @@ const STEPS = [
     text: 'Collect enough cups to unlock a reward, then choose the product you want from the list.',
     image: '/how-it-works/step-2.png',
     bg: 'linear-gradient(165deg, #FCF2D6 0%, #F8E7B9 100%)',
+    accent: '#E0A12B',
     Icon: RewardIcon,
   },
   {
     key: 'buy',
     title: 'Buy it in the store',
-    text: 'Buy that product at any supermarket or grocery store in the Netherlands, and keep the printed receipt.',
+    text: (
+      <>Buy that product at <strong>any</strong> supermarket or grocery store in <strong>the Netherlands</strong>, and keep the printed receipt.</>
+    ),
     image: '/how-it-works/step-3.png',
     bg: 'linear-gradient(165deg, #E9F4E7 0%, #D6ECD8 100%)',
+    accent: '#5FA044',
     Icon: StoreIcon,
   },
   {
@@ -73,6 +78,7 @@ const STEPS = [
     text: 'Snap a photo of your receipt and enter your IBAN so we can confirm the purchase.',
     image: '/how-it-works/step-4.png',
     bg: 'linear-gradient(165deg, #E6EAFC 0%, #D2DBF8 100%)',
+    accent: '#5468C8',
     Icon: ReceiptIcon,
   },
   {
@@ -81,6 +87,7 @@ const STEPS = [
     text: 'Once it is verified, your cashback lands in your bank account within 1 to 2 business days.',
     image: '/how-it-works/step-5.png',
     bg: 'linear-gradient(165deg, #ECF8F1 0%, #DAF1E6 100%)',
+    accent: '#2EA785',
     Icon: CashIcon,
   },
 ];
@@ -182,7 +189,7 @@ export default function HowItWorks({ onClose, onComplete }) {
           <div className="hiw__art-fallback"><Icon /></div>
           <img className="hiw__art-img" src={step.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         </div>
-        <span className="hiw__chip"><Icon /></span>
+        <span className="hiw__chip" style={{ color: step.accent }}><Icon /></span>
         <h2 className="hiw__title">{step.title}</h2>
         <p className="hiw__text">{step.text}</p>
       </div>

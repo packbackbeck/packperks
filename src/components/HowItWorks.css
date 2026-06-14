@@ -134,7 +134,8 @@
   height: 40px;
   border-radius: var(--radius-md, 13px);
   background: rgba(255, 255, 255, 0.75);
-  color: var(--bk-orange, #FEA01E);
+  /* icon colour is set inline per step (step.accent) to match each page */
+  color: var(--black, #1D1D1D);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   margin-bottom: 14px;
 }
@@ -154,6 +155,10 @@
   color: var(--text-muted, rgba(0, 0, 0, 0.8));
   margin: 0;
   max-width: 300px;
+}
+.hiw__text strong {
+  font-weight: var(--fw-bold, 700);
+  color: var(--black, #1D1D1D);
 }
 
 /* Footer */

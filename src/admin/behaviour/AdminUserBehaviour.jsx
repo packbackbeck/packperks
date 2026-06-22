@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { getUserBehaviourStats } from '../lib/adminApi';
+import { getUserBehaviourStats, getUserBehaviourDailyHistory } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import QuickLinks from '../shared/QuickLinks';
 import MetricIcon from './behaviourIcons';
@@ -98,6 +98,41 @@ function downloadFile(content, filename, mime) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/* Unit shown in each history column header, and the raw cell value (kept as
+ * a real number so the spreadsheet can chart it). Excel (.csv) gets a comma
+ * decimal to match its semicolon-separated convention. */
+function unitSuffix(valueType) {
+  if (valueType === 'percent') return '%';
+  if (valueType === 'duration') return 'sec';
+  return 'count';
+}
+
+function histCell(valueType, v, isExcel) {
+  if (v === null || v === undefined || Number.isNaN(v)) return '';
+  let num;
+  if (valueType === 'percent') num = Math.round(v * 10) / 10;
+  else if (valueType === 'duration') num = Math.round((v / 1000) * 10) / 10; // ms → seconds
+  else num = Math.round(v);
+  const s = String(num);
+  return isExcel ? s.replace('.', ',') : s;
+}
+
+/* A second table: one row per day, one column per selected metric, each
+ * cell the metric's cumulative value as of that day. Numeric cells are
+ * written raw (no escaping) so Excel decimals survive the ';' separator. */
+function buildHistoryCsv(hist, selectedIds, formatId) {
+  const isExcel = formatId === 'xlsx-csv';
+  const sep = isExcel ? ';' : ',';
+  const cols = hist.metrics.filter(m => selectedIds.has(m.id));
+  const title = escapeCsv('Daily history — cumulative value per day');
+  const header = ['Date', ...cols.map(m => `${m.label} (${unitSuffix(m.valueType)})`)]
+    .map(escapeCsv).join(sep);
+  const rows = hist.dates.map((d, i) =>
+    [escapeCsv(d.iso.slice(0, 10)), ...cols.map(m => histCell(m.valueType, m.values[i], isExcel))].join(sep)
+  );
+  return [title, header, ...rows].join('\n');
+}
+
 /* Flatten one metric into an export row. desc can be a React node on a
  * couple of cards; only plain-string descriptions are exported. */
 function metricToRow(m, groupTitle) {
@@ -186,6 +221,8 @@ export default function AdminUserBehaviour({ onNavigate }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [format, setFormat] = useState('xlsx-csv');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [includeHistory, setIncludeHistory] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const orgName = activeOrg?.partner_brand_name || activeOrg?.name || 'this organisation';
 
@@ -240,19 +277,36 @@ export default function AdminUserBehaviour({ onNavigate }) {
   const selectAll = () => setSelectedIds(new Set((metrics || []).map(m => m.id)));
   const selectNone = () => setSelectedIds(new Set());
 
-  function handleExport() {
-    if (!metrics || selectedIds.size === 0) return;
-    const groupTitle = Object.fromEntries(GROUPS.map(g => [g.id, g.title]));
-    // Preserve the on-screen order; only include checked metrics. Use the
-    // effective (possibly overridden) section in the export.
-    const rows = metrics
-      .filter(m => selectedIds.has(m.id))
-      .map(m => metricToRow(m, groupTitle[effGroup(m)] || effGroup(m)));
-    const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
-    const stamp = new Date().toISOString().slice(0, 10);
-    const slug = (orgName || 'org').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    downloadFile(buildCsv(rows, fmt.id), `packperks_user_behaviour_${slug}_${stamp}.${fmt.ext}`, fmt.mime);
-    setExportOpen(false);
+  async function handleExport() {
+    if (!metrics || selectedIds.size === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const groupTitle = Object.fromEntries(GROUPS.map(g => [g.id, g.title]));
+      // Preserve the on-screen order; only include checked metrics. Use the
+      // effective (possibly overridden) section in the export.
+      const rows = metrics
+        .filter(m => selectedIds.has(m.id))
+        .map(m => metricToRow(m, groupTitle[effGroup(m)] || effGroup(m)));
+      const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
+      let content = buildCsv(rows, fmt.id);
+
+      // Optional second table: each selected metric's value, day by day.
+      if (includeHistory) {
+        const hist = await getUserBehaviourDailyHistory(range);
+        content += '\n\n' + buildHistoryCsv(hist, selectedIds, fmt.id);
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const slug = (orgName || 'org').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const suffix = includeHistory ? '_with_daily_history' : '';
+      downloadFile(content, `packperks_user_behaviour${suffix}_${slug}_${stamp}.${fmt.ext}`, fmt.mime);
+      setExportOpen(false);
+    } catch (e) {
+      console.error('behaviour export failed', e);
+      setError(e?.message || 'Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   const openMetric = metrics && openId ? metrics.find(m => m.id === openId) : null;
@@ -325,6 +379,20 @@ export default function AdminUserBehaviour({ onNavigate }) {
               })}
             </div>
 
+            <label className="ub-export__history">
+              <input
+                type="checkbox"
+                className="ub-switch-input"
+                checked={includeHistory}
+                onChange={e => setIncludeHistory(e.target.checked)}
+              />
+              <span className="ub-switch" aria-hidden="true"><span className="ub-switch__dot" /></span>
+              <span className="ub-export__history-text">
+                <span className="ub-export__history-title">Include daily history</span>
+                <span className="ub-export__history-sub">Adds a second table: each selected metric's value day by day across the chosen period.</span>
+              </span>
+            </label>
+
             <div className="ub-export__foot">
               <div className="ub-export__formats">
                 {FORMATS.map(f => (
@@ -334,8 +402,8 @@ export default function AdminUserBehaviour({ onNavigate }) {
                   </label>
                 ))}
               </div>
-              <button className="ub-export__go" onClick={handleExport} disabled={selectedIds.size === 0}>
-                Download{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+              <button className="ub-export__go" onClick={handleExport} disabled={selectedIds.size === 0 || exporting}>
+                {exporting ? 'Preparing…' : `Download${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
               </button>
             </div>
           </div>

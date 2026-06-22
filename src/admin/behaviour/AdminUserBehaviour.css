@@ -199,6 +199,45 @@
   .ub-export__go { width: 100%; }
 }
 
+/* History toggle inside the export sheet */
+.ub-export__history {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 12px 20px 0;
+  padding: 12px 14px;
+  background: #F7F4EF;
+  border: 1px solid #EFEAE1;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.ub-export__history-text { display: flex; flex-direction: column; gap: 2px; }
+.ub-export__history-title { font-size: 13px; font-weight: 700; color: #1A1A1A; }
+.ub-export__history-sub { font-size: 11.5px; line-height: 1.45; color: #8A8175; }
+
+/* Toggle switch (checkbox + track + thumb) */
+.ub-switch-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ub-switch {
+  flex-shrink: 0;
+  width: 38px; height: 22px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: #D8D2C8;
+  position: relative;
+  transition: background .15s ease;
+}
+.ub-switch__dot {
+  position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform .15s ease;
+}
+.ub-switch-input:checked + .ub-switch { background: #5333A5; }
+.ub-switch-input:checked + .ub-switch .ub-switch__dot { transform: translateX(16px); }
+.ub-switch-input:focus-visible + .ub-switch { outline: 2px solid #5333A5; outline-offset: 2px; }
+
 .ub-error {
   background: rgba(220,38,38,0.08);
   border: 1px solid #DC2626;

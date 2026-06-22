@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { getUserBehaviourStats } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import QuickLinks from '../shared/QuickLinks';
+import MetricIcon from './behaviourIcons';
+import DateRangePicker from './DateRangePicker';
+import MetricDetailModal from './MetricDetailModal';
 import './AdminUserBehaviour.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -11,6 +14,11 @@ import './AdminUserBehaviour.css';
  * denominator it came from in two small inner cards. Metrics that need
  * event instrumentation we don't capture yet are shown as "Not tracked yet"
  * with a note, never a faked number.
+ *
+ * On top of the cards: a time-window picker (defaults to all-time) scopes
+ * every metric; a tile click opens a tailored detail modal with a trend
+ * chart and a control to re-file the metric between sections; and the
+ * whole board can be exported to a spreadsheet.
  * ───────────────────────────────────────────────────────────────────── */
 
 const GROUPS = [
@@ -18,6 +26,9 @@ const GROUPS = [
   { id: 'secondary', title: 'Secondary', desc: 'Supporting behaviour and claim mix.' },
   { id: 'optional',  title: 'Optional',  desc: 'Derived or instrumentation-dependent signals.' },
 ];
+
+/* Where the user's section re-assignments are remembered (per browser). */
+const OVERRIDES_KEY = 'ppk_behaviour_group_overrides';
 
 /* Export formats — same convention as Reports: the "Excel" entry is a
  * UTF-8-BOM CSV with a semicolon separator so Excel (Win/Mac) opens it as
@@ -102,7 +113,7 @@ function metricToRow(m, groupTitle) {
   };
 }
 
-function BehaviourCard({ m }) {
+function BehaviourCard({ m, onOpen }) {
   const hasNum = m.numLabel != null && m.numerator != null;
   const hasDen = m.denLabel != null && m.denominator != null;
   const noData = m.measurable && !m.valueText && (m.denominator == null || m.denominator === 0);
@@ -114,7 +125,14 @@ function BehaviourCard({ m }) {
   else valueEl = fmtPct(m.value);
 
   return (
-    <div className={`ub-card${!m.measurable ? ' ub-card--na' : ''}`}>
+    <button
+      type="button"
+      className={`ub-card${!m.measurable ? ' ub-card--na' : ''}`}
+      onClick={() => onOpen(m)}
+      aria-label={`${m.label} — open details`}
+    >
+      <span className="ub-card__icon" aria-hidden="true"><MetricIcon id={m.id} width="18" height="18" /></span>
+
       <div className="ub-card__label">{m.label}</div>
 
       <div className="ub-card__value">{valueEl}</div>
@@ -142,15 +160,27 @@ function BehaviourCard({ m }) {
       )}
 
       <div className="ub-card__desc">{m.desc}</div>
-    </div>
+      <span className="ub-card__more">View details →</span>
+    </button>
   );
 }
 
 export default function AdminUserBehaviour({ onNavigate }) {
   const { activeOrg } = useOrg();
   const [metrics, setMetrics] = useState(null);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Time window (null/null = all-time).
+  const [range, setRange] = useState({ from: null, to: null });
+
+  // Detail modal + per-browser section re-assignments.
+  const [openId, setOpenId] = useState(null);
+  const [overrides, setOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; }
+    catch { return {}; }
+  });
 
   // Export-to-spreadsheet state.
   const [exportOpen, setExportOpen] = useState(false);
@@ -159,12 +189,13 @@ export default function AdminUserBehaviour({ onNavigate }) {
 
   const orgName = activeOrg?.partner_brand_name || activeOrg?.name || 'this organisation';
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (r) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getUserBehaviourStats();
-      setMetrics(data);
+      const data = await getUserBehaviourStats(r || { from: null, to: null });
+      setMetrics(data.metrics);
+      setMeta(data.meta);
     } catch (e) {
       console.error('getUserBehaviourStats failed', e);
       setError(e?.message || 'Failed to load behaviour metrics.');
@@ -173,9 +204,9 @@ export default function AdminUserBehaviour({ onNavigate }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load, activeOrg?.id]);
+  useEffect(() => { load(range); }, [load, activeOrg?.id, range]);
 
-  // Whenever the metric set changes, default every metric to "on".
+  // Whenever the metric set changes, default every metric to "on" for export.
   useEffect(() => {
     if (metrics) setSelectedIds(new Set(metrics.map(m => m.id)));
   }, [metrics]);
@@ -187,6 +218,17 @@ export default function AdminUserBehaviour({ onNavigate }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [exportOpen]);
+
+  // Effective section for a metric = user's override, else its native group.
+  const effGroup = (m) => overrides[m.id] || m.group;
+
+  function changeGroup(id, g) {
+    setOverrides(prev => {
+      const next = { ...prev, [id]: g };
+      try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   function toggleMetric(id) {
     setSelectedIds(prev => {
@@ -201,16 +243,19 @@ export default function AdminUserBehaviour({ onNavigate }) {
   function handleExport() {
     if (!metrics || selectedIds.size === 0) return;
     const groupTitle = Object.fromEntries(GROUPS.map(g => [g.id, g.title]));
-    // Preserve the on-screen order; only include checked metrics.
+    // Preserve the on-screen order; only include checked metrics. Use the
+    // effective (possibly overridden) section in the export.
     const rows = metrics
       .filter(m => selectedIds.has(m.id))
-      .map(m => metricToRow(m, groupTitle[m.group] || m.group));
+      .map(m => metricToRow(m, groupTitle[effGroup(m)] || effGroup(m)));
     const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
     const stamp = new Date().toISOString().slice(0, 10);
     const slug = (orgName || 'org').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     downloadFile(buildCsv(rows, fmt.id), `packperks_user_behaviour_${slug}_${stamp}.${fmt.ext}`, fmt.mime);
     setExportOpen(false);
   }
+
+  const openMetric = metrics && openId ? metrics.find(m => m.id === openId) : null;
 
   return (
     <div className="ub-page">
@@ -219,10 +264,11 @@ export default function AdminUserBehaviour({ onNavigate }) {
           <h1 className="ub-header__title">User Behaviour</h1>
           <p className="ub-header__sub">
             Real behavioural rates for {orgName}. Every percentage shows the exact counts
-            it was calculated from. All-time, computed from live cups, scans, claims, and users.
+            it was calculated from. Pick a time window, or click any tile to dive in.
           </p>
         </div>
         <div className="ub-header__actions">
+          <DateRangePicker value={range} meta={meta} onChange={setRange} />
           <button
             className="ub-export-btn"
             onClick={() => setExportOpen(true)}
@@ -234,7 +280,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
             </svg>
             Export
           </button>
-          <button className="ub-refresh" onClick={load} disabled={loading}>
+          <button className="ub-refresh" onClick={() => load(range)} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
@@ -263,7 +309,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
 
             <div className="ub-export__list">
               {GROUPS.map(g => {
-                const items = metrics.filter(m => m.group === g.id);
+                const items = metrics.filter(m => effGroup(m) === g.id);
                 if (!items.length) return null;
                 return (
                   <div key={g.id} className="ub-export__group">
@@ -297,7 +343,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
       )}
 
       {metrics && GROUPS.map(g => {
-        const cards = metrics.filter(m => m.group === g.id);
+        const cards = metrics.filter(m => effGroup(m) === g.id);
         if (!cards.length) return null;
         return (
           <section key={g.id} className="ub-section">
@@ -306,11 +352,21 @@ export default function AdminUserBehaviour({ onNavigate }) {
               <p className="ub-section__desc">{g.desc}</p>
             </div>
             <div className="ub-grid">
-              {cards.map(m => <BehaviourCard key={m.id} m={m} />)}
+              {cards.map(m => <BehaviourCard key={m.id} m={m} onOpen={() => setOpenId(m.id)} />)}
             </div>
           </section>
         );
       })}
+
+      {openMetric && (
+        <MetricDetailModal
+          metric={openMetric}
+          effectiveGroup={effGroup(openMetric)}
+          groups={GROUPS}
+          onChangeGroup={(g) => changeGroup(openMetric.id, g)}
+          onClose={() => setOpenId(null)}
+        />
+      )}
 
       <QuickLinks currentPage="behaviour" onNavigate={onNavigate} />
     </div>

@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { applyOrgFilter, getActiveOrgId } from '../context/orgState';
+import { fmtDuration } from './behaviourFormat';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Multi-org note (Phase 2): every query in this file that touches a
@@ -802,20 +803,7 @@ export async function getUserActionStats() {
  *   • Redeemed  = a generated batch that got ≥1 successful QR scan.
  *   • Cup spent = cups_redeemed on committed claims (completed + pending).
  * ───────────────────────────────────────────────────────────────────── */
-export async function getUserBehaviourStats() {
-  const [cupsRes, scansRes, claimsRes, usersRes, cliRes] = await Promise.all([
-    applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source')),
-    applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at')),
-    applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed')),
-    applyOrgFilter(supabase.from('users').select('id, email')),
-    applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props')),
-  ]);
-  const cups   = cupsRes.data   || [];
-  const scans  = scansRes.data  || [];
-  const claims = claimsRes.data || [];
-  const users  = usersRes.data  || [];
-  const ev     = cliRes.data    || [];
-
+function computeMetrics({ cups, scans, claims, users, ev }) {
   const ok = (s) => s.status === 'success' || s.status === 'partial';
   const successScans = scans.filter(s => s.source === 'qr' && ok(s));
 
@@ -853,16 +841,6 @@ export async function getUserBehaviourStats() {
     }
   }
   const avgSecondScanMs = gapUsers > 0 ? gapSum / gapUsers : null;
-  const fmtDuration = (ms) => {
-    if (ms == null) return null;
-    const sec = ms / 1000;
-    if (sec < 90) return `${Math.round(sec)} sec`;
-    const min = sec / 60;
-    if (min < 90) return `${Math.round(min)} min`;
-    const hr = min / 60;
-    if (hr < 48) return `${hr.toFixed(1)} hours`;
-    return `${(hr / 24).toFixed(1)} days`;
-  };
 
   // ── Cups ──
   const totalCups     = cups.length;
@@ -944,7 +922,11 @@ export async function getUserBehaviourStats() {
   const sharedUsers = new Set(ev.filter(e => e.event === 'share_cup' && e.user_id).map(e => e.user_id)).size;
 
   const pct = (n, d) => (d > 0 ? (n / d) * 100 : null);
-  const M = (o) => ({ measurable: true, ...o, value: pct(o.numerator, o.denominator) });
+  // Percentage metrics: value and the chartable rawValue are the same %.
+  const M = (o) => {
+    const value = pct(o.numerator, o.denominator);
+    return { measurable: true, valueType: 'percent', ...o, value, rawValue: value };
+  };
 
   return [
     // ── Primary ──
@@ -958,11 +940,11 @@ export async function getUserBehaviourStats() {
         desc: 'People who came back and scanned a second QR receipt, out of all redeemed receipts.' }),
     (avgSecondScanMs != null
       ? { measurable: true, id: 'avg_second_scan', group: 'primary', label: 'Avg time to 2nd scan',
-          value: null, valueText: fmtDuration(avgSecondScanMs),
+          valueType: 'duration', value: null, rawValue: avgSecondScanMs, valueText: fmtDuration(avgSecondScanMs),
           numerator: gapUsers, numLabel: 'Returning users measured', denominator: null, denLabel: null,
           desc: 'Average time between a customer\'s first and second cup scan.' }
       : { measurable: false, id: 'avg_second_scan', group: 'primary', label: 'Avg time to 2nd scan',
-          value: null, numerator: null, denominator: null,
+          valueType: 'duration', value: null, rawValue: null, numerator: null, denominator: null,
           desc: 'Average time between a customer\'s first and second cup scan.',
           note: 'No customer has a second scan yet, so there is nothing to average.' }),
     M({ id: 'cup_spent', group: 'primary', label: 'Cup spent rate',
@@ -1011,29 +993,29 @@ export async function getUserBehaviourStats() {
         desc: 'Generated QR receipts that were never scanned in.' }),
     (avgSessionMs != null
       ? { measurable: true, id: 'avg_session', group: 'optional', label: 'Avg session time',
-          value: null, valueText: fmtDuration(avgSessionMs),
+          valueType: 'duration', value: null, rawValue: avgSessionMs, valueText: fmtDuration(avgSessionMs),
           numerator: spanSessions, numLabel: 'Sessions measured', denominator: null, denLabel: null,
           desc: 'Average time between a visit\'s first and last recorded action.' }
       : { measurable: false, id: 'avg_session', group: 'optional', label: 'Avg session time',
-          value: null, numerator: null, denominator: null,
+          valueType: 'duration', value: null, rawValue: null, numerator: null, denominator: null,
           desc: 'Average time a customer spends per visit.',
           note: 'No multi-action sessions recorded yet. Fills in as customers use the app.' }),
     (totalClicks > 0
       ? { measurable: true, id: 'button_clicks', group: 'optional', label: 'Button clicks',
-          value: null, valueText: totalClicks.toLocaleString(),
+          valueType: 'count', value: null, rawValue: totalClicks, valueText: totalClicks.toLocaleString(),
           numerator: totalClicks, numLabel: 'Tracked interactions', denominator: null, denLabel: null,
           desc: clicksDesc }
       : { measurable: false, id: 'button_clicks', group: 'optional', label: 'Button clicks',
-          value: null, numerator: null, denominator: null,
+          valueType: 'count', value: null, rawValue: null, numerator: null, denominator: null,
           desc: clicksDesc,
           note: 'No button interactions recorded yet. Fills in as customers use the app.' }),
     (screenSessions > 0
       ? { measurable: true, id: 'last_screen', group: 'optional', label: 'Most common last screen',
-          value: null, valueText: topScreen,
+          valueType: 'count', value: null, rawValue: topScreenCount, valueText: topScreen,
           numerator: topScreenCount, numLabel: `Ended on "${topScreen}"`, denominator: screenSessions, denLabel: 'Sessions tracked',
           desc: 'Where customers most often stop. Use it to spot drop-off points.' }
       : { measurable: false, id: 'last_screen', group: 'optional', label: 'Most common last screen',
-          value: null, numerator: null, denominator: null,
+          valueType: 'count', value: null, rawValue: null, numerator: null, denominator: null,
           desc: 'Where customers drop off, the last screen they reached.',
           note: 'No screen views recorded yet. Fills in as customers use the app.' }),
     M({ id: 'impact_shares', group: 'optional', label: 'Cup share rate',
@@ -1041,6 +1023,126 @@ export async function getUserBehaviourStats() {
         numLabel: 'Users who shared', denLabel: 'Total users',
         desc: 'Customers who shared a cup or their impact with someone else.' }),
   ];
+}
+
+/* Which timestamp column places each table's rows in time. */
+const BEHAVIOUR_TS = {
+  cups:   r => r.created_at,
+  scans:  r => r.scanned_at,
+  claims: r => r.created_at,
+  users:  r => r.created_at,
+  ev:     r => r.created_at,
+};
+
+const toMsOrNull = (v) => {
+  const t = v ? new Date(v).getTime() : NaN;
+  return Number.isFinite(t) ? t : null;
+};
+
+function bucketLabel(ms) {
+  return new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+/* ~16 evenly-spaced (day-aligned) cumulative checkpoints across the window
+ * so every metric's series tells a "how did this build up" story. */
+function makeBuckets(fromMs, toMs) {
+  if (!(toMs > fromMs)) return [{ endMs: toMs, label: bucketLabel(toMs) }];
+  const dayMs = 86400000;
+  const days = (toMs - fromMs) / dayMs;
+  const TARGET = 16;
+  const stepDays = Math.max(1, Math.ceil(days / TARGET));
+  const out = [];
+  for (let d = stepDays; d < days; d += stepDays) {
+    const endMs = fromMs + d * dayMs;
+    out.push({ endMs, label: bucketLabel(endMs) });
+  }
+  out.push({ endMs: toMs, label: bucketLabel(toMs) });
+  return out;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * getUserBehaviourStats — behavioural metrics for the active org,
+ * optionally scoped to a time window, each carrying a cumulative series.
+ *
+ * @param range  { from, to } ISO strings, or null/omitted for all-time.
+ * Returns { metrics, meta }. metrics each gain a `series` of { t, label, v }
+ * points and a numeric `rawValue` / `valueType` for charting. meta carries
+ * the applied window plus the data's true min/max dates so the UI can build
+ * a date picker and default it to the full period.
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getUserBehaviourStats(range = null) {
+  const [cupsRes, scansRes, claimsRes, usersRes, cliRes] = await Promise.all([
+    applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at')),
+    applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at')),
+    applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed, created_at')),
+    applyOrgFilter(supabase.from('users').select('id, email, created_at')),
+    applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props')),
+  ]);
+  const allRows = {
+    cups:   cupsRes.data   || [],
+    scans:  scansRes.data  || [],
+    claims: claimsRes.data || [],
+    users:  usersRes.data  || [],
+    ev:     cliRes.data     || [],
+  };
+
+  // Data extent across every table (using each table's own timestamp).
+  let minMs = Infinity, maxMs = -Infinity;
+  for (const key of Object.keys(allRows)) {
+    for (const r of allRows[key]) {
+      const t = toMsOrNull(BEHAVIOUR_TS[key](r));
+      if (t == null) continue;
+      if (t < minMs) minMs = t;
+      if (t > maxMs) maxMs = t;
+    }
+  }
+  const hasData = minMs !== Infinity;
+  const minDate = hasData ? minMs : Date.now();
+  const maxDate = hasData ? maxMs : Date.now();
+
+  // Effective window: explicit range wins, otherwise the full data extent.
+  const reqFrom = range && range.from ? toMsOrNull(range.from) : null;
+  const reqTo   = range && range.to   ? toMsOrNull(range.to)   : null;
+  const effFrom = reqFrom != null ? reqFrom : minDate;
+  const effTo   = reqTo   != null ? reqTo   : maxDate;
+
+  const sliceRows = (fromMs, toMs) => {
+    const out = {};
+    for (const key of Object.keys(allRows)) {
+      out[key] = allRows[key].filter(r => {
+        const t = toMsOrNull(BEHAVIOUR_TS[key](r));
+        return t != null && t >= fromMs && t <= toMs;
+      });
+    }
+    return out;
+  };
+
+  // Current metrics over the selected window.
+  const metrics = computeMetrics(sliceRows(effFrom, effTo));
+
+  // Cumulative series: recompute the full metric set at each checkpoint so
+  // even derived metrics (e.g. "returned to scan again") stay correct.
+  const buckets = makeBuckets(effFrom, effTo);
+  const seriesById = new Map(metrics.map(m => [m.id, []]));
+  for (const b of buckets) {
+    const bm = computeMetrics(sliceRows(effFrom, b.endMs));
+    for (const m of bm) {
+      const arr = seriesById.get(m.id);
+      if (arr) arr.push({ t: b.endMs, label: b.label, v: m.rawValue == null ? null : m.rawValue });
+    }
+  }
+  for (const m of metrics) m.series = seriesById.get(m.id) || [];
+
+  return {
+    metrics,
+    meta: {
+      from: new Date(effFrom).toISOString(),
+      to: new Date(effTo).toISOString(),
+      minDate: new Date(minDate).toISOString(),
+      maxDate: new Date(maxDate).toISOString(),
+      hasData,
+    },
+  };
 }
 
 /* ─────────────────────────────────────────────────────────────────────

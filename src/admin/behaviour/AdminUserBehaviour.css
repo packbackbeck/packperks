@@ -25,6 +25,12 @@
   max-width: 640px;
   line-height: 1.5;
 }
+.ub-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .ub-refresh {
   font-size: 13px;
   border: 1px solid #E4DFD6;
@@ -37,6 +43,161 @@
 }
 .ub-refresh:hover { background: #F7F4EF; }
 .ub-refresh:disabled { opacity: 0.6; cursor: default; }
+
+.ub-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #5333A5;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: #5333A5;
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ub-export-btn:hover { background: #472C8F; }
+.ub-export-btn:disabled { opacity: 0.55; cursor: default; }
+.ub-export-btn svg { flex-shrink: 0; }
+
+/* ── Export sheet ── */
+.ub-export-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 24, 20, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+.ub-export {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.ub-export__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 0;
+}
+.ub-export__title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0;
+}
+.ub-export__close {
+  border: none;
+  background: none;
+  color: #8A8175;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+  border-radius: 6px;
+}
+.ub-export__close:hover { background: #F2EEE7; color: #1A1A1A; }
+.ub-export__sub {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #6C6259;
+  margin: 6px 20px 0;
+}
+.ub-export__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 8px;
+}
+.ub-export__count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8A8175;
+}
+.ub-export__toolbtns { display: flex; gap: 6px; }
+.ub-export__toolbtns button {
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #E4DFD6;
+  border-radius: 7px;
+  padding: 5px 10px;
+  background: #fff;
+  color: #5333A5;
+  cursor: pointer;
+}
+.ub-export__toolbtns button:hover { background: #F7F4EF; }
+
+.ub-export__list {
+  overflow-y: auto;
+  padding: 0 20px;
+  flex: 1;
+}
+.ub-export__group { margin-bottom: 12px; }
+.ub-export__group-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #A79F92;
+  margin: 8px 0 4px;
+}
+.ub-export__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #1D1D1D;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ub-export__item:hover { background: #F7F4EF; }
+.ub-export__item input { width: 16px; height: 16px; accent-color: #5333A5; cursor: pointer; }
+
+.ub-export__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid #F0ECE5;
+}
+.ub-export__formats { display: flex; gap: 14px; }
+.ub-export__fmt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #4A443D;
+  cursor: pointer;
+}
+.ub-export__fmt input { accent-color: #5333A5; cursor: pointer; }
+.ub-export__go {
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  border-radius: 9px;
+  padding: 9px 18px;
+  background: #5333A5;
+  color: #fff;
+  cursor: pointer;
+}
+.ub-export__go:hover { background: #472C8F; }
+.ub-export__go:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 520px) {
+  .ub-export__foot { flex-direction: column; align-items: stretch; }
+  .ub-export__go { width: 100%; }
+}
 
 .ub-error {
   background: rgba(220,38,38,0.08);

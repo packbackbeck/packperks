@@ -818,7 +818,6 @@ export async function getUserBehaviourStats() {
 
   const ok = (s) => s.status === 'success' || s.status === 'partial';
   const successScans = scans.filter(s => s.source === 'qr' && ok(s));
-  const totalQrScans = scans.filter(s => s.source === 'qr').length;
 
   // ── Receipts (cup batches) ──
   const generatedBatches = new Set(cups.map(c => c.batch_id).filter(Boolean));
@@ -989,9 +988,13 @@ export async function getUserBehaviourStats() {
         numLabel: 'Redeemed cups', denLabel: 'Generated cups',
         desc: 'Individual cup tokens that were scanned in, out of all generated.' }),
     M({ id: 'third_scan', group: 'secondary', label: 'Third scan rate',
-        numerator: usersWith3, denominator: totalQrScans,
-        numLabel: '3rd-time scanners', denLabel: 'Total scans',
-        desc: 'Customers who scanned a third time, against all scan events.' }),
+        numerator: usersWith3, denominator: redeemedReceipts,
+        numLabel: '3rd-time scanners', denLabel: 'Redeemed receipts',
+        desc: 'Customers who scanned a third time, out of all redeemed receipts.' }),
+    M({ id: 'third_scan_returning', group: 'secondary', label: 'Third scan rate (returning)',
+        numerator: usersWith3, denominator: usersWith2,
+        numLabel: '3rd-time scanners', denLabel: 'Returned to scan again',
+        desc: 'Customers who scanned a third time, out of those who returned to scan a second time.' }),
     M({ id: 'rewards_share', group: 'secondary', label: 'Rewards claims share',
         numerator: cashbackClaims, denominator: totalClaims,
         numLabel: 'Reward (cashback) claims', denLabel: 'Total claims',

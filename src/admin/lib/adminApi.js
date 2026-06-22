@@ -1060,17 +1060,28 @@ function makeBuckets(fromMs, toMs) {
   return out;
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * getUserBehaviourStats — behavioural metrics for the active org,
- * optionally scoped to a time window, each carrying a cumulative series.
- *
- * @param range  { from, to } ISO strings, or null/omitted for all-time.
- * Returns { metrics, meta }. metrics each gain a `series` of { t, label, v }
- * points and a numeric `rawValue` / `valueType` for charting. meta carries
- * the applied window plus the data's true min/max dates so the UI can build
- * a date picker and default it to the full period.
- * ───────────────────────────────────────────────────────────────────── */
-export async function getUserBehaviourStats(range = null) {
+/* One cumulative checkpoint per day across the window (stepping coarser if
+ * the span is enormous, so we never run thousands of recomputes). Used by
+ * the day-by-day history export. */
+function makeDailyBuckets(fromMs, toMs) {
+  if (!(toMs > fromMs)) return [{ endMs: toMs, label: bucketLabel(toMs) }];
+  const dayMs = 86400000;
+  const days = Math.floor((toMs - fromMs) / dayMs);
+  const CAP = 400;
+  const stepDays = days > CAP ? Math.ceil(days / CAP) : 1;
+  const out = [];
+  for (let d = 1; d <= days; d += stepDays) {
+    const endMs = fromMs + d * dayMs;
+    out.push({ endMs, label: bucketLabel(endMs) });
+  }
+  if (!out.length || out[out.length - 1].endMs !== toMs) {
+    out.push({ endMs: toMs, label: bucketLabel(toMs) });
+  }
+  return out;
+}
+
+/* Load every behaviour-relevant table for the active org, once. */
+async function fetchBehaviourRows() {
   const [cupsRes, scansRes, claimsRes, usersRes, cliRes] = await Promise.all([
     applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at')),
     applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at')),
@@ -1078,15 +1089,18 @@ export async function getUserBehaviourStats(range = null) {
     applyOrgFilter(supabase.from('users').select('id, email, created_at')),
     applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props')),
   ]);
-  const allRows = {
+  return {
     cups:   cupsRes.data   || [],
     scans:  scansRes.data  || [],
     claims: claimsRes.data || [],
     users:  usersRes.data  || [],
     ev:     cliRes.data     || [],
   };
+}
 
-  // Data extent across every table (using each table's own timestamp).
+/* Data extent + the effective [effFrom, effTo] window for a requested range
+ * (range null/blank → the full data extent). */
+function behaviourWindow(allRows, range) {
   let minMs = Infinity, maxMs = -Infinity;
   for (const key of Object.keys(allRows)) {
     for (const r of allRows[key]) {
@@ -1099,33 +1113,50 @@ export async function getUserBehaviourStats(range = null) {
   const hasData = minMs !== Infinity;
   const minDate = hasData ? minMs : Date.now();
   const maxDate = hasData ? maxMs : Date.now();
-
-  // Effective window: explicit range wins, otherwise the full data extent.
   const reqFrom = range && range.from ? toMsOrNull(range.from) : null;
   const reqTo   = range && range.to   ? toMsOrNull(range.to)   : null;
-  const effFrom = reqFrom != null ? reqFrom : minDate;
-  const effTo   = reqTo   != null ? reqTo   : maxDate;
-
-  const sliceRows = (fromMs, toMs) => {
-    const out = {};
-    for (const key of Object.keys(allRows)) {
-      out[key] = allRows[key].filter(r => {
-        const t = toMsOrNull(BEHAVIOUR_TS[key](r));
-        return t != null && t >= fromMs && t <= toMs;
-      });
-    }
-    return out;
+  return {
+    minDate, maxDate, hasData,
+    effFrom: reqFrom != null ? reqFrom : minDate,
+    effTo:   reqTo   != null ? reqTo   : maxDate,
   };
+}
+
+/* Filter every table to [fromMs, toMs] by its own timestamp column. */
+function sliceBehaviourRows(allRows, fromMs, toMs) {
+  const out = {};
+  for (const key of Object.keys(allRows)) {
+    out[key] = allRows[key].filter(r => {
+      const t = toMsOrNull(BEHAVIOUR_TS[key](r));
+      return t != null && t >= fromMs && t <= toMs;
+    });
+  }
+  return out;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * getUserBehaviourStats — behavioural metrics for the active org,
+ * optionally scoped to a time window, each carrying a cumulative series.
+ *
+ * @param range  { from, to } ISO strings, or null/omitted for all-time.
+ * Returns { metrics, meta }. metrics each gain a `series` of { t, label, v }
+ * points and a numeric `rawValue` / `valueType` for charting. meta carries
+ * the applied window plus the data's true min/max dates so the UI can build
+ * a date picker and default it to the full period.
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getUserBehaviourStats(range = null) {
+  const allRows = await fetchBehaviourRows();
+  const { minDate, maxDate, hasData, effFrom, effTo } = behaviourWindow(allRows, range);
 
   // Current metrics over the selected window.
-  const metrics = computeMetrics(sliceRows(effFrom, effTo));
+  const metrics = computeMetrics(sliceBehaviourRows(allRows, effFrom, effTo));
 
   // Cumulative series: recompute the full metric set at each checkpoint so
   // even derived metrics (e.g. "returned to scan again") stay correct.
   const buckets = makeBuckets(effFrom, effTo);
   const seriesById = new Map(metrics.map(m => [m.id, []]));
   for (const b of buckets) {
-    const bm = computeMetrics(sliceRows(effFrom, b.endMs));
+    const bm = computeMetrics(sliceBehaviourRows(allRows, effFrom, b.endMs));
     for (const m of bm) {
       const arr = seriesById.get(m.id);
       if (arr) arr.push({ t: b.endMs, label: b.label, v: m.rawValue == null ? null : m.rawValue });
@@ -1142,6 +1173,38 @@ export async function getUserBehaviourStats(range = null) {
       maxDate: new Date(maxDate).toISOString(),
       hasData,
     },
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * getUserBehaviourDailyHistory — the same metrics, but as a day-by-day
+ * cumulative table for spreadsheet export. Each metric's value is computed
+ * from the window start up to the end of every day in the window. Returns
+ * aligned dates + each metric's value array (null where there's no data
+ * for that day yet).
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getUserBehaviourDailyHistory(range = null) {
+  const allRows = await fetchBehaviourRows();
+  const { effFrom, effTo, hasData } = behaviourWindow(allRows, range);
+
+  // Metric identity/order/units come from one full-window pass.
+  const base = computeMetrics(sliceBehaviourRows(allRows, effFrom, effTo));
+  const meta = base.map(m => ({ id: m.id, label: m.label, group: m.group, valueType: m.valueType }));
+  const valuesById = new Map(meta.map(m => [m.id, []]));
+
+  const buckets = makeDailyBuckets(effFrom, effTo);
+  for (const b of buckets) {
+    const byId = new Map(computeMetrics(sliceBehaviourRows(allRows, effFrom, b.endMs)).map(m => [m.id, m.rawValue]));
+    for (const m of meta) {
+      const v = byId.has(m.id) ? byId.get(m.id) : null;
+      valuesById.get(m.id).push(v == null ? null : v);
+    }
+  }
+
+  return {
+    hasData,
+    dates: buckets.map(b => ({ label: b.label, iso: new Date(b.endMs).toISOString() })),
+    metrics: meta.map(m => ({ ...m, values: valuesById.get(m.id) })),
   };
 }
 

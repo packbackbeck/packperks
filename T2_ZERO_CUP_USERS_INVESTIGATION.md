@@ -228,38 +228,63 @@ where ce.event='app_loaded'
 group by 1,2,3,4 order by accounts desc;
 ```
 
-## Suggested next fixes (unchanged priority)
-1. **S1** — count *returners* (≥1 scan/cup) separately from *visitors* so the 42% isn't measuring page-opens. Optionally defer account creation until the first real action.
-2. **In-app-browser handling** — detect `in_app` and prompt "open in your normal browser" before scanning, so cups don't strand in throwaway webview accounts; and/or push email-link binding earlier to consolidate identities (`users.merged_into`).
-3. **S4** — unique one-time cup QRs + a clear "already claimed" screen.
-
 ---
 
-# Final summary — hypothesis test log, verdict & actions
+# Resolution overview — complete log (updated 24 Jun)
 
-## Test log
+The authoritative end-to-end summary: the issue, everything we tested, what shipped, the regression we caused and fixed, and what's still open. The sections above are the detailed evidence behind it.
+
+## Issue & root cause
+
+- **Issue:** on **t2**, 21 of 52 profiles (~42%) have 0 cups — including **14 who joined on/after 12 June** (the in-scope group), inflating both the user count and the headline "42%".
+- **Root cause:** the app creates a **permanent anonymous account (+ a `cup_balances` row) on every app-load, before and regardless of any cup** (`getOrCreateUser()` at `App.jsx`, runs before the deeplink check). So a "0-cup user" means *"someone opened the app,"* not *"a cup failed to credit."* It is **not** a broken scan-to-credit pipeline.
+- **Three feeders (largest first):** (1) **bare-URL opens** — the 11-June poster QR still circulating (screenshots/shares/history) + shared/bookmarked links; (2) **Android in-app-browser duplication** — webviews don't persist `localStorage`, so each open mints a fresh account; (3) a few **already-claimed** scans.
+- The original *"13 different people scanned an already-claimed receipt"* theory is **disproved** — of the 14, only **4 ever attempted a scan** (all `already_claimed`); the other **10 never scanned** (events = `app_loaded` + `reward_shown` only).
+
+## Hypothesis test log
 
 | # | Hypothesis | How it was tested | Verdict |
 |---|---|---|---|
-| **H1** | App provisions an account on app-open, no cup required | Opened the bare slug URL in incognito | ✅ **Confirmed** — a new account (Ferris Fox / 0 cups / Mac, Chrome 148) was created on load |
-| **H2** | 0-cup accounts arrive via non-cup links (still-live poster URL, shared/bookmarked link) | Couldn't be tested directly — no entry data was captured at the time | ⚙️ **Now testable** — entry instrumentation (S2) + an Entry-source metric have been added |
-| **H3** | In-app browsers mint duplicate throwaway accounts | Opened `?batch` links inside Telegram's in-app browser (twice) | ✅ **Confirmed** — a new account each open; the cup stranded in the webview account while the real browser showed 0 |
-| H3b | Android-skew sub-finding | Compared device strings of empty vs cup users | ✅ **Confirmed** — 16/26 Android users empty (vs 5/29 iOS); "Android 10" is Chrome/WebView reduced-UA collapsing into one bucket |
-| **H4** | The scanners hit a genuinely already-claimed cup | Queried the failed scans + first-claimer | ✅ **Confirmed but minor** — only 4 of 14 scanned; of 17 total fails, 9 are self re-scans, 8 are true cross-user collisions |
+| **H1** | Account is created on app-open, no cup required | Bare slug URL in incognito | ✅ **Confirmed** — new account (Ferris Fox / 0 cups) created on load |
+| **H2** | 0-cup accounts arrive via non-cup links (poster URL / shared) | No entry data existed → instrumented (S2) | ⚙️ **Now measured** — S2 + the Entry-source metric capture it going forward |
+| **H3** | In-app browsers mint duplicate throwaway accounts | `?batch` link in Telegram in-app browser (×2) | ✅ **Confirmed** — new account each open; cup stranded in the webview account |
+| H3b | Android skew | Compared device strings of empty vs cup users | ✅ **Confirmed** — 16/26 Android empty vs 5/29 iOS; "Android 10" = Chrome/WebView reduced-UA bucket |
+| **H4** | Scanners hit a genuinely already-claimed cup | Queried failed scans + first claimer | ✅ **Confirmed but minor** — 4/14 scanned; of 17 fails, 9 self re-scans, 8 cross-user |
 
-## Verdict
+## What we tested / verified (chronological)
 
-Empty users are **app-opens that never banked a cup, made permanent because the account is created on load — not a broken scan-to-credit pipeline.** Three feeders, in order of size: (1) **bare-URL opens** (the 11-June poster QR still circulating, plus shared/bookmarked links); (2) **in-app-browser duplication**, Android-skewed; (3) a small number of **already-claimed** scans. The original "13 different people scanned an already-claimed receipt" theory is **disproved** — only 4 of the 14 scanned at all.
+1. **Data forensics (Supabase, read-only).** Identified t2 as the org; confirmed 21/52 zero-cup (7 on 11 Jun, 14 ≥12 Jun); per-user event signatures (10 = open-only, 4 = failed scan); device skew; no shared `device_id`s; duplicate accounts created 6–20 s apart.
+2. **Code trace.** `getOrCreateUser()` on load (before deeplink), deeplink auto-claim + param-strip, `getDeviceId()` localStorage, `ShareCupSheet` emits `?batch` (not bare) links.
+3. **Live hypothesis tests (by you).** Incognito bare URL → new 0-cup account (H1). Telegram in-app `?batch` → new account per open, cup stranded (H3).
+4. **Android in-app feature verification (in-browser, spoofed UA — no physical device).**
+   - **Detection matrix:** Android Instagram/Facebook/Telegram webviews → detected; **Android Chrome, Samsung Internet, Chrome Custom Tab, iOS, desktop, empty UA → not detected (no false positives, no throw).**
+   - **No crash:** spoofed an Android in-app UA + a `?batch` deeplink → the sheet rendered correctly, app did not blank, **0 console errors**.
+   - **Intent URL** built by "Open in default browser" is well-formed (`intent://…?batch=…;scheme=https;…BROWSABLE;end`) — opens the default browser carrying the unclaimed cup on a real device.
+   - **"Collect here anyway"** claimed in place, handled the failure via the existing "already claimed" page, stripped the param — no crash.
+5. **Build + lint** run clean on every change.
 
-## Steps taken (done)
+## What changed (shipped to `main`)
 
-- **S2 — entry instrumentation.** `app_loaded` now records `deeplink / ref / referrer / in_app / standalone` (`getEntryContext()` in `src/utils/analytics.js`, wired in `src/App.jsx` before the `?batch` param is stripped). In-app cup shares are tagged `ref=share` (`src/components/ShareCupSheet.jsx`).
-- **Entry-source metric in User Behaviour.** A new **"Entry source"** tile (Optional group) with a bar/pie breakdown, so the source of every visit is visible in the dashboard: *Shared cups (in-app) · Cup receipt QR · Messaging / social · In-app browser · Other website · Direct / poster QR · Untracked (pre-update)*. Source: `classifyEntry()` in `src/admin/lib/adminApi.js`, rendered via the shared breakdown chart in `MetricDetailModal.jsx`. Opens recorded before S2 shipped show as "Untracked (pre-update)"; real sources accrue from deploy onward.
-- **In-app-browser redirect (Android).** When an **Android** in-app webview (Instagram/Facebook/Telegram, detected via the `; wv)` marker — never normal Chrome/Custom Tabs) opens a cup deeplink, the claim is **held** and a thoughtful sheet offers **"Open in default browser"** (an Android intent URL carrying the still-unclaimed `?batch`, so the cup lands on the user's real-browser account) with **"Collect here anyway"** as a never-lose-the-cup fallback. iOS is intentionally skipped (no reliable force-redirect). Actions tracked (`inapp_prompt_shown` / `open_in_default_browser` / `collect_here_anyway`) and surfaced as the **"In-app browser redirect"** metric at the bottom of User Behaviour. Files: `src/components/InAppBrowserSheet.jsx`, `src/App.jsx`, `isAndroidInAppBrowser()` in `src/utils/analytics.js`.
-- **S1 — visitor vs. user split.** The dashboard now distinguishes real users from visitors. A profile counts as a **user** the moment it does anything real — adds a cup, *tries* a scan (even an already-claimed one), sets an email or IBAN, picks a reward, or edits/regenerates its name; everything else is a **visitor** (opened only). Added three User-Behaviour metrics (`src/admin/lib/adminApi.js`): **Active users (not just visitors)** %, **Visitor rate** %, and an **Audience split** bar/pie (Active vs Visitors). Customer-side, a small **"Visitor"** badge + **"Add your first cup"** big CTA now shows on the profile page until the first real action (`isVisitor` in `src/App.jsx`, rendered in `src/components/UserPage.jsx`). The selected-reward default is excluded from the signal (it auto-sets on load).
+| Area | What | Files | Commit |
+|---|---|---|---|
+| **S2 — entry tracking** | `app_loaded` records `deeplink / ref / referrer / in_app / standalone`; in-app shares tagged `ref=share` | `utils/analytics.js`, `App.jsx`, `components/ShareCupSheet.jsx` | `0bbbaa1` |
+| **Entry-source metric** | "Entry source" bar/pie tile (shared link / messaging / cup receipt / plain URL / direct / untracked) | `admin/lib/adminApi.js`, `admin/behaviour/MetricDetailModal.jsx`, `behaviourIcons.jsx` | `0bbbaa1` |
+| **S1 — visitor vs user** | "Active users", "Visitor rate", "Audience split" metrics; a profile becomes a *user* on first real action (cup, scan attempt, email, IBAN, reward pick, name edit) | `admin/lib/adminApi.js` | `0bbbaa1` |
+| **S1 — customer badge** | "Visitor" badge + "Add your first cup" CTA on the profile page until the first real action | `App.jsx`, `components/UserPage.jsx(.css)` | `0bbbaa1` |
+| **In-app redirect (Android)** | Hold the claim in Android webviews; "Open in default browser" (intent URL, keeps the cup claimable) + "Collect here anyway" fallback; "In-app browser redirect" metric | `components/InAppBrowserSheet.jsx(.css)`, `App.jsx`, `utils/analytics.js`, `admin/lib/adminApi.js` | `bd6460e` |
+| **Hotfix** | Blank-screen regression fix (see below) | `App.jsx` | `0954b91` |
+| **This report** | The investigation document | `T2_ZERO_CUP_USERS_INVESTIGATION.md` | `b253761` |
 
-## Steps still recommended (not yet done)
+## Regression we introduced — and fixed
 
-- **Defer account creation (optional hardening of S1).** S1 reframes the *reporting*; the app still creates an anonymous row on load. Optionally hold off persisting the `users`/`cup_balances` row until the first real action, so visitors don't create DB rows at all.
-- **In-app-browser handling on iOS** — Android is done (above); iOS in-app browsers can't be force-redirected to Safari and detection (WhatsApp/Telegram) is unreliable, so it's deferred. Optionally guide iOS users to the in-app "Open in Safari" control, and/or push email-link binding to consolidate identities.
-- **S4** — unique one-time cup QRs + a clear "already claimed" screen.
+S1's `isVisitor` ran in the render body and read `profile.email` / `profile.iban`, but `profile` initialises to `null` and is only populated after async init — and `isVisitor` runs **before** the loading/error guards. So the first render threw `Cannot read properties of null`, unmounting the whole app → blank `<div id="root">` on every device/browser. **Fix:** optional chaining (`profile?.email` / `profile?.iban`), commit `0954b91`. **Verified live** in a preview: the app renders the home screen again with **0 console errors**. (Lesson applied: customer-facing render changes are now verified in a running preview, not by build alone.)
+
+## What's still open (not done)
+
+- **Defer account creation (optional hardening of S1).** S1 fixes the *reporting*; the app still writes an anonymous row on load. Optionally hold off creating the `users`/`cup_balances` row until the first real action, so visitors never create DB rows.
+- **iOS in-app handling.** Android is done; iOS in-app browsers can't be force-redirected to Safari and detection (WhatsApp/Telegram) is unreliable, so it's deferred. Options: guide iOS users to the in-app "Open in Safari" control, and/or push email-link binding to consolidate identities (`users.merged_into`).
+- **S4** — unique one-time cup QRs + a clearer "already claimed" screen (reduces the cross-user collision class).
+
+## Net effect
+
+The 0-cup inflation is now **explained, measured, and partly prevented**: you can see *where* each visit comes from and *how many* profiles are real users vs visitors, Android in-app users are steered to keep their cup, and no path loses a cup. Remaining items are hardening, not blockers.

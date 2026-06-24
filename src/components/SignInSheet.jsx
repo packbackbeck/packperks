@@ -197,6 +197,13 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
     e.preventDefault();
     if (!email.trim()) return;
     setError(null);
+    // Already signed in to this exact email? There's nothing to restore —
+    // say so plainly instead of letting the merge return a vague error.
+    if (currentEmail && currentEmail.trim().toLowerCase() === email.trim().toLowerCase()) {
+      setError("You're already signed in with this email on this device — your cups are already here.");
+      setStatus('restore_email');
+      return;
+    }
     setStatus('restore_sending');
     try {
       await requestRestoreOtp(email);
@@ -235,7 +242,9 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
             ? 'That code expired. Tap "Send a new code" below to get a fresh one.'
             : code === 'invalid_token' || /invalid/i.test(code || '')
               ? "That code doesn't match. Double-check the email — codes are 6 digits, no spaces."
-              : (code || 'Something went wrong verifying the code.');
+              : code === 'update_failed' || code === 'survivor_update_failed' || code === 'merge_balance_failed'
+                ? "Looks like you're already signed in to this account on this device — your cups should already be here. Pull to refresh to check."
+                : (code || 'Something went wrong verifying the code.');
       setError(friendly);
       setStatus('restore_code');
     }

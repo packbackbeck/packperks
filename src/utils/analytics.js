@@ -175,4 +175,23 @@ function isAndroidInAppBrowser() {
   return /;\s*wv\)/i.test(ua) || /FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\//i.test(ua);
 }
 
-export { EVENTS, track, setAnalyticsContext, getEntryContext, isAndroidInAppBrowser };
+// iOS in-app browsers we can ACTUALLY detect from the UA (Facebook,
+// Instagram, Line, WeChat, the Google app, TikTok, Snapchat, Pinterest).
+// WhatsApp / Telegram / plain SFSafariViewController look like Safari and
+// are intentionally NOT matched — so normal Safari/Chrome iOS users never
+// trip this. We can't force-open Safari on iOS, so the sheet only guides.
+function isIosInAppBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (!/iPhone|iPad|iPod/i.test(ua)) return false;
+  return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\/|musical_ly|Bytedance|Snapchat|Pinterest/i.test(ua);
+}
+
+/** 'android' | 'ios' | null — which in-app webview (if any) we're inside. */
+function getInAppBrowserKind() {
+  if (isAndroidInAppBrowser()) return 'android';
+  if (isIosInAppBrowser()) return 'ios';
+  return null;
+}
+
+export { EVENTS, track, setAnalyticsContext, getEntryContext, isAndroidInAppBrowser, getInAppBrowserKind };

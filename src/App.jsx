@@ -26,7 +26,7 @@ import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
-import { track, EVENTS, setAnalyticsContext, getEntryContext, isAndroidInAppBrowser } from './utils/analytics';
+import { track, EVENTS, setAnalyticsContext, getEntryContext, getInAppBrowserKind } from './utils/analytics';
 import {
   getOrCreateUser,
   generateInitialProfile,
@@ -502,14 +502,15 @@ export default function App() {
         if (urlBatch || urlCups) {
           const parsed = parseCupQr(window.location.href);
           if (parsed) {
-            if (isAndroidInAppBrowser()) {
-              // Android in-app webview: DON'T claim or strip the param yet —
-              // the cup would strand in a throwaway account. Hold it and let
-              // the user reopen in their default browser (where it claims
-              // onto their real account). "Collect here anyway" is the safe
+            const inAppKind = getInAppBrowserKind();
+            if (inAppKind) {
+              // In-app webview (Android, or a detectable iOS app): DON'T
+              // claim or strip the param yet — the cup would strand in a
+              // throwaway account. Hold it and prompt the user to open in
+              // their real browser. "Collect here anyway" is the safe
               // fallback. The param stays in the URL so both paths work.
-              track(EVENTS.INAPP_PROMPT_SHOWN);
-              setInAppClaim({ parsed });
+              track(EVENTS.INAPP_PROMPT_SHOWN, { platform: inAppKind });
+              setInAppClaim({ parsed, platform: inAppKind });
             } else {
               // Normal browser (incl. iOS, desktop, Chrome Custom Tabs):
               // unchanged — clear the param so a refresh doesn't re-trigger,
@@ -631,16 +632,24 @@ export default function App() {
   // the phone's default browser via an Android intent URL, carrying the
   // ?batch param so the claim lands on the real-browser account.
   const handleOpenInDefaultBrowser = () => {
-    track(EVENTS.OPEN_IN_DEFAULT_BROWSER);
+    track(EVENTS.OPEN_IN_DEFAULT_BROWSER, { platform: inAppClaim?.platform });
     setInAppRedirecting(true);
     try {
-      const u = new URL(window.location.href); // param was deliberately kept
-      const intentUrl =
-        `intent://${u.host}${u.pathname}${u.search}` +
-        `#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
-      window.location.href = intentUrl;
+      const href = window.location.href; // param was deliberately kept
+      if (inAppClaim?.platform === 'ios') {
+        // iOS can't be force-redirected reliably. Best-effort: the
+        // x-safari- scheme opens Safari from some in-app browsers; if it's
+        // ignored the sheet stays with manual "tap ••• → Open in Safari"
+        // guidance + "Collect here anyway", so nothing is made worse.
+        window.location.href = 'x-safari-' + href;
+      } else {
+        const u = new URL(href);
+        window.location.href =
+          `intent://${u.host}${u.pathname}${u.search}` +
+          `#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
+      }
     } catch (e) {
-      console.warn('open-in-default-browser failed:', e);
+      console.warn('open-in-browser failed:', e);
     }
   };
   // Fallback / explicit choice: claim right here (in the webview). Never
@@ -1197,6 +1206,7 @@ export default function App() {
           default browser before the cup strands in a throwaway account. */}
       <InAppBrowserSheet
         open={!!inAppClaim}
+        platform={inAppClaim?.platform}
         redirecting={inAppRedirecting}
         onOpenDefaultBrowser={handleOpenInDefaultBrowser}
         onCollectHere={handleCollectHere}

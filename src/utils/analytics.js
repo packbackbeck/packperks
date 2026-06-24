@@ -49,6 +49,10 @@ const EVENTS = {
   NAME_EDIT_OPENED:       'name_edit_opened',
   NAME_REGENERATED:       'name_regenerated',
   REWARD_CARD_OPENED:     'reward_card_opened',
+  // ── In-app browser redirect (Android) ──
+  INAPP_PROMPT_SHOWN:     'inapp_prompt_shown',
+  OPEN_IN_DEFAULT_BROWSER:'open_in_default_browser',
+  COLLECT_HERE_ANYWAY:    'collect_here_anyway',
   // ── UI events (console-only) ──
   CUP_ADDED:              'cup_added',
 };
@@ -68,6 +72,9 @@ const PERSISTED = new Set([
   EVENTS.WITHDRAW_ALL_CUPS,
   EVENTS.TERMS_OPENED,
   EVENTS.SHARE_CUP,
+  EVENTS.INAPP_PROMPT_SHOWN,
+  EVENTS.OPEN_IN_DEFAULT_BROWSER,
+  EVENTS.COLLECT_HERE_ANYWAY,
   EVENTS.ADD_CUPS_OPENED,
   EVENTS.BALANCE_OPENED,
   EVENTS.ACCOUNT_OPENED,
@@ -151,4 +158,21 @@ function getEntryContext() {
   };
 }
 
-export { EVENTS, track, setAnalyticsContext, getEntryContext };
+/**
+ * True only for Android in-app webviews — where localStorage isn't shared
+ * with the user's real browser, so a claimed cup strands in a throwaway
+ * account. Keyed off the Android System WebView marker ("; wv)"), which
+ * backs in-app browsers (Instagram, Facebook, Telegram, …). Normal Chrome,
+ * Samsung Internet, and Chrome Custom Tabs do NOT include it, so real
+ * browsers are never matched. iOS is intentionally excluded for now (its
+ * in-app browsers can't be force-redirected to Safari, and detection of
+ * WhatsApp/Telegram there is unreliable).
+ */
+function isAndroidInAppBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (!/Android/i.test(ua)) return false;
+  return /;\s*wv\)/i.test(ua) || /FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\//i.test(ua);
+}
+
+export { EVENTS, track, setAnalyticsContext, getEntryContext, isAndroidInAppBrowser };

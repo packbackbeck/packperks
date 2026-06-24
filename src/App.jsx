@@ -6,6 +6,7 @@ import FeaturedReward from './components/FeaturedReward';
 import GoalSection from './components/GoalSection';
 import Modal from './components/Modal';
 import UserPage from './components/UserPage';
+import InAppBrowserSheet from './components/InAppBrowserSheet';
 import ReceiptPage from './components/ReceiptPage';
 import SuccessPage from './components/SuccessPage';
 import RewardDetailSheet from './components/RewardDetailSheet';
@@ -25,7 +26,7 @@ import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
-import { track, EVENTS, setAnalyticsContext, getEntryContext } from './utils/analytics';
+import { track, EVENTS, setAnalyticsContext, getEntryContext, isAndroidInAppBrowser } from './utils/analytics';
 import {
   getOrCreateUser,
   generateInitialProfile,
@@ -246,6 +247,10 @@ export default function App() {
   // anything real this session (scan attempt, name/email/IBAN edit, reward
   // pick); persisted signals (cups, email, IBAN) cover it across reloads.
   const [didEngage, setDidEngage] = useState(false);
+  // Android in-app browser hit a cup deeplink: hold the claim and offer to
+  // reopen in the default browser. { parsed } = the cup payload, kept unclaimed.
+  const [inAppClaim, setInAppClaim] = useState(null);
+  const [inAppRedirecting, setInAppRedirecting] = useState(false);
 
   /* ── Navigation ── */
   const [page, setPage] = useState('home');
@@ -497,14 +502,22 @@ export default function App() {
         if (urlBatch || urlCups) {
           const parsed = parseCupQr(window.location.href);
           if (parsed) {
-            // Clear the param so a refresh doesn't re-trigger.
-            window.history.replaceState({}, '', window.location.pathname);
-            // Small delay so the home screen renders first, then the
-            // claim result lands on top instead of flashing.
-            // Pass user.id directly — handleCupScan closes over the
-            // *initial* render's userId state (null) and would silently
-            // return early without this override.
-            setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }, user.id), 100);
+            if (isAndroidInAppBrowser()) {
+              // Android in-app webview: DON'T claim or strip the param yet —
+              // the cup would strand in a throwaway account. Hold it and let
+              // the user reopen in their default browser (where it claims
+              // onto their real account). "Collect here anyway" is the safe
+              // fallback. The param stays in the URL so both paths work.
+              track(EVENTS.INAPP_PROMPT_SHOWN);
+              setInAppClaim({ parsed });
+            } else {
+              // Normal browser (incl. iOS, desktop, Chrome Custom Tabs):
+              // unchanged — clear the param so a refresh doesn't re-trigger,
+              // then auto-claim. Pass user.id directly to avoid the stale
+              // userId closure on first render.
+              window.history.replaceState({}, '', window.location.pathname);
+              setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }, user.id), 100);
+            }
           }
         }
       } catch (err) {
@@ -613,6 +626,33 @@ export default function App() {
   };
 
   const handleAddCup = () => setPage('cup-scan');
+
+  // In-app browser sheet (Android): reopen the still-unclaimed deeplink in
+  // the phone's default browser via an Android intent URL, carrying the
+  // ?batch param so the claim lands on the real-browser account.
+  const handleOpenInDefaultBrowser = () => {
+    track(EVENTS.OPEN_IN_DEFAULT_BROWSER);
+    setInAppRedirecting(true);
+    try {
+      const u = new URL(window.location.href); // param was deliberately kept
+      const intentUrl =
+        `intent://${u.host}${u.pathname}${u.search}` +
+        `#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
+      window.location.href = intentUrl;
+    } catch (e) {
+      console.warn('open-in-default-browser failed:', e);
+    }
+  };
+  // Fallback / explicit choice: claim right here (in the webview). Never
+  // loses the cup; also covers a mis-detected normal browser.
+  const handleCollectHere = () => {
+    track(EVENTS.COLLECT_HERE_ANYWAY);
+    const parsed = inAppClaim?.parsed;
+    setInAppClaim(null);
+    setInAppRedirecting(false);
+    window.history.replaceState({}, '', window.location.pathname);
+    if (parsed) setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }, userId), 50);
+  };
   const handleWithdraw = () => setDirectRefundOpen(true);
 
   /* ── Direct refund ── */
@@ -1153,6 +1193,15 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* Android in-app browser hit a cup deeplink — offer to open in the
+          default browser before the cup strands in a throwaway account. */}
+      <InAppBrowserSheet
+        open={!!inAppClaim}
+        redirecting={inAppRedirecting}
+        onOpenDefaultBrowser={handleOpenInDefaultBrowser}
+        onCollectHere={handleCollectHere}
+      />
+
       {/* Cup-scan success — modal popup over the live home screen (portaled
           to <body>), so the customer sees their updated balance behind it. */}
       {page === 'cup-scan-success' && (

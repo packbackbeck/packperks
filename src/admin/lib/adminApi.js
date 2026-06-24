@@ -973,6 +973,13 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
     .map(([k, c]) => ({ key: k, label: k, count: c }));
   const totalEntries = [...entryCounts.values()].reduce((s, n) => s + n, 0);
 
+  // In-app browser redirect (Android): prompt shown → opened in default
+  // browser vs collected here anyway vs no choice yet.
+  const inappShown     = ev.filter(e => e.event === 'inapp_prompt_shown').length;
+  const inappOpened    = ev.filter(e => e.event === 'open_in_default_browser').length;
+  const inappCollected = ev.filter(e => e.event === 'collect_here_anyway').length;
+  const inappPending   = Math.max(0, inappShown - inappOpened - inappCollected);
+
   // Customers who shared (a cup / their impact).
   const sharedUsers = new Set(ev.filter(e => e.event === 'share_cup' && e.user_id).map(e => e.user_id)).size;
 
@@ -1107,6 +1114,22 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
         numerator: sharedUsers, denominator: totalUsers,
         numLabel: 'Users who shared', denLabel: 'Total users',
         desc: 'Customers who shared a cup or their impact with someone else.' }),
+    (inappShown > 0
+      ? { measurable: true, id: 'inapp_redirect', group: 'optional', label: 'In-app browser redirect',
+          valueType: 'count', value: null, rawValue: inappShown, valueText: inappShown.toLocaleString(),
+          numerator: inappShown, numLabel: 'Prompts shown', denominator: null, denLabel: null,
+          breakdown: [
+            { key: 'opened', label: 'Opened in default browser', count: inappOpened },
+            { key: 'collected', label: 'Collected here anyway', count: inappCollected },
+            { key: 'pending', label: 'No choice yet', count: inappPending },
+          ],
+          breakdownTitle: 'In-app prompt outcomes', breakdownNoun: 'prompts',
+          desc: 'Android in-app browsers (Instagram/Facebook/Telegram, …) that opened a cup deeplink. We prompt them to open in their default browser so the cup sticks to their real account; this shows what they chose.' }
+      : { measurable: false, id: 'inapp_redirect', group: 'optional', label: 'In-app browser redirect',
+          valueType: 'count', value: null, rawValue: null, numerator: null, denominator: null,
+          breakdown: [],
+          desc: 'Android in-app browsers that opened a cup deeplink, and whether they moved to their default browser to claim.',
+          note: 'No in-app browser prompts recorded yet. Fills in as Android in-app opens hit a cup link.' }),
   ];
 }
 

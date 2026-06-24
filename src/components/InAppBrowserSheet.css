@@ -1,0 +1,98 @@
+.iab-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(28, 24, 20, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: iab-fade 0.2s ease;
+}
+@keyframes iab-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.iab-sheet {
+  width: 100%;
+  max-width: 440px;
+  background: var(--white, #fff);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 22px calc(28px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: iab-slide 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes iab-slide { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+@media (min-width: 520px) {
+  .iab-overlay { align-items: center; }
+  .iab-sheet { border-radius: 22px; padding-bottom: 28px; }
+}
+
+.iab-sheet__grip {
+  width: 40px; height: 4px;
+  border-radius: 999px;
+  background: #E2DCD2;
+  margin: 4px 0 16px;
+}
+.iab-sheet__icon {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(253, 111, 70, 0.12);
+  color: var(--bk-orange, #FD6F46);
+  margin-bottom: 14px;
+}
+.iab-sheet__title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--black, #1D1D1D);
+  margin: 0 0 8px;
+}
+.iab-sheet__body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #6C6259;
+  margin: 0 0 20px;
+  max-width: 320px;
+}
+.iab-sheet__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--bk-orange, #FD6F46);
+  border: none;
+  border-radius: 14px;
+  padding: 15px 18px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(253, 111, 70, 0.32);
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.iab-sheet__cta:hover { filter: brightness(1.06); }
+.iab-sheet__cta:active { transform: translateY(1px); }
+.iab-sheet__cta--alt { background: #1D1D1D; box-shadow: none; }
+
+.iab-sheet__secondary {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6C6259;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+}
+.iab-sheet__secondary:hover { color: var(--black, #1D1D1D); }
+
+.iab-sheet__reassure {
+  font-size: 12px;
+  color: #A79F92;
+  margin: 12px 0 0;
+}

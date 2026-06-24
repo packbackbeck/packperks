@@ -297,8 +297,8 @@ export default function App() {
   const isVisitor =
     (cupCount || 0) === 0 &&
     (lifetimeCups || 0) === 0 &&
-    !(profile.email && String(profile.email).trim()) &&
-    !(profile.iban && String(profile.iban).trim()) &&
+    !(profile?.email && String(profile.email).trim()) &&
+    !(profile?.iban && String(profile.iban).trim()) &&
     !didEngage;
 
   /* Effective section flags: an action button is visible only when

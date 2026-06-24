@@ -54,9 +54,11 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId, orgName
     // Use the batch_id form so the QR stays compact regardless of how
     // many cups are in the share (max-cup-share is 10 so it's a wash,
     // but consistency with the admin batch QR is nice).
+    // ref=share tags the link so an opened account is attributable to an
+    // in-app cup share (vs a poster QR / bare URL) in app_loaded analytics.
     const url = shareResult.batch_id
-      ? `${APP_URL}?batch=${shareResult.batch_id}`
-      : `${APP_URL}?cups=${shareResult.cup_ids.join(',')}`;
+      ? `${APP_URL}?batch=${shareResult.batch_id}&ref=share`
+      : `${APP_URL}?cups=${shareResult.cup_ids.join(',')}&ref=share`;
     QRCodeLib.toDataURL(url, {
       width: 220,
       margin: 2,

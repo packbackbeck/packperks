@@ -25,7 +25,7 @@ import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
-import { track, EVENTS, setAnalyticsContext } from './utils/analytics';
+import { track, EVENTS, setAnalyticsContext, getEntryContext } from './utils/analytics';
 import {
   getOrCreateUser,
   generateInitialProfile,
@@ -242,6 +242,10 @@ export default function App() {
     }
   }, [liveRewards, selectedRewardId]);
   const [claimed, setClaimed] = usePersistedState('claimed', false); // transient UI flag, localStorage is fine
+  // S1: a "visitor" only opened the app. This flips true the moment they do
+  // anything real this session (scan attempt, name/email/IBAN edit, reward
+  // pick); persisted signals (cups, email, IBAN) cover it across reloads.
+  const [didEngage, setDidEngage] = useState(false);
 
   /* ── Navigation ── */
   const [page, setPage] = useState('home');
@@ -281,6 +285,16 @@ export default function App() {
   const otherRewards = liveRewards.filter((r) => r.id !== selectedRewardId);
   const isUnlocked = cupCount >= selectedReward.cupsNeeded;
   const cupsRemaining = Math.max(0, selectedReward.cupsNeeded - cupCount);
+
+  // S1: still just a visitor? No cups, no contact details, and no engaging
+  // action this session. (selectedRewardId is excluded — it defaults to the
+  // featured reward on load, so its presence doesn't mean they picked one.)
+  const isVisitor =
+    (cupCount || 0) === 0 &&
+    (lifetimeCups || 0) === 0 &&
+    !(profile.email && String(profile.email).trim()) &&
+    !(profile.iban && String(profile.iban).trim()) &&
+    !didEngage;
 
   /* Effective section flags: an action button is visible only when
    * BOTH the feature flag (sidebar Quick Settings) AND the design
@@ -393,7 +407,10 @@ export default function App() {
         // Funnel analytics: tie this session to the resolved org + user,
         // then mark the app as loaded (top of the feasibility-test funnel).
         setAnalyticsContext({ orgId: org?.id, userId: user.id });
-        track(EVENTS.APP_LOADED, { slug: pathSlug || null });
+        // Capture entry context BEFORE the deeplink's ?batch param is
+        // stripped below, so we can later attribute 0-cup accounts to a
+        // shared link / in-app browser / bare URL.
+        track(EVENTS.APP_LOADED, { slug: pathSlug || null, ...getEntryContext() });
         // Detect the device once per session and push it to Supabase so
         // the admin Users tab can show what kind of phone is using the
         // app. We only re-push if it changed (e.g. user switched
@@ -579,6 +596,7 @@ export default function App() {
 
   /* ── Profile handler ── */
   const handleSaveProfile = (updates) => {
+    setDidEngage(true); // editing name / email / IBAN means they're no longer just a visitor
     setProfile((prev) => ({ ...prev, ...updates }));
     if (userId) persist(updateUserProfile(userId, updates));
   };
@@ -587,6 +605,7 @@ export default function App() {
   const handlePickReward = (id) => {
     const reward = rewards.find((r) => r.id === id);
     track(EVENTS.REWARD_SELECTED, { reward_id: id, reward_name: reward?.name, cup_count: cupCount });
+    setDidEngage(true); // actively picking a reward = a real user, not a visitor
     setSelectedRewardId(id);
     setClaimed(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -822,6 +841,7 @@ export default function App() {
   // hasn't happened yet. Passing user.id directly sidesteps the race.
   const handleCupScan = async (parsed, meta = {}, _overrideUserId) => {
     track(EVENTS.CUP_ADDED);
+    setDidEngage(true); // any scan attempt (even an already-claimed one) = a real user
     const uid = _overrideUserId || userId;
     if (!uid) return;
 
@@ -1018,6 +1038,7 @@ export default function App() {
           authEmail={authEmail}
           onOpenSignIn={() => setShowSignIn(true)}
           onAddCup={handleAddCup}
+          isVisitor={isVisitor}
           onWithdraw={showRefund ? handleWithdraw : null}
           onOpenShare={showShare ? () => setShareSheetOpen(true) : null}
           onOpenNextCupFree={showNextCupFree ? () => setShareSheetOpen(true) : null}

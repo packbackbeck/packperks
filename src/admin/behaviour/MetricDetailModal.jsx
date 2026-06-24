@@ -39,16 +39,17 @@ function MetricTooltip({ active, payload, label, valueType }) {
   );
 }
 
-function BreakdownTip({ active, payload, total }) {
+function BreakdownTip({ active, payload, total, noun = 'clicks' }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload || {};
   const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
+  const unit = row.count === 1 ? noun.replace(/s$/, '') : noun;
   return (
     <div className="ub-tip">
       <div className="ub-tip__label">{row.label}</div>
       <div className="ub-tip__val">
         <span className="ub-tip__dot" style={{ background: row._color || ACCENT }} />
-        {fmtNum(row.count)} {row.count === 1 ? 'click' : 'clicks'} · {pct}%
+        {fmtNum(row.count)} {unit} · {pct}%
       </div>
     </div>
   );
@@ -78,7 +79,7 @@ function trendOf(m) {
 
 /* Per-item breakdown: counts per button as a bar chart, toggleable to a
  * pie with percentages. Used for the Button-clicks metric. */
-function ClickBreakdown({ items }) {
+function ClickBreakdown({ items, title = 'Clicks by button', noun = 'clicks' }) {
   const [view, setView] = useState('bar');
   const rows = items.map((b, i) => ({ ...b, _color: PALETTE[i % PALETTE.length] }));
   const total = rows.reduce((s, b) => s + b.count, 0);
@@ -88,8 +89,8 @@ function ClickBreakdown({ items }) {
     <div className="ub-bd">
       <div className="ub-bd__head">
         <div>
-          <h3 className="ub-bd__title">Clicks by button</h3>
-          <p className="ub-bd__sub">{fmtNum(total)} tracked interactions across {rows.length} buttons</p>
+          <h3 className="ub-bd__title">{title}</h3>
+          <p className="ub-bd__sub">{fmtNum(total)} {noun} across {rows.length} categories</p>
         </div>
         <div className="ub-seg" role="tablist" aria-label="Chart type">
           <button role="tab" aria-selected={view === 'bar'} className={`ub-seg__btn${view === 'bar' ? ' is-active' : ''}`} onClick={() => setView('bar')}>
@@ -109,7 +110,7 @@ function ClickBreakdown({ items }) {
             <CartesianGrid strokeDasharray="3 3" stroke="#F0ECE5" horizontal={false} />
             <XAxis type="number" tick={{ fontSize: 11, fill: '#9E9A93' }} tickLine={false} axisLine={false} allowDecimals={false} />
             <YAxis type="category" dataKey="label" width={92} tick={{ fontSize: 12, fill: '#4A443D' }} tickLine={false} axisLine={false} />
-            <Tooltip cursor={{ fill: 'rgba(83,51,165,0.05)' }} content={<BreakdownTip total={total} />} />
+            <Tooltip cursor={{ fill: 'rgba(83,51,165,0.05)' }} content={<BreakdownTip total={total} noun={noun} />} />
             <Bar dataKey="count" radius={[0, 6, 6, 0]} isAnimationActive={false}>
               {rows.map(r => <Cell key={r.key} fill={r._color} />)}
               <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 700, fill: '#4A443D' }} />
@@ -126,7 +127,7 @@ function ClickBreakdown({ items }) {
                 labelLine={false} stroke="#fff" strokeWidth={2}>
                 {rows.map(r => <Cell key={r.key} fill={r._color} />)}
               </Pie>
-              <Tooltip content={<BreakdownTip total={total} />} />
+              <Tooltip content={<BreakdownTip total={total} noun={noun} />} />
             </PieChart>
           </ResponsiveContainer>
           <ul className="ub-bd__legend">
@@ -219,8 +220,8 @@ export default function MetricDetailModal({ metric: m, effectiveGroup, groups, o
           )}
         </div>
 
-        {/* Middle: per-button breakdown (button_clicks) OR the time chart */}
-        {hasBreakdown ? <ClickBreakdown items={m.breakdown} /> : timeChart}
+        {/* Middle: a per-item breakdown (button_clicks / entry_source) OR the time chart */}
+        {hasBreakdown ? <ClickBreakdown items={m.breakdown} title={m.breakdownTitle} noun={m.breakdownNoun} /> : timeChart}
 
         {/* Tailored figures */}
         {m.measurable ? (
@@ -269,7 +270,7 @@ export default function MetricDetailModal({ metric: m, effectiveGroup, groups, o
         {/* Time-series chart sits at the very bottom for breakdown metrics */}
         {hasBreakdown && (
           <div className="ub-detail__bottom">
-            <h3 className="ub-bd__title">Clicks over time</h3>
+            <h3 className="ub-bd__title">{m.breakdownNoun === 'visits' ? 'Visits over time' : 'Clicks over time'}</h3>
             {timeChart}
           </div>
         )}

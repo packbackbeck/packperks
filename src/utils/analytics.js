@@ -124,4 +124,31 @@ function track(eventName, props = {}) {
   }
 }
 
-export { EVENTS, track, setAnalyticsContext };
+/**
+ * Capture how this visit arrived, for attributing accounts that end up with
+ * 0 cups. Attached to the APP_LOADED event so the admin can tell, per user,
+ * whether they came from a shared link, an in-app browser, a cup deeplink,
+ * or a bare URL (e.g. a circulating poster QR).
+ *
+ *   deeplink   'batch' | 'cups' | null  — was a cup attached to the URL?
+ *   ref        e.g. 'share'             — tag we add to shared links
+ *   referrer   hostname of document.referrer (null for QR/camera/direct)
+ *   in_app     true for known in-app webviews (FB/IG/Line/WeChat/Android wv)
+ *   standalone true if launched from an installed PWA
+ */
+function getEntryContext() {
+  if (typeof window === 'undefined') return {};
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  const sp = new URLSearchParams(window.location.search);
+  let referrer = null;
+  try { if (document.referrer) referrer = new URL(document.referrer).hostname; } catch { /* leave referrer null */ }
+  return {
+    deeplink: sp.get('batch') ? 'batch' : (sp.get('cups') ? 'cups' : null),
+    ref: sp.get('ref') || null,
+    referrer,
+    in_app: /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Twitter|TikTok|; wv\)|GSA\//i.test(ua),
+    standalone: !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches),
+  };
+}
+
+export { EVENTS, track, setAnalyticsContext, getEntryContext };

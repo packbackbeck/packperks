@@ -661,6 +661,64 @@
 }
 
 /* ── Cups ⇄ value box (mirrors the refund-sheet compare box) ── */
+/* ── Visitor nudge (S1): shown until the first cup / any real action ── */
+.user-page__visitor {
+  width: 330px;
+  background: var(--white);
+  border: 1.5px dashed var(--bk-orange);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-screen);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+.user-page__visitor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bk-orange);
+  background: rgba(253, 111, 70, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.user-page__visitor-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--black);
+  margin: 4px 0 0;
+}
+.user-page__visitor-sub {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6C6259;
+  margin: 0 0 4px;
+  max-width: 260px;
+}
+.user-page__visitor-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--white);
+  background: var(--bk-orange);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 13px 18px;
+  cursor: pointer;
+}
+.user-page__visitor-cta:hover { filter: brightness(1.07); }
+.user-page__visitor-cta:active { transform: translateY(1px); }
+
 .user-page__value-box {
   display: flex;
   align-items: center;

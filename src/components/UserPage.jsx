@@ -232,6 +232,7 @@ export default function UserPage({
   authEmail = null,
   onOpenSignIn,
   onAddCup,
+  isVisitor = false,
   onWithdraw,
   onShareCup,
   onOpenShare,
@@ -435,6 +436,27 @@ export default function UserPage({
           )}
         </div>
       </div>
+
+      {/* ── Visitor nudge ── shown until they bank their first cup (or take
+            any real action). Small "Visitor" badge + a big add-first-cup CTA. */}
+      {isVisitor && onAddCup && (
+        <div className="user-page__visitor">
+          <span className="user-page__visitor-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" />
+            </svg>
+            Visitor
+          </span>
+          <h3 className="user-page__visitor-title">Add your first cup</h3>
+          <p className="user-page__visitor-sub">Return a cup to start collecting — then unlock cashback rewards.</p>
+          <button type="button" className="user-page__visitor-cta" onClick={onAddCup}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add your first cup
+          </button>
+        </div>
+      )}
 
       {/* ── Cups ⇄ value box ── cups on the left, euro equivalent on the
             right, with a subtle "≈" between (mirrors the refund compare box). */}

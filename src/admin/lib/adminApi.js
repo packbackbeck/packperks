@@ -858,6 +858,26 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
   const totalUsers = users.length;
   const withEmail  = users.filter(u => u.email && String(u.email).trim()).length;
 
+  // ── Visitor vs. user (S1) ──
+  // A "visitor" only opened the app. The moment someone adds a cup, tries a
+  // scan (even an already-claimed one), sets an email/IBAN, picks a reward,
+  // or edits/regenerates their name, they're a real user. Derived from
+  // persisted state + scan rows + action events so it survives reloads.
+  const scanUserIds = new Set(scans.map(s => s.user_id).filter(Boolean));
+  const ENGAGE_EVENTS = new Set([
+    'reward_selected', 'name_edit_opened', 'name_regenerated', 'email_saved',
+    'reward_claim_attempted', 'withdraw_all_cups', 'direct_refund_opened', 'share_cup',
+  ]);
+  const eventEngagedIds = new Set(ev.filter(e => ENGAGE_EVENTS.has(e.event) && e.user_id).map(e => e.user_id));
+  const isEngagedUser = (u) =>
+    !!(u.email && String(u.email).trim()) ||
+    !!(u.iban && String(u.iban).trim()) ||
+    !!u.selected_reward_id ||
+    scanUserIds.has(u.id) ||
+    eventEngagedIds.has(u.id);
+  const engagedUsers = users.filter(isEngagedUser).length;
+  const visitorUsers = Math.max(0, totalUsers - engagedUsers);
+
   // ── Behavioural events (client_events) ──
   const visitorSessions = new Set(ev.filter(e => e.event === 'app_loaded' && e.session_id).map(e => e.session_id)).size;
 
@@ -925,6 +945,34 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
     .sort((a, b) => b[1] - a[1])
     .map(([k, c]) => ({ key: k, label: ACTION_LABELS[k] || k, count: c }));
 
+  // Entry source — where each visit came from, read from the app_loaded
+  // event's entry context (captured client-side from referrer / deeplink /
+  // ref / in-app UA). Events recorded before that instrumentation shipped
+  // have none of these keys and are bucketed as "Untracked (pre-update)".
+  const MSG_REF = /whatsapp|wa\.me|telegram|t\.me|t\.co|instagram|facebook|fb\.|messenger|twitter|x\.com|tiktok|line|snapchat|reddit|linkedin/;
+  const classifyEntry = (p) => {
+    if (!p || typeof p !== 'object') return 'Untracked (pre-update)';
+    const tracked = ('in_app' in p) || ('deeplink' in p) || ('referrer' in p) || ('ref' in p);
+    if (!tracked) return 'Untracked (pre-update)';
+    const referrer = typeof p.referrer === 'string' ? p.referrer.toLowerCase() : '';
+    if (p.ref === 'share') return 'Shared cups (in-app)';
+    if (p.deeplink === 'batch' || p.deeplink === 'cups') return 'Cup receipt QR';
+    if (referrer && MSG_REF.test(referrer)) return 'Messaging / social';
+    if (p.in_app === true) return 'In-app browser';
+    if (referrer) return 'Other website';
+    return 'Direct / poster QR';
+  };
+  const entryCounts = new Map();
+  for (const e of ev) {
+    if (e.event !== 'app_loaded') continue;
+    const label = classifyEntry(e.props);
+    entryCounts.set(label, (entryCounts.get(label) || 0) + 1);
+  }
+  const entryBreakdown = [...entryCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, c]) => ({ key: k, label: k, count: c }));
+  const totalEntries = [...entryCounts.values()].reduce((s, n) => s + n, 0);
+
   // Customers who shared (a cup / their impact).
   const sharedUsers = new Set(ev.filter(e => e.event === 'share_cup' && e.user_id).map(e => e.user_id)).size;
 
@@ -962,6 +1010,10 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
         numerator: usersWithClaim, denominator: totalUsers,
         numLabel: 'Users who claimed', denLabel: 'Total users',
         desc: 'Users who made at least one claim, out of everyone who used the app.' }),
+    M({ id: 'active_users', group: 'primary', label: 'Active users (not just visitors)',
+        numerator: engagedUsers, denominator: totalUsers,
+        numLabel: 'Active users', denLabel: 'All profiles',
+        desc: 'Profiles that did something real — added a cup, tried a scan (even an already-claimed one), set an email or IBAN, picked a reward, or edited their name. The rest are visitors who only opened the app (e.g. via a shared/poster link), which inflates the raw user count.' }),
 
     // ── Secondary ──
     M({ id: 'emails_input', group: 'secondary', label: 'Emails input rate',
@@ -1011,13 +1063,37 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
       ? { measurable: true, id: 'button_clicks', group: 'optional', label: 'Button clicks',
           valueType: 'count', value: null, rawValue: totalClicks, valueText: totalClicks.toLocaleString(),
           numerator: totalClicks, numLabel: 'Tracked interactions', denominator: null, denLabel: null,
-          breakdown: clickBreakdown,
+          breakdown: clickBreakdown, breakdownTitle: 'Clicks by button', breakdownNoun: 'clicks',
           desc: 'How often each key button is pressed across all visits.' }
       : { measurable: false, id: 'button_clicks', group: 'optional', label: 'Button clicks',
           valueType: 'count', value: null, rawValue: null, numerator: null, denominator: null,
           breakdown: [],
           desc: 'How often each key button is pressed across all visits.',
           note: 'No button interactions recorded yet. Fills in as customers use the app.' }),
+    (totalEntries > 0
+      ? { measurable: true, id: 'entry_source', group: 'optional', label: 'Entry source',
+          valueType: 'count', value: null, rawValue: totalEntries, valueText: totalEntries.toLocaleString(),
+          numerator: totalEntries, numLabel: 'App opens tracked', denominator: null, denLabel: null,
+          breakdown: entryBreakdown, breakdownTitle: 'Visits by source', breakdownNoun: 'visits',
+          desc: 'How visitors reach the app — in-app share, messaging/social, a cup receipt QR, a plain link, or direct. Captured per visit; opens before this was instrumented show as "Untracked".' }
+      : { measurable: false, id: 'entry_source', group: 'optional', label: 'Entry source',
+          valueType: 'count', value: null, rawValue: null, numerator: null, denominator: null,
+          breakdown: [],
+          desc: 'How visitors reach the app — in-app share, messaging/social, a cup receipt QR, a plain link, or direct.',
+          note: 'No app-open events recorded yet. Fills in as customers open the app.' }),
+    M({ id: 'visitor_rate', group: 'optional', label: 'Visitor rate',
+        numerator: visitorUsers, denominator: totalUsers,
+        numLabel: 'Visitors (opened only)', denLabel: 'All profiles',
+        desc: 'Share of profiles that only ever opened the app and never took an action — created by a shared/poster link or an in-app browser. This is the slice of the raw user count that is not a real user.' }),
+    { measurable: true, id: 'audience_split', group: 'optional', label: 'Audience split',
+        valueType: 'count', value: null, rawValue: totalUsers, valueText: totalUsers.toLocaleString(),
+        numerator: totalUsers, numLabel: 'Total profiles', denominator: null, denLabel: null,
+        breakdown: [
+          { key: 'active', label: 'Active users', count: engagedUsers },
+          { key: 'visitor', label: 'Visitors', count: visitorUsers },
+        ],
+        breakdownTitle: 'Active users vs visitors', breakdownNoun: 'profiles',
+        desc: 'Every profile split into active users (did something) vs visitors (only opened the app).' },
     (screenSessions > 0
       ? { measurable: true, id: 'last_screen', group: 'optional', label: 'Most common last screen',
           valueType: 'count', value: null, rawValue: topScreenCount, valueText: topScreen,
@@ -1095,7 +1171,7 @@ async function fetchBehaviourRows() {
     applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at')),
     applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at')),
     applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed, created_at')),
-    applyOrgFilter(supabase.from('users').select('id, email, created_at')),
+    applyOrgFilter(supabase.from('users').select('id, email, iban, selected_reward_id, created_at')),
     applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props')),
   ]);
   return {

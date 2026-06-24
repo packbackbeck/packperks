@@ -108,6 +108,26 @@ const Share = (p) => (
     <path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" />
   </svg>
 );
+const Entry = (p) => (
+  <svg {...base} {...p}>
+    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
+  </svg>
+);
+const UserCheck = (p) => (
+  <svg {...base} {...p}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><polyline points="17 11 19 13 23 9" />
+  </svg>
+);
+const Eye = (p) => (
+  <svg {...base} {...p}>
+    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const Users = (p) => (
+  <svg {...base} {...p}>
+    <path d="M17 21v-2a4 4 0 0 0-3-3.87" /><path d="M9 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="7" cy="7" r="3" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
 const Chart = (p) => (
   <svg {...base} {...p}>
     <path d="M4 4v16h16" /><path d="M7 15l3.5-4 3 2.5L20 7" />
@@ -131,6 +151,10 @@ const ICONS = {
   avg_session: Stopwatch,
   button_clicks: Click,
   last_screen: Phone,
+  entry_source: Entry,
+  active_users: UserCheck,
+  visitor_rate: Eye,
+  audience_split: Users,
   impact_shares: Share,
 };
 

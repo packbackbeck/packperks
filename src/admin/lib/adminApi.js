@@ -1404,11 +1404,27 @@ export async function getAdminUsers() {
     (balances || []).map(b => [b.user_id, { balance: b.balance, lifetime: b.lifetime_cups }])
   );
 
-  return (users || []).map(u => ({
-    ...u,
-    cupBalance: balanceMap[u.id]?.balance || 0,
-    lifetimeCups: balanceMap[u.id]?.lifetime || 0,
-  }));
+  // Anyone who ever attempted a scan (even a failed / already-claimed one)
+  // counts as a real user — same engagement rule as the behaviour metrics.
+  const { data: scanRows } = await applyOrgFilter(
+    supabase.from('cup_scans').select('user_id')
+  );
+  const scanUserIds = new Set((scanRows || []).map(s => s.user_id).filter(Boolean));
+
+  return (users || []).map(u => {
+    const cupBalance = balanceMap[u.id]?.balance || 0;
+    const lifetimeCups = balanceMap[u.id]?.lifetime || 0;
+    // Visitor = only opened the app; becomes a user on any real action
+    // (a cup, a scan attempt, an email/IBAN, or an explicit reward pick).
+    const isVisitor = !(
+      lifetimeCups > 0 || cupBalance > 0 ||
+      (u.email && String(u.email).trim()) ||
+      (u.iban && String(u.iban).trim()) ||
+      u.selected_reward_id ||
+      scanUserIds.has(u.id)
+    );
+    return { ...u, cupBalance, lifetimeCups, isVisitor };
+  });
 }
 
 export async function getUserActivity(userId) {

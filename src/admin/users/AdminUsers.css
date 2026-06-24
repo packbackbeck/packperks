@@ -13,7 +13,58 @@
 .au-header {
   margin-bottom: 24px;
   flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
+
+/* Visitor / User type tag */
+.au-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.au-type--user { color: #1A8737; background: rgba(26, 135, 55, 0.10); }
+.au-type--visitor { color: #8A8175; background: #EFEAE1; }
+
+/* "Show visitors" toggle */
+.au-visitor-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4A443D;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+}
+.au-switch-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.au-switch {
+  width: 38px; height: 22px;
+  border-radius: 999px;
+  background: #D8D2C8;
+  position: relative;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.au-switch__dot {
+  position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+.au-switch-input:checked + .au-switch { background: #5333A5; }
+.au-switch-input:checked + .au-switch .au-switch__dot { transform: translateX(16px); }
+.au-switch-input:focus-visible + .au-switch { outline: 2px solid #5333A5; outline-offset: 2px; }
 .au-header__title { font-size: 22px; font-weight: 800; color: #1A1A1A; margin: 0 0 4px; }
 .au-header__sub   { color: #7A7166; font-size: 13px; margin: 0; }
 

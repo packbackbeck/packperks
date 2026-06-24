@@ -67,6 +67,19 @@ function DeviceBadge({ device }) {
   );
 }
 
+function TypeTag({ visitor }) {
+  return (
+    <span className={`au-type au-type--${visitor ? 'visitor' : 'user'}`} title={visitor ? 'Opened the app but took no action yet' : 'Did something real (cup, scan, email, IBAN, or reward)'}>
+      {visitor ? (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      ) : (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+      )}
+      {visitor ? 'Visitor' : 'User'}
+    </span>
+  );
+}
+
 function SortIcon({ active, dir }) {
   return (
     <span className={`au-sort-icon${active ? ' au-sort-icon--active' : ''}`}>
@@ -317,6 +330,7 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
 
 const SORT_KEYS = {
   name:    (u) => (u.display_name || '').toLowerCase(),
+  type:    (u) => (u.isVisitor ? 1 : 0),
   email:   (u) => (u.email || '').toLowerCase(),
   device:  (u) => (u.device || '').toLowerCase(),
   cups:    (u) => u.cupBalance,
@@ -332,6 +346,7 @@ export default function AdminUsers({ onNavigate }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [sortKey, setSortKey] = useState('joined');
   const [sortDir, setSortDir] = useState('desc');
+  const [showVisitors, setShowVisitors] = useState(true); // default on
 
   const reload = () => {
     setLoading(true);
@@ -357,8 +372,12 @@ export default function AdminUsers({ onNavigate }) {
     if (selectedUser?.id === userId) setSelectedUser(prev => ({ ...prev, ...updates }));
   }
 
+  const visitorCount = useMemo(() => users.filter(u => u.isVisitor).length, [users]);
+  const userCount = users.length - visitorCount;
+
   const filtered = useMemo(() => {
     let list = users;
+    if (!showVisitors) list = list.filter(u => !u.isVisitor);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(u =>
@@ -374,7 +393,7 @@ export default function AdminUsers({ onNavigate }) {
       if (av > bv) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [users, search, sortKey, sortDir]);
+  }, [users, search, sortKey, sortDir, showVisitors]);
 
   const sel = useBulkSelection(filtered);
 
@@ -391,8 +410,20 @@ export default function AdminUsers({ onNavigate }) {
       <div className="au-header">
         <div>
           <h1 className="au-header__title">Users</h1>
-          <p className="au-header__sub">{loading ? 'Loading…' : `${users.length} registered users`}</p>
+          <p className="au-header__sub">
+            {loading ? 'Loading…' : `${userCount} user${userCount === 1 ? '' : 's'} · ${visitorCount} visitor${visitorCount === 1 ? '' : 's'}`}
+          </p>
         </div>
+        <label className="au-visitor-toggle" title="Visitors opened the app but took no action yet">
+          <span>Show visitors</span>
+          <input
+            type="checkbox"
+            className="au-switch-input"
+            checked={showVisitors}
+            onChange={e => setShowVisitors(e.target.checked)}
+          />
+          <span className="au-switch" aria-hidden="true"><span className="au-switch__dot" /></span>
+        </label>
       </div>
 
       <div className="au-layout">
@@ -426,6 +457,7 @@ export default function AdminUsers({ onNavigate }) {
                       />
                     </th>
                     <ThCol label="User" sortKey="name" />
+                    <ThCol label="Type" sortKey="type" style={{ width: 110 }} />
                     <ThCol label="Email" sortKey="email" />
                     <ThCol label="Device" sortKey="device" style={{ width: 160 }} />
                     <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />
@@ -436,7 +468,7 @@ export default function AdminUsers({ onNavigate }) {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={8} className="au-table__empty">
+                    <tr><td colSpan={9} className="au-table__empty">
                       {users.length === 0 ? (
                         <EmptyState
                           icon={
@@ -493,6 +525,7 @@ export default function AdminUsers({ onNavigate }) {
                           </div>
                         </div>
                       </td>
+                      <td><TypeTag visitor={user.isVisitor} /></td>
                       <td className="au-muted" onClick={e => e.stopPropagation()}>
                         <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
                       </td>

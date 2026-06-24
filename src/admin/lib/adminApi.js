@@ -906,6 +906,13 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
     direct_refund_opened: 'Direct refund',
     withdraw_all_cups: 'Withdraw cups',
     terms_opened: 'Terms',
+    add_cups_opened: 'Add more cups',
+    balance_opened: 'Check balance',
+    account_opened: 'Check account',
+    howto_opened: 'How it works',
+    name_edit_opened: 'Edit name',
+    name_regenerated: 'Regenerate name',
+    reward_card_opened: 'View reward',
   };
   const clickCounts = new Map();
   for (const e of ev) {

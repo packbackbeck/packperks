@@ -41,6 +41,14 @@ const EVENTS = {
   WITHDRAW_ALL_CUPS:      'withdraw_all_cups',
   TERMS_OPENED:           'terms_opened',
   SHARE_CUP:              'share_cup',
+  // ── Button taps (persisted for User Behaviour → Button clicks) ──
+  ADD_CUPS_OPENED:        'add_cups_opened',
+  BALANCE_OPENED:         'balance_opened',
+  ACCOUNT_OPENED:         'account_opened',
+  HOWTO_OPENED:           'howto_opened',
+  NAME_EDIT_OPENED:       'name_edit_opened',
+  NAME_REGENERATED:       'name_regenerated',
+  REWARD_CARD_OPENED:     'reward_card_opened',
   // ── UI events (console-only) ──
   CUP_ADDED:              'cup_added',
 };
@@ -60,6 +68,13 @@ const PERSISTED = new Set([
   EVENTS.WITHDRAW_ALL_CUPS,
   EVENTS.TERMS_OPENED,
   EVENTS.SHARE_CUP,
+  EVENTS.ADD_CUPS_OPENED,
+  EVENTS.BALANCE_OPENED,
+  EVENTS.ACCOUNT_OPENED,
+  EVENTS.HOWTO_OPENED,
+  EVENTS.NAME_EDIT_OPENED,
+  EVENTS.NAME_REGENERATED,
+  EVENTS.REWARD_CARD_OPENED,
 ]);
 
 /**

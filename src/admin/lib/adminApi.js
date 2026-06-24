@@ -913,10 +913,10 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
   }
   let totalClicks = 0;
   for (const c of clickCounts.values()) totalClicks += c;
-  const clickBreakdown = [...clickCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const clicksDesc = totalClicks > 0
-    ? 'Share of clicks: ' + clickBreakdown.map(([k, c]) => `${ACTION_LABELS[k]} ${Math.round((c / totalClicks) * 100)}%`).join(', ') + '.'
-    : 'How many times key buttons are pressed and each one\'s share.';
+  // Per-button counts, highest first — the detail view charts these.
+  const clickBreakdown = [...clickCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, c]) => ({ key: k, label: ACTION_LABELS[k] || k, count: c }));
 
   // Customers who shared (a cup / their impact).
   const sharedUsers = new Set(ev.filter(e => e.event === 'share_cup' && e.user_id).map(e => e.user_id)).size;
@@ -1004,10 +1004,12 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
       ? { measurable: true, id: 'button_clicks', group: 'optional', label: 'Button clicks',
           valueType: 'count', value: null, rawValue: totalClicks, valueText: totalClicks.toLocaleString(),
           numerator: totalClicks, numLabel: 'Tracked interactions', denominator: null, denLabel: null,
-          desc: clicksDesc }
+          breakdown: clickBreakdown,
+          desc: 'How often each key button is pressed across all visits.' }
       : { measurable: false, id: 'button_clicks', group: 'optional', label: 'Button clicks',
           valueType: 'count', value: null, rawValue: null, numerator: null, denominator: null,
-          desc: clicksDesc,
+          breakdown: [],
+          desc: 'How often each key button is pressed across all visits.',
           note: 'No button interactions recorded yet. Fills in as customers use the app.' }),
     (screenSessions > 0
       ? { measurable: true, id: 'last_screen', group: 'optional', label: 'Most common last screen',

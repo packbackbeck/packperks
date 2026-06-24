@@ -1,6 +1,7 @@
 import './RewardCard.css';
 import cupIconWhite from '../assets/images/cup-icon-white.svg';
 import { rewardImageStyle } from '../utils/imageTransform';
+import { track, EVENTS } from '../utils/analytics';
 
 // Tag label colour: white by default, switching to dark only when the
 // background is very light or yellowish (where white would be unreadable).
@@ -47,7 +48,7 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
     <article
       className="reward-card"
       aria-label={`${reward.name} — ${isUnlocked ? 'Ready' : `${cupsRemaining} cups remaining`}`}
-      onClick={() => onViewDetail?.(reward)}
+      onClick={() => { track(EVENTS.REWARD_CARD_OPENED, { reward_id: reward.id }); onViewDetail?.(reward); }}
       style={{ cursor: 'pointer' }}
     >
       <div className="reward-card__inner">

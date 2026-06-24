@@ -323,11 +323,13 @@ export default function UserPage({
   };
 
   const handleRegenerate = () => {
+    track(EVENTS.NAME_REGENERATED);
     const fresh = generateProfile();
     saveProfile({ displayName: fresh.displayName, animalIndex: fresh.animalIndex });
   };
 
   const handleEditName = () => {
+    track(EVENTS.NAME_EDIT_OPENED);
     setEditNameValue(profile.displayName);
     setIsEditingName(true);
   };
@@ -455,7 +457,7 @@ export default function UserPage({
 
       {/* ── How it works ── opens the full-screen Stories-style guide ── */}
       {onOpenHowItWorks && (
-        <button type="button" className="user-page__howto" onClick={onOpenHowItWorks}>
+        <button type="button" className="user-page__howto" onClick={() => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); }}>
           <span className="user-page__howto-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />

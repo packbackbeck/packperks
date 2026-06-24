@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { track, EVENTS } from '../utils/analytics';
 import './Header.css';
 import packbackLogo from '../assets/images/packback-logo.png';
 import burgerKingLogo from '../assets/images/burger-king-logo.png';
@@ -81,7 +82,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }
         <button
           type="button"
           className="header__tile header__tile--add"
-          onClick={onAddCup}
+          onClick={() => { track(EVENTS.ADD_CUPS_OPENED); onAddCup?.(); }}
           aria-label="Add more cups"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -95,7 +96,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }
           ref={cupTileRef}
           type="button"
           className="header__tile header__tile--cups"
-          onClick={onBadgeClick}
+          onClick={() => { track(EVENTS.BALANCE_OPENED); onBadgeClick?.(); }}
           aria-label={`${cupCount} cups collected. Tap to open your profile.`}
         >
           <span className="header__tile-count">{cupCount}</span>
@@ -109,7 +110,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }
         <button
           type="button"
           className="header__tile header__tile--user"
-          onClick={onBadgeClick}
+          onClick={() => { track(EVENTS.ACCOUNT_OPENED); onBadgeClick?.(); }}
           aria-label="Open your profile"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

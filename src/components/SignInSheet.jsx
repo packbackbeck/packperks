@@ -6,6 +6,8 @@ import {
   requestRestoreOtp,
   verifyRestoreOtp,
   finaliseRestore,
+  checkEmailSaveOrMerge,
+  mergeByEmail,
 } from '../lib/api';
 import './SignInSheet.css';
 
@@ -44,6 +46,8 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
    *   • 'restore' — recover an existing account on a new device
    *                 (OTP code entry + server-side merge)
    * Each mode has its own status machine (see `status` below). */
+  const mergeFromSave = useRef(false); // true once we've routed Save → merge OTP
+  const [mergeOtherCount, setMergeOtherCount] = useState(0); // for the merge-offer prompt
   const [mode, setMode] = useState('save'); // 'save' | 'restore'
   const [status, setStatus] = useState('idle'); // see comments per-mode below
   const [email, setEmail] = useState('');
@@ -108,7 +112,10 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
     if (!email.trim()) return;
     setError(null);
 
-    // No-verification mode: store the email straight onto the user row.
+    // No-verification mode: check first whether this email is already on
+    // ANOTHER PackPerks account in the same org. If clean → save directly
+    // (frictionless, same as before). If used → DON'T save; route to the
+    // OTP verify + merge flow so we never create another duplicate.
     if (!requireVerification) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
         setError("That email doesn't look quite right — try again.");
@@ -117,9 +124,17 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
       }
       setStatus('sending');
       try {
-        await onSaveEmailDirect?.(email.trim());
-        setCurrentEmail(email.trim());
-        setStatus('savedDirect');
+        const check = await checkEmailSaveOrMerge(email);
+        if (check?.status === 'merge_required') {
+          setMergeOtherCount(check.other_count || 1);
+          setStatus('merge_offer');
+        } else {
+          // Server saved the email; sync local state.
+          setCurrentEmail(email.trim());
+          setStatus('savedDirect');
+          // Best-effort: also notify the parent so its in-memory profile updates.
+          try { await onSaveEmailDirect?.(email.trim()); } catch { /* server already saved */ }
+        }
       } catch (err) {
         setError(err?.message || 'Could not save your email. Please try again.');
         setStatus('error');
@@ -225,8 +240,12 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
     setStatus('restore_verifying');
     try {
       await verifyRestoreOtp(email, otpCode);
-      // Auth session is now in place. Ask the edge function to merge.
-      const result = await finaliseRestore();
+      // Auth session is now in place. Use the merge-all flow if we came
+      // from a duplicate-email save; otherwise use the legacy pairwise
+      // restore (existing "I lost my cups" UX).
+      const result = mergeFromSave.current
+        ? await mergeByEmail()
+        : await finaliseRestore();
       setRestoreResult(result);
       setCurrentEmail(email.trim());
       setStatus('restore_done');
@@ -260,8 +279,27 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
     setError(null);
     setOtpCode('');
     setRestoreResult(null);
+    mergeFromSave.current = false;
     setStatus('idle');
     setMode('save');
+  }
+
+  // From the "merge_offer" step (Save flow detected the email is already
+  // on another account) — send the 6-digit code and switch into the
+  // existing OTP-entry UI. On verify we'll call mergeByEmail (see
+  // mergeFromSave above) instead of the pairwise finaliseRestore.
+  async function handleSendMergeCode() {
+    setError(null);
+    setStatus('restore_sending');
+    try {
+      await requestRestoreOtp(email);
+      mergeFromSave.current = true;
+      setMode('restore');
+      setStatus('restore_code');
+    } catch (err) {
+      setError(err?.message || 'Could not send the code. Please try again.');
+      setStatus('merge_offer');
+    }
   }
 
   if (!open) return null;
@@ -270,6 +308,38 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
     <div className="signin-overlay" onClick={onClose}>
       <div className="signin-sheet" onClick={e => e.stopPropagation()}>
         <button className="signin-close" onClick={onClose} aria-label="Close">×</button>
+
+        {/* Email is already on another account — offer to verify + merge */}
+        {status === 'merge_offer' && (
+          <div className="signin-state">
+            <div className="signin-art">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="9" />
+              </svg>
+            </div>
+            <h2 className="signin-title">This email already has cups</h2>
+            <p className="signin-sub">
+              <strong>{email}</strong> is already linked to {mergeOtherCount > 1 ? `${mergeOtherCount} other accounts` : 'another account'} on PackPerks.
+              <br />To use it here, we'll send a 6-digit code to verify it's you — then combine the cups into one account.
+            </p>
+            {error && <p className="signin-error">{error}</p>}
+            <button
+              type="button"
+              className="signin-btn signin-btn--primary"
+              onClick={handleSendMergeCode}
+              disabled={status === 'restore_sending'}
+            >
+              Send 6-digit code
+            </button>
+            <button
+              type="button"
+              className="signin-btn signin-btn--ghost"
+              onClick={() => { setEmail(''); setError(null); setStatus('idle'); }}
+            >
+              Use a different email
+            </button>
+          </div>
+        )}
 
         {/* Email saved without verification (verification toggle is off) */}
         {status === 'savedDirect' && (

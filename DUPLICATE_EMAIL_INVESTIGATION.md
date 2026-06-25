@@ -177,23 +177,35 @@ consolidates.
   and a two-step "Continue → Merge N accounts" confirm. Cross-org
   selections refuse in-UI; the server re-validates.
 
-### ⏳ Still to build / decide
-- **Customer merge flow (H2):** entering an already-existing email → "we'll
-  email you a 6-digit code to merge your cups" → merge on verify. The
-  server primitive (`admin-merge-users` / future `merge-by-email`) is now
-  in place, so this is a UI-only addition next.
-- **One-off cleanup:** merge Samuel's existing 4 accounts (→ 6 cups in one)
-  using the new admin tool. This is a destructive write and needs explicit
-  authorization before it runs — the tool is ready whenever you say go.
+### ✅ Customer merge flow (H2) — shipped
+When a customer types an email in the "save your cups" form, the new
+**`check-email-save`** edge function (anonymous) runs first. If no other
+account in the same org has that email it saves directly (frictionless,
+same UX as before). If one or more do, it does **not** save — the sheet
+flips to a "This email already has cups" step explaining the situation
+and offers to send a 6-digit code. The user verifies via the existing OTP
+input, and on success the new **`merge-by-email`** edge function (JWT-
+authenticated) folds **every** PackPerks row with that email in the org
+(plus the current device user) into one survivor — same merge-all logic
+as the admin tool (sum balances, repoint history/claims/scans/cups,
+soft-mark absorbed rows, most-recent-non-empty profile fields, link
+`auth_user_id` + `email_verified` on the survivor). Both functions are
+deployed live; the SignInSheet wiring is in. **This prevents new
+same-email duplicates from being created at all.**
+
+### ⏳ One-off cleanup pending
+- **Merge Samuel's existing 4 accounts** (→ 6 cups in one) using the new
+  admin tool. This is a destructive write and needs explicit authorization
+  — the tool is ready whenever you say go.
 
 ---
 
 ## Net position
 
-The duplication is **explained, measurable, and now correctable**. New
-iOS-in-app cases are actively reduced (detection + Safari guidance), the
-server-side **merge-all** primitive is live, and admins can fold multiple
-accounts into one from the Users table in two clicks. The only piece still
-to build is the **customer-side "this email already exists — merge via
-6-digit code"** flow that prevents new duplicates from forming in the first
-place; the underlying merge is now ready for it.
+The duplication is **explained, measurable, prevented, and correctable**.
+New iOS-in-app cases are actively reduced (detection + Safari guidance);
+typing an already-used email in the customer flow now triggers a 6-digit
+verify + merge instead of creating another duplicate; admins can fold
+multiple existing accounts into one from the Users table in two clicks.
+Only the one-off cleanup of Samuel's 4 accounts is still pending — it's
+a single admin "Merge 4 → 1" away.

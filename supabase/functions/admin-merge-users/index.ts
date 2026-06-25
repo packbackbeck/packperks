@@ -206,19 +206,35 @@ Deno.serve(async (req) => {
     mergedLifetime += b.lifetime_cups || 0;
   }
 
-  const { error: balUpsertErr } = await supabase
+  // Write the merged balance onto the survivor. `cup_balances.user_id`
+  // has no UNIQUE constraint, so we can't ON CONFLICT it — explicit
+  // "row exists? update : insert" instead. Verified no user currently
+  // has duplicate balance rows.
+  const { data: survBalRow } = await supabase
     .from("cup_balances")
-    .upsert(
-      {
-        user_id: survivorId,
+    .select("user_id")
+    .eq("user_id", survivorId)
+    .maybeSingle();
+  if (survBalRow) {
+    const { error } = await supabase
+      .from("cup_balances")
+      .update({
         balance: mergedBalance,
         lifetime_cups: mergedLifetime,
         updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
-  if (balUpsertErr) {
-    return jsonResponse({ error: "merge_balance_failed", detail: balUpsertErr.message }, 500);
+      })
+      .eq("user_id", survivorId);
+    if (error) return jsonResponse({ error: "merge_balance_failed", detail: error.message }, 500);
+  } else {
+    const { error } = await supabase
+      .from("cup_balances")
+      .insert({
+        user_id: survivorId,
+        org_id: survivor.org_id,
+        balance: mergedBalance,
+        lifetime_cups: mergedLifetime,
+      });
+    if (error) return jsonResponse({ error: "merge_balance_failed", detail: error.message }, 500);
   }
 
   // ── Repoint FKs from each absorbed → survivor ─────────────────────────

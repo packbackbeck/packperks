@@ -251,6 +251,44 @@ export async function verifyRestoreOtp(email, code) {
   if (error) throw error
 }
 
+// ── H2 / duplicate-email guard ────────────────────────────────────────────
+// Anonymous endpoint: take an email + the current device_id. If no OTHER
+// account in the same org has that email it saves directly and returns
+// { status: 'saved' }. If one or more do, it does NOT save and returns
+// { status: 'merge_required', other_count } so the UI can switch to the
+// verify-and-merge flow (requestRestoreOtp → verifyRestoreOtp → mergeByEmail).
+export async function checkEmailSaveOrMerge(email) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    throw new Error('invalid_email')
+  }
+  const { data, error } = await supabase.functions.invoke('check-email-save', {
+    body: { email: email.trim(), device_id: getDeviceId() },
+  })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.detail || payload?.error || error.message), { detail: payload })
+  }
+  return data
+}
+
+// JWT-authenticated: after the user has verified the OTP for an email,
+// merge EVERY PackPerks row (in this org) carrying that email — plus the
+// current device user — into one survivor. Returns the merged result so
+// the UI can show "you now have N cups total". Must be called AFTER
+// verifyRestoreOtp() succeeds so there's a valid auth session.
+export async function mergeByEmail() {
+  const { data, error } = await supabase.functions.invoke('merge-by-email', {
+    body: { device_id: getDeviceId() },
+  })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.detail || payload?.error || error.message), { detail: payload })
+  }
+  return data
+}
+
 // Finalise the restore: ask the edge function to find the email-side
 // users row, merge any cups the current device has into it, and link
 // the rows together. Must be called AFTER verifyRestoreOtp succeeds so

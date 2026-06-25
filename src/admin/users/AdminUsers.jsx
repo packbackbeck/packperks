@@ -6,6 +6,7 @@ import EmptyState from '../shared/EmptyState';
 import QuickLinks from '../shared/QuickLinks';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
+import MergeUsersModal from './MergeUsersModal';
 import './AdminUsers.css';
 
 function formatDate(ts) {
@@ -347,6 +348,7 @@ export default function AdminUsers({ onNavigate }) {
   const [sortKey, setSortKey] = useState('joined');
   const [sortDir, setSortDir] = useState('desc');
   const [showVisitors, setShowVisitors] = useState(true); // default on
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const reload = () => {
     setLoading(true);
@@ -562,6 +564,28 @@ export default function AdminUsers({ onNavigate }) {
           const ids = sel.selectedIds;
           await deleteRecords('users', ids);
           if (selectedUser && ids.includes(selectedUser.id)) setSelectedUser(null);
+          sel.clear();
+          reload();
+        }}
+        extraAction={{
+          label: `Merge ${sel.count}`,
+          onClick: () => setMergeOpen(true),
+          // Merge needs ≥2 selected accounts. Only available when 2+ are chosen.
+          visible: sel.count >= 2,
+        }}
+      />
+
+      <MergeUsersModal
+        open={mergeOpen}
+        users={users.filter(u => sel.isSelected(u.id))}
+        onClose={() => setMergeOpen(false)}
+        onMerged={(result) => {
+          // Close, clear selection, drop the right-pane if it was an absorbed
+          // user, then reload from the server so balances/profile reflect the
+          // merge.
+          setMergeOpen(false);
+          const absorbed = result?.absorbed_ids || [];
+          if (selectedUser && absorbed.includes(selectedUser.id)) setSelectedUser(null);
           sel.clear();
           reload();
         }}

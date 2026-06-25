@@ -1464,6 +1464,25 @@ export async function adjustUserBalance(userId, newBalance) {
   if (error) throw error;
 }
 
+/* Merge multiple PackPerks user accounts into one (admin tool).
+ * Sums every cup balance + lifetime, repoints history/claims/scans/cups
+ * onto the survivor, and keeps the most-recent non-empty profile values
+ * (display_name, email, iban, …). Soft-marks absorbed rows with
+ * merged_into so they can't be hit by anonymous reads any more. Audited
+ * server-side. Returns { status:'merged', survivor_id, absorbed_ids,
+ * merged_balance, merged_lifetime, profile_update, repoint_errors }. */
+export async function mergeUsers(survivorId, absorbedIds) {
+  const { data, error } = await supabase.functions.invoke('admin-merge-users', {
+    body: { survivor_id: survivorId, absorbed_ids: absorbedIds },
+  });
+  if (error) {
+    let payload = null;
+    try { payload = await error.context?.json?.(); } catch { /* ignore */ }
+    throw Object.assign(new Error(payload?.detail || payload?.error || error.message), { detail: payload });
+  }
+  return data;
+}
+
 export async function adminUpdateUser(userId, updates) {
   const allowed = ['display_name', 'email', 'iban'];
   const filtered = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)));

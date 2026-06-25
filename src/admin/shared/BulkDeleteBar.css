@@ -32,7 +32,13 @@
   font-weight: 700; cursor: pointer; white-space: nowrap;
 }
 .bulkbar__danger:hover:not(:disabled) { background: #B42318; }
-.bulkbar__danger:disabled, .bulkbar__ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+.bulkbar__primary {
+  padding: 7px 14px; border-radius: 8px; border: none;
+  background: #5333A5; color: #fff; font-family: inherit; font-size: 12px;
+  font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.bulkbar__primary:hover:not(:disabled) { background: #472C8F; }
+.bulkbar__danger:disabled, .bulkbar__ghost:disabled, .bulkbar__primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .bulkbar__error { font-size: 12px; color: #FCA5A5; width: 100%; }
 
 /* Shared checkbox-cell sizing for the select column. */

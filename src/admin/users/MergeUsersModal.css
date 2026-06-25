@@ -1,0 +1,122 @@
+.mum-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 24, 20, 0.55);
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: mum-fade 0.18s ease;
+}
+@keyframes mum-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.mum {
+  background: #fff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.3);
+}
+
+.mum__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid #F2EEE7;
+}
+.mum__title { font-size: 18px; font-weight: 800; color: #1A1A1A; margin: 0 0 4px; }
+.mum__sub { font-size: 12.5px; line-height: 1.5; color: #6C6259; margin: 0; max-width: 420px; }
+.mum__close {
+  border: none; background: none; color: #8A8175; cursor: pointer; padding: 6px;
+  font-size: 18px; line-height: 0.6; border-radius: 6px; flex-shrink: 0;
+}
+.mum__close:hover:not(:disabled) { background: #F2EEE7; color: #1A1A1A; }
+.mum__close:disabled { opacity: 0.5; cursor: default; }
+
+.mum__summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 14px 22px;
+  background: #FBFAF7;
+  border-bottom: 1px solid #F2EEE7;
+}
+.mum__summary > div {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  font-size: 11px; color: #8A8175; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.mum__summary strong { font-size: 22px; font-weight: 800; color: #1D1D1D; text-transform: none; letter-spacing: 0; }
+
+.mum__section-title {
+  font-size: 13px; font-weight: 800; color: #1A1A1A;
+  margin: 16px 22px 4px;
+}
+.mum__hint { font-size: 12px; line-height: 1.5; color: #6C6259; margin: 0 22px 10px; }
+
+.mum__list {
+  list-style: none; margin: 0; padding: 0 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.mum__row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 12px; margin-bottom: 6px;
+  border: 1.5px solid #ECE9E3; border-radius: 12px;
+  cursor: pointer;
+  background: #fff;
+}
+.mum__row:hover { border-color: #D8CFC0; }
+.mum__row.is-selected { border-color: #5333A5; background: #F7F4FB; }
+.mum__row input[type="radio"] { width: 16px; height: 16px; accent-color: #5333A5; cursor: pointer; flex-shrink: 0; }
+.mum__row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mum__row-name { font-size: 13px; font-weight: 700; color: #1D1D1D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mum__row-id { font-weight: 500; color: #A79F92; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
+.mum__row-meta { font-size: 11.5px; color: #8A8175; display: flex; gap: 6px; }
+.mum__row-stats { text-align: right; flex-shrink: 0; }
+.mum__row-stats strong { font-size: 15px; font-weight: 800; color: #1A8737; }
+.mum__row-dim { font-size: 11px; color: #A79F92; margin-top: 2px; }
+
+.mum__error {
+  margin: 0 22px 12px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  color: #B42318;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.mum__foot {
+  display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+  padding: 14px 22px 18px;
+  border-top: 1px solid #F2EEE7;
+  flex-wrap: wrap;
+}
+.mum__confirm-text {
+  flex: 1; min-width: 0;
+  font-size: 12.5px; line-height: 1.5; color: #1D1D1D; margin: 0;
+}
+.mum__ghost {
+  font-size: 13px; font-weight: 600; color: #4A443D;
+  background: #fff; border: 1px solid #E4DFD6; border-radius: 9px;
+  padding: 9px 14px; cursor: pointer;
+}
+.mum__ghost:hover:not(:disabled) { background: #F7F4EF; }
+.mum__primary {
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: #5333A5; border: none; border-radius: 9px;
+  padding: 9px 16px; cursor: pointer;
+}
+.mum__primary:hover:not(:disabled) { background: #472C8F; }
+.mum__primary--strong { background: #DC2626; }
+.mum__primary--strong:hover:not(:disabled) { background: #B42318; }
+.mum__ghost:disabled, .mum__primary:disabled { opacity: 0.55; cursor: not-allowed; }

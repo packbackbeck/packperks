@@ -145,40 +145,55 @@ consolidates.
   deeplink are steered to the default browser (intent URL), reducing new
   stranded/duplicate accounts; "Collect here anyway" fallback.
 
-### ✅ Built, verified, pending push (this round)
+### ✅ Built and shipped (this round)
 - **iOS in-app detection** — extends the in-app redirect to the detectable
   iOS in-app browsers (Instagram, Facebook, Line, WeChat, Google app,
   TikTok, Snapchat, Pinterest). Normal Safari/Chrome and WhatsApp/Telegram
   are **not** matched, so normal iOS users are unaffected. iOS can't be
   force-redirected, so the sheet guides "tap ••• → Open in Safari" (with a
   best-effort `x-safari` open) + "Collect here anyway". Verified live by
-  spoofing an iOS in-app UA: renders correctly, no crash, no console errors.
-  *Directly reduces the H1 cause for the iOS case that produced these 4
-  accounts.*
+  spoofing an iOS in-app UA. *Directly reduces the H1 cause for the iOS
+  case that produced these 4 accounts.*
 - **Clearer restore errors** — replaces the vague "update failed" with a
   precise "you're already signed in with this email on this device" guard
   and a friendlier merge-error message.
+- **Merge-all server logic (H3) — `admin-merge-users` edge function.**
+  Folds **all** selected accounts into one chosen survivor (not pairwise
+  like `restore-by-email`). It sums every cup balance + lifetime, repoints
+  `activity_history` / `claims` / `cup_scans` / `cups` (`shared_by_user_id`,
+  `activated_by_user_id`) onto the survivor, soft-marks absorbed rows with
+  `merged_into` (and clears their `device_id` / `email` / `iban` so no
+  anonymous read can hit them again), and writes the merged-profile fields
+  as the **most-recent non-empty** value across all selected accounts.
+  Cross-org merges and already-merged inputs are refused; the caller must
+  be an active admin (`owner`/`admin`/`manager`). Audited to
+  `admin_action_log`. Deployed live (v1 ACTIVE).
+- **Admin manual merge UI.** In the admin Users table, selecting **2+
+  users** turns the existing bulk action bar's purple "Merge N" button on
+  alongside "Delete selected" (single-selection still just shows Delete, so
+  no existing flow changed). "Merge N" opens a thoughtful modal: total
+  cups + lifetime + account count at the top, a radio list of every
+  selected account (survivor defaults to the most-recently-active row),
+  and a two-step "Continue → Merge N accounts" confirm. Cross-org
+  selections refuse in-UI; the server re-validates.
 
-### ⏳ Designed, not yet built (the direct duplicate-email fix)
+### ⏳ Still to build / decide
 - **Customer merge flow (H2):** entering an already-existing email → "we'll
-  email you a 6-digit code to merge your cups" → merge on verify.
-- **Merge-all server logic (H3):** fold *all* same-email accounts, sum every
-  balance, keep most-recent non-empty profile data (extends `restore-by-
-  email`, which is currently pairwise).
-- **Admin manual merge:** multi-select in the Users table → "Merge selected"
-  → confirm.
-- **One-off cleanup:** merge Samuel's existing 4 accounts (→ 6 cups in one).
-  This is a destructive DB write and needs explicit authorization before it
-  runs.
+  email you a 6-digit code to merge your cups" → merge on verify. The
+  server primitive (`admin-merge-users` / future `merge-by-email`) is now
+  in place, so this is a UI-only addition next.
+- **One-off cleanup:** merge Samuel's existing 4 accounts (→ 6 cups in one)
+  using the new admin tool. This is a destructive write and needs explicit
+  authorization before it runs — the tool is ready whenever you say go.
 
 ---
 
 ## Net position
 
-The duplication is **explained and measurable**, and new iOS-in-app cases
-are now actively reduced. The remaining work — the account-**merge** (server
-logic + customer 6-digit-code flow + admin manual merge) — is the piece that
-both **prevents** new same-email duplicates and **cleans up** existing ones
-(including Samuel's four). It is scoped and ready to build; it's held only
-because it combines real accounts and cups and warrants a dedicated,
-carefully-tested pass.
+The duplication is **explained, measurable, and now correctable**. New
+iOS-in-app cases are actively reduced (detection + Safari guidance), the
+server-side **merge-all** primitive is live, and admins can fold multiple
+accounts into one from the Users table in two clicks. The only piece still
+to build is the **customer-side "this email already exists — merge via
+6-digit code"** flow that prevents new duplicates from forming in the first
+place; the underlying merge is now ready for it.

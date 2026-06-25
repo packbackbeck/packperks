@@ -4,7 +4,12 @@ import './BulkDeleteBar.css';
 /* Floating action bar shown when ≥1 row is selected in an admin table.
  * Two-step confirm (click → confirm) so a bulk delete can't fire on a
  * single misclick. `onDelete` should perform the delete and resolve. */
-export default function BulkDeleteBar({ count, noun = 'records', onDelete, onClear }) {
+/* `extraAction` (optional) — a non-destructive action button shown alongside
+ * Delete (e.g. "Merge selected" on the Users table). Pass:
+ *   { label, onClick, disabled?, visible? }
+ * `visible` lets the caller hide the button at certain counts (e.g. merge
+ * needs ≥2 selected). It's hidden during the delete-confirm step. */
+export default function BulkDeleteBar({ count, noun = 'records', onDelete, onClear, extraAction }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -35,6 +40,15 @@ export default function BulkDeleteBar({ count, noun = 'records', onDelete, onCle
       {!confirming ? (
         <div className="bulkbar__actions">
           <button className="bulkbar__ghost" onClick={onClear} disabled={busy}>Clear</button>
+          {extraAction && (extraAction.visible !== false) && (
+            <button
+              className="bulkbar__primary"
+              onClick={extraAction.onClick}
+              disabled={busy || extraAction.disabled}
+            >
+              {extraAction.label}
+            </button>
+          )}
           <button className="bulkbar__danger" onClick={() => setConfirming(true)} disabled={busy}>
             Delete selected
           </button>

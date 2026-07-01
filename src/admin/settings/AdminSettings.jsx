@@ -93,9 +93,9 @@ export const SECTIONS = [
     ),
   },
   {
-    id: 'budget',
-    title: 'Reward budget',
-    desc: 'Cap how much cashback this organisation pays out. Customers never see the amount.',
+    id: 'limits',
+    title: 'Limits & caps',
+    desc: 'Hold caps, daily caps, balance resets, and the reward budget — plus the message each shows when hit.',
     tone: 'orange',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -621,33 +621,142 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             </Field>
           </SectionCard>
 
-          {/* ── Reward budget ── */}
+          {/* ── Limits & caps ── */}
           <SectionCard section={SECTIONS[5]}>
-            <RewardBudgetSection />
-
-            <div className="as-budget-copy">
-              <p className="as-budget-copy__head">Message shown when the cap is reached</p>
-              <p className="as-budget-copy__hint">
-                Shown to customers when claiming is paused. It never reveals the amount or that a
-                budget exists. This text follows the normal Publish flow (Save draft, then Publish).
-              </p>
-              <Field label="Title">
+            {/* Max balance a customer may hold before they must redeem. */}
+            <div className="as-limit-block">
+              <Field
+                label="Max cups a customer can hold"
+                hint="When reached, they must spend cups before earning more. 0 = no limit."
+              >
                 <input
-                  className="as-input"
-                  value={settings.budgetPausedTitle || ''}
-                  onChange={e => updateSetting('budgetPausedTitle', e.target.value, 'paused message title')}
-                  placeholder="Rewards are paused for a moment"
+                  className="as-input as-input--short"
+                  type="number" min="0" max="9999"
+                  value={settings.maxHoldBalance ?? 0}
+                  onChange={e => updateSetting('maxHoldBalance', Math.max(0, parseInt(e.target.value) || 0), 'hold cap')}
                 />
               </Field>
-              <Field label="Body">
+              <Field label="Message when the hold cap is hit" hint="Shown when they try to earn past the cap.">
                 <textarea
                   className="as-input as-input--textarea"
-                  rows={3}
-                  value={settings.budgetPausedBody || ''}
-                  onChange={e => updateSetting('budgetPausedBody', e.target.value, 'paused message body')}
-                  placeholder="We're handling a high number of reward claims right now, so claiming is briefly unavailable. Please try again a little later."
+                  rows={2}
+                  value={settings.holdCapMessage || ''}
+                  onChange={e => updateSetting('holdCapMessage', e.target.value, 'hold-cap message')}
+                  placeholder="You've reached the maximum number of cups you can hold. Redeem a reward first, then keep collecting."
                 />
               </Field>
+            </div>
+
+            {/* Max cups earned per calendar day. */}
+            <div className="as-limit-block">
+              <Field
+                label="Max cups per day"
+                hint="Upper bound on cups a customer can earn in a single day. 0 = no limit."
+              >
+                <input
+                  className="as-input as-input--short"
+                  type="number" min="0" max="9999"
+                  value={settings.maxCupsPerDay ?? 0}
+                  onChange={e => updateSetting('maxCupsPerDay', Math.max(0, parseInt(e.target.value) || 0), 'daily cap')}
+                />
+              </Field>
+              <Field label="Message when the daily cap is hit">
+                <textarea
+                  className="as-input as-input--textarea"
+                  rows={2}
+                  value={settings.dailyCapMessage || ''}
+                  onChange={e => updateSetting('dailyCapMessage', e.target.value, 'daily-cap message')}
+                  placeholder="You've reached today's cup limit. Come back tomorrow to keep collecting."
+                />
+              </Field>
+            </div>
+
+            {/* Rolling balance reset. */}
+            <div className="as-limit-block">
+              <Field
+                label="Reset balances every (days)"
+                hint="Unspent cups expire on this cycle. 0 = never expire."
+              >
+                <input
+                  className="as-input as-input--short"
+                  type="number" min="0" max="3650"
+                  value={settings.balanceResetDays ?? 0}
+                  onChange={e => updateSetting('balanceResetDays', Math.max(0, parseInt(e.target.value) || 0), 'reset interval')}
+                />
+              </Field>
+              <Field
+                label="Warning banner (shown ~1 week before reset)"
+                hint="Leave blank to skip the pre-reset warning."
+              >
+                <textarea
+                  className="as-input as-input--textarea"
+                  rows={2}
+                  value={settings.resetWarningMessage || ''}
+                  onChange={e => updateSetting('resetWarningMessage', e.target.value, 'reset warning')}
+                  placeholder="Heads up — unspent cups reset soon. Redeem yours before they expire!"
+                />
+              </Field>
+            </div>
+
+            {/* ── Reward budget (moved here) ── */}
+            <div className="as-limit-block as-limit-block--budget">
+              <p className="as-limit-block__head">Reward budget</p>
+              <p className="as-limit-block__hint">
+                Cap how much cashback this organisation pays out. Customers never see the amount.
+              </p>
+              <RewardBudgetSection />
+
+              <div className="as-budget-copy">
+                <p className="as-budget-copy__head">Message shown when the cap is reached</p>
+                <p className="as-budget-copy__hint">
+                  Shown to customers when claiming is paused. It never reveals the amount or that a
+                  budget exists. This text follows the normal Publish flow (Save draft, then Publish).
+                </p>
+                <Field label="Title">
+                  <input
+                    className="as-input"
+                    value={settings.budgetPausedTitle || ''}
+                    onChange={e => updateSetting('budgetPausedTitle', e.target.value, 'paused message title')}
+                    placeholder="Rewards are paused for a moment"
+                  />
+                </Field>
+                <Field label="Body">
+                  <textarea
+                    className="as-input as-input--textarea"
+                    rows={3}
+                    value={settings.budgetPausedBody || ''}
+                    onChange={e => updateSetting('budgetPausedBody', e.target.value, 'paused message body')}
+                    placeholder="We're handling a high number of reward claims right now, so claiming is briefly unavailable. Please try again a little later."
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {/* ── Limits already set in code (read-only) ── */}
+            <div className="as-limit-block as-limit-block--readonly">
+              <p className="as-limit-block__head">Also enforced (set elsewhere or in code)</p>
+              <ul className="as-limit-readonly-list">
+                <li>
+                  <span>Cups awarded per scan</span>
+                  <strong>{settings.maxCupsPerScan ?? 1}</strong>
+                  <em>Cup rules</em>
+                </li>
+                <li>
+                  <span>Max cups per share</span>
+                  <strong>{settings.maxCupsToShare ?? 1}</strong>
+                  <em>Cup rules</em>
+                </li>
+                <li>
+                  <span>Min IBAN length</span>
+                  <strong>{settings.minIbanLength ?? 15}</strong>
+                  <em>Cup rules</em>
+                </li>
+                <li>
+                  <span>BYO auto-credit</span>
+                  <strong>2 / 24 h</strong>
+                  <em>byo-mint (code)</em>
+                </li>
+              </ul>
             </div>
           </SectionCard>
         </div>

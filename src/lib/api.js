@@ -175,6 +175,109 @@ export async function getOrCreateUser(orgId) {
   return newUser
 }
 
+// ── Customer identity (Phase 3 store groups) ───────────────────────────────
+//
+// A `customer_identities` row is the ONE shared profile for a person across
+// every org in a group. `users` stays one row per (person, org) with its own
+// per-org balance; `users.identity_id` points at that shared identity.
+//
+// This is BEST-EFFORT and only meaningful for GROUPED orgs — call it after
+// resolving the per-org user row, and only when the org belongs to a group.
+// It never throws: an identity is an enhancement (shared profile + the Stores
+// page), never a prerequisite for collecting cups, so any failure is logged
+// and swallowed. Ungrouped orgs (every existing org) never call this, so
+// their hot path is completely unchanged.
+//
+// Reuse order: (1) an identity already linked on this row, (2) an identity
+// matching the auth user, (3) an identity a sibling `users` row on the SAME
+// device already points at (same browser, another store in the group), else
+// (4) mint a fresh identity seeded from this row's profile.
+export async function ensureIdentityForUser(userRow, opts = {}) {
+  try {
+    if (!userRow?.id) return null
+
+    // (1) Already linked → return the identity (unless it's dangling).
+    if (userRow.identity_id) {
+      const { data } = await supabase
+        .from('customer_identities').select('*').eq('id', userRow.identity_id).maybeSingle()
+      if (data) return data
+    }
+
+    const authUid  = opts.authUid  || userRow.auth_user_id || null
+    const deviceId = opts.deviceId || userRow.device_id    || null
+
+    let identity = null
+
+    // (2) Match by auth user.
+    if (authUid) {
+      const { data } = await supabase
+        .from('customer_identities').select('*').eq('auth_user_id', authUid).maybeSingle()
+      identity = data || null
+    }
+
+    // (3) Same-browser sibling rows (other stores in the group) already
+    //     linked to an identity → reuse it.
+    if (!identity && deviceId) {
+      const { data: siblings } = await supabase
+        .from('users').select('identity_id')
+        .eq('device_id', deviceId)
+        .not('identity_id', 'is', null)
+        .limit(1)
+      const sibId = siblings?.[0]?.identity_id
+      if (sibId) {
+        const { data } = await supabase
+          .from('customer_identities').select('*').eq('id', sibId).maybeSingle()
+        identity = data || null
+      }
+    }
+
+    // (4) Mint a fresh identity from this row's profile.
+    if (!identity) {
+      const insert = {
+        auth_user_id: authUid,
+        display_name: userRow.display_name || null,
+        animal_index: userRow.animal_index ?? 0,
+        email:        userRow.email || opts.authEmail || null,
+        email_verified: !!userRow.email_verified_at,
+        entry_org_id: userRow.org_id || null,
+      }
+      const { data: created, error: createErr } = await supabase
+        .from('customer_identities').insert(insert).select('*').single()
+      if (createErr) {
+        // Unique auth_user_id race (StrictMode / concurrent tab) — re-fetch.
+        if (createErr.code === '23505' && authUid) {
+          const { data } = await supabase
+            .from('customer_identities').select('*').eq('auth_user_id', authUid).maybeSingle()
+          identity = data || null
+        } else {
+          console.warn('ensureIdentityForUser: create failed', createErr)
+          return null
+        }
+      } else {
+        identity = created
+      }
+    }
+
+    if (!identity) return null
+
+    // Link the user row to the identity.
+    if (userRow.identity_id !== identity.id) {
+      await supabase.from('users').update({ identity_id: identity.id }).eq('id', userRow.id)
+      userRow.identity_id = identity.id
+    }
+    // Backfill entry_org_id if the identity somehow lacks one.
+    if (!identity.entry_org_id && userRow.org_id) {
+      await supabase.from('customer_identities')
+        .update({ entry_org_id: userRow.org_id }).eq('id', identity.id)
+      identity.entry_org_id = userRow.org_id
+    }
+    return identity
+  } catch (e) {
+    console.warn('ensureIdentityForUser threw (non-fatal):', e)
+    return null
+  }
+}
+
 // ── Email magic link auth ──────────────────────────────────────────────────
 //
 // Two-step flow:
@@ -544,6 +647,24 @@ export async function claimCups(userId, parsed, opts = {}) {
   return data
 }
 
+// ── BYO cup mint (Phase 3 "Bring Your Own cup") ────────────────────────────
+// Adds one cup at a Bring-Your-Own store by scanning the stationary counter
+// QR (/<slug>/?byo=1). The byo-mint edge function enforces the rolling-24h
+// soft cap: it auto-credits ≤2 cups, and the 3rd+ returns
+// { status:'pending_review' } (creating an admin approval request) instead of
+// crediting. Success returns { status:'credited', newBalance, preBalance, ... }.
+export async function mintByoCup(userId, orgId) {
+  const { data, error } = await supabase.functions.invoke('byo-mint', {
+    body: { user_id: userId, org_id: orgId, device_id: getDeviceId() },
+  })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.error || error.message), { detail: payload })
+  }
+  return data
+}
+
 // ── Cup scans (legacy: photo-based, kept for backwards compat) ─────────────
 // Logs each scan event. Phase 2: set status='pending' and populate photo_url.
 export async function logCupScan(userId, { cupsAwarded = 1, photoUrl = null } = {}) {
@@ -627,7 +748,7 @@ export async function getOrgBySlug(slug) {
   try {
     const { data } = await supabase
       .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint')
+      .select('id, name, slug, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
       .eq('slug', slug)
       .is('deleted_at', null)
       .maybeSingle()
@@ -662,7 +783,7 @@ export async function getOrgById(orgId) {
   try {
     const { data } = await supabase
       .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint')
+      .select('id, name, slug, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
       .eq('id', orgId)
       .maybeSingle()
     return data || null
@@ -677,7 +798,7 @@ export async function getDefaultOrg() {
   try {
     const { data } = await supabase
       .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint')
+      .select('id, name, slug, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
       .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .limit(1)

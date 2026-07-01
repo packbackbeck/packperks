@@ -755,3 +755,73 @@
   text-transform: uppercase;
   transition: color 0.18s ease;
 }
+
+/* ─── Guide stories panel ─────────────────────────────────────────── */
+.aad__btn--sm { padding: 6px 12px; font-size: 12.5px; }
+
+.aad-guide__empty {
+  margin: 4px 0 14px; padding: 12px 14px; border-radius: 12px;
+  background: #F7F3EA; border: 1px dashed #DED6C6;
+  font-size: 12.5px; color: #7A7166; line-height: 1.5;
+}
+.aad-guide__list { display: flex; flex-direction: column; gap: 12px; }
+.aad-guide__step {
+  border: 1px solid #E7E0D2; border-radius: 14px; background: #fff; overflow: hidden;
+}
+.aad-guide__step-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; background: #F8F4EC; border-bottom: 1px solid #EFE9DC;
+}
+.aad-guide__step-num { font-size: 12.5px; font-weight: 800; color: #2A2724; }
+.aad-guide__step-tools { display: flex; gap: 6px; }
+.aad-guide__icon-btn {
+  width: 26px; height: 26px; border-radius: 7px; border: 1px solid #DED6C6;
+  background: #fff; color: #5A554F; cursor: pointer; font-size: 13px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.aad-guide__icon-btn:hover:not(:disabled) { background: #F1EBDF; }
+.aad-guide__icon-btn:disabled { opacity: 0.4; cursor: default; }
+.aad-guide__icon-btn--danger:hover { background: #FDE9E4; color: #C4583A; border-color: #F0C4B8; }
+
+.aad-guide__step-body { display: flex; gap: 14px; padding: 14px; }
+.aad-guide__media { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.aad-guide__thumb {
+  width: 84px; height: 84px; border-radius: 14px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.aad-guide__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.aad-guide__iconpreview svg { width: 34px; height: 34px; }
+.aad-guide__media-actions { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+
+.aad-guide__fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.aad-guide__f { display: flex; flex-direction: column; gap: 4px; }
+.aad-guide__f > span { font-size: 11.5px; font-weight: 700; color: #6B6459; }
+.aad-guide__f input[type="text"], .aad-guide__f textarea {
+  width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #DED6C6;
+  border-radius: 9px; font-family: inherit; font-size: 13px; color: #2A2724; background: #fff;
+}
+.aad-guide__f textarea { resize: vertical; }
+.aad-guide__err { font-size: 11.5px; color: #C4583A; }
+
+.aad-guide__row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.aad-guide__f--icon { flex: 1; min-width: 200px; }
+.aad-guide__icons { display: flex; gap: 6px; flex-wrap: wrap; }
+.aad-guide__icon-opt {
+  width: 38px; height: 38px; border-radius: 10px; border: 1.5px solid #DED6C6;
+  background: #fff; color: #7A7166; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.aad-guide__icon-opt svg { width: 20px; height: 20px; }
+.aad-guide__icon-opt.is-on { background: #FBF7EF; }
+
+.aad-guide__f--color { width: 150px; }
+.aad-guide__color { display: flex; align-items: center; gap: 6px; }
+.aad-guide__color input[type="color"] {
+  width: 34px; height: 34px; padding: 0; border: 1px solid #DED6C6; border-radius: 8px;
+  background: none; cursor: pointer;
+}
+.aad-guide__color input[type="text"] {
+  flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid #DED6C6; border-radius: 8px;
+  font-family: inherit; font-size: 12.5px; text-transform: uppercase;
+}
+.aad-guide__add { margin-top: 14px; }

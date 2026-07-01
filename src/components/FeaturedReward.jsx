@@ -21,6 +21,7 @@ export default function FeaturedReward({
   onViewDetail,
   onNudge,
   onAddCup,
+  onExplain,
 }) {
   // If the user has a saved IBAN (from profile), pre-fill the input —
   // the field UI is identical to "they just typed it", just already
@@ -35,7 +36,9 @@ export default function FeaturedReward({
 
   const handleClaim = () => {
     if (!isUnlocked) {
-      // Trigger nudge on the progress bar
+      // Not enough cups yet: open the "how it works" stories so the user
+      // learns how to collect them. Still nudge the progress bar underneath.
+      onExplain?.();
       setNudgeVisible(true);
       onNudge?.(cupsRemaining);
       return;

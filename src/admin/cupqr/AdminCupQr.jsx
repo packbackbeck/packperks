@@ -29,7 +29,7 @@ const EXPIRY_PRESETS = [
 // customer's phone, which must land on the live, working app (not a
 // localhost dev server they can't reach). So batches generated from
 // localhost OR Vercel both produce QRs that open the Vercel app.
-const PROD_URL = 'https://packperks-v1.vercel.app/';
+const PROD_URL = 'https://perks.packback.app/';
 
 /* ─────────────────────────────────────────────────────────────────────
  * AdminCupQr — generates and prints scannable cup-return receipts.

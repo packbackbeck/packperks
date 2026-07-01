@@ -46,6 +46,13 @@ export const DEFAULT_DESIGN = {
     showPackbackLogo:    true,
     showBrandLogo:       true,
   },
+  // Guide "stories" (the How-it-works walkthrough). Empty steps → the app
+  // falls back to the built-in / group-mode steps. When an admin adds steps
+  // here they fully replace those, each carrying its own title, text, image,
+  // icon and colours.
+  guide: {
+    steps: [],
+  },
 };
 
 export function mergeDesign(partial) {
@@ -54,6 +61,7 @@ export function mergeDesign(partial) {
     colors:   { ...DEFAULT_DESIGN.colors,   ...(p.colors   || {}) },
     copy:     { ...DEFAULT_DESIGN.copy,     ...(p.copy     || {}) },
     sections: { ...DEFAULT_DESIGN.sections, ...(p.sections || {}) },
+    guide:    { steps: Array.isArray(p.guide?.steps) ? p.guide.steps : [] },
   };
 }
 

@@ -32,15 +32,39 @@
   background: var(--bk-green);
 }
 
-/* Cups row floats above the fill */
-.cup-progress__cups-row {
+/* Rows wrapper — one row normally, two stacked rows for >5-cup rewards. */
+.cup-progress__rows {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cups row floats above the fill */
+.cup-progress__cups-row {
   display: flex;
   align-items: center;
   justify-content: space-evenly;
   padding: 10px 16px;
   min-height: 70px;
+}
+
+/* Two-row layout: smaller cups so up to ~6 fit per row. Equal gaps on all
+   sides — the wrapper owns the outer padding (top/bottom/left = right) plus
+   the inter-row gap, so the rows aren't cramped vertically vs the sides. */
+.cup-progress__track--tworow { border-radius: 30px; }
+.cup-progress__track--tworow .cup-progress__rows {
+  padding: 10px;
+  gap: 10px;
+}
+.cup-progress__track--tworow .cup-progress__cups-row {
+  min-height: 0;
+  padding: 0;
+}
+.cup-progress__track--tworow .cup-progress__cup-icon-wrap,
+.cup-progress__track--tworow .cup-progress__cup-img {
+  width: 38px;
+  height: 38px;
 }
 
 .cup-progress__cup {
@@ -117,16 +141,17 @@
   opacity: 0.35;
 }
 
-.cup-progress__dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
-  flex-shrink: 0;
+/* End-goal star (odd two-row layouts). Faded until every cup is collected,
+ * then it lights up white with a soft glow. */
+.cup-progress__star {
+  width: 30px;
+  height: 30px;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color var(--duration-slow) ease;
 }
-
-.cup-progress__dot--active {
-  background: var(--white);
+.cup-progress__cup--star-lit .cup-progress__star {
+  color: #FFFFFF;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6));
 }
 
 .cup-progress__overflow {

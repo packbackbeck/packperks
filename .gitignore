@@ -16,6 +16,12 @@ dist-ssr
 .claude/
 .claire/
 
+# Supabase CLI local temp
+supabase/.temp/
+
+# Local scratch logs
+mqlog.txt
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

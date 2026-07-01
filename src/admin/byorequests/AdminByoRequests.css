@@ -1,0 +1,138 @@
+/* AdminByoRequests — Phase 3 BYO approval queue */
+
+.byoreq { padding: 28px 32px; max-width: 1000px; }
+
+.byoreq__head { margin-bottom: 20px; }
+.byoreq__eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
+  color: #1A8737;
+}
+.byoreq__title { margin: 4px 0 6px; font-size: 26px; font-weight: 700; color: #0F0F0F; }
+.byoreq__sub { margin: 0; font-size: 13px; color: #5A554F; line-height: 1.5; max-width: 640px; }
+
+/* Stationary QR card */
+.byoreq__qr-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  background: #FAF8F3;
+  border: 1px solid #ECE5D8;
+  border-radius: 12px;
+}
+.byoreq__qr {
+  width: 128px; height: 128px;
+  border-radius: 10px;
+  background: #FFFFFF;
+  border: 1px solid #ECE5D8;
+  padding: 6px;
+  flex-shrink: 0;
+}
+.byoreq__qr-info h3 { margin: 0 0 6px; font-size: 15px; color: #0F0F0F; }
+.byoreq__qr-info p { margin: 0 0 8px; font-size: 13px; color: #5A554F; line-height: 1.45; max-width: 420px; }
+.byoreq__qr-url {
+  display: inline-block;
+  background: #F0E9DB;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #5A554F;
+  word-break: break-all;
+}
+
+/* Per-store daily auto-credit limit */
+.byoreq__cap {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #E4DCCB;
+}
+.byoreq__cap-label {
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 13px; font-weight: 700; color: #2A2724; margin-bottom: 7px;
+}
+.byoreq__cap-hint { font-size: 11.5px; font-weight: 500; color: #8A8175; line-height: 1.4; }
+.byoreq__cap-row { display: flex; align-items: center; gap: 8px; }
+.byoreq__cap-input {
+  width: 72px; padding: 7px 9px; border: 1px solid #D6CFC2; border-radius: 8px;
+  font-family: inherit; font-size: 14px; color: #2A2724; background: #fff;
+}
+.byoreq__cap-save {
+  padding: 7px 13px; border: none; border-radius: 8px;
+  background: var(--bk-green, #1A8737); color: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.byoreq__cap-save:disabled { opacity: 0.5; cursor: default; }
+.byoreq__cap-msg { font-size: 12.5px; font-weight: 600; color: #1A8737; }
+
+/* Filter tabs */
+.byoreq__tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.byoreq__tab {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #D6CFC2;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5A554F;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.byoreq__tab:hover { background: #F4EFE5; color: #0F0F0F; }
+.byoreq__tab--on { background: #FD6F46; color: #FFFFFF; border-color: #FD6F46; }
+
+.byoreq__error {
+  margin-bottom: 14px; padding: 10px 14px; border-radius: 8px;
+  background: #FEE7E3; border: 1px solid #F6B5AD; color: #8E1F12; font-size: 13px;
+}
+.byoreq__notice {
+  margin-bottom: 14px; padding: 10px 14px; border-radius: 8px;
+  background: #E7F6EC; border: 1px solid #A9DCBC; color: #1A6B38; font-size: 13px;
+}
+.byoreq__skeleton { padding: 24px; text-align: center; color: #7A7166; font-size: 14px; }
+
+.byoreq__empty {
+  background: #FAF8F3; border: 1px dashed #D6CFC2; border-radius: 12px;
+  padding: 40px 24px; text-align: center;
+}
+.byoreq__empty h3 { margin: 0 0 6px; font-size: 17px; color: #0F0F0F; }
+.byoreq__empty p { margin: 0; font-size: 13px; color: #5A554F; }
+
+/* Table */
+.byoreq__table-wrap { background: #FFFFFF; border: 1px solid #ECE5D8; border-radius: 12px; overflow: hidden; }
+.byoreq__table { width: 100%; border-collapse: collapse; }
+.byoreq__table th {
+  text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+  color: #7A7166; padding: 12px 16px; border-bottom: 1px solid #ECE5D8; background: #FAF8F3;
+}
+.byoreq__th-actions { text-align: right; }
+.byoreq__table td { padding: 13px 16px; border-bottom: 1px solid #F4EFE5; font-size: 14px; vertical-align: middle; }
+.byoreq__table tbody tr:last-child td { border-bottom: none; }
+.byoreq__table tbody tr:hover { background: #FCFAF5; }
+
+.byoreq__cust { font-weight: 600; color: #0F0F0F; }
+.byoreq__cust-sub { font-size: 11.5px; color: #7A7166; margin-top: 2px; }
+.byoreq__when { color: #5A554F; font-size: 12.5px; }
+
+.byoreq__pill {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: capitalize;
+}
+.byoreq__pill--pending  { background: rgba(254, 160, 30, 0.18); color: #A66A00; }
+.byoreq__pill--approved { background: rgba(26, 135, 55, 0.16);  color: #1A6B38; }
+.byoreq__pill--denied   { background: #F4EFE5; color: #7A7166; }
+
+.byoreq__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.byoreq__btn {
+  padding: 6px 13px; border-radius: 7px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; transition: background 0.14s ease;
+}
+.byoreq__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.byoreq__btn--approve { background: #1A8737; color: #FFFFFF; }
+.byoreq__btn--approve:hover:not(:disabled) { background: #14702D; }
+.byoreq__btn--deny { background: transparent; color: #B4463E; border-color: #E4C9C4; }
+.byoreq__btn--deny:hover:not(:disabled) { background: #FDECEA; }
+
+.byoreq__muted { color: #A69C8D; font-size: 13px; }

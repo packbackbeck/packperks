@@ -5,6 +5,7 @@ import QuickLinks from '../shared/QuickLinks';
 import MetricIcon from './behaviourIcons';
 import DateRangePicker from './DateRangePicker';
 import MetricDetailModal from './MetricDetailModal';
+import ScopeToggle from '../shared/ScopeToggle';
 import './AdminUserBehaviour.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -201,7 +202,7 @@ function BehaviourCard({ m, onOpen }) {
 }
 
 export default function AdminUserBehaviour({ onNavigate }) {
-  const { activeOrg } = useOrg();
+  const { activeOrg, scopeOrgIds, statsScope } = useOrg();
   const [metrics, setMetrics] = useState(null);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -230,7 +231,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getUserBehaviourStats(r || { from: null, to: null });
+      const data = await getUserBehaviourStats(r || { from: null, to: null }, scopeOrgIds);
       setMetrics(data.metrics);
       setMeta(data.meta);
     } catch (e) {
@@ -239,7 +240,9 @@ export default function AdminUserBehaviour({ onNavigate }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // scopeOrgIds is derived from statsScope + active org, so those deps cover it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statsScope, activeOrg?.id]);
 
   useEffect(() => { load(range); }, [load, activeOrg?.id, range]);
 
@@ -292,7 +295,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
 
       // Optional second table: each selected metric's value, day by day.
       if (includeHistory) {
-        const hist = await getUserBehaviourDailyHistory(range);
+        const hist = await getUserBehaviourDailyHistory(range, scopeOrgIds);
         content += '\n\n' + buildHistoryCsv(hist, selectedIds, fmt.id);
       }
 
@@ -322,6 +325,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
           </p>
         </div>
         <div className="ub-header__actions">
+          <ScopeToggle />
           <DateRangePicker value={range} meta={meta} onChange={setRange} />
           <button
             className="ub-export-btn"

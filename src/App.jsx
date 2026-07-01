@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import { applyDesignColors, mergeDesign } from './admin/appdesign/designDefaults';
 import CupProgress from './components/CupProgress';
@@ -55,8 +55,12 @@ import {
   getOrgBySlug,
   getDefaultOrg,
   isRewardBudgetBlocked,
+  ensureIdentityForUser,
+  mintByoCup,
 } from './lib/api';
+import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, getGroupBySlug } from './lib/groups';
 import BudgetPausedModal from './components/BudgetPausedModal';
+import StoresPage from './components/StoresPage';
 import './App.css';
 
 /* Best-effort device fingerprint from the user agent. Falls back to a
@@ -185,7 +189,7 @@ export default function App() {
     refundRatePerCup: 1.00,
     heroHeadline: 'Collect Cups & Get Rewards',
     heroSubtext: 'We pool your cup deposits into one cashback payout — worth more than a standard refund.',
-    featureCupSharing: true,
+    featureCupSharing: false,
     featureDonations: true,
     featureDirectRefunds: true,
     maintenanceMode: false,
@@ -203,6 +207,18 @@ export default function App() {
    *   • Brand color (org.brand_color exposed to CSS variables / chips)
    */
   const [activeOrg, setActiveOrg] = useState(null);
+  // Phase 3: group context for the active org (null when the org isn't in a
+  // group — i.e. every existing single org, which then behaves unchanged).
+  // Drives the Stores page and the mode-sensitive (BYO vs deposit) copy.
+  const [groupCtx, setGroupCtx] = useState(null);
+  // Phase 3: this person's per-store balances across the group (org id →
+  // {balance, lifetime}). Powers the Stores page + the A1 unlock gate.
+  const [groupBalances, setGroupBalances] = useState({});
+  // Phase 3: per-store extras for the Stores page (org id → {featured, location}).
+  const [groupStores, setGroupStores] = useState({});
+  // Phase 3: result of a BYO stationary-QR scan (?byo). Drives a confirmation
+  // modal — credited (+ optional cross-store note) or held-for-review.
+  const [byoResult, setByoResult] = useState(null);
   // Reward-budget gate: true when this org has reached its cashback cap.
   // The amount is never sent to the client — only this boolean.
   const [rewardBudgetBlocked, setRewardBudgetBlocked] = useState(false);
@@ -317,6 +333,20 @@ export default function App() {
   const showImpact      = design.sections.showImpact !== false;
   const designCopy      = design.copy;
 
+  /* Phase 3: mode-sensitive copy. For a grouped org we compose the copy
+   * from its group's mode (BYO drops all deposit/return/SmartBin wording);
+   * for an ungrouped org this is null and every string below falls back to
+   * the app's existing per-org / hardcoded copy — so nothing changes for
+   * the existing single orgs. */
+  const groupCopy    = useMemo(() => (groupCtx ? composeGroupCopy(groupCtx) : null), [groupCtx]);
+  const heroHeadline = groupCopy?.heroHeadline ?? liveSettings.heroHeadline;
+  const heroSubtext  = groupCopy?.heroSubtext  ?? liveSettings.heroSubtext;
+  const effDesignCopy = groupCopy ? { ...designCopy, ...groupCopy.designCopy } : designCopy;
+  const isByo        = groupCopy?.mode === 'byo';
+  // Guide "stories" steps: an admin-edited guide (App Design) wins; else the
+  // group-mode copy; else HowItWorks falls back to its built-in steps.
+  const guideSteps   = (design.guide?.steps?.length ? design.guide.steps : groupCopy?.howItWorks?.steps);
+
   /* Detect "preview mode" — when the App Design tab's iframe embeds
    * us with ?preview=1, we skip every Supabase round-trip (auth,
    * user creation, balance, history, claims) and just render the
@@ -387,14 +417,33 @@ export default function App() {
         // Path shape: /<slug>/?... — first non-empty segment is the slug.
         // If no slug (e.g. visiting /), fall back to the default org so
         // the existing demo URL keeps working without breakage.
-        const pathSlug = (window.location.pathname || '/')
-          .split('/')
-          .filter(Boolean)[0] || null;
-        const isReservedSlug = pathSlug === 'admin'; // admin route uses its own shell
-        const org = (!isReservedSlug && pathSlug)
-          ? (await getOrgBySlug(pathSlug)) || (await getDefaultOrg())
-          : (await getDefaultOrg());
+        // Path shapes:
+        //   /<orgSlug>              → that store (legacy, still works)
+        //   /<groupSlug>            → the group's Stores hub
+        //   /<groupSlug>/<orgSlug>  → that store within the group
+        const segs = (window.location.pathname || '/').split('/').filter(Boolean);
+        const seg0 = segs[0] === 'admin' ? null : (segs[0] || null);
+        const seg1 = segs[1] || null;
+        let org = null;
+        let hubRoute = false;
+        if (seg0) {
+          const grp = await getGroupBySlug(seg0);
+          if (grp) {
+            if (seg1) {
+              // Individual store under the group.
+              org = (await getOrgBySlug(seg1)) || grp.members[0] || null;
+            } else {
+              // Group hub → open the Stores page. Use a member for context.
+              hubRoute = true;
+              org = grp.members[0] || null;
+            }
+          } else {
+            org = await getOrgBySlug(seg0);
+          }
+        }
+        if (!org) org = await getDefaultOrg();
         if (org) setActiveOrg(org);
+        if (hubRoute) setPage('stores'); // /<groupSlug> lands on the Stores hub
 
         const user = await getOrCreateUser(org?.id);
 
@@ -415,7 +464,7 @@ export default function App() {
         // Capture entry context BEFORE the deeplink's ?batch param is
         // stripped below, so we can later attribute 0-cup accounts to a
         // shared link / in-app browser / bare URL.
-        track(EVENTS.APP_LOADED, { slug: pathSlug || null, ...getEntryContext() });
+        track(EVENTS.APP_LOADED, { slug: seg0 || null, ...getEntryContext() });
         // Detect the device once per session and push it to Supabase so
         // the admin Users tab can show what kind of phone is using the
         // app. We only re-push if it changed (e.g. user switched
@@ -479,6 +528,35 @@ export default function App() {
         if (config?.settings) {
           setLiveSettings(s => ({ ...s, ...config.settings }));
         }
+
+        // Phase 3: resolve this org's group context. Returns null for
+        // ungrouped orgs (every existing org), so nothing below changes for
+        // them. For grouped orgs it drives the Stores page + BYO/deposit copy.
+        const gctx = await getGroupContext(org?.id);
+        setGroupCtx(gctx);
+        if (gctx) {
+          // Best-effort: link this per-org user row to the person's shared
+          // identity, then pull their balances across the group's stores.
+          // Internally guarded — never throws, never blocks the home render.
+          try {
+            const identity = await ensureIdentityForUser(user, {
+              deviceId: user.device_id,
+              authUid: user.auth_user_id,
+              authEmail: user.email,
+            });
+            if (identity?.id) {
+              const bals = await getGroupBalances(identity.id, gctx.members.map(m => m.id));
+              setGroupBalances(bals);
+            }
+          } catch (e) {
+            console.warn('group identity/balances (non-fatal):', e);
+          }
+          // Per-store featured reward + location for the Stores page (best-effort).
+          getGroupStores(gctx.members.map(m => m.id))
+            .then(setGroupStores)
+            .catch(e => console.warn('getGroupStores (non-fatal):', e));
+        }
+
         setCupCount(balance);
         setHistory(hist);
         setUserClaims(claims);
@@ -520,6 +598,43 @@ export default function App() {
               setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }, user.id), 100);
             }
           }
+        }
+
+        // Phase 3 BYO: the stationary counter QR opens /<slug>/?byo=1. Mint
+        // one cup via the byo-mint edge function (soft cap: ≤2 auto-credit per
+        // rolling 24h, 3rd+ held for admin review). The edge function is the
+        // authority and rejects any non-BYO org, so this is safe to attempt
+        // whenever the param is present.
+        const urlByo = sp.get('byo');
+        if (urlByo && org?.id) {
+          window.history.replaceState({}, '', window.location.pathname);
+          const gcopy = gctx ? composeGroupCopy(gctx) : null;
+          mintByoCup(user.id, org.id)
+            .then(res => {
+              if (res?.status === 'credited') {
+                setCupCount(res.newBalance);
+                setByoResult({
+                  status: 'credited',
+                  title: gcopy?.scanSuccess?.title || 'Cup added',
+                  body:  gcopy?.scanSuccess?.body  || 'That’s another cup toward your cashback.',
+                  crossOrg: (res.preBalance === 0 && (gctx?.members?.length || 0) > 1) ? gcopy?.crossOrgNotice : null,
+                });
+              } else if (res?.status === 'pending_review') {
+                setByoResult({
+                  status: 'pending',
+                  title: gcopy?.dailyCapReview?.title || 'Thanks — this one’s being checked',
+                  body:  gcopy?.dailyCapReview?.body  || 'This extra cup has been sent for a quick review.',
+                });
+              }
+            })
+            .catch(err => {
+              console.warn('BYO mint failed:', err);
+              setByoResult({
+                status: 'error',
+                title: 'Couldn’t add the cup',
+                body: 'Please try scanning the counter code again in a moment.',
+              });
+            });
         }
       } catch (err) {
         console.error('PackPerks init failed:', err);
@@ -627,6 +742,13 @@ export default function App() {
   };
 
   const handleAddCup = () => setPage('cup-scan');
+
+  /* Phase 3: switch to another store in the group. Org identity is resolved
+   * from the URL slug on load, so switching = navigating to that slug (a
+   * clean re-bootstrap into the other venue's app, branding, and balance). */
+  const handleSwitchStore = (member) => {
+    if (member?.slug) window.location.href = `/${member.slug}/`;
+  };
 
   // In-app browser sheet (Android): reopen the still-unclaimed deeplink in
   // the phone's default browser via an Android intent URL, carrying the
@@ -1073,6 +1195,50 @@ export default function App() {
     );
   }
 
+  if (page === 'stores') {
+    // Enrich each group member with this person's balance + the store's
+    // featured reward and location for the redesigned Stores hub.
+    const storeCards = (groupCtx?.members || []).map(m => ({
+      id: m.id,
+      name: m.name,
+      slug: m.slug,
+      brand_color: m.brand_color,
+      logo_url: m.logo_url,
+      balance: m.id === activeOrg?.id ? cupCount : (groupBalances[m.id]?.balance || 0),
+      featured: groupStores[m.id]?.featured || null,
+      rewards: groupStores[m.id]?.rewards || [],
+      location: groupStores[m.id]?.location || null,
+    }));
+    const groupSlug = groupCtx?.group?.slug;
+    // Total cups this person has collected across the group (lifetime), for
+    // the plastic-avoided impact panel.
+    const personalCups = Object.values(groupBalances).reduce((sum, b) => sum + (b?.lifetime || 0), 0);
+    return (
+      <>
+        <StoresPage
+          group={groupCtx?.group}
+          intro={groupCopy?.storesIntro}
+          stores={storeCards}
+          personalCups={personalCups}
+          onSelectStore={(store) => {
+            // Open the store within the group: /<groupSlug>/<orgSlug>.
+            if (groupSlug && store?.slug) window.location.href = `/${groupSlug}/${store.slug}`;
+            else handleSwitchStore(store);
+          }}
+          onOpenAccount={() => setPage('user')}
+          onOpenGuide={() => setHowItWorksOpen(true)}
+        />
+        {howItWorksOpen && (
+          <HowItWorks
+            steps={guideSteps}
+            onClose={() => setHowItWorksOpen(false)}
+            onComplete={() => setHiwSeen(true)}
+          />
+        )}
+      </>
+    );
+  }
+
   if (page === 'user') {
     return (
       <div className="app">
@@ -1095,7 +1261,7 @@ export default function App() {
           showActivity={showActivity}
           showImpact={showImpact}
           lifetimeCups={lifetimeCups}
-          copy={designCopy}
+          copy={effDesignCopy}
           onRefreshClaims={async () => {
             // Re-pull claims when user lands on the activity tab — that's when
             // they'd notice an admin status change. Cheap enough to do eagerly.
@@ -1195,7 +1361,7 @@ export default function App() {
             cupCount={cupCount}
           />
         )}
-        {howItWorksOpen && <HowItWorks onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
+        {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
       </div>
     );
   }
@@ -1223,6 +1389,16 @@ export default function App() {
         />
       )}
 
+      {/* Grouped org → a "back to all stores" affordance above everything. */}
+      {groupCtx && (
+        <button type="button" className="app__see-stores" onClick={() => { if (groupCtx?.group?.slug) window.location.href = `/${groupCtx.group.slug}`; else setPage('stores'); }}>
+          <svg className="app__see-stores-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          See all stores
+        </button>
+      )}
+
       <Header
         cupCount={cupCount}
         onBadgeClick={() => setPage('user')}
@@ -1232,30 +1408,8 @@ export default function App() {
       />
 
       <section className="app__hero">
-        <h1 className="app__headline">{liveSettings.heroHeadline}</h1>
-        <p className="app__subtext">{liveSettings.heroSubtext}</p>
-        {!hiwSeen && (
-          <button
-            type="button"
-            className="app__how-box"
-            onClick={() => setHowItWorksOpen(true)}
-          >
-            <span className="app__how-box-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M9.3 9.2a2.8 2.8 0 0 1 5.3 1c0 1.9-2.6 2.2-2.6 3.6" />
-                <line x1="12" y1="17.4" x2="12.01" y2="17.4" />
-              </svg>
-            </span>
-            <span className="app__how-box-text">
-              <span className="app__how-box-title">How does it work?</span>
-              <span className="app__how-box-sub">See how cups turn into cashback</span>
-            </span>
-            <svg className="app__how-box-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="9 6 15 12 9 18" />
-            </svg>
-          </button>
-        )}
+        <h1 className="app__headline">{heroHeadline}</h1>
+        <p className="app__subtext">{heroSubtext}</p>
       </section>
 
       <CupProgress
@@ -1282,6 +1436,7 @@ export default function App() {
         onViewDetail={() => handleViewDetail(selectedReward)}
         onNudge={handleNudge}
         onAddCup={handleAddCup}
+        onExplain={() => setHowItWorksOpen(true)}
       />
 
       <GoalSection
@@ -1305,7 +1460,7 @@ export default function App() {
         />
       )}
 
-      {howItWorksOpen && <HowItWorks onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
+      {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
 
       <BudgetPausedModal
         open={budgetPausedOpen}
@@ -1315,20 +1470,50 @@ export default function App() {
       />
 
       <Modal open={termsOpen} onClose={() => setTermsOpen(false)} title="Voucher Terms">
-        <p><strong>How it works:</strong> Return your reusable PackBack cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} location. Each returned cup adds to your balance.</p>
-        <ul>
-          <li>Rewards are digital vouchers — no app download needed.</li>
-          <li>One reward can be claimed per cup cycle.</li>
-          <li>Vouchers are valid for 30 days after claiming.</li>
-          {liveSettings?.featureDirectRefunds && (
-            <li>Cashback is sent to your IBAN within 1 to 2 business days.</li>
-          )}
-          <li>You can switch your reward goal at any time before claiming.</li>
-        </ul>
-        {liveSettings?.featureDirectRefunds && (
-          <p><strong>Refund policy:</strong> If you prefer cash over a food reward, use &quot;Get the direct refund&quot; to withdraw your cup deposit instead.</p>
+        {groupCopy ? (
+          /* Grouped org: use the group's mode-sensitive terms (BYO drops all
+           * deposit/return wording). */
+          <>
+            <p><strong>{groupCopy.terms.title}:</strong> {groupCopy.terms.intro}</p>
+            <ul>
+              {groupCopy.terms.points.map((pt, i) => <li key={i}>{pt}</li>)}
+            </ul>
+          </>
+        ) : (
+          <>
+            <p><strong>How it works:</strong> Return your reusable PackBack cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} location. Each returned cup adds to your balance.</p>
+            <ul>
+              <li>Rewards are digital vouchers — no app download needed.</li>
+              <li>One reward can be claimed per cup cycle.</li>
+              <li>Vouchers are valid for 30 days after claiming.</li>
+              {liveSettings?.featureDirectRefunds && (
+                <li>Cashback is sent to your IBAN within 1 to 2 business days.</li>
+              )}
+              <li>You can switch your reward goal at any time before claiming.</li>
+            </ul>
+            {liveSettings?.featureDirectRefunds && (
+              <p><strong>Refund policy:</strong> If you prefer cash over a food reward, use &quot;Get the direct refund&quot; to withdraw your cup deposit instead.</p>
+            )}
+          </>
         )}
         <button className="modal-btn" onClick={() => setTermsOpen(false)}>Got it</button>
+      </Modal>
+
+      {/* Phase 3 BYO: stationary-QR scan result. */}
+      <Modal
+        open={!!byoResult}
+        onClose={() => setByoResult(null)}
+        title={byoResult?.status === 'credited' ? 'Nice!' : byoResult?.status === 'pending' ? 'Thanks!' : 'Hmm'}
+      >
+        <p className="app__byo-title"><strong>{byoResult?.title}</strong></p>
+        <p>{byoResult?.body}</p>
+        {byoResult?.crossOrg && (
+          <div className="app__byo-crossorg">
+            <strong>{byoResult.crossOrg.title}</strong>
+            <span>{byoResult.crossOrg.body}</span>
+          </div>
+        )}
+        <button className="modal-btn" onClick={() => setByoResult(null)}>Got it</button>
       </Modal>
 
       {liveSettings.featureDirectRefunds && (

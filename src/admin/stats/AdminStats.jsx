@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { getStatsMetrics, purgeOrgRecords } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
+import ScopeToggle from '../shared/ScopeToggle';
 import './AdminStats.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -137,7 +138,7 @@ function InspectModal({ view, showAll, onToggleAll, onClose }) {
 }
 
 export default function AdminStats() {
-  const { activeOrg } = useOrg();
+  const { activeOrg, scopeOrgIds, statsScope } = useOrg();
   const [range, setRange] = useState('all');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -160,7 +161,7 @@ export default function AdminStats() {
     try {
       const r = RANGES.find(x => x.id === rangeId) || RANGES[0];
       const fromTs = r.days ? Date.now() - r.days * 24 * 60 * 60 * 1000 : null;
-      const result = await getStatsMetrics({ fromTs });
+      const result = await getStatsMetrics({ fromTs, orgIds: scopeOrgIds });
       setData(result);
     } catch (e) {
       console.error('getStatsMetrics failed', e);
@@ -168,7 +169,9 @@ export default function AdminStats() {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // scopeOrgIds is derived from statsScope + active org.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statsScope, activeOrg?.id]);
 
   useEffect(() => { load(range); }, [range, load, activeOrg?.id]);
 
@@ -215,6 +218,7 @@ export default function AdminStats() {
           </p>
         </div>
         <div className="stats-header__actions">
+          <ScopeToggle />
           <select
             className="stats-range"
             value={range}

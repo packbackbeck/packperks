@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartBin · IQ Lab</title>
+<style>
+:root {
+  --orange: #E8500A;
+  --orange-dim: rgba(232,80,10,.12);
+  --purple: #5B21B6;
+  --purple-mid: #7C3AED;
+  --purple-dim: rgba(91,33,182,.1);
+  --bg: #F7F5FF;
+  --card: #FFFFFF;
+  --border: #E2D9F3;
+  --text: #150D2E;
+  --muted: #7C6FA0;
+  --green: #16A34A;
+  --red: #DC2626;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── WIRE BG ── */
+#wireSvg {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── SHELL: full viewport grid ── */
+.shell {
+  position: relative; z-index: 1;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  grid-template-columns: 1fr;
+  padding: 12px 16px 12px;
+  gap: 10px;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-size: 13px; font-weight: 900; letter-spacing: 3px;
+  color: var(--purple);
+}
+.logo span { color: var(--orange); }
+
+.header-pills { display: flex; gap: 10px; }
+.pill {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: var(--muted); letter-spacing: 1px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 10px;
+}
+.dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  animation: blink 1.6s ease-in-out infinite;
+}
+.dot.g { background: var(--green); }
+.dot.o { background: var(--orange); animation-delay: .5s; }
+.dot.p { background: var(--purple-mid); animation-delay: 1s; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── BODY GRID ── */
+.body {
+  display: grid;
+  grid-template-columns: 220px 1fr 200px;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* ── GENERIC CARD ── */
+.card {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex; flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+.card-tag {
+  font-size: 9px; letter-spacing: 2px; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tag-icon {
+  width: 18px; height: 18px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+}
+.tag-icon.p { background: var(--purple-dim); }
+.tag-icon.o { background: var(--orange-dim); }
+
+/* ── LEFT COLUMN ── */
+.left-col { display: flex; flex-direction: column; gap: 10px; }
+
+.big-val {
+  font-size: 34px; font-weight: 900; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--purple);
+}
+.big-val.orange { color: var(--orange); }
+.val-delta {
+  font-size: 10px; margin-top: 4px;
+  color: var(--green);
+}
+.val-delta.dn { color: var(--red); }
+
+canvas.spark { display: block; width: 100%; margin-top: auto; }
+
+/* gauge card */
+.gauge-card { align-items: center; }
+#gaugeCanvas { display: block; }
+.gauge-num {
+  font-size: 26px; font-weight: 900; color: var(--purple);
+  text-align: center; margin-top: -4px;
+}
+
+/* mini bottom cards */
+.mini-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-top: auto;
+}
+.mini {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+}
+.mini-lbl { font-size: 8px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+.mini-v { font-size: 18px; font-weight: 900; color: var(--purple); margin-top: 2px; }
+.mini-v.o { color: var(--orange); }
+.mini-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; }
+.mini-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg,var(--purple),var(--orange)); transition: width .8s ease; }
+
+/* ── CENTER COLUMN ── */
+.center-col {
+  display: flex; flex-direction: column;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px 18px;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+
+.center-label {
+  font-size: 10px; letter-spacing: 3px; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 6px;
+}
+
+/* BUTTON */
+#calcBtn {
+  font-family: 'Courier New', monospace;
+  font-size: 14px; font-weight: 900; letter-spacing: 1.5px;
+  color: white;
+  background: linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%);
+  border: none; border-radius: 12px;
+  padding: 14px 36px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(91,33,182,.3);
+  transition: transform .1s, box-shadow .1s, opacity .3s;
+  position: relative;
+  overflow: hidden;
+}
+#calcBtn::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(135deg,rgba(255,255,255,.2) 0%,transparent 60%);
+}
+#calcBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(91,33,182,.4); }
+#calcBtn:active { transform: translateY(0); }
+#calcBtn.hidden { opacity:0; pointer-events:none; height:0; padding:0; margin:0; overflow:hidden; }
+#calcBtn span { position:relative; z-index:1; }
+#calcBtn small { display:block; font-size:9px; font-weight:400; opacity:.65; margin-top:2px; position:relative; z-index:1; }
+
+/* IQ DISPLAY */
+.iq-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  flex: 1; justify-content: center;
+  width: 100%;
+}
+
+.smartbin-text {
+  font-size: 11px; letter-spacing: 2px; color: var(--muted);
+  text-transform: uppercase; text-align: center; margin-bottom: 8px;
+}
+
+/* SLOT MACHINE DIGITS */
+#iqSlot {
+  display: flex; justify-content: center; gap: 2px;
+  height: 130px; overflow: hidden;
+  line-height: 1;
+}
+.digit-col {
+  display: flex; flex-direction: column; align-items: center;
+  overflow: hidden;
+  height: 130px;
+  width: 82px;
+}
+.digit-strip {
+  display: flex; flex-direction: column;
+  transition: transform .0s;
+  /* will be animated via JS */
+}
+.digit-char {
+  font-size: 120px; font-weight: 900;
+  color: var(--purple);
+  line-height: 130px;
+  height: 130px;
+  width: 82px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.iq-unit-row {
+  display: flex; align-items: center; gap: 10px; margin-top: 2px;
+}
+.iq-unit { font-size: 11px; font-weight: 700; color: var(--orange); letter-spacing: 3px; }
+.iq-sep { width: 40px; height: 1px; background: var(--border); }
+
+.pct-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px;
+}
+.pct-lbl { font-size: 10px; color: var(--muted); letter-spacing: 1px; white-space: nowrap; }
+.pct-track { flex:1; height: 6px; background: var(--purple-dim); border-radius: 3px; position: relative; }
+.pct-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--purple), var(--orange));
+  transition: width .6s cubic-bezier(.34,1.56,.64,1);
+  position: relative;
+}
+.pct-fill::after {
+  content:''; position:absolute; right:-5px; top:-5px;
+  width:16px; height:16px; border-radius:50%;
+  background: var(--orange); border: 2.5px solid white;
+  box-shadow: 0 0 8px rgba(232,80,10,.5);
+  animation: pctPing 1.4s ease-in-out infinite;
+}
+@keyframes pctPing { 0%,100%{box-shadow:0 0 6px rgba(232,80,10,.4)} 50%{box-shadow:0 0 14px rgba(232,80,10,.9)} }
+.pct-num { font-size: 11px; font-weight: 900; color: var(--orange); white-space: nowrap; min-width: 54px; text-align: right; }
+
+/* BELL CURVE */
+.curve-wrap {
+  width: 100%; margin-top: 12px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 10px 6px;
+  flex-shrink: 0;
+}
+.curve-title { font-size: 9px; letter-spacing: 2px; color: var(--muted); text-align:center; margin-bottom:4px; }
+#bellCanvas { display: block; width: 100%; }
+.sd-row { display:flex; justify-content:space-between; padding: 2px 6px 0; }
+.sd-row span { font-size: 8px; color: var(--muted); }
+
+/* ── RIGHT COLUMN ── */
+.right-col { display: flex; flex-direction: column; gap: 10px; }
+
+/* node pulse decorations */
+.node {
+  position: fixed; pointer-events: none; z-index: 0;
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.node::after {
+  content:''; position:absolute; inset:-4px; border-radius:50%;
+  border: 1.5px solid; opacity:.3;
+  animation: nodeRing 2.2s ease-out infinite;
+}
+@keyframes nodeRing { 0%{transform:scale(1);opacity:.3} 100%{transform:scale(2.8);opacity:0} }
+
+/* ── LOCK STATE ── */
+@keyframes lockGlow {
+  0%  { color: var(--orange); filter: drop-shadow(0 0 20px rgba(232,80,10,.8)); }
+  60% { color: var(--orange); filter: drop-shadow(0 0 40px rgba(232,80,10,.4)); }
+  100%{ color: var(--purple); filter: none; }
+}
+.digit-char.locked { animation: lockGlow .9s ease-out forwards; }
+</style>
+</head>
+<body>
+
+<svg id="wireSvg"></svg>
+
+<div class="node" id="n1" style="top:18%;left:6%;background:#7C3AED"></div>
+<div class="node" id="n2" style="top:65%;left:4%;background:#E8500A;animation-delay:.7s"></div>
+<div class="node" id="n3" style="top:25%;right:5%;background:#5B21B6;animation-delay:1.1s"></div>
+<div class="node" id="n4" style="bottom:18%;right:7%;background:#E8500A;animation-delay:1.8s"></div>
+
+<div class="shell">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">SMART<span>BIN</span> &middot; IQ LAB</div>
+    <div class="header-pills">
+      <div class="pill"><div class="dot g"></div>NEURAL CORE</div>
+      <div class="pill"><div class="dot o"></div>SENSOR <span id="sensorVal" style="margin-left:2px">99.4</span>%</div>
+      <div class="pill"><div class="dot p"></div>READY</div>
+      <button onclick="lowIQ()" style="font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;color:var(--muted);background:none;border:1px dashed var(--border);border-radius:20px;padding:3px 10px;cursor:pointer;opacity:.45;transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='.45'">LOW IQ</button>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- LEFT -->
+    <div class="left-col">
+
+      <div class="card" style="flex:1">
+        <div class="card-tag">NEURAL FLUX <div class="tag-icon p">⚡</div></div>
+        <div class="big-val" id="flux">8.42</div>
+        <div class="val-delta" id="fluxD">▲ +0.03 / cycle</div>
+        <canvas class="spark" id="spark1" height="44"></canvas>
+      </div>
+
+      <div class="card" style="flex:1">
+        <div class="card-tag">SYNAPSE RATE <div class="tag-icon o">Hz</div></div>
+        <div class="big-val orange" id="synapse">2,847</div>
+        <div class="val-delta" id="synapseD">▲ +12 Hz</div>
+        <canvas class="spark" id="spark2" height="44"></canvas>
+      </div>
+
+      <div class="card gauge-card" style="flex:1">
+        <div class="card-tag">COGNITIVE LOAD <div class="tag-icon p">◉</div></div>
+        <canvas id="gaugeCanvas" width="160" height="84"></canvas>
+        <div class="gauge-num" id="cogLoad">76%</div>
+      </div>
+
+    </div>
+
+    <!-- CENTER -->
+    <div class="center-col">
+      <div class="center-label">COGNITIVE ANALYSIS ENGINE v4.1</div>
+
+      <button id="calcBtn" onclick="calculateIQ()">
+        <span>▶ CALCULATE MY IQ</span>
+        <small>ENGAGE NEURAL PROCESSING</small>
+      </button>
+
+      <div class="iq-wrap" id="iqWrap">
+        <div class="smartbin-text">SmartBin calculated your IQ:</div>
+        <div id="iqSlot"></div>
+        <div class="iq-unit-row">
+          <div class="iq-sep"></div>
+          <div class="iq-unit">IQ POINTS</div>
+          <div class="iq-sep"></div>
+        </div>
+        <div class="pct-row">
+          <span class="pct-lbl">PERCENTILE</span>
+          <div class="pct-track"><div class="pct-fill" id="pctFill" style="width:0%"></div></div>
+          <span class="pct-num" id="pctNum">—</span>
+        </div>
+      </div>
+
+      <div class="curve-wrap">
+        <div class="curve-title">POPULATION DISTRIBUTION MODEL</div>
+        <canvas id="bellCanvas" height="90"></canvas>
+        <div class="sd-row">
+          <span>55</span><span>70</span><span>85</span><span>100</span><span>115</span><span>130</span><span>145+</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-col">
+
+      <div class="card" style="flex:1">
+        <div class="card-tag">ENTROPY QUOTIENT <div class="tag-icon o">∞</div></div>
+        <div class="big-val orange" id="entropy">0.914</div>
+        <div class="val-delta dn" id="entropyD">▼ −0.002 stabilizing</div>
+        <canvas class="spark" id="spark3" height="44"></canvas>
+      </div>
+
+      <div class="card" style="flex:1">
+        <div class="card-tag">PROCESSING CYCLES <div class="tag-icon p">⟳</div></div>
+        <div class="big-val" id="cycles" style="font-size:22px">1,204,847</div>
+        <div class="mini-bar" style="margin-top:8px"><div class="mini-fill" id="cycleBar" style="width:82%"></div></div>
+      </div>
+
+      <div class="card" style="flex:2">
+        <div class="card-tag">SYSTEM STATUS <div class="tag-icon p">▣</div></div>
+        <div class="mini-grid" style="grid-template-columns:1fr;gap:6px;">
+          <div class="mini">
+            <div class="mini-lbl">CONFIDENCE</div>
+            <div class="mini-v o" id="conf">99.7%</div>
+            <div class="mini-bar"><div class="mini-fill" id="confFill" style="width:99.7%"></div></div>
+          </div>
+          <div class="mini">
+            <div class="mini-lbl">DATA INTEGRITY</div>
+            <div class="mini-v" id="integrity">NOMINAL</div>
+            <div class="mini-bar"><div class="mini-fill" style="width:96%"></div></div>
+          </div>
+          <div class="mini">
+            <div class="mini-lbl">ANALYSIS DEPTH</div>
+            <div class="mini-v o" id="depth">LAYER 7</div>
+            <div class="mini-bar"><div class="mini-fill" id="depthFill" style="width:70%"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── CONFIG ── */
+const IQ_MIN = 180, IQ_MAX = 250;
+
+/* ── SLOT MACHINE ── */
+const DIGITS_COUNT = 3; // 3-digit IQ
+const slot = document.getElementById('iqSlot');
+
+// build digit columns
+const strips = [];
+for (let i = 0; i < DIGITS_COUNT; i++) {
+  const col = document.createElement('div');
+  col.className = 'digit-col';
+  const strip = document.createElement('div');
+  strip.className = 'digit-strip';
+  // 0-9 repeated for looping feel
+  for (let d = 0; d <= 9; d++) {
+    const ch = document.createElement('div');
+    ch.className = 'digit-char';
+    ch.textContent = d;
+    strip.appendChild(ch);
+  }
+  col.appendChild(strip);
+  slot.appendChild(col);
+  strips.push(strip);
+}
+
+let currentIQ = IQ_MIN + Math.floor(Math.random() * (IQ_MAX - IQ_MIN + 1));
+let locked = false;
+let driftInterval = null;
+
+function showDigit(stripEl, digit, instant) {
+  const offset = -(digit * 130);
+  if (instant) {
+    stripEl.style.transition = 'none';
+    stripEl.style.transform = `translateY(${offset}px)`;
+  } else {
+    stripEl.style.transition = 'transform 0.08s cubic-bezier(.22,.61,.36,1)';
+    stripEl.style.transform = `translateY(${offset}px)`;
+  }
+}
+
+function setIQDisplay(iq, instant = false) {
+  const s = String(iq).padStart(3, '0');
+  for (let i = 0; i < DIGITS_COUNT; i++) {
+    showDigit(strips[i], parseInt(s[i]), instant);
+  }
+}
+
+// initial display
+setIQDisplay(currentIQ, true);
+updateBell(currentIQ);
+updatePct(currentIQ);
+
+/* ── DRIFT ── */
+function startDrift() {
+  if (driftInterval) return;
+  driftInterval = setInterval(() => {
+    if (locked) return;
+    const delta = Math.random() < .5 ? -1 : 1;
+    currentIQ = Math.max(IQ_MIN, Math.min(IQ_MAX, currentIQ + delta));
+    setIQDisplay(currentIQ);
+    updateBell(currentIQ);
+    updatePct(currentIQ);
+  }, 280);
+}
+startDrift();
+
+/* ── LOW IQ ── */
+function lowIQ() {
+  document.getElementById('calcBtn').classList.add('hidden');
+  locked = true;
+  const target = Math.floor(Math.random() * 21); // 0–20
+  const duration = 2600;
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min((now - start) / duration, 1);
+    if (t < 1) {
+      if (Math.random() < ((1 - t * t) * .8 + .05)) {
+        const rand = Math.floor(Math.random() * 21);
+        setIQDisplay(rand);
+        updateBell(rand);
+      }
+      requestAnimationFrame(tick);
+    } else {
+      setIQDisplay(target, false);
+      updateBell(target);
+      updatePct(target);
+      currentIQ = target;
+      const cols = slot.querySelectorAll('.digit-char');
+      cols.forEach(c => c.classList.add('locked'));
+      setTimeout(() => cols.forEach(c => c.classList.remove('locked')), 1000);
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ── CALCULATE ── */
+function calculateIQ() {
+  // hide button immediately
+  document.getElementById('calcBtn').classList.add('hidden');
+
+  locked = true;
+  const target = IQ_MIN + Math.floor(Math.random() * (IQ_MAX - IQ_MIN + 1));
+  const duration = 2600;
+  const start = performance.now();
+
+  function tick(now) {
+    const t = Math.min((now - start) / duration, 1);
+
+    if (t < 1) {
+      // speed decreases as t approaches 1
+      const spinSpeed = 1 - t * t;
+      if (Math.random() < (spinSpeed * .8 + .05)) {
+        const rand = IQ_MIN + Math.floor(Math.random() * (IQ_MAX - IQ_MIN + 1));
+        setIQDisplay(rand);
+        updateBell(rand);
+      }
+      requestAnimationFrame(tick);
+    } else {
+      // LOCK on target
+      setIQDisplay(target, false);
+      updateBell(target);
+      updatePct(target);
+      currentIQ = target;
+
+      // add locked glow to each digit char
+      const cols = slot.querySelectorAll('.digit-char');
+      cols.forEach(c => c.classList.add('locked'));
+      // remove class after animation
+      setTimeout(() => cols.forEach(c => c.classList.remove('locked')), 1000);
+
+      // permanently locked — never drift again
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ── BELL CURVE ── */
+function gauss(x, mean=100, sd=15) {
+  return Math.exp(-0.5 * ((x - mean) / sd) ** 2);
+}
+
+function updateBell(iq) {
+  const canvas = document.getElementById('bellCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const PAD = 8, xMin = 55, xMax = 145;
+  const toX = v => PAD + ((v - xMin) / (xMax - xMin)) * (W - PAD * 2);
+
+  ctx.clearRect(0, 0, W, H);
+
+  const clampIQ = Math.min(iq, 145);
+
+  // shaded region
+  ctx.beginPath();
+  for (let x = xMin; x <= clampIQ; x += .4) {
+    const px = toX(x), py = H - PAD - gauss(x) * (H - PAD * 2);
+    x <= xMin ? ctx.moveTo(px, H - PAD) : ctx.lineTo(px, py);
+  }
+  ctx.lineTo(toX(clampIQ), H - PAD); ctx.closePath();
+  const g = ctx.createLinearGradient(toX(xMin), 0, toX(clampIQ), 0);
+  g.addColorStop(0, 'rgba(91,33,182,.12)');
+  g.addColorStop(1, 'rgba(232,80,10,.35)');
+  ctx.fillStyle = g; ctx.fill();
+
+  // curve
+  ctx.beginPath();
+  for (let x = xMin; x <= xMax; x += .4) {
+    const px = toX(x), py = H - PAD - gauss(x) * (H - PAD * 2);
+    x <= xMin ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = '#5B21B6'; ctx.lineWidth = 2; ctx.stroke();
+
+  // marker
+  const mx = toX(clampIQ);
+  const my = H - PAD - gauss(clampIQ) * (H - PAD * 2);
+  ctx.beginPath(); ctx.moveTo(mx, H - PAD); ctx.lineTo(mx, my);
+  ctx.strokeStyle = 'rgba(232,80,10,.7)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#E8500A'; ctx.fill();
+  ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  if (iq > 145) {
+    ctx.fillStyle = '#E8500A'; ctx.font = 'bold 9px Courier New';
+    ctx.fillText('→ OFF-CHART', W - 70, 14);
+  }
+}
+
+function updatePct(iq) {
+  const pct = (99.9990 + ((iq - 180) / 70) * 0.009).toFixed(4);
+  document.getElementById('pctNum').textContent = pct + '%';
+  document.getElementById('pctFill').style.width = '99.8%';
+}
+
+/* ── LIVE METRICS ── */
+let fluxV    = 8.42;
+let synV     = 2847;
+let cogV     = 76;
+let entrV    = 0.914;
+let cycleV   = 1204847;
+let depthV   = 7;
+const s1 = Array(28).fill(.5).map(() => Math.random());
+const s2 = Array(28).fill(.5).map(() => Math.random());
+const s3 = Array(28).fill(.5).map(() => Math.random());
+
+function rw(v, mn, mx, step) {
+  v += (Math.random() - .5) * step;
+  return Math.max(mn, Math.min(mx, v));
+}
+
+function updateMetrics() {
+  const prevFlux = fluxV;
+  fluxV  = rw(fluxV, 5.5, 12, .14);
+  synV   = Math.round(rw(synV, 2100, 3500, 45));
+  cogV   = Math.round(rw(cogV, 48, 99, 2));
+  entrV  = parseFloat(rw(entrV, .84, .99, .005).toFixed(3));
+  cycleV += Math.floor(Math.random() * 600 + 80);
+  depthV  = Math.round(rw(depthV, 4, 9, .3));
+
+  const fluxEl = document.getElementById('flux');
+  fluxEl.textContent = fluxV.toFixed(2);
+  const fd = fluxV - prevFlux;
+  const fdEl = document.getElementById('fluxD');
+  fdEl.textContent = (fd >= 0 ? '▲ +' : '▼ ') + Math.abs(fd).toFixed(2) + ' / cycle';
+  fdEl.className = 'val-delta' + (fd < 0 ? ' dn' : '');
+
+  document.getElementById('synapse').textContent = synV.toLocaleString();
+  document.getElementById('cogLoad').textContent  = cogV + '%';
+  document.getElementById('entropy').textContent  = entrV;
+  document.getElementById('cycles').textContent   = cycleV.toLocaleString();
+  document.getElementById('depth').textContent    = 'LAYER ' + depthV;
+  document.getElementById('depthFill').style.width = (depthV / 9 * 100) + '%';
+
+  const conf = (99.5 + Math.random() * .45).toFixed(1);
+  document.getElementById('conf').textContent = conf + '%';
+  document.getElementById('confFill').style.width = conf + '%';
+
+  document.getElementById('sensorVal').textContent = (98.4 + Math.random() * 1.5).toFixed(1);
+
+  s1.push(fluxV / 12); s1.shift();
+  s2.push(synV / 3500); s2.shift();
+  s3.push(entrV); s3.shift();
+
+  drawSpark('spark1', s1, '#5B21B6');
+  drawSpark('spark2', s2, '#E8500A');
+  drawSpark('spark3', s3, '#7C3AED');
+
+  drawGauge(cogV);
+}
+
+function drawSpark(id, data, color) {
+  const c = document.getElementById(id);
+  const dpr = window.devicePixelRatio || 1;
+  c.width  = c.offsetWidth  * dpr;
+  c.height = c.offsetHeight * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = c.offsetWidth, H = c.offsetHeight;
+  ctx.clearRect(0, 0, W, H);
+  const step = W / (data.length - 1);
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i * step, y = H - v * H * .82 - H * .06;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+  ctx.fillStyle = color + '1A'; ctx.fill();
+}
+
+function drawGauge(pct) {
+  const c = document.getElementById('gaugeCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, 160, 84);
+  const cx = 80, cy = 80, r = 62;
+  const sA = Math.PI, eA = 2 * Math.PI;
+  const fA = sA + (pct / 100) * Math.PI;
+  ctx.beginPath(); ctx.arc(cx, cy, r, sA, eA);
+  ctx.strokeStyle = '#EDE9F9'; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.stroke();
+  const g = ctx.createLinearGradient(cx - r, 0, cx + r, 0);
+  g.addColorStop(0, '#5B21B6'); g.addColorStop(1, '#E8500A');
+  ctx.beginPath(); ctx.arc(cx, cy, r, sA, fA);
+  ctx.strokeStyle = g; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.stroke();
+  const nx = cx + Math.cos(fA) * r, ny = cy + Math.sin(fA) * r;
+  ctx.beginPath(); ctx.arc(nx, ny, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#E8500A'; ctx.fill();
+  ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+}
+
+/* ── WIRE SVG ── */
+function buildWires() {
+  const svg = document.getElementById('wireSvg');
+  const W = window.innerWidth, H = window.innerHeight;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
+  const pts = [
+    [W*.07,H*.18],[W*.22,H*.42],[W*.5,H*.25],
+    [W*.78,H*.38],[W*.93,H*.28],[W*.62,H*.72],
+    [W*.18,H*.78],[W*.5,H*.68],[W*.86,H*.76],[W*.09,H*.56],
+  ];
+  [[0,1],[1,2],[2,3],[3,4],[2,7],[5,7],[6,7],[7,8],[0,9],[9,6]].forEach(([a,b]) => {
+    const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',pts[a][0]); l.setAttribute('y1',pts[a][1]);
+    l.setAttribute('x2',pts[b][0]); l.setAttribute('y2',pts[b][1]);
+    l.setAttribute('stroke','#D4C4F0'); l.setAttribute('stroke-width','1');
+    l.setAttribute('stroke-dasharray','5 5'); l.setAttribute('opacity','.4');
+    svg.appendChild(l);
+  });
+  pts.forEach(([x,y],i) => {
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r','3');
+    c.setAttribute('fill', i%2===0 ? '#7C3AED' : '#E8500A'); c.setAttribute('opacity','.5');
+    svg.appendChild(c);
+  });
+}
+
+window.addEventListener('load', () => {
+  buildWires();
+  window.addEventListener('resize', buildWires);
+  updateMetrics();
+  setInterval(updateMetrics, 700);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
+import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT } from '../lib/adminApi';
+import { useOrg } from '../context/OrgContext';
+import './AdminByoRequests.css';
+
+/* ─────────────────────────────────────────────────────────────────────
+ * AdminByoRequests — Phase 3 BYO approval queue.
+ *
+ * A bring-your-own store auto-credits up to 2 cups per customer per
+ * rolling 24h (the byo-mint edge function). The 3rd+ scan lands here as
+ * a pending request: an admin Approves (credits the cup) or Denies.
+ *
+ * Also hosts the store's stationary "counter QR" (/<slug>/?byo=1) that
+ * customers scan to collect — print it and stand it on the counter.
+ * ───────────────────────────────────────────────────────────────────── */
+
+const PROD_URL = 'https://perks.packback.app/';
+
+const STATUSES = [
+  { key: 'pending',  label: 'Pending' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'denied',   label: 'Denied' },
+  { key: 'all',      label: 'All' },
+];
+
+function fmtWhen(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  } catch { return iso; }
+}
+
+export default function AdminByoRequests() {
+  const { activeOrgId, activeOrgSlug } = useOrg();
+  const [status, setStatus]   = useState('pending');
+  const [rows, setRows]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+  const [busyId, setBusyId]   = useState(null);
+  const [notice, setNotice]   = useState(null);
+  const qrRef = useRef(null);
+
+  // Per-store daily auto-credit cap (how many times/day a customer can scan
+  // this store's QR before extra scans are held for review).
+  const [cap, setCap]         = useState(BYO_CAP_DEFAULT);
+  const [capInput, setCapInput] = useState(String(BYO_CAP_DEFAULT));
+  const [savingCap, setSavingCap] = useState(false);
+  const [capMsg, setCapMsg]   = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (!activeOrgId) return undefined;
+    getByoCap(activeOrgId).then(n => {
+      if (!alive) return;
+      setCap(n); setCapInput(String(n));
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [activeOrgId]);
+
+  async function handleSaveCap() {
+    setSavingCap(true); setCapMsg(null);
+    try {
+      const saved = await saveByoCap(activeOrgId, capInput);
+      setCap(saved); setCapInput(String(saved));
+      setCapMsg('Saved');
+      setTimeout(() => setCapMsg(null), 2500);
+    } catch (e) {
+      setCapMsg(e.message || 'Could not save.');
+    } finally {
+      setSavingCap(false);
+    }
+  }
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setRows(await getByoRequests(status));
+    } catch (e) {
+      console.error(e);
+      setError(e.message || 'Failed to load requests.');
+    } finally {
+      setLoading(false);
+    }
+  }, [status, activeOrgId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const byoUrl = activeOrgSlug ? `${PROD_URL}${activeOrgSlug}/?byo=1` : null;
+  useEffect(() => {
+    if (!byoUrl || !qrRef.current) return;
+    QRCode.toCanvas(qrRef.current, byoUrl, {
+      width: 168, margin: 1, errorCorrectionLevel: 'M',
+      color: { dark: '#0F0F0F', light: '#FFFFFF' },
+    }).catch(err => console.error('BYO QR draw failed:', err));
+  }, [byoUrl]);
+
+  async function decide(id, action) {
+    setBusyId(id);
+    setError(null);
+    setNotice(null);
+    try {
+      if (action === 'approve') {
+        await approveByoRequest(id);
+        setNotice('Approved — the cup was credited to the customer.');
+      } else {
+        await denyByoRequest(id);
+        setNotice('Request denied. No cup was credited.');
+      }
+      await load();
+      setTimeout(() => setNotice(null), 4000);
+    } catch (e) {
+      console.error(e);
+      setError(e.message || 'Action failed.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="byoreq">
+      <header className="byoreq__head">
+        <div>
+          <span className="byoreq__eyebrow">Phase 3 · Bring-Your-Own</span>
+          <h1 className="byoreq__title">BYO cup requests</h1>
+          <p className="byoreq__sub">
+            Customers auto-collect up to {cap} {cap === 1 ? 'cup' : 'cups'} per 24&nbsp;hours at this store.
+            Any extra scan in that window lands here for review — approve to credit the cup, or deny.
+          </p>
+        </div>
+      </header>
+
+      {/* Stationary counter QR for this store */}
+      <section className="byoreq__qr-card">
+        <canvas ref={qrRef} className="byoreq__qr" width="168" height="168" />
+        <div className="byoreq__qr-info">
+          <h3>Counter QR for this store</h3>
+          <p>Print this and stand it on the counter. Scanning it adds one cup to the customer’s balance at this store. This QR is unique to this store — it won’t add cups anywhere else.</p>
+          {byoUrl
+            ? <code className="byoreq__qr-url">{byoUrl}</code>
+            : <span className="byoreq__muted">This store isn’t in a bring-your-own group yet.</span>}
+
+          {/* Per-store daily scan limit */}
+          <div className="byoreq__cap">
+            <label className="byoreq__cap-label" htmlFor="byo-cap">
+              Auto-credit limit
+              <span className="byoreq__cap-hint">Scans per customer per 24&nbsp;hours before extra scans need review.</span>
+            </label>
+            <div className="byoreq__cap-row">
+              <input
+                id="byo-cap"
+                className="byoreq__cap-input"
+                type="number" min="1" max="50" step="1"
+                value={capInput}
+                onChange={e => setCapInput(e.target.value)}
+                disabled={!activeOrgId || savingCap}
+              />
+              <button
+                type="button"
+                className="byoreq__cap-save"
+                onClick={handleSaveCap}
+                disabled={!activeOrgId || savingCap || capInput === String(cap)}
+              >
+                {savingCap ? 'Saving…' : 'Save limit'}
+              </button>
+              {capMsg && <span className="byoreq__cap-msg">{capMsg}</span>}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="byoreq__tabs">
+        {STATUSES.map(s => (
+          <button
+            key={s.key}
+            className={`byoreq__tab ${status === s.key ? 'byoreq__tab--on' : ''}`}
+            onClick={() => setStatus(s.key)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {error && <div className="byoreq__error">{error}</div>}
+      {notice && <div className="byoreq__notice">{notice}</div>}
+
+      {loading ? (
+        <div className="byoreq__skeleton">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="byoreq__empty">
+          <h3>{status === 'pending' ? 'No pending requests' : 'Nothing here'}</h3>
+          <p>
+            {status === 'pending'
+              ? 'When a customer goes over the auto-credit cap, their extra cup appears here for review.'
+              : 'No requests with this status.'}
+          </p>
+        </div>
+      ) : (
+        <div className="byoreq__table-wrap">
+          <table className="byoreq__table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Cups</th>
+                <th>Requested</th>
+                <th>Status</th>
+                <th className="byoreq__th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.id}>
+                  <td>
+                    <div className="byoreq__cust">{r.userName || 'Anonymous'}</div>
+                    {r.userEmail && <div className="byoreq__cust-sub">{r.userEmail}</div>}
+                  </td>
+                  <td>{r.cups}</td>
+                  <td className="byoreq__when">{fmtWhen(r.created_at)}</td>
+                  <td>
+                    <span className={`byoreq__pill byoreq__pill--${r.status}`}>{r.status}</span>
+                    {r.status !== 'pending' && r.decided_at && (
+                      <div className="byoreq__cust-sub">{fmtWhen(r.decided_at)}</div>
+                    )}
+                  </td>
+                  <td onClick={e => e.stopPropagation()}>
+                    {r.status === 'pending' ? (
+                      <div className="byoreq__actions">
+                        <button
+                          className="byoreq__btn byoreq__btn--approve"
+                          disabled={busyId === r.id}
+                          onClick={() => decide(r.id, 'approve')}
+                        >
+                          {busyId === r.id ? '…' : 'Approve'}
+                        </button>
+                        <button
+                          className="byoreq__btn byoreq__btn--deny"
+                          disabled={busyId === r.id}
+                          onClick={() => decide(r.id, 'deny')}
+                        >
+                          Deny
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="byoreq__muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

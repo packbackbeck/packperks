@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import './HowItWorks.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -42,7 +42,18 @@ const CashIcon = () => (
   </svg>
 );
 
-const STEPS = [
+/* Named icon set — admins pick one of these per guide step in App Design.
+ * Keys are stable string ids stored in the config; values are the SVGs. */
+export const GUIDE_ICONS = {
+  cup:     CupIcon,
+  reward:  RewardIcon,
+  store:   StoreIcon,
+  receipt: ReceiptIcon,
+  cash:    CashIcon,
+};
+export const GUIDE_ICON_KEYS = Object.keys(GUIDE_ICONS);
+
+const DEFAULT_STEPS = [
   {
     key: 'return',
     title: 'Return your cups',
@@ -94,11 +105,33 @@ const STEPS = [
 
 const STEP_DURATION = 6500;
 
-export default function HowItWorks({ onClose, onComplete }) {
+/* Overlay custom step text (e.g. the BYO copy: [{title, body}, …]) onto the
+ * built-in visual scaffolding (icons / gradients / art), so a group in a
+ * different mode gets its own wording without needing bespoke artwork. */
+function resolveSteps(custom) {
+  if (!custom?.length) return DEFAULT_STEPS;
+  return custom.map((s, i) => {
+    const base = DEFAULT_STEPS[i % DEFAULT_STEPS.length];
+    // Each field falls back to the built-in scaffolding when the admin
+    // hasn't set it, so partially-edited steps still look complete.
+    return {
+      key:    s.key || `step-${i}`,
+      title:  s.title,
+      text:   s.body ?? s.text,
+      image:  s.image || base.image,
+      bg:     s.bg || base.bg,
+      accent: s.accent || base.accent,
+      Icon:   (s.icon && GUIDE_ICONS[s.icon]) || base.Icon,
+    };
+  });
+}
+
+export default function HowItWorks({ onClose, onComplete, steps: customSteps }) {
+  const steps = useMemo(() => resolveSteps(customSteps), [customSteps]);
   const [index, setIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [auto, setAuto] = useState(true);
-  const last = STEPS.length - 1;
+  const last = steps.length - 1;
 
   function goNext() {
     setAuto(false);
@@ -154,7 +187,7 @@ export default function HowItWorks({ onClose, onComplete }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
-  const step = STEPS[index];
+  const step = steps[index];
   const Icon = step.Icon;
 
   return (
@@ -165,7 +198,7 @@ export default function HowItWorks({ onClose, onComplete }) {
       <button className="hiw__tap hiw__tap--next" onClick={goNext} aria-label="Next step" tabIndex={-1} />
 
       <div className="hiw__bars">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <div key={s.key} className="hiw__bar">
             <span
               className="hiw__bar-fill"
@@ -195,7 +228,7 @@ export default function HowItWorks({ onClose, onComplete }) {
       </div>
 
       <div className="hiw__foot">
-        <span className="hiw__count">{index + 1} of {STEPS.length}</span>
+        <span className="hiw__count">{index + 1} of {steps.length}</span>
         <button className="hiw__cta" onClick={goNext}>
           {index >= last ? 'Got it' : 'Next'}
         </button>

@@ -40,7 +40,21 @@ export function getActiveOrgId() {
  *       supabase.from('users').select('id')
  *     );
  */
-export function applyOrgFilter(query) {
+export function applyOrgFilter(query, orgIdsOverride) {
+  // Explicit scope override (Phase 3 group analytics): an array of org ids.
+  //   • [id]        → single-org filter (same as default)
+  //   • [id1, id2…] → group filter via .in()
+  //   • []          → no filter
+  // When the override is omitted (undefined), fall back to the global active
+  // org — the original, unchanged behaviour every other caller relies on.
+  if (orgIdsOverride !== undefined) {
+    const ids = Array.isArray(orgIdsOverride)
+      ? orgIdsOverride.filter(Boolean)
+      : (orgIdsOverride ? [orgIdsOverride] : []);
+    if (ids.length === 0) return query;
+    if (ids.length === 1) return query.eq('org_id', ids[0]);
+    return query.in('org_id', ids);
+  }
   const orgId = _activeOrgId;
   if (!orgId) return query;
   return query.eq('org_id', orgId);

@@ -80,25 +80,33 @@ function writeUrlOrgParam(slug) {
 
 export function OrgProvider({ children }) {
   const [availableOrgs, setAvailableOrgs] = useState([]);
+  const [groups, setGroups]               = useState([]); // org_groups rows (id, name, slug)
   const [activeOrg, setActiveOrg]         = useState(null);
   const [status, setStatus]               = useState('loading');
   const [error, setError]                 = useState(null);
+  // Phase 3: analytics scope for the group-aware pages — 'org' (this store,
+  // default) or 'group' (all stores in the active org's group combined).
+  const [statsScope, setStatsScope]       = useState('org');
 
   /* Fetch all visible orgs and pick the active one. */
   const refresh = useCallback(async (preferredId = null) => {
     setStatus('loading');
     setError(null);
     try {
-      const { data, error: err } = await supabase
-        .from('organizations')
-        .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint, created_at, updated_at')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true });
+      const [{ data, error: err }, { data: grpData }] = await Promise.all([
+        supabase
+          .from('organizations')
+          .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint, group_id, group_active, created_at, updated_at')
+          .is('deleted_at', null)
+          .order('created_at', { ascending: true }),
+        supabase.from('org_groups').select('id, name, slug'),
+      ]);
 
       if (err) throw err;
 
       const orgs = data || [];
       setAvailableOrgs(orgs);
+      setGroups(grpData || []);
 
       if (orgs.length === 0) {
         setActiveOrg(null);
@@ -137,6 +145,35 @@ export function OrgProvider({ children }) {
     refresh();
   }, [refresh]);
 
+  // Reset the analytics scope to "this store" whenever the active org
+  // changes — a new org may be in a different group (or none).
+  useEffect(() => {
+    setStatsScope('org');
+  }, [activeOrg?.id]);
+
+  // Active org's cup-sharing flag + its group's copy mode — used to gate
+  // the sidebar (Cup Transfers only when sharing is on; BYO Requests vs
+  // Receipt Generator by mode).
+  const [activeOrgSharing, setActiveOrgSharing] = useState(false);
+  const [activeGroupMode, setActiveGroupMode] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const oid = activeOrg?.id;
+    const gid = activeOrg?.group_id;
+    if (!oid) { setActiveOrgSharing(false); setActiveGroupMode(null); return undefined; }
+    (async () => {
+      const keys = [`published:${oid}`];
+      if (gid) keys.push(`published:group:${gid}`);
+      const { data } = await supabase.from('app_config').select('key, value').in('key', keys);
+      if (!alive) return;
+      const orgCfg = (data || []).find(r => r.key === `published:${oid}`);
+      const grpCfg = gid ? (data || []).find(r => r.key === `published:group:${gid}`) : null;
+      setActiveOrgSharing(orgCfg?.value?.settings?.featureCupSharing === true);
+      setActiveGroupMode(grpCfg?.value?.settings?.mode || null);
+    })();
+    return () => { alive = false; };
+  }, [activeOrg?.id, activeOrg?.group_id]);
+
   /* Switch to a different org. Accepts an id OR a slug. */
   const switchOrg = useCallback((idOrSlug) => {
     if (!idOrSlug) return;
@@ -153,6 +190,21 @@ export function OrgProvider({ children }) {
     writeUrlOrgParam(next.slug);
   }, [availableOrgs]);
 
+  // ── Group awareness (Phase 3) ──────────────────────────────────────
+  const groupsById = {};
+  groups.forEach(g => { groupsById[g.id] = g; });
+
+  const activeGroupId = activeOrg?.group_id || null;
+  const activeGroup   = activeGroupId ? (groupsById[activeGroupId] || null) : null;
+  const groupMembers  = activeGroupId ? availableOrgs.filter(o => o.group_id === activeGroupId) : [];
+  const groupMemberIds = groupMembers.map(o => o.id);
+
+  // The org id(s) analytics should cover, given the current scope toggle.
+  const scopeOrgIds =
+    (statsScope === 'group' && activeGroupId && groupMemberIds.length)
+      ? groupMemberIds
+      : (activeOrg?.id ? [activeOrg.id] : []);
+
   const value = {
     activeOrg,
     activeOrgId:   activeOrg?.id   || null,
@@ -162,6 +214,17 @@ export function OrgProvider({ children }) {
     error,
     switchOrg,
     refresh,
+    // group awareness
+    groups,
+    groupsById,
+    activeGroup,          // { id, name, slug } | null
+    groupMembers,         // full org rows in the active org's group
+    groupMemberIds,
+    statsScope,           // 'org' | 'group'
+    setStatsScope,
+    scopeOrgIds,          // org id(s) the analytics pages should query
+    activeOrgSharing,     // is cup sharing on for the active org?
+    activeGroupMode,      // 'byo' | 'deposit' | null (active org's group)
   };
 
   return <OrgCtx.Provider value={value}>{children}</OrgCtx.Provider>;

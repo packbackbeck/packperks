@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ProfileMenu from './auth/ProfileMenu';
 import OrgSwitcher from './context/OrgSwitcher';
+import { useOrg } from './context/OrgContext';
 import { logAction } from './auth/actionLog';
 import './AdminSidebar.css';
 
@@ -128,6 +129,18 @@ const NAV_ITEMS = [
     ),
   },
   {
+    id: 'byorequests',
+    label: 'BYO Requests',
+    /* Cup + check glyph — the bring-your-own approval queue. */
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 3h12l-1 15a2 2 0 0 1-2 1.8H9A2 2 0 0 1 7 18L6 3z" />
+        <path d="M5 3h14" />
+        <path d="M9.5 11.5l2 2 3.5-4" />
+      </svg>
+    ),
+  },
+  {
     id: 'reports',
     label: 'Reports',
     icon: (
@@ -181,8 +194,8 @@ const ROLE_VISIBLE_TABS = {
   // Manager + Checker also see the Org tab (read-only) so they know
   // where they work; the editing controls inside are gated by
   // PermissionGate so they're disabled.
-  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'reports', 'stats', 'behaviour']),
-  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'reports', 'stats', 'behaviour']),
+  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'reports', 'stats', 'behaviour']),
+  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour']),
 };
 
 export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState, role, onAddOrg }) {
@@ -194,6 +207,10 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
   // routes through a confirm step. Other toggles fire immediately.
   const [maintenanceConfirm, setMaintenanceConfirm] = useState(null);
   // null when closed; { nextValue: true|false } when open.
+
+  // Feature/mode gating for the nav (Phase 3).
+  const { activeOrgSharing, activeGroupMode } = useOrg();
+  const isByo = activeGroupMode === 'byo';
 
   function confirmMaintenance() {
     if (!maintenanceConfirm) return;
@@ -218,7 +235,15 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
           // Hide tabs the current role can't access. Always show Org +
           // Activity to owner/admin (we'll add those tabs in P7/P8).
           const visible = ROLE_VISIBLE_TABS[role];
-          return visible === null || !visible || visible.has(item.id);
+          if (!(visible === null || !visible || visible.has(item.id))) return false;
+          // Phase 3 gating:
+          //  • Cup Transfers only when cup sharing is on for this org.
+          //  • BYO orgs show BYO Requests and hide the Receipt Generator;
+          //    non-BYO orgs do the reverse.
+          if (item.id === 'transactions' && !activeOrgSharing) return false;
+          if (item.id === 'byorequests' && !isByo) return false;
+          if (item.id === 'cupqr' && isByo) return false;
+          return true;
         }).map(item => {
           const isActive = activePage === item.id;
           const badge =

@@ -7,7 +7,7 @@ import './ShareCupSheet.css';
 // → App.jsx detects the ?cups= param → activates the cups for them.
 // When running on localhost, point at the local origin so the demo loop
 // works without re-deploying to Vercel for every share.
-const PROD_URL = 'https://packperks-v1.vercel.app/';
+const PROD_URL = 'https://perks.packback.app/';
 const APP_URL = (() => {
   if (typeof window === 'undefined') return PROD_URL;
   const origin = window.location.origin;

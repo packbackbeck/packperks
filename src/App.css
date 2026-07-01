@@ -93,6 +93,41 @@
   color: var(--text-light);
 }
 
+/* "See all stores" — top-of-home back affordance for grouped orgs.
+   A compact pill with a left arrow; opens the Stores page. */
+.app__see-stores {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 8px 14px 8px 10px;
+  background: var(--white, #FFFFFF);
+  border: none;
+  border-radius: 999px;
+  box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
+  color: var(--bk-brown, #502314);
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.app__see-stores-arrow { flex-shrink: 0; }
+
+/* BYO scan-result modal: the cross-store note (A8) sits below the message. */
+.app__byo-title { margin-bottom: 6px; }
+.app__byo-crossorg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--bk-green-light, #D4EDDA);
+  border-radius: 12px;
+}
+.app__byo-crossorg strong { font-size: 13px; color: var(--bk-brown, #502314); }
+.app__byo-crossorg span { font-size: 12.5px; color: var(--text-light); line-height: 1.45; }
+
 /* Info links row */
 .app__info-links {
   display: flex;

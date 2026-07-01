@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_DESIGN, mergeDesign } from './designDefaults';
 import { extractColorsFromFile } from './extractColors';
 import { saveAppConfig } from '../../lib/api';
+import { uploadRewardImage } from '../lib/adminApi';
+import { GUIDE_ICONS, GUIDE_ICON_KEYS } from '../../components/HowItWorks';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import './AdminAppDesign.css';
@@ -39,6 +41,7 @@ const TABS = [
   { id: 'colors',   label: 'Colors' },
   { id: 'copy',     label: 'Copy' },
   { id: 'sections', label: 'Sections' },
+  { id: 'guide',    label: 'Guide stories' },
   { id: 'import',   label: 'Smart import' },
 ];
 
@@ -207,6 +210,9 @@ export default function AdminAppDesign({ draftState }) {
             )}
             {tab === 'sections' && (
               <SectionsPanel sections={design.sections} onPatch={(p) => patchDesign('sections', p)} />
+            )}
+            {tab === 'guide' && (
+              <GuidePanel steps={design.guide?.steps || []} onChange={(steps) => patchDesign('guide', { steps })} />
             )}
             {tab === 'import' && (
               <SmartImportPanel onApply={replaceColors} />
@@ -534,6 +540,190 @@ function Toggle({ value, onChange, label }) {
       <span className="aad-toggle__dot" />
     </button>
   );
+}
+
+/* ─── Guide stories panel ─────────────────────────────────────────────
+ * Edits the How-it-works walkthrough (the full-screen "stories" guide).
+ * Steps live under design.guide.steps. An empty list means "use the
+ * built-in / group-mode guide"; adding steps here fully replaces it.
+ * Each step carries a title, body text, an optional image, an icon and
+ * an accent colour. */
+function GuidePanel({ steps, onChange }) {
+  const list = Array.isArray(steps) ? steps : [];
+
+  function update(i, patch) {
+    onChange(list.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  }
+  function add() {
+    const n = list.length;
+    onChange([
+      ...list,
+      {
+        key: `step-${n + 1}-${n}`,
+        title: '',
+        text: '',
+        image: '',
+        icon: GUIDE_ICON_KEYS[n % GUIDE_ICON_KEYS.length],
+        accent: '#E08A53',
+        bg: '',
+      },
+    ]);
+  }
+  function remove(i) { onChange(list.filter((_, idx) => idx !== i)); }
+  function move(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  }
+
+  return (
+    <div className="aad-guide">
+      <div className="aad-section-head">
+        <h2>Guide stories</h2>
+        <span className="aad__hint-inline">
+          The full-screen walkthrough customers open from “How it works”. Empty = the built-in guide.
+        </span>
+      </div>
+
+      {list.length === 0 && (
+        <p className="aad-guide__empty">
+          No custom steps yet — the app shows its built-in guide. Add a step to fully take over the walkthrough.
+        </p>
+      )}
+
+      <div className="aad-guide__list">
+        {list.map((s, i) => (
+          <GuideStepEditor
+            key={s.key || i}
+            index={i}
+            total={list.length}
+            step={s}
+            onUpdate={(patch) => update(i, patch)}
+            onRemove={() => remove(i)}
+            onMove={(dir) => move(i, dir)}
+          />
+        ))}
+      </div>
+
+      <button type="button" className="aad__btn aad__btn--ghost aad-guide__add" onClick={add}>
+        + Add step
+      </button>
+    </div>
+  );
+}
+
+function GuideStepEditor({ index, total, step, onUpdate, onRemove, onMove }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState(null);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setErr(null); setUploading(true);
+    try {
+      const url = await uploadRewardImage(file);
+      if (!url) throw new Error('Upload returned no URL.');
+      onUpdate({ image: url });
+    } catch (ex) {
+      setErr(ex.message || 'Upload failed. Paste a URL instead.');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  const accent = step.accent || '#E08A53';
+
+  return (
+    <div className="aad-guide__step">
+      <div className="aad-guide__step-head">
+        <span className="aad-guide__step-num">Step {index + 1}</span>
+        <div className="aad-guide__step-tools">
+          <button type="button" className="aad-guide__icon-btn" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move up">↑</button>
+          <button type="button" className="aad-guide__icon-btn" onClick={() => onMove(1)} disabled={index === total - 1} aria-label="Move down">↓</button>
+          <button type="button" className="aad-guide__icon-btn aad-guide__icon-btn--danger" onClick={onRemove} aria-label="Remove step">✕</button>
+        </div>
+      </div>
+
+      <div className="aad-guide__step-body">
+        {/* Image */}
+        <div className="aad-guide__media">
+          <div className="aad-guide__thumb" style={{ background: step.bg || `${accent}22` }}>
+            {step.image
+              ? <img src={step.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              : <IconPreview iconKey={step.icon} accent={accent} />}
+          </div>
+          <div className="aad-guide__media-actions">
+            <button type="button" className="aad__btn aad__btn--ghost aad__btn--sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+              {uploading ? 'Uploading…' : 'Upload image'}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+            {step.image && (
+              <button type="button" className="aad__link" onClick={() => onUpdate({ image: '' })}>Clear</button>
+            )}
+          </div>
+        </div>
+
+        <div className="aad-guide__fields">
+          <label className="aad-guide__f">
+            <span>Title</span>
+            <input type="text" value={step.title || ''} onChange={(e) => onUpdate({ title: e.target.value })} placeholder="Bring your own cup" />
+          </label>
+          <label className="aad-guide__f">
+            <span>Text</span>
+            <textarea rows={2} value={step.text ?? step.body ?? ''} onChange={(e) => onUpdate({ text: e.target.value })} placeholder="Short explanation shown under the title." />
+          </label>
+          <label className="aad-guide__f">
+            <span>Image URL</span>
+            <input type="text" value={step.image || ''} onChange={(e) => onUpdate({ image: e.target.value })} placeholder="https://… or upload above" />
+          </label>
+          {err && <span className="aad-guide__err">{err}</span>}
+
+          <div className="aad-guide__row">
+            <label className="aad-guide__f aad-guide__f--icon">
+              <span>Icon</span>
+              <div className="aad-guide__icons">
+                {GUIDE_ICON_KEYS.map((k) => {
+                  const Ic = GUIDE_ICONS[k];
+                  const on = (step.icon || GUIDE_ICON_KEYS[index % GUIDE_ICON_KEYS.length]) === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      className={`aad-guide__icon-opt ${on ? 'is-on' : ''}`}
+                      style={on ? { borderColor: accent, color: accent } : undefined}
+                      onClick={() => onUpdate({ icon: k })}
+                      aria-label={k}
+                      title={k}
+                    >
+                      <Ic />
+                    </button>
+                  );
+                })}
+              </div>
+            </label>
+
+            <label className="aad-guide__f aad-guide__f--color">
+              <span>Accent</span>
+              <span className="aad-guide__color">
+                <input type="color" value={normHex(accent)} onChange={(e) => onUpdate({ accent: e.target.value.toUpperCase() })} />
+                <input type="text" value={accent} onChange={(e) => onUpdate({ accent: e.target.value.toUpperCase() })} spellCheck="false" />
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Small live icon preview (used as the thumbnail fallback + swatch). */
+function IconPreview({ iconKey, accent }) {
+  const Ic = GUIDE_ICONS[iconKey] || GUIDE_ICONS[GUIDE_ICON_KEYS[0]];
+  return <span className="aad-guide__iconpreview" style={{ color: accent }}><Ic /></span>;
 }
 
 /* ─── Smart import panel ──────────────────────────────────────────── */

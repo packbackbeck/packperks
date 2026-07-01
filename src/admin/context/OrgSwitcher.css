@@ -178,6 +178,45 @@
   color: #FF5533;
 }
 
+/* ── Group rows (Phase 3): a group listed like an org, with its member
+ * stores nested beneath it. ─────────────────────────────────────────── */
+.orgsw__groupblock { margin-top: 2px; }
+
+.orgsw__grouprow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #E8E4DC;
+  font-size: 12px;
+  font-weight: 700;
+  position: relative;
+}
+.orgsw__grouprow:hover { background: #232323; }
+
+/* Group leading mark — green collection glyph. */
+.orgsw__chip--group {
+  background: rgba(58, 176, 106, 0.20);
+  color: #6BD79A;
+}
+
+/* Group-settings gear: hidden until the group row is hovered. */
+.orgsw__gear--group { color: #6BD79A; }
+.orgsw__grouprow:hover .orgsw__gear--group,
+.orgsw__gear--group:focus-visible { opacity: 1; }
+.orgsw__gear--group:hover { background: rgba(58, 176, 106, 0.18); }
+
+/* Member stores nested under their group, with a guide line. */
+.orgsw__item--nested {
+  box-sizing: border-box;
+  width: calc(100% - 12px);
+  margin-left: 12px;
+  border-left: 1.5px solid #333;
+  border-radius: 0 6px 6px 0;
+}
+
 .orgsw__divider {
   height: 1px;
   background: #2A2A2A;

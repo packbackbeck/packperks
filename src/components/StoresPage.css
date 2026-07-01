@@ -1,0 +1,240 @@
+/* StoresPage — Phase 3 multi-venue hub (redesign) */
+
+.stores2 {
+  min-height: 100dvh;
+  padding: 20px 16px 40px;
+  background: var(--bk-cream, #F4EBDC);
+  font-family: var(--font-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Top bar (platform brand + account; no back button) ─────────────── */
+.stores2__topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.stores2__brand-logo { height: 30px; width: auto; max-width: 200px; display: block; }
+/* System explanation — its own full-width row below the bar. */
+.stores2__intro { margin: 0; font-size: 12.5px; color: var(--text-light); line-height: 1.5; width: 100%; }
+.stores2__topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.stores2__iconbtn {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--white, #fff); border: none;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--black, #1a1a1a); cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  transition: transform 0.14s ease, color 0.14s ease;
+}
+.stores2__iconbtn:hover { transform: translateY(-1px); color: var(--bk-green, #1A8737); }
+
+/* ── View toggle ─────────────────────────────────────────────────────── */
+.stores2__viewtoggle {
+  display: inline-flex; align-self: flex-start; gap: 2px;
+  padding: 3px; background: rgba(0, 0, 0, 0.05); border-radius: 12px;
+}
+.stores2__viewopt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border: none; border-radius: 9px;
+  background: transparent; color: var(--text-muted, #6C6259);
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.stores2__viewopt.is-on { background: var(--white, #fff); color: var(--bk-green, #1A8737); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+/* ── Info card ───────────────────────────────────────────────────────── */
+.stores2__infocard {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px; background: var(--white, #fff);
+  border-radius: 18px; box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.05));
+}
+.stores2__info-icon {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
+  background: var(--bk-green-light, #D4EDDA); color: var(--bk-green, #1A8737);
+  display: flex; align-items: center; justify-content: center;
+}
+.stores2__info-text { display: flex; flex-direction: column; gap: 3px; }
+.stores2__info-text strong { font-size: 15px; color: var(--black, #1a1a1a); }
+.stores2__info-text span { font-size: 13px; color: var(--text-light); line-height: 1.45; }
+
+.stores2__section { font-size: 15px; font-weight: 800; color: var(--black, #1a1a1a); margin: 2px 2px -4px; }
+
+/* ── Nearby-now hero (current store) ─────────────────────────────────── */
+.stores2__hero {
+  display: flex; align-items: stretch; width: 100%; padding: 0;
+  background: var(--white, #fff); border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 20px; overflow: hidden; cursor: pointer; text-align: left;
+  font-family: inherit; box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.05));
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.stores2__hero:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.1); }
+/* Logo panel: brand colour + a diagonal light→dark sheen that flatters any
+ * brand hue; the (transparent) logo is tinted white so it reads on top. */
+.stores2__hero-logo {
+  position: relative; flex-shrink: 0; width: 116px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.stores2__hero-logo::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0.05) 44%, rgba(0, 0, 0, 0.30) 100%);
+}
+.stores2__hero-logo-img {
+  position: relative; z-index: 1;
+  width: 76px; max-height: 82px; object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+.stores2__hero-logo-letter { position: relative; z-index: 1; color: #fff; font-weight: 800; font-size: 42px; }
+.stores2__hero-body { flex: 1; min-width: 0; padding: 16px 8px 16px 14px; display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+.stores2__here { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--bk-green, #1A8737); }
+.stores2__hero-name { font-size: 23px; font-weight: 800; color: var(--black, #1a1a1a); line-height: 1.1; margin: 1px 0 3px; }
+/* Featured reward carousel — each reward is ONE block (image + name) that
+   slides as a single unit; the viewport clips the horizontal track (the
+   track's slide transition is set inline so the loop can snap seamlessly). */
+.stores2__hero-featured-viewport { margin-top: 10px; overflow: hidden; border-radius: 13px; }
+.stores2__hero-featured-track { display: flex; }
+.stores2__hero-featured {
+  flex: 0 0 100%; width: 100%; box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px; background: rgba(0, 0, 0, 0.04); border-radius: 13px;
+}
+.stores2__hero-featured-img {
+  width: 42px; height: 42px; border-radius: 10px; object-fit: cover;
+  flex-shrink: 0; background: #F0ECE2;
+}
+.stores2__hero-featured-name {
+  flex: 1; min-width: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  font-size: 13.5px; font-weight: 700; line-height: 1.25; color: var(--black, #1a1a1a);
+  overflow: hidden;
+}
+.stores2__hero-arrow { align-self: center; width: 22px; height: 22px; color: var(--text-light); flex-shrink: 0; margin-right: 10px; }
+
+/* ── Other-store cards ───────────────────────────────────────────────── */
+.stores2__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.stores2__card {
+  display: flex; align-items: center; gap: 13px; width: 100%; padding: 12px;
+  background: var(--white, #fff); border: none; border-radius: 18px; cursor: pointer;
+  text-align: left; font-family: inherit; box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.05));
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.stores2__card:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.1); }
+.stores2__mark {
+  flex-shrink: 0; width: 66px; height: 66px; border-radius: 15px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 26px;
+}
+.stores2__mark--img { background: #fff; object-fit: contain; padding: 7px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06); }
+.stores2__card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.stores2__card-name { font-size: 17px; font-weight: 800; color: var(--black, #1a1a1a); }
+.stores2__cups { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--text-muted, #6C6259); }
+.stores2__cups strong { font-size: 16px; color: var(--black, #1a1a1a); }
+.stores2__cups-icon { width: 18px; height: 18px; opacity: 0.85; }
+.stores2__cups--brand strong { color: var(--bk-green, #1A8737); }
+.stores2__tag {
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; max-width: 100%;
+  padding: 4px 9px; border-radius: 20px; background: rgba(0, 0, 0, 0.05);
+  color: var(--text-muted, #6C6259); font-size: 11.5px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.stores2__tag svg { flex-shrink: 0; }
+/* Auto-cycling reward thumbnail (slides left every 3s). */
+.stores2__thumb { position: relative; overflow: hidden; flex-shrink: 0; width: 58px; height: 58px; border-radius: 13px; background: #F0ECE2; }
+.stores2__thumb-track { display: flex; height: 100%; transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1); }
+.stores2__thumb-slide { flex: 0 0 100%; width: 100%; height: 100%; object-fit: cover; }
+.stores2__card-arrow { flex-shrink: 0; width: 20px; height: 20px; color: var(--text-light); }
+
+/* ── Map view (fills the screen height) ──────────────────────────────── */
+.stores2__map { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+.stores2__map-canvas {
+  position: relative; width: 100%; flex: 1; min-height: 440px; border-radius: 22px;
+  overflow: hidden; box-shadow: var(--shadow-screen, 0 6px 24px rgba(0, 0, 0, 0.08));
+}
+/* Leaflet fills the rounded canvas. */
+.stores2__map-canvas .leaflet-container {
+  width: 100%; height: 100%;
+  font-family: var(--font-primary);
+  background: #E9F1E4;
+}
+/* PackPerks-styled zoom control. */
+.stores2__map-canvas .leaflet-control-zoom {
+  border: none; border-radius: 12px; overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14); margin: 14px;
+}
+.stores2__map-canvas .leaflet-control-zoom a {
+  width: 34px; height: 34px; line-height: 34px;
+  color: var(--bk-brown, #502314); font-weight: 700; border: none;
+}
+.stores2__map-canvas .leaflet-control-zoom a:hover { background: var(--bk-green-light, #D4EDDA); color: var(--bk-green, #1A8737); }
+.stores2__map-canvas .leaflet-control-attribution { border-radius: 8px 0 0 0; font-size: 10px; }
+/* Custom brand-coloured marker (divIcon). */
+.stores2__leaflet-icon { background: none; border: none; }
+.stores2__leaflet-pin {
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 50%; box-sizing: border-box;
+  color: #fff; font-weight: 800; font-size: 16px;
+  border: 3px solid #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.32);
+}
+.stores2__leaflet-pin.is-current { box-shadow: 0 0 0 3px var(--bk-green, #1A8737), 0 3px 8px rgba(0, 0, 0, 0.32); }
+/* PackPerks-styled popup shell. */
+.stores2__map-canvas .leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.2);
+  padding: 2px;
+}
+.stores2__map-canvas .leaflet-popup-content { margin: 13px 15px; line-height: 1.4; }
+.stores2__map-canvas .leaflet-popup-tip { box-shadow: 0 12px 34px rgba(0, 0, 0, 0.2); }
+.stores2__map-canvas .leaflet-popup-close-button {
+  width: 26px; height: 26px; font-size: 18px; color: var(--text-light);
+  padding: 4px 6px 0 0;
+}
+
+/* Marker popup content — mirrors the list-view store card
+   (logo · name · cups · featured item). */
+.stores2__popcard { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+.stores2__popcard-top { display: flex; align-items: center; gap: 10px; }
+.stores2__popcard-logo {
+  width: 42px; height: 42px; border-radius: 11px; object-fit: contain;
+  background: #fff; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+.stores2__popcard-logo--letter {
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 18px;
+}
+.stores2__popcard-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stores2__popcard-name { font-size: 14.5px; font-weight: 800; color: var(--black, #1a1a1a); line-height: 1.15; }
+.stores2__popcard-cups { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: #6C6259; }
+.stores2__popcard-cups b { color: var(--black, #1a1a1a); font-weight: 800; }
+.stores2__popcard-cupicon { width: 14px; height: 14px; object-fit: contain; }
+.stores2__popcard-thumb { width: 42px; height: 42px; border-radius: 11px; object-fit: cover; flex-shrink: 0; background: #F0ECE2; }
+.stores2__popcard-tag {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  padding: 4px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.05);
+  font-size: 11.5px; font-weight: 700; color: var(--black, #1a1a1a);
+}
+.stores2__popup-btn {
+  margin-top: 9px; padding: 8px 12px; border: none; border-radius: 10px;
+  background: var(--bk-green, #1A8737); color: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  transition: filter 0.14s ease;
+}
+.stores2__popup-btn:hover { filter: brightness(1.08); }
+.stores2__map-hint { text-align: center; font-size: 12.5px; color: var(--text-light); }
+
+/* ── Plastic-avoided impact (list view) ──────────────────────────────── */
+.stores2__impact { margin-top: 6px; }
+.stores2__impact-title { display: block; font-size: 15px; font-weight: 800; color: var(--black, #1a1a1a); margin-bottom: 10px; }
+.stores2__impact-squares { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stores2__impact-sq {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+  padding: 14px; background: var(--white, #fff); border-radius: 16px;
+  box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.05));
+}
+.stores2__impact-sq--community { background: var(--bk-green-light, #D4EDDA); }
+.stores2__impact-icon {
+  width: 34px; height: 34px; border-radius: 10px; margin-bottom: 2px;
+  background: var(--bk-green-light, #D4EDDA); color: var(--bk-green, #1A8737);
+  display: flex; align-items: center; justify-content: center;
+}
+.stores2__impact-sq--community .stores2__impact-icon { background: rgba(255, 255, 255, 0.65); }
+.stores2__impact-icon svg { width: 18px; height: 18px; }
+.stores2__impact-val { font-size: 22px; font-weight: 800; color: var(--black, #1a1a1a); line-height: 1.05; }
+.stores2__impact-cap { font-size: 12px; color: var(--text-light); line-height: 1.35; }
+.stores2__impact-compare { margin: 12px 2px 0; font-size: 13px; color: var(--text-muted, #6C6259); text-align: center; }

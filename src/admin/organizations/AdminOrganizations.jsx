@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { listAllOrganizations, softDeleteOrganization, restoreOrganization, duplicateOrganization } from '../lib/adminApi';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { listAllOrganizations, listOrgGroups, softDeleteOrganization, restoreOrganization, duplicateOrganization } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
+import OrgGroupsPanel from './OrgGroupsPanel';
 import './AdminOrganizations.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ function formatDate(iso) {
 export default function AdminOrganizations({ onAddOrg, onNavigate }) {
   const { activeOrgId, switchOrg, refresh } = useOrg();
   const [orgs, setOrgs]       = useState([]);
+  const [groups, setGroups]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // {id, name}
@@ -50,8 +52,9 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
     setLoading(true);
     setError(null);
     try {
-      const list = await listAllOrganizations();
+      const [list, grps] = await Promise.all([listAllOrganizations(), listOrgGroups()]);
       setOrgs(list);
+      setGroups(grps);
     } catch (e) {
       console.error(e);
       setError(e.message || 'Failed to load organisations.');
@@ -59,6 +62,13 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
       setLoading(false);
     }
   }, []);
+
+  // group_id → { name, mode } for the per-row group chip.
+  const groupById = useMemo(() => {
+    const m = {};
+    groups.forEach(g => { m[g.id] = g; });
+    return m;
+  }, [groups]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -195,6 +205,15 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                           {org.partner_brand_name && org.partner_brand_name !== org.name && (
                             <div className="ao-org-partner">{org.partner_brand_name}</div>
                           )}
+                          {org.group_id && groupById[org.group_id] && (
+                            <span
+                              className={`ao-group-chip ao-group-chip--${groupById[org.group_id].mode}`}
+                              title={`In group “${groupById[org.group_id].name}”${org.group_active === false ? ' · hidden from Stores list' : ''}`}
+                            >
+                              {groupById[org.group_id].name}
+                              {org.group_active === false && <span className="ao-group-chip__off">hidden</span>}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -251,6 +270,8 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
           </table>
         </div>
       )}
+
+      {!loading && <OrgGroupsPanel orgs={orgs} groups={groups} onChanged={load} />}
 
       {confirmDelete && (
         <div className="ao-modal-backdrop" onClick={() => setConfirmDelete(null)}>

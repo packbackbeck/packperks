@@ -6,6 +6,7 @@ import {
 import { getAdminStats, getRewardBudget } from '../lib/adminApi';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import { useOrg } from '../context/OrgContext';
+import ScopeToggle from '../shared/ScopeToggle';
 import PiiMask from '../shared/PiiMask';
 import QuickLinks from '../shared/QuickLinks';
 import { useReorder } from './useReorder';
@@ -426,7 +427,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
   const { draft, updateDraft } = draftState;
   const blocks = draft.dashboardBlocks;
 
-  const { activeOrg } = useOrg();
+  const { activeOrg, scopeOrgIds, statsScope } = useOrg();
   const [stats, setStats]       = useState(null);
   const [loading, setLoading]   = useState(true);
   const [budget, setBudget]     = useState(null);
@@ -464,10 +465,12 @@ export default function AdminOverview({ draftState, onNavigate }) {
 
   function loadStats() {
     setLoading(true);
-    getAdminStats().then(setStats).catch(() => setStats(null)).finally(() => setLoading(false));
+    getAdminStats(scopeOrgIds).then(setStats).catch(() => setStats(null)).finally(() => setLoading(false));
   }
 
-  useEffect(() => { loadStats(); }, []);
+  // Re-run on scope toggle (this store ↔ whole group) and org change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadStats(); }, [statsScope, activeOrg?.id]);
 
   // Reward-budget monitor — refetched when the active org changes.
   useEffect(() => {
@@ -660,6 +663,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
           <p className="ov-header__sub">Platform health at a glance</p>
         </div>
         <div className="ov-header__actions">
+          <ScopeToggle />
           <div className="ov-period-toggle">
             {PERIOD_OPTIONS.map(opt => (
               <button

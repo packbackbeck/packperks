@@ -156,6 +156,7 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
         partner_brand_name: draft.partner_brand_name?.trim() || null,
         email_domain_hint: draft.email_domain_hint?.trim() || null,
         logo_url: draft.logo_url?.trim() || null,
+        logo_width: (draft.logo_width === '' || draft.logo_width == null) ? null : Number(draft.logo_width),
         legal_name: draft.legal_name?.trim() || null,
         kvk_number: draft.kvk_number?.trim() || null,
         btw_number: draft.btw_number?.trim() || null,
@@ -298,6 +299,33 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
             onChange={handleLogoFile}
             style={{ display: 'none' }}
           />
+
+          {/* Header logo width — controls .header__logo-bk in the user app. */}
+          <span className="org-field__label" style={{ marginTop: 12 }}>Header logo width</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="range"
+              min="40" max="200" step="2"
+              value={draft.logo_width ?? 88}
+              onChange={e => setDraft(d => ({ ...d, logo_width: Number(e.target.value) }))}
+              disabled={saving}
+              style={{ flex: 1, accentColor: '#FD6F46' }}
+              aria-label="Header logo width"
+            />
+            <input
+              type="number"
+              min="40" max="200"
+              value={draft.logo_width ?? ''}
+              placeholder="auto"
+              onChange={e => setDraft(d => ({
+                ...d,
+                logo_width: e.target.value === '' ? null : Math.max(40, Math.min(200, Number(e.target.value))),
+              }))}
+              className="org-input"
+              style={{ width: 78 }}
+            />
+            <span style={{ fontSize: 12, color: '#7A7166' }}>px</span>
+          </div>
         </div>
       </div>
 

@@ -14,11 +14,14 @@ import cupIcon from '../assets/images/cup-icon.svg';
  * window before App.jsx resolves the active org from the URL slug). */
 function OrgMark({ org }) {
   const altText = org?.name || 'Organisation';
+  // Per-org logo width (set in admin org settings). Height auto-scales so
+  // the logo keeps its aspect ratio; null → the CSS default size.
+  const logoStyle = org?.logo_width ? { width: `${org.logo_width}px`, height: 'auto' } : undefined;
   if (org?.logo_url) {
-    return <img src={org.logo_url} alt={altText} className="header__logo-bk" />;
+    return <img src={org.logo_url} alt={altText} className="header__logo-bk" style={logoStyle} />;
   }
   if (!org || org.slug === 'burger-king' || org.slug === 'burgerking') {
-    return <img src={burgerKingLogo} alt={altText} className="header__logo-bk" />;
+    return <img src={burgerKingLogo} alt={altText} className="header__logo-bk" style={logoStyle} />;
   }
   const letter = (org?.name || '?').trim().charAt(0).toUpperCase() || '?';
   return (

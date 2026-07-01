@@ -22,6 +22,7 @@ import AdminTransactions from './transactions/AdminTransactions';
 import AdminActivityLog from './activity/AdminActivityLog';
 import AdminSupport from './support/AdminSupport';
 import AdminDonations from './donations/AdminDonations';
+import AdminByoRequests from './byorequests/AdminByoRequests';
 import AdminAppDesign from './appdesign/AdminAppDesign';
 import { useAdminDraft } from './hooks/useAdminDraft';
 import './AdminApp.css';
@@ -76,7 +77,7 @@ export default function AdminApp() {
  * ───────────────────────────────────────────────────────────────────── */
 const VALID_PAGES = new Set([
   'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
-  'transactions', 'donations', 'org', 'organizations', 'settings',
+  'transactions', 'donations', 'byorequests', 'org', 'organizations', 'settings',
   'history', 'reports', 'stats', 'behaviour', 'support', 'receipts',
 ]);
 const DEFAULT_PAGE = 'overview';
@@ -207,6 +208,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="donations" activeId={page} visited={visited}>
             <AdminDonations onNavigate={setPage} draftState={draftState} />
+          </KeepAlive>
+          <KeepAlive id="byorequests" activeId={page} visited={visited}>
+            <AdminByoRequests onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="support" activeId={page} visited={visited}>
             <AdminSupport onNavigate={setPage} />

@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { applyOrgFilter, getActiveOrgId } from '../context/orgState';
 import { fmtDuration } from './behaviourFormat';
+import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Multi-org note (Phase 2): every query in this file that touches a
@@ -14,22 +15,24 @@ import { fmtDuration } from './behaviourFormat';
  * in the payload so new rows are tagged correctly.
  * ───────────────────────────────────────────────────────────────────── */
 
-export async function getAdminStats() {
+export async function getAdminStats(orgIds) {
+  // orgIds (optional): explicit scope for the group-analytics toggle. When
+  // omitted, applyOrgFilter falls back to the global active org (unchanged).
   const [usersRes, balancesRes, claimsRes, scansRes, historyRes, cupActivityRes] = await Promise.all([
     // `display_name, email, device` are needed by the Overview insights
     // panels (device breakdown pie + top-returners leaderboard) — without
     // them every user falls into the "Unknown" device bucket and the
     // leaderboard shows "Anonymous" for everyone.
-    applyOrgFilter(supabase.from('users').select('id, display_name, email, device, created_at, updated_at')),
-    applyOrgFilter(supabase.from('cup_balances').select('user_id, balance, lifetime_cups')),
+    applyOrgFilter(supabase.from('users').select('id, display_name, email, device, created_at, updated_at'), orgIds),
+    applyOrgFilter(supabase.from('cup_balances').select('user_id, balance, lifetime_cups'), orgIds),
     // reward_id is needed by the Overview "Reward Popularity" chart —
     // without it the chart filtered everything out and rendered blank.
-    applyOrgFilter(supabase.from('claims').select('id, type, reward_id, cups_redeemed, payout_amount, status, created_at')),
-    applyOrgFilter(supabase.from('cup_scans').select('id, status, cups_awarded, scanned_at')),
-    applyOrgFilter(supabase.from('activity_history').select('id, type, created_at').order('created_at', { ascending: false }).limit(20)),
+    applyOrgFilter(supabase.from('claims').select('id, type, reward_id, cups_redeemed, payout_amount, status, created_at'), orgIds),
+    applyOrgFilter(supabase.from('cup_scans').select('id, status, cups_awarded, scanned_at'), orgIds),
+    applyOrgFilter(supabase.from('activity_history').select('id, type, created_at').order('created_at', { ascending: false }).limit(20), orgIds),
     // Fetch all cup_added events for reliable daily chart (no limit, guaranteed
     // written) and to compute the retention metric (need user_id for that).
-    applyOrgFilter(supabase.from('activity_history').select('id, type, created_at, user_id').eq('type', 'cup_added')),
+    applyOrgFilter(supabase.from('activity_history').select('id, type, created_at, user_id').eq('type', 'cup_added'), orgIds),
   ]);
 
   const users    = usersRes.data || [];
@@ -141,32 +144,33 @@ function classify({ value, lowerIsBetter, go, condLow, condHigh }) {
 
 const pct = (num, den) => (den > 0 ? (num / den) * 100 : null);
 
-export async function getStatsMetrics({ fromTs = null, toTs = null } = {}) {
+export async function getStatsMetrics({ fromTs = null, toTs = null, orgIds } = {}) {
+  // orgIds (optional): explicit scope for the group-analytics toggle.
   // ── QR scan events for the active org, in range ────────────────────
   let scanQ = supabase
     .from('cup_scans')
     .select('id, user_id, status, error_code, error_message, cups_awarded, requested_cup_ids, activated_cup_ids, batch_id, org_id, scanned_at, source')
     .eq('source', 'qr');
-  scanQ = applyOrgFilter(scanQ);
+  scanQ = applyOrgFilter(scanQ, orgIds);
   if (fromTs) scanQ = scanQ.gte('scanned_at', new Date(fromTs).toISOString());
   if (toTs)   scanQ = scanQ.lte('scanned_at', new Date(toTs).toISOString());
   scanQ = scanQ.order('scanned_at', { ascending: true });
 
   // ── Cups for this org (org-consistency + generation count) ─────────
   const cupsQ = applyOrgFilter(
-    supabase.from('cups').select('id, batch_id, org_id, created_at')
+    supabase.from('cups').select('id, batch_id, org_id, created_at'), orgIds
   );
 
   // ── system_events: QR-generation attempts (Phase 2) for metric #1 ──
   let sysQ = applyOrgFilter(
-    supabase.from('system_events').select('event_type, status, count, created_at').eq('event_type', 'qr_generation')
+    supabase.from('system_events').select('event_type, status, count, created_at').eq('event_type', 'qr_generation'), orgIds
   );
   if (fromTs) sysQ = sysQ.gte('created_at', new Date(fromTs).toISOString());
   if (toTs)   sysQ = sysQ.lte('created_at', new Date(toTs).toISOString());
 
   // ── client_events: app funnel (Phase 2) for metrics #6, #9, #10 ────
   let cliQ = applyOrgFilter(
-    supabase.from('client_events').select('event, session_id, user_id, created_at, props')
+    supabase.from('client_events').select('event, session_id, user_id, created_at, props'), orgIds
   );
   if (fromTs) cliQ = cliQ.gte('created_at', new Date(fromTs).toISOString());
   if (toTs)   cliQ = cliQ.lte('created_at', new Date(toTs).toISOString());
@@ -1188,14 +1192,15 @@ function makeDailyBuckets(fromMs, toMs) {
   return out;
 }
 
-/* Load every behaviour-relevant table for the active org, once. */
-async function fetchBehaviourRows() {
+/* Load every behaviour-relevant table for the active org (or an explicit
+ * group scope via orgIds), once. */
+async function fetchBehaviourRows(orgIds) {
   const [cupsRes, scansRes, claimsRes, usersRes, cliRes] = await Promise.all([
-    applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at')),
-    applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at')),
-    applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed, created_at')),
-    applyOrgFilter(supabase.from('users').select('id, email, iban, selected_reward_id, created_at')),
-    applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props')),
+    applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at'), orgIds),
+    applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at'), orgIds),
+    applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed, created_at'), orgIds),
+    applyOrgFilter(supabase.from('users').select('id, email, iban, selected_reward_id, created_at'), orgIds),
+    applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props'), orgIds),
   ]);
   return {
     cups:   cupsRes.data   || [],
@@ -1252,8 +1257,8 @@ function sliceBehaviourRows(allRows, fromMs, toMs) {
  * the applied window plus the data's true min/max dates so the UI can build
  * a date picker and default it to the full period.
  * ───────────────────────────────────────────────────────────────────── */
-export async function getUserBehaviourStats(range = null) {
-  const allRows = await fetchBehaviourRows();
+export async function getUserBehaviourStats(range = null, orgIds) {
+  const allRows = await fetchBehaviourRows(orgIds);
   const { minDate, maxDate, hasData, effFrom, effTo } = behaviourWindow(allRows, range);
 
   // Current metrics over the selected window.
@@ -1291,8 +1296,8 @@ export async function getUserBehaviourStats(range = null) {
  * aligned dates + each metric's value array (null where there's no data
  * for that day yet).
  * ───────────────────────────────────────────────────────────────────── */
-export async function getUserBehaviourDailyHistory(range = null) {
-  const allRows = await fetchBehaviourRows();
+export async function getUserBehaviourDailyHistory(range = null, orgIds) {
+  const allRows = await fetchBehaviourRows(orgIds);
   const { effFrom, effTo, hasData } = behaviourWindow(allRows, range);
 
   // Metric identity/order/units come from one full-window pass.
@@ -2185,7 +2190,7 @@ export async function createOrganization(payload) {
     minIbanLength:      15,
     maxCupsPerScan:     economics.maxCupsPerScan ?? 1,
     maxCupsToShare:     economics.maxCupsToShare ?? 10,
-    featureCupSharing:    features.featureCupSharing    ?? true,
+    featureCupSharing:    features.featureCupSharing    ?? false,
     featureDonations:     features.featureDonations     ?? true,
     featureDirectRefunds: features.featureDirectRefunds ?? true,
     maintenanceMode: false,
@@ -2365,6 +2370,411 @@ export async function updateOrg(orgId, updates) {
     .eq('id', orgId)
     .select('*')
     .single();
+  if (error) throw error;
+  return data;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Phase 3 — store groups (Bring-Your-Own).
+ *
+ * A group ties several venues together so a customer keeps one identity
+ * across them (per-store balances, a shared Stores page). Each group has
+ * a "mode" — 'deposit' (the original model) or 'byo' (bring your own
+ * cup, no deposit) — which selects the default customer copy. The group
+ * default copy lives in app_config under `published:group:<id>`, mirroring
+ * the per-org `published:<org_id>` pattern, so no extra table is needed.
+ *
+ * Membership + the per-member on/off switch live on `organizations`
+ * (`group_id`, `group_active`), both additive and defaulting to the
+ * pre-Phase-3 behaviour (ungrouped, active) for every existing org.
+ * ───────────────────────────────────────────────────────────────────── */
+
+const GROUP_CFG_KEY = (groupId) => `published:group:${groupId}`;
+
+function slugifyGroup(s) {
+  return (s || '')
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'group';
+}
+
+/* Seed app_config value for a new group. The mode selects the default
+ * copy preset (resolved at read time by composeGroupCopy); admin copy
+ * edits (A6) layer on top under settings.copy. */
+function groupConfigFromMode(mode) {
+  return { settings: { mode: normalizeMode(mode), copy: {} } };
+}
+
+/* List every group with its member orgs and resolved mode. Members
+ * include soft-deleted orgs (flagged via deleted_at) so the admin can
+ * see the full picture; the UI can filter as needed. */
+export async function listOrgGroups() {
+  const { data: groups, error } = await supabase
+    .from('org_groups')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const list = groups || [];
+  if (list.length === 0) return [];
+
+  const ids = list.map(g => g.id);
+  const { data: orgs, error: orgErr } = await supabase
+    .from('organizations')
+    .select('id, name, slug, brand_color, logo_url, group_id, group_active, deleted_at')
+    .in('group_id', ids);
+  if (orgErr) throw orgErr;
+
+  const keys = ids.map(GROUP_CFG_KEY);
+  const { data: cfgs } = await supabase
+    .from('app_config')
+    .select('key, value')
+    .in('key', keys);
+  const cfgByGroup = {};
+  (cfgs || []).forEach(c => {
+    const gid = c.key.replace('published:group:', '');
+    cfgByGroup[gid] = c.value || null;
+  });
+
+  return list.map(g => ({
+    ...g,
+    mode: normalizeMode(cfgByGroup[g.id]?.settings?.mode),
+    config: cfgByGroup[g.id] || null,
+    members: (orgs || [])
+      .filter(o => o.group_id === g.id)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+  }));
+}
+
+/* Create a group. Seeds the default copy from the chosen mode so a BYO
+ * group immediately reads as a bring-your-own programme. */
+export async function createOrgGroup({ name, mode = 'deposit' } = {}) {
+  const clean = (name || '').trim();
+  if (!clean) throw new Error('Group name is required.');
+
+  const { data: existing } = await supabase.from('org_groups').select('slug');
+  const taken = new Set((existing || []).map(r => r.slug));
+  const base = slugifyGroup(clean);
+  let slug = base, n = 2;
+  while (taken.has(slug)) slug = `${base}-${n++}`;
+
+  const { data: row, error } = await supabase
+    .from('org_groups')
+    .insert({ name: clean, slug })
+    .select('*')
+    .single();
+  if (error) throw error;
+
+  const value = groupConfigFromMode(mode);
+  const { error: cfgErr } = await supabase
+    .from('app_config')
+    .upsert({ key: GROUP_CFG_KEY(row.id), value, updated_at: new Date().toISOString() });
+  if (cfgErr) console.warn('createOrgGroup: config seed failed', cfgErr);
+
+  return { ...row, mode: value.settings.mode, config: value, members: [] };
+}
+
+export async function renameOrgGroup(groupId, name, slug) {
+  const clean = (name || '').trim();
+  if (!clean) throw new Error('Group name is required.');
+  const updates = { name: clean, updated_at: new Date().toISOString() };
+
+  // Optional slug change — this is the /<groupSlug> URL for the Stores hub.
+  if (slug !== undefined && slug !== null) {
+    const base = slugifyGroup(slug);
+    const { data: existing } = await supabase.from('org_groups').select('id, slug').neq('id', groupId);
+    const taken = new Set((existing || []).map(r => r.slug));
+    let s = base, n = 2;
+    while (taken.has(s)) s = `${base}-${n++}`;
+    updates.slug = s;
+  }
+
+  const { data, error } = await supabase
+    .from('org_groups')
+    .update(updates)
+    .eq('id', groupId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/* Switch a group's copy mode. Clears any per-string overrides so the new
+ * mode's preset shows cleanly (switching mode = picking a fresh template);
+ * the admin can then re-customise via saveGroupCopy. */
+export async function setOrgGroupMode(groupId, mode) {
+  const m = normalizeMode(mode);
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { settings: {} };
+  value.settings = value.settings || {};
+  value.settings.mode = m;
+  value.settings.copy = {}; // reset overrides to the new mode's preset
+
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
+/* Save the group's customer-copy overrides (A6). `copy` is the full
+ * edited bundle { heroHeadline, heroSubtext, howItWorks, terms,
+ * crossOrgNotice, dailyCapReview, scanSuccess, designCopy } — the customer
+ * app's composeGroupCopy fills any missing key from the mode preset. */
+export async function saveGroupCopy(groupId, copy) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { settings: { mode: 'deposit' } };
+  value.settings = value.settings || {};
+  value.settings.copy = copy || {};
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
+/* Drop all copy overrides → the group reverts to its mode preset. */
+export async function resetGroupCopy(groupId) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  if (!existing?.value) return null;
+  const value = JSON.parse(JSON.stringify(existing.value));
+  value.settings = value.settings || {};
+  value.settings.copy = {};
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
+/* Combined stats across a group's active member orgs: per-store and
+ * group totals for users, current cups (balance), lifetime cups, claims,
+ * and payout. Aggregated client-side over a handful of scoped queries —
+ * fine at demo scale (member orgs are few). */
+export async function getGroupStats(groupId) {
+  const empty = { totals: { stores: 0, users: 0, cups: 0, lifetime: 0, claims: 0, payout: 0 }, perStore: [] };
+  if (!groupId) return empty;
+
+  const { data: members } = await supabase
+    .from('organizations')
+    .select('id, name, slug')
+    .eq('group_id', groupId).is('deleted_at', null)
+    .order('name', { ascending: true });
+  const orgIds = (members || []).map(m => m.id);
+  if (orgIds.length === 0) return empty;
+
+  const { data: users } = await supabase
+    .from('users').select('id, org_id').in('org_id', orgIds).is('merged_into', null);
+  const userIds = (users || []).map(u => u.id);
+  const orgByUser = {};
+  (users || []).forEach(u => { orgByUser[u.id] = u.org_id; });
+
+  let bals = [];
+  if (userIds.length) {
+    const { data } = await supabase
+      .from('cup_balances').select('user_id, balance, lifetime_cups').in('user_id', userIds);
+    bals = data || [];
+  }
+  const { data: claims } = await supabase
+    .from('claims').select('org_id, payout_amount, status').in('org_id', orgIds);
+
+  // Seed per-store buckets.
+  const byOrg = {};
+  (members || []).forEach(m => {
+    byOrg[m.id] = { orgId: m.id, name: m.name, slug: m.slug, users: 0, cups: 0, lifetime: 0, claims: 0, payout: 0 };
+  });
+  (users || []).forEach(u => { if (byOrg[u.org_id]) byOrg[u.org_id].users += 1; });
+  bals.forEach(b => {
+    const orgId = orgByUser[b.user_id];
+    if (!byOrg[orgId]) return;
+    byOrg[orgId].cups     += b.balance || 0;
+    byOrg[orgId].lifetime += b.lifetime_cups || 0;
+  });
+  (claims || []).forEach(c => {
+    if (!byOrg[c.org_id]) return;
+    byOrg[c.org_id].claims += 1;
+    if (c.status === 'completed') byOrg[c.org_id].payout += Number(c.payout_amount) || 0;
+  });
+
+  const perStore = (members || []).map(m => byOrg[m.id]);
+  const totals = perStore.reduce((t, s) => ({
+    stores: t.stores + 1,
+    users:  t.users + s.users,
+    cups:   t.cups + s.cups,
+    lifetime: t.lifetime + s.lifetime,
+    claims: t.claims + s.claims,
+    payout: t.payout + s.payout,
+  }), { stores: 0, users: 0, cups: 0, lifetime: 0, claims: 0, payout: 0 });
+
+  return { totals, perStore };
+}
+
+/* Delete a group. organizations.group_id is ON DELETE SET NULL, so
+ * members simply detach (they keep working standalone). We also drop the
+ * group's config row. */
+export async function deleteOrgGroup(groupId) {
+  const { error } = await supabase.from('org_groups').delete().eq('id', groupId);
+  if (error) throw error;
+  await supabase.from('app_config').delete().eq('key', GROUP_CFG_KEY(groupId));
+  return true;
+}
+
+/* Add an org to a group (or remove it with groupId = null). */
+export async function setOrgGroupMembership(orgId, groupId) {
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({ group_id: groupId || null, updated_at: new Date().toISOString() })
+    .eq('id', orgId)
+    .select('id, group_id, group_active')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/* Toggle a member's presence in the group's Stores list (A7). Off keeps
+ * the org fully functional standalone but hides it from the group view. */
+export async function setOrgGroupActive(orgId, active) {
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({ group_active: !!active, updated_at: new Date().toISOString() })
+    .eq('id', orgId)
+    .select('id, group_active')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Phase 3 — BYO cup requests (admin approval queue).
+ *
+ * The byo-mint edge function auto-credits ≤2 cups per rolling 24h; the
+ * 3rd+ scan lands here as a pending request. An admin approves (credits
+ * the cup) or denies. Mirrors the claims approve/deny pattern — the
+ * credit is a direct cup_balances bump (like adjustUserBalance), scoped
+ * to the active org.
+ * ───────────────────────────────────────────────────────────────────── */
+
+export async function getByoRequests(status = 'pending') {
+  let q = supabase
+    .from('byo_cup_requests')
+    .select('id, org_id, user_id, identity_id, cups, status, device_id, note, created_at, decided_at, decided_by, user:users(display_name, email, device)')
+    .order('created_at', { ascending: false });
+  q = applyOrgFilter(q);
+  if (status && status !== 'all') q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []).map(r => ({
+    ...r,
+    userName: r.user?.display_name || null,
+    userEmail: r.user?.email || null,
+    userDevice: r.user?.device || null,
+  }));
+}
+
+export async function getByoPendingCount() {
+  let q = supabase.from('byo_cup_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+  q = applyOrgFilter(q);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count || 0;
+}
+
+/* Per-store BYO auto-credit cap: how many cups a customer can auto-collect
+ * from THIS store's counter QR per rolling 24h before extra scans are held
+ * for review. Stored in its own app_config row (`byo:cap:<orgId>`) so it
+ * never collides with the design draft/publish flow, and is org-scoped so a
+ * store's cap never affects another store. The byo-mint edge function reads
+ * the same key; default is 2 when unset. */
+export const BYO_CAP_DEFAULT = 2;
+
+export async function getByoCap(orgId) {
+  if (!orgId) return BYO_CAP_DEFAULT;
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', `byo:cap:${orgId}`).maybeSingle();
+  const n = Number(data?.value?.dailyCap);
+  return Number.isFinite(n) && n > 0 ? n : BYO_CAP_DEFAULT;
+}
+
+export async function saveByoCap(orgId, dailyCap) {
+  if (!orgId) throw new Error('No active store selected.');
+  const n = Math.max(1, Math.min(50, parseInt(dailyCap, 10) || BYO_CAP_DEFAULT));
+  const { error } = await supabase.from('app_config').upsert({
+    key: `byo:cap:${orgId}`, value: { dailyCap: n }, updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  return n;
+}
+
+export async function approveByoRequest(reqId) {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: reqRow, error: reqErr } = await supabase
+    .from('byo_cup_requests').select('*').eq('id', reqId).maybeSingle();
+  if (reqErr) throw reqErr;
+  if (!reqRow) throw new Error('Request not found.');
+  if (reqRow.status !== 'pending') throw new Error('This request has already been decided.');
+
+  const cups = reqRow.cups || 1;
+
+  // Credit the user's per-org balance (+ lifetime).
+  const { data: bal } = await supabase
+    .from('cup_balances').select('balance, lifetime_cups').eq('user_id', reqRow.user_id).maybeSingle();
+  const newBalance  = (bal?.balance || 0) + cups;
+  const newLifetime = (bal?.lifetime_cups || 0) + cups;
+  if (bal) {
+    const { error: balErr } = await supabase
+      .from('cup_balances')
+      .update({ balance: newBalance, lifetime_cups: newLifetime, updated_at: new Date().toISOString() })
+      .eq('user_id', reqRow.user_id);
+    if (balErr) throw balErr;
+  } else {
+    await supabase.from('cup_balances').insert({
+      user_id: reqRow.user_id, org_id: reqRow.org_id, balance: newBalance, lifetime_cups: newLifetime,
+    });
+  }
+
+  // Log the credit (source 'byo_admin' so it never counts toward the auto
+  // cap) + a user-visible activity entry. Both best-effort.
+  try {
+    await supabase.from('cup_scans').insert({
+      user_id: reqRow.user_id, org_id: reqRow.org_id, scan_type: 'byo', source: 'byo_admin',
+      status: 'success', cups_awarded: cups, scanned_at: new Date().toISOString(),
+    });
+  } catch (e) { console.warn('approveByoRequest: scan log failed', e); }
+  try {
+    await supabase.from('activity_history').insert({
+      user_id: reqRow.user_id, type: 'cup_added', label: 'Cup added (approved)',
+    });
+  } catch (e) { console.warn('approveByoRequest: activity log failed', e); }
+
+  // Mark approved — the status guard prevents a double-credit race.
+  const { data: updated, error: updErr } = await supabase
+    .from('byo_cup_requests')
+    .update({ status: 'approved', decided_at: new Date().toISOString(), decided_by: user?.id ?? null })
+    .eq('id', reqId).eq('status', 'pending')
+    .select('*').single();
+  if (updErr) throw updErr;
+  return updated;
+}
+
+export async function denyByoRequest(reqId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('byo_cup_requests')
+    .update({ status: 'denied', decided_at: new Date().toISOString(), decided_by: user?.id ?? null })
+    .eq('id', reqId).eq('status', 'pending')
+    .select('*').single();
   if (error) throw error;
   return data;
 }

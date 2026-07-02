@@ -5,7 +5,8 @@
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  /* Top margin matches the home screen (.app = 60px) + clears the notch. */
+  padding: calc(48px + env(safe-area-inset-top, 0px)) 16px calc(18px + env(safe-area-inset-bottom, 0px));
   color: var(--black, #1D1D1D);
   font-family: var(--font-primary, system-ui, sans-serif);
   transition: background 0.45s ease;

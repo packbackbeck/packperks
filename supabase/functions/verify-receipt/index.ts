@@ -194,17 +194,19 @@ const VERIFY_TOOL = {
   },
 };
 
-function buildSystemPrompt(requiredItem: string, requiredQty = 1) {
+function buildSystemPrompt(requiredItem: string, requiredQty = 1, venueName = "a participating venue") {
   const qtyClause = requiredQty > 1
     ? `
 
 QUANTITY REQUIREMENT: the customer must have bought AT LEAST ${requiredQty} of this item. Add up the qty of every matching line item. PASS only when the total matched quantity is ${requiredQty} or more. If fewer are present, FAIL this check and state how many you found (for example "found 1, requires ${requiredQty}").`
     : "";
-  return _buildSystemPrompt(requiredItem, qtyClause);
+  return _buildSystemPrompt(requiredItem, qtyClause, venueName);
 }
 
-function _buildSystemPrompt(requiredItem: string, qtyClause: string) {
-  return `You are a receipt verification assistant for PackPerks, a reusable-cup rewards program in the Netherlands. Customers return reusable cups at a partner venue, collect cups, and submit a purchase receipt to claim a reward.
+function _buildSystemPrompt(requiredItem: string, qtyClause: string, venueName: string) {
+  return `You are a receipt verification assistant for PackPerks, a reusable-cup rewards program in the Netherlands. Customers collect cups at a participating venue and submit a purchase receipt to claim a reward.
+
+EXPECTED VENUE: "${venueName}". The receipt should look like it came from this venue (or another real retail venue selling the item). Do not reject a receipt merely because the branding is a different real venue — brand-matching is advisory, authenticity is what matters.
 
 You will receive ONE image. Run THREE checks SEQUENTIALLY with short-circuit logic and return the verdict via the record_receipt_verdict tool.
 
@@ -271,7 +273,7 @@ interface ThreeCheckVerdict {
   packperks_token?: string | null;
 }
 
-function decideStatus(v: ThreeCheckVerdict): {
+function decideStatus(v: ThreeCheckVerdict, byo = false): {
   status: "pending" | "completed" | "failed";
   failureChecks: string[];
   skippedChecks: string[];
@@ -290,6 +292,18 @@ function decideStatus(v: ThreeCheckVerdict): {
     v.check_is_authentic_burger_king?.passed === true &&
     v.check_contains_required_item?.passed === true;
   const confidence = v.confidence ?? 0;
+
+  // BYO venues: the AI CLASSIFIES, it doesn't auto-reject. Reject ONLY a photo
+  // that isn't a receipt at all; every real receipt goes to the admin claims
+  // queue as 'pending' with the AI's full verdict, and the admin decides.
+  // (Duplicate / timestamp fraud checks below still apply.)
+  if (byo) {
+    if (v.check_is_receipt?.passed === false) {
+      return { status: "failed", failureChecks, skippedChecks };
+    }
+    return { status: "pending", failureChecks, skippedChecks };
+  }
+
   if (failureChecks.length > 0 && confidence < 0.5) {
     return { status: "failed", failureChecks, skippedChecks };
   }
@@ -344,6 +358,39 @@ async function lookupRequiredItem(rewardId: string | null, orgId: string | null)
     "oreo-king-fusion": "Oreo King Fusion",
   };
   return { name: FALLBACK[rewardId] ?? `Reward "${rewardId}"`, requiredQty: 1 };
+}
+
+// The venue the receipt is expected to be from — used in the prompt instead of
+// a hard-coded brand, so verification is per-venue rather than locked to the
+// original Burger King test setup.
+async function lookupVenueName(orgId: string | null): Promise<string> {
+  if (!orgId) return "a participating venue";
+  try {
+    const { data } = await supabase
+      .from("organizations")
+      .select("name, partner_brand_name")
+      .eq("id", orgId)
+      .maybeSingle();
+    return data?.partner_brand_name || data?.name || "a participating venue";
+  } catch {
+    return "a participating venue";
+  }
+}
+
+// Is this org part of a BYO ("bring your own cup") group? BYO venues use the
+// lenient, admin-decides verification policy (reject only non-receipt photos).
+async function isByoOrg(orgId: string | null): Promise<boolean> {
+  if (!orgId) return false;
+  try {
+    const { data: org } = await supabase
+      .from("organizations").select("group_id").eq("id", orgId).maybeSingle();
+    if (!org?.group_id) return false;
+    const { data: cfg } = await supabase
+      .from("app_config").select("value").eq("key", `published:group:${org.group_id}`).maybeSingle();
+    return (cfg?.value as { settings?: { mode?: string } } | null)?.settings?.mode === "byo";
+  } catch {
+    return false;
+  }
 }
 
 // Sum the quantity of receipt line items that match the required item name
@@ -410,6 +457,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "rate_limited", detail: "Too many receipt verifications today. Try again tomorrow." }, 429);
 
   const { name: requiredItem, requiredQty } = await lookupRequiredItem(claim.reward_id, claim.org_id);
+  const [venueName, byo] = await Promise.all([
+    lookupVenueName(claim.org_id),
+    isByoOrg(claim.org_id),
+  ]);
 
   const { data: photoBlob, error: dlErr } = await supabase.storage
     .from("receipts")
@@ -487,7 +538,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 1024,
-        system: buildSystemPrompt(requiredItem, requiredQty),
+        system: buildSystemPrompt(requiredItem, requiredQty, venueName),
         tools: [VERIFY_TOOL],
         tool_choice: { type: "tool", name: "record_receipt_verdict" },
         messages: [
@@ -547,7 +598,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  let { status, failureChecks, skippedChecks } = decideStatus(verdict);
+  let { status, failureChecks, skippedChecks } = decideStatus(verdict, byo);
   let postAiReason: string | null = null;
 
   // ── PackPerks test-receipt override ───────────────────────────────────
@@ -604,10 +655,12 @@ Deno.serve(async (req) => {
       .in("status", ["completed", "pending"])
       .maybeSingle();
     if (dup) {
-      status = "failed";
+      // Flag the duplicate for the admin. BYO leaves the final call to the
+      // admin (status stays pending); other modes hard-reject.
       failureChecks = ["duplicate_receipt", ...failureChecks];
       postAiReason =
         "This receipt's transaction number has already been used for a cashback claim.";
+      if (!byo) status = "failed";
     }
   }
 
@@ -629,8 +682,8 @@ Deno.serve(async (req) => {
             !Number.isNaN(cupReturnDate.getTime()) &&
             receiptDate.getTime() < cupReturnDate.getTime()
           ) {
-            status = "failed";
             failureChecks = ["is_newer_than_cup_return", ...failureChecks];
+            if (!byo) status = "failed";
             postAiReason =
               `Receipt is dated ${receiptDate.toISOString()}, but your most recent ` +
               `cup return was ${cupReturnDate.toISOString()}. The receipt must be ` +

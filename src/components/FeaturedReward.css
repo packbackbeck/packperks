@@ -274,13 +274,14 @@
 .featured-reward__nudge {
   font-family: var(--font-primary);
   font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
+  font-weight: var(--fw-bold);
   color: var(--bk-brown);
   text-align: center;
-  padding: 6px 10px;
-  background: var(--bk-cream);
+  padding: 7px 12px;
+  /* Soft accent-tinted pill that adapts to the org palette. */
+  background: color-mix(in srgb, var(--bk-orange) 16%, var(--white, #fff));
   border-radius: var(--radius-sm);
-  border: 1px solid var(--bk-orange);
+  border: 1px solid color-mix(in srgb, var(--bk-orange) 45%, transparent);
   animation: nudge-appear 0.25s ease both;
 }
 
@@ -300,7 +301,6 @@
   justify-content: center;
   gap: 7px;
   width: 100%;
-  margin-top: 8px;
   padding: 12px;
   background: var(--bk-orange);
   color: #FFFFFF;

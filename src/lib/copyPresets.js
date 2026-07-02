@@ -143,8 +143,8 @@ export const COPY_PRESETS = {
       body:  'You’re collecting at a different store in this group. This cup is added here — each store keeps its own balance, so your cups at other venues stay exactly where they are.',
     },
     dailyCapReview: {
-      title: 'Thanks — this one’s being checked',
-      body:  'You’ve already collected your automatic cups for today. This extra cup has been sent for a quick review and will appear in your balance once it’s approved. Thanks for bringing your own cup!',
+      title: 'You’ve reached today’s cup limit',
+      body:  'There’s a limit on how many cups you can collect per day at this store, and you’ve hit it for today. We’ll review this scan and, if it’s valid, add the cup to your balance.',
     },
     scanSuccess: {
       title: 'Cup added',

@@ -30,7 +30,7 @@ function buildCopy(brand) {
     emoji: '🔁',
     title: 'Someone already used this QR',
     body: "Every cup QR can only be claimed once — looks like another customer scanned this receipt first.",
-    hint: "If you printed this receipt yourself, ask the smart bin for a fresh one. If a friend shared it with you, ask them to share again.",
+    hint: "If a friend shared this QR with you, ask them to share again, or scan the counter QR at the venue for a fresh cup.",
     primary: 'Scan a different QR',
   },
   no_cups_claimed: {
@@ -51,7 +51,7 @@ function buildCopy(brand) {
     emoji: '⏰',
     title: 'This receipt has expired',
     body: "This QR receipt is past its claim window. Receipts can only be redeemed for a limited time after they're printed.",
-    hint: "Ask the smart bin for a fresh receipt, or use one from a more recent visit.",
+    hint: "Scan the counter QR again on your next visit for a fresh cup.",
     primary: 'Scan a different QR',
   },
   batch_revoked: {

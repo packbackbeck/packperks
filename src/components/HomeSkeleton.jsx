@@ -1,54 +1,42 @@
 import './HomeSkeleton.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * HomeSkeleton — first-paint placeholder for the home screen (P-47).
+ * HomeSkeleton — first-paint placeholder for the home screen.
  *
- * Replaces the previous bare "🥤 Loading your cups…" spinner. The
- * skeleton matches the actual home-screen layout (header chip, cup
- * progress block, featured reward card, goal section, share row) so
- * the perceived load is "your home is composing" rather than "we're
- * stuck". The shimmer is purely CSS — no JS animation cost.
+ * Mirrors the ACTUAL home layout — header lockup + cup tiles, big two-line
+ * headline, subtext, the cup-progress bar, and the large featured-reward
+ * card — so the perceived load reads as "your home is composing" rather
+ * than a generic spinner.
  *
- * Each block uses neutral cream tones so it doesn't promise the user
- * a specific colour scheme — once the real components mount they pop
- * into place over the skeleton without a jarring colour swap. */
+ * Colours: it sits on the app's own cream background and uses a soft,
+ * neutral shimmer (translucent black over the cream) so it never promises
+ * a specific palette and the real components pop cleanly into place. */
 export default function HomeSkeleton() {
   return (
     <div className="hsk">
-      {/* Header chip */}
+      {/* Header — brand lockup + the three round tiles */}
       <div className="hsk__topbar">
         <span className="hsk__shimmer hsk__shimmer--logo" />
-        <span className="hsk__shimmer hsk__shimmer--avatar" />
-      </div>
-
-      {/* Cup progress card */}
-      <div className="hsk__card">
-        <span className="hsk__shimmer hsk__shimmer--title" />
-        <span className="hsk__shimmer hsk__shimmer--big" />
-        <div className="hsk__cup-row">
-          {[0, 1, 2, 3, 4, 5].map(i => (
-            <span key={i} className="hsk__shimmer hsk__shimmer--cup" />
-          ))}
+        <div className="hsk__tiles">
+          <span className="hsk__shimmer hsk__shimmer--tile" />
+          <span className="hsk__shimmer hsk__shimmer--tile" />
+          <span className="hsk__shimmer hsk__shimmer--tile" />
         </div>
       </div>
+
+      {/* Hero headline + subtext */}
+      <div className="hsk__hero">
+        <span className="hsk__shimmer hsk__shimmer--h1" />
+        <span className="hsk__shimmer hsk__shimmer--h1 hsk__shimmer--h1-short" />
+        <span className="hsk__shimmer hsk__shimmer--sub" />
+      </div>
+
+      {/* Cup-progress bar */}
+      <span className="hsk__shimmer hsk__shimmer--progress" />
 
       {/* Featured reward card */}
-      <div className="hsk__reward">
-        <span className="hsk__shimmer hsk__shimmer--reward-img" />
-        <div className="hsk__reward-text">
-          <span className="hsk__shimmer hsk__shimmer--line" />
-          <span className="hsk__shimmer hsk__shimmer--line hsk__shimmer--line-short" />
-          <span className="hsk__shimmer hsk__shimmer--btn" />
-        </div>
-      </div>
+      <span className="hsk__shimmer hsk__shimmer--reward-card" />
 
-      {/* Goal section */}
-      <div className="hsk__card hsk__card--short">
-        <span className="hsk__shimmer hsk__shimmer--title" />
-        <span className="hsk__shimmer hsk__shimmer--line" />
-      </div>
-
-      {/* Footer hint — softly identifies the brand without committing */}
       <p className="hsk__hint">Loading your cups…</p>
     </div>
   );

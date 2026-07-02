@@ -246,6 +246,12 @@ export default function UserPage({
   onRefreshClaims,
   onClose,
   onOpenHowItWorks,
+  // Phase 3: "general" account view opened from the Stores hub — cupCount is
+  // the SUM across every store, history is combined + tagged with a store name.
+  combined = false,
+  combinedNote,
+  // The active store's name — used for the per-store balance caption.
+  storeName,
 }) {
   // Refresh claim status when the user enters this page — admin approvals
   // that happened while the user wasn't looking get pulled in automatically.
@@ -448,7 +454,7 @@ export default function UserPage({
             Visitor
           </span>
           <h3 className="user-page__visitor-title">Add your first cup</h3>
-          <p className="user-page__visitor-sub">Return a cup to start collecting — then unlock cashback rewards.</p>
+          <p className="user-page__visitor-sub">Scan a counter QR to start collecting — then unlock cashback rewards.</p>
           <button type="button" className="user-page__visitor-cta" onClick={onAddCup}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -461,19 +467,28 @@ export default function UserPage({
       {/* ── Cups ⇄ value box ── cups on the left, euro equivalent on the
             right, with a subtle "≈" between (mirrors the refund compare box). */}
       <div className="user-page__value-box">
-        <div className="user-page__value-option">
-          <span className="user-page__value-num">
-            <img src={cupIcon} alt="" width="22" height="22" />
-            {cupCount}
-          </span>
-          <span className="user-page__value-label">cup{cupCount !== 1 ? 's' : ''} collected</span>
-        </div>
-        <span className="user-page__value-approx" aria-label="approximately">≈</span>
-        <div className="user-page__value-option user-page__value-option--right">
-          <span className="user-page__value-num user-page__value-num--euro">
-            €{(cupCount * (cashbackRate || 1.25)).toFixed(2)}
-          </span>
-          <span className="user-page__value-label">in cashback</span>
+        {(combined || storeName) && (
+          <p className="user-page__value-note">
+            {combined
+              ? (combinedNote || 'Total across all your stores combined.')
+              : `Your balance at ${storeName}.`}
+          </p>
+        )}
+        <div className="user-page__value-row">
+          <div className="user-page__value-option">
+            <span className="user-page__value-num">
+              <img src={cupIcon} alt="" width="22" height="22" />
+              {cupCount}
+            </span>
+            <span className="user-page__value-label">cup{cupCount !== 1 ? 's' : ''} collected</span>
+          </div>
+          <span className="user-page__value-approx" aria-label="approximately">≈</span>
+          <div className="user-page__value-option user-page__value-option--right">
+            <span className="user-page__value-num user-page__value-num--euro">
+              €{(cupCount * (cashbackRate || 1.25)).toFixed(2)}
+            </span>
+            <span className="user-page__value-label">in cashback</span>
+          </div>
         </div>
       </div>
 
@@ -728,7 +743,7 @@ export default function UserPage({
               )}
             </div>
           ) : (
-            <span className="user-page__history-empty">No activity yet. Start by returning a cup!</span>
+            <span className="user-page__history-empty">No activity yet. Start by scanning a counter QR!</span>
           )
         ) : (
           <div className="user-page__card user-page__card--list user-page__history-scroll">
@@ -776,7 +791,10 @@ export default function UserPage({
                   </div>
                   <div className="user-page__history-text">
                     <span className="user-page__history-label">{item.label}</span>
-                    <span className="user-page__history-time">{item.time}</span>
+                    <span className="user-page__history-time">
+                      {item.storeName && <span className="user-page__history-store">{item.storeName}</span>}
+                      {item.time}
+                    </span>
                   </div>
                   <svg className="user-page__history-chevron" width="14" height="14" viewBox="0 0 20 20" fill="none">
                     <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -968,7 +986,7 @@ const COMPARISON_PHRASES = [
 ];
 
 function pickComparison(cups) {
-  if (cups <= 0) return 'Return your first cup to see your impact';
+  if (cups <= 0) return 'Collect your first cup to see your impact';
   const i = cups % COMPARISON_PHRASES.length;
   return COMPARISON_PHRASES[i](cups);
 }

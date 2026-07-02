@@ -154,7 +154,7 @@ export default function FeaturedReward({
               <p className="featured-reward__claim-desc">
                 {isUnlocked
                   ? 'Scan your receipt and enter your IBAN to receive your cashback. '
-                  : <>Return your cups to earn cashback. Keep your purchase receipt — you'll need it to claim.</>}
+                  : <>Collect cups to earn cashback. Keep your purchase receipt — you'll need it to claim.</>}
                 <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the voucher terms</button>
                 {onOpenRefund && (
                   <><span style={{ margin: '0 4px' }}>or</span>

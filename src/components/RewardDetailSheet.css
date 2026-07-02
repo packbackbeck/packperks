@@ -67,13 +67,11 @@
   object-fit: cover;
 }
 
-/* Admin-uploaded images (http(s) URLs) — fit and center the whole
- * product photo, with breathing room around the edges. */
+/* Admin-uploaded images (http(s) URLs) — fill the full width of the hero
+ * (cropping top/bottom as needed) instead of letterboxing with side gaps. */
 .rds-image--uploaded {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  padding: 16px;
-  box-sizing: border-box;
 }
 
 /* ── Scrollable body ── */

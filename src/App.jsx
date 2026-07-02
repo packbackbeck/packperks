@@ -56,6 +56,8 @@ import {
   getDefaultOrg,
   isRewardBudgetBlocked,
   ensureIdentityForUser,
+  propagateProfileToGroup,
+  getGroupActivity,
   mintByoCup,
 } from './lib/api';
 import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, getGroupBySlug } from './lib/groups';
@@ -211,9 +213,19 @@ export default function App() {
   // group — i.e. every existing single org, which then behaves unchanged).
   // Drives the Stores page and the mode-sensitive (BYO vs deposit) copy.
   const [groupCtx, setGroupCtx] = useState(null);
+  // Phase 3: the shared customer identity id for this person (grouped orgs
+  // only). Lets profile edits propagate to every store in the group.
+  const identityIdRef = useRef(null);
+  // Whether the active group is BYO — profile consistency across stores is a
+  // BYO-only behaviour.
+  const byoGroupRef = useRef(false);
   // Phase 3: this person's per-store balances across the group (org id →
   // {balance, lifetime}). Powers the Stores page + the A1 unlock gate.
   const [groupBalances, setGroupBalances] = useState({});
+  // Phase 3: when the account page is opened FROM the Stores hub it shows a
+  // combined view — summed balance + activity across every store.
+  const [accountCombined, setAccountCombined] = useState(false);
+  const [combinedHistory, setCombinedHistory] = useState([]);
   // Phase 3: per-store extras for the Stores page (org id → {featured, location}).
   const [groupStores, setGroupStores] = useState({});
   // Phase 3: result of a BYO stationary-QR scan (?byo). Drives a confirmation
@@ -447,7 +459,35 @@ export default function App() {
 
         const user = await getOrCreateUser(org?.id);
 
-        // Generate a display name for brand-new users
+        // Phase 3: resolve the group + shared identity FIRST, so a store the
+        // customer is visiting for the first time inherits the SAME name /
+        // email / IBAN they already have at their first store (rather than
+        // minting a fresh random profile). ensureIdentityForUser backfills
+        // `user` in place; returns null for ungrouped orgs.
+        const gctx = await getGroupContext(org?.id);
+        setGroupCtx(gctx);
+        const byoGroup = gctx?.mode === 'byo';
+        byoGroupRef.current = byoGroup;
+        let identity = null;
+        if (gctx) {
+          try {
+            // Profile consistency across stores is a BYO-only behaviour
+            // (syncProfile). Deposit groups still get an identity for the
+            // Stores page + combined balances, just no shared profile.
+            identity = await ensureIdentityForUser(user, {
+              deviceId: user.device_id,
+              authUid: user.auth_user_id,
+              authEmail: user.email,
+              syncProfile: byoGroup,
+            });
+            identityIdRef.current = identity?.id || null;
+          } catch (e) {
+            console.warn('group identity (non-fatal):', e);
+          }
+        }
+
+        // Generate a display name only for a genuinely brand-new person — one
+        // with no name on this row AND none inherited from the shared identity.
         let displayName = user.display_name;
         let animalIndex = user.animal_index ?? 0;
         if (!displayName) {
@@ -455,6 +495,8 @@ export default function App() {
           displayName = generated.displayName;
           animalIndex = generated.animalIndex;
           await updateUserProfile(user.id, { displayName, animalIndex });
+          // BYO only: seed the shared identity so sibling stores inherit this name.
+          if (identity?.id && byoGroup) persist(propagateProfileToGroup(identity.id, { displayName, animalIndex }));
         }
 
         setUserId(user.id);
@@ -529,27 +571,17 @@ export default function App() {
           setLiveSettings(s => ({ ...s, ...config.settings }));
         }
 
-        // Phase 3: resolve this org's group context. Returns null for
-        // ungrouped orgs (every existing org), so nothing below changes for
-        // them. For grouped orgs it drives the Stores page + BYO/deposit copy.
-        const gctx = await getGroupContext(org?.id);
-        setGroupCtx(gctx);
+        // Phase 3: `gctx` + `identity` were resolved up-front (above) so the
+        // profile could be shared before minting a name. For grouped orgs,
+        // pull the per-store balances + the Stores-page data here.
         if (gctx) {
-          // Best-effort: link this per-org user row to the person's shared
-          // identity, then pull their balances across the group's stores.
-          // Internally guarded — never throws, never blocks the home render.
           try {
-            const identity = await ensureIdentityForUser(user, {
-              deviceId: user.device_id,
-              authUid: user.auth_user_id,
-              authEmail: user.email,
-            });
             if (identity?.id) {
               const bals = await getGroupBalances(identity.id, gctx.members.map(m => m.id));
               setGroupBalances(bals);
             }
           } catch (e) {
-            console.warn('group identity/balances (non-fatal):', e);
+            console.warn('group balances (non-fatal):', e);
           }
           // Per-store featured reward + location for the Stores page (best-effort).
           getGroupStores(gctx.members.map(m => m.id))
@@ -612,18 +644,16 @@ export default function App() {
           mintByoCup(user.id, org.id)
             .then(res => {
               if (res?.status === 'credited') {
+                // Show the SAME success popup as a normal cup claim
+                // (CupScanSuccess) rather than a bespoke BYO modal.
                 setCupCount(res.newBalance);
-                setByoResult({
-                  status: 'credited',
-                  title: gcopy?.scanSuccess?.title || 'Cup added',
-                  body:  gcopy?.scanSuccess?.body  || 'That’s another cup toward your cashback.',
-                  crossOrg: (res.preBalance === 0 && (gctx?.members?.length || 0) > 1) ? gcopy?.crossOrgNotice : null,
-                });
+                setLastCupsScanned(1);
+                setPage('cup-scan-success');
               } else if (res?.status === 'pending_review') {
                 setByoResult({
                   status: 'pending',
-                  title: gcopy?.dailyCapReview?.title || 'Thanks — this one’s being checked',
-                  body:  gcopy?.dailyCapReview?.body  || 'This extra cup has been sent for a quick review.',
+                  title: gcopy?.dailyCapReview?.title || 'You’ve reached today’s cup limit',
+                  body:  gcopy?.dailyCapReview?.body  || 'You’ve hit today’s cup limit at this store. We’ll review this scan and, if it’s valid, add the cup to your balance.',
                 });
               }
             })
@@ -728,6 +758,17 @@ export default function App() {
     setDidEngage(true); // editing name / email / IBAN means they're no longer just a visitor
     setProfile((prev) => ({ ...prev, ...updates }));
     if (userId) persist(updateUserProfile(userId, updates));
+    // Phase 3 (BYO groups only): keep the account identical across every store
+    // in the group — push name / email / IBAN edits to the shared identity +
+    // sibling rows.
+    if (identityIdRef.current && byoGroupRef.current) {
+      persist(propagateProfileToGroup(identityIdRef.current, {
+        displayName: updates.displayName,
+        animalIndex: updates.animalIndex,
+        email: updates.email,
+        iban: updates.iban,
+      }));
+    }
   };
 
   /* ── Reward handlers ── */
@@ -742,6 +783,20 @@ export default function App() {
   };
 
   const handleAddCup = () => setPage('cup-scan');
+
+  // Open the account page as a COMBINED, group-wide view (from the Stores hub):
+  // summed balance + activity across every store, each tagged with its store.
+  const openCombinedAccount = () => {
+    setAccountCombined(true);
+    setCombinedHistory([]);
+    setPage('user');
+    const idId = identityIdRef.current;
+    if (idId && groupCtx?.members?.length) {
+      const nameById = {};
+      groupCtx.members.forEach(m => { nameById[m.id] = m.name; });
+      getGroupActivity(idId, nameById).then(setCombinedHistory).catch(() => setCombinedHistory([]));
+    }
+  };
 
   /* Phase 3: switch to another store in the group. Org identity is resolved
    * from the URL slug on load, so switching = navigating to that slug (a
@@ -1011,6 +1066,21 @@ export default function App() {
   // though setUserId() was called moments earlier — the re-render
   // hasn't happened yet. Passing user.id directly sidesteps the race.
   const handleCupScan = async (parsed, meta = {}, _overrideUserId) => {
+    // Phase 3 BYO counter QR: this QR carries no cup UUIDs — it's credited by
+    // the byo-mint edge function (always +1, up to the per-store daily cap).
+    // Re-enter the stationary-QR flow on the CURRENT origin using only the
+    // store-slug path, so it works on any domain (localhost, vercel, or
+    // perks.packback.app) regardless of the domain baked into the QR. The
+    // reload lets init resolve the store + mint via the proven ?byo path.
+    if (parsed?.byo) {
+      track(EVENTS.CUP_ADDED);
+      setDidEngage(true);
+      const path = (parsed.byoPath && parsed.byoPath !== '/')
+        ? parsed.byoPath
+        : (activeOrg?.slug ? `/${activeOrg.slug}/` : '/');
+      window.location.href = `${path}?byo=1`;
+      return;
+    }
     track(EVENTS.CUP_ADDED);
     setDidEngage(true); // any scan attempt (even an already-claimed one) = a real user
     const uid = _overrideUserId || userId;
@@ -1225,8 +1295,9 @@ export default function App() {
             if (groupSlug && store?.slug) window.location.href = `/${groupSlug}/${store.slug}`;
             else handleSwitchStore(store);
           }}
-          onOpenAccount={() => setPage('user')}
+          onOpenAccount={openCombinedAccount}
           onOpenGuide={() => setHowItWorksOpen(true)}
+          onScanCup={() => setPage('cup-scan')}
         />
         {howItWorksOpen && (
           <HowItWorks
@@ -1240,14 +1311,20 @@ export default function App() {
   }
 
   if (page === 'user') {
+    // Combined (from-Stores) account view: sum balances + merge activity
+    // across every store in the group.
+    const combinedBalance = Object.values(groupBalances).reduce((s, b) => s + (b?.balance || 0), 0);
+    const acctCombined = accountCombined && !!groupCtx;
     return (
       <div className="app">
         <UserPage
           profile={profile}
           onSaveProfile={handleSaveProfile}
-          cupCount={cupCount}
+          cupCount={acctCombined ? combinedBalance : cupCount}
           cashbackRate={liveSettings.cashbackRatePerCup}
-          history={history}
+          history={acctCombined ? combinedHistory : history}
+          combined={acctCombined}
+          storeName={acctCombined ? null : (activeOrg?.partner_brand_name || activeOrg?.name)}
           userClaims={userClaims}
           rewards={liveRewards}
           authEmail={authEmail}
@@ -1269,7 +1346,13 @@ export default function App() {
               try { setUserClaims(await getMyClaims(userId)); } catch (e) { console.error(e); }
             }
           }}
-          onClose={() => setPage('home')}
+          onClose={() => {
+            // From the combined (Stores) view, go back to the Stores hub;
+            // otherwise back to this store's home.
+            if (acctCombined && groupCtx?.group?.slug) { window.location.href = `/${groupCtx.group.slug}`; return; }
+            setAccountCombined(false);
+            setPage('home');
+          }}
           onOpenHowItWorks={() => setHowItWorksOpen(true)}
         />
         <SignInSheet
@@ -1401,7 +1484,7 @@ export default function App() {
 
       <Header
         cupCount={cupCount}
-        onBadgeClick={() => setPage('user')}
+        onBadgeClick={() => { setAccountCombined(false); setPage('user'); }}
         onAddCup={handleAddCup}
         org={activeOrg}
         design={design}
@@ -1503,9 +1586,8 @@ export default function App() {
       <Modal
         open={!!byoResult}
         onClose={() => setByoResult(null)}
-        title={byoResult?.status === 'credited' ? 'Nice!' : byoResult?.status === 'pending' ? 'Thanks!' : 'Hmm'}
+        title={byoResult?.title || 'Hmm'}
       >
-        <p className="app__byo-title"><strong>{byoResult?.title}</strong></p>
         <p>{byoResult?.body}</p>
         {byoResult?.crossOrg && (
           <div className="app__byo-crossorg">

@@ -26,16 +26,6 @@ function compressToJpeg(canvas, maxWidth = 800, quality = 0.65) {
   }
 }
 
-const CupIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
-    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
-    <line x1="6" y1="1" x2="6" y2="4"/>
-    <line x1="10" y1="1" x2="10" y2="4"/>
-    <line x1="14" y1="1" x2="14" y2="4"/>
-  </svg>
-);
-
 function ProcessingOverlay({ count }) {
   return (
     <div className="cup-scan__loading-overlay">
@@ -118,7 +108,7 @@ export default function CupScanPage({ onScan, onBack, onError }) {
       handledRef.current = true;
       const photoDataUrl = compressToJpeg(canvas);
       setPendingCount(
-        parsed.batchId ? 1 : parsed.cupIds.length,
+        (parsed.byo || parsed.batchId) ? 1 : parsed.cupIds.length,
       );
       streamRef.current?.getTracks().forEach(t => t.stop());
       onScan?.(parsed, { scanType: 'gallery', photoDataUrl });
@@ -144,7 +134,7 @@ export default function CupScanPage({ onScan, onBack, onError }) {
         scheduleScan();
       })
       .catch(() => {
-        if (mounted) setCameraError('Camera access denied. Open the bin receipt URL on your phone instead.');
+        if (mounted) setCameraError('Camera access denied. Scan the counter QR with your phone camera instead.');
       });
     return () => {
       mounted = false;
@@ -197,7 +187,7 @@ export default function CupScanPage({ onScan, onBack, onError }) {
         // Capture the same frame the decode succeeded on as the scan photo.
         const photoDataUrl = compressToJpeg(canvas);
         setPendingCount(
-          parsed.batchId ? 1 /* count unknown until server resolves */ : parsed.cupIds.length,
+          (parsed.byo || parsed.batchId) ? 1 /* count unknown until server resolves */ : parsed.cupIds.length,
         );
         streamRef.current?.getTracks().forEach(t => t.stop());
         onScan?.(parsed, { scanType: 'camera', photoDataUrl });
@@ -219,16 +209,11 @@ export default function CupScanPage({ onScan, onBack, onError }) {
         Back
       </button>
 
-      <div className="cup-scan__step-pill">
-        <div className="cup-scan__step-icon"><CupIcon /></div>
-        <span>Scan the QR on your bin receipt</span>
-      </div>
-
       <div className="receipt-page__header">
         <h1 className="receipt-page__title">Scan your cup QR</h1>
         <p className="receipt-page__subtitle">
-          Point the camera at the QR code on the receipt the smart bin printed.
-          We'll add all your returned cups to your balance.
+          Point your camera at the PackPerks QR on the café counter.
+          We'll add a cup to your balance at that venue.
         </p>
       </div>
 

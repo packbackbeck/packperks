@@ -26,11 +26,18 @@ import './StoresPage.css';
 
 function StoreMark({ store, variant }) {
   const cls = `stores2__mark${variant ? ` stores2__mark--${variant}` : ''}`;
+  const bg = store?.brand_color || 'var(--bk-green, #1A8737)';
   if (store?.logo_url) {
-    return <img className={`${cls} stores2__mark--img`} src={store.logo_url} alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />;
+    // Brand-coloured tile with a diagonal light→dark sheen (works on any hue)
+    // and the logo tinted white — mirrors the hero logo panel.
+    return (
+      <span className={`${cls} stores2__mark--brand`} style={{ background: bg }}>
+        <img className="stores2__mark-img" src={store.logo_url} alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+      </span>
+    );
   }
   return (
-    <span className={cls} style={{ background: store?.brand_color || 'var(--bk-green, #1A8737)' }}>
+    <span className={cls} style={{ background: bg }}>
       {(store?.name || 'S').charAt(0).toUpperCase()}
     </span>
   );
@@ -252,9 +259,17 @@ function StoresImpact({ personalCups }) {
   }, []);
   const personalG = (personalCups || 0) * GRAMS_PER_CUP;
   const communityG = (communityCups || 0) * GRAMS_PER_CUP;
+  // Personal square → a leaf (your own footprint). Community square → a
+  // group/people glyph (everyone on PackPerks together).
   const LeafIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" /><path d="M2 21c0-3 1.85-5.36 5.08-6" />
+    </svg>
+  );
+  const GroupIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
   return (
@@ -267,7 +282,7 @@ function StoresImpact({ personalCups }) {
           <span className="stores2__impact-cap">you’ve avoided</span>
         </div>
         <div className="stores2__impact-sq stores2__impact-sq--community">
-          <span className="stores2__impact-icon"><LeafIcon /></span>
+          <span className="stores2__impact-icon"><GroupIcon /></span>
           <span className="stores2__impact-val">{communityCups == null ? '…' : formatGrams(communityG)}</span>
           <span className="stores2__impact-cap">by all PackPerks users together</span>
         </div>
@@ -291,6 +306,7 @@ export default function StoresPage({
   onSelectStore,
   onOpenAccount,
   onOpenGuide,
+  onScanCup,
 }) {
   const [view, setView] = useState('list');
 
@@ -309,6 +325,13 @@ export default function StoresPage({
       <header className="stores2__topbar">
         <img src={packperksLogo} alt="PackPerks" className="stores2__brand-logo" />
         <div className="stores2__topbar-actions">
+          {onScanCup && (
+            <button type="button" className="stores2__iconbtn stores2__iconbtn--scan" onClick={onScanCup} aria-label="Scan a cup QR">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          )}
           <button type="button" className="stores2__iconbtn" onClick={onOpenGuide} aria-label="How it works">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
@@ -374,12 +397,6 @@ export default function StoresPage({
                     <div className="stores2__card-body">
                       <span className="stores2__card-name">{s.name}</span>
                       <Cups n={s.balance || 0} />
-                      {s.featured && (
-                        <span className="stores2__tag">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
-                          {s.featured.name}
-                        </span>
-                      )}
                     </div>
                     <RewardThumb rewards={s.rewards} fallback={s.featured?.image} delay={(idx + 1) * 450} />
                     <svg className="stores2__card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18" /></svg>

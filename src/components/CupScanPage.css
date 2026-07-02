@@ -1,12 +1,13 @@
 /* CupScanPage-specific overrides on top of ReceiptPage base */
 
 .cup-scan-page {
-  padding-top: 52px; /* room for back button */
+  /* Room for the back button + clearance for the iPhone Dynamic Island / notch. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 52px);
 }
 
 .cup-scan__back {
   position: absolute;
-  top: var(--sp-4);
+  top: calc(env(safe-area-inset-top, 0px) + var(--sp-4));
   left: var(--sp-4);
   display: flex;
   align-items: center;
@@ -20,26 +21,6 @@
   cursor: pointer;
 }
 .cup-scan__back:hover { color: var(--black); }
-
-.cup-scan__step-pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: rgba(26, 135, 55, 0.1);
-  border-radius: 99px;
-  font-family: var(--font-primary);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
-  color: #1A8737;
-  margin-bottom: var(--sp-2);
-}
-
-.cup-scan__step-icon {
-  display: flex;
-  align-items: center;
-  color: #1A8737;
-}
 
 /* 1.5s loading overlay */
 .cup-scan__loading-overlay {

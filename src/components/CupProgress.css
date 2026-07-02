@@ -32,6 +32,30 @@
   background: var(--bk-green);
 }
 
+/* Two-row "snake" progress fill — each segment is half the box height; the
+ * top segment fills left→right first, then the bottom segment. Together they
+ * read as one continuous snake winding through both rows. */
+.cup-progress__snake {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.cup-progress__snake-seg {
+  position: absolute;
+  left: 0;
+  height: 50%;
+  min-width: 0;
+  background: var(--bk-orange);
+  border-radius: 30px;
+  transition: width var(--duration-slow) var(--ease-out-expo), background var(--duration-slow) ease;
+}
+/* The top segment's bottom-left stays square so the fill reads as one snake
+ * flowing down into the bottom row rather than two separate pills. */
+.cup-progress__snake-seg--top { top: 0; border-bottom-left-radius: 0; }
+.cup-progress__snake-seg--bottom { bottom: 0; }
+.cup-progress__snake-seg--complete { background: var(--bk-green); }
+
 /* Rows wrapper — one row normally, two stacked rows for >5-cup rewards. */
 .cup-progress__rows {
   position: relative;
@@ -120,25 +144,13 @@
 .cup-progress__cup-img {
   width: 48px;
   height: 48px;
+  color: #fff; /* currentColor drives the glyph stroke (empty) + fill (collected) */
 }
 
-/* Filled cups: white icon */
-.cup-progress__cup--filled .cup-progress__cup-img {
-  filter: brightness(0) invert(1);
-}
-
-/* Checkmark overlay on filled cups */
-.cup-progress__cup-check {
-  position: absolute;
-  top: 55%;
-  left: 50%;
-  transform: translate(-50%, -40%);
-}
-
-/* Empty cups: faded, semi-transparent */
+/* Empty cups: faint white outline. Collected cups render a solid white cup
+ * with a carved-in checkmark (see CupGlyph). */
 .cup-progress__cup--empty .cup-progress__cup-img {
-  filter: brightness(0) invert(1);
-  opacity: 0.35;
+  opacity: 0.4;
 }
 
 /* End-goal star (odd two-row layouts). Faded until every cup is collected,

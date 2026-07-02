@@ -721,15 +721,21 @@
 
 .user-page__value-box {
   display: flex;
-  align-items: center;
-  /* Equal horizontal gaps: edge→cups = cups→≈ = ≈→€ = €→edge. No side
-     padding so space-evenly owns all the horizontal spacing. */
-  justify-content: space-evenly;
+  flex-direction: column;
+  align-items: stretch;
   width: 330px;
   background: var(--white);
   border-radius: var(--radius-lg);
   padding: var(--sp-4) 0;
   box-shadow: var(--shadow-screen);
+}
+/* Row holding cups ≈ cashback. Equal horizontal gaps: edge→cups = cups→≈ =
+   ≈→€ = €→edge. No side padding so space-evenly owns all the spacing. */
+.user-page__value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  width: 100%;
 }
 .user-page__value-option {
   display: flex;
@@ -1085,6 +1091,28 @@
 .user-page__history-time {
   font-family: var(--font-primary);
   font-size: var(--fs-xs);
+  color: var(--text-light);
+}
+
+/* Combined (from-Stores) account view: store name badge on each activity row. */
+.user-page__history-store {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--bk-brown, #502314);
+  font-weight: 700;
+}
+
+/* Value-box caption at the TOP of the box — "sum across all stores"
+   (combined view) or "at <store>" (per-store view). */
+.user-page__value-note {
+  margin: 0 auto 10px;
+  padding: 0 16px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 700;
   color: var(--text-light);
 }
 

@@ -29,16 +29,27 @@ function getDeviceId() {
 }
 
 // ── Profile generation (for brand-new users) ───────────────────────────────
-const ANIMAL_NAMES = ['Fox', 'Panda', 'Bear', 'Rabbit', 'Cat', 'Owl', 'Deer', 'Penguin']
+// Existing animals keep their original index positions (animal_index is stored
+// on the user row); new animals are appended, and each animal's rhyming-name
+// pool is expanded for much more variety.
+const ANIMAL_NAMES = ['Fox', 'Panda', 'Bear', 'Rabbit', 'Cat', 'Owl', 'Deer', 'Penguin', 'Otter', 'Duck', 'Frog', 'Koala', 'Moose', 'Hedgehog', 'Seal', 'Turtle']
 const SILLY_NAMES = {
-  Fox:     ['Ferris Fox',    'Felix Fox',    'Francis Fox'],
-  Panda:   ['Amanda Panda',  'Sandy Panda',  'Wanda Panda'],
-  Bear:    ['Barry Bear',    'Perry Bear',   'Larry Bear'],
-  Rabbit:  ['Habit Rabbit',  'Grabbit Rabbit','Abbott Rabbit'],
-  Cat:     ['Chadwick Cat',  'Pat the Cat',  'Natty Cat'],
-  Owl:     ['Rowland Owl',   'Powell Owl',   'Fowler Owl'],
-  Deer:    ['Cheerful Deer', 'Sheer Deer',   'Pierre Deer'],
-  Penguin: ['Finn Penguin',  'Quinn Penguin','Guin Penguin'],
+  Fox:      ['Ferris Fox',    'Felix Fox',     'Francis Fox',   'Foster Fox',    'Roxy Fox',       'Knox Fox'],
+  Panda:    ['Amanda Panda',  'Sandy Panda',   'Wanda Panda',   'Miranda Panda', 'Brandy Panda',   'Chandra Panda'],
+  Bear:     ['Barry Bear',    'Perry Bear',    'Larry Bear',    'Harry Bear',    'Sherry Bear',    'Teddy Bear'],
+  Rabbit:   ['Habit Rabbit',  'Grabbit Rabbit','Abbott Rabbit', 'Bunny Rabbit',  'Hopper Rabbit',  'Cadbury Rabbit'],
+  Cat:      ['Chadwick Cat',  'Pat the Cat',   'Natty Cat',     'Tabby Cat',     'Cleo Cat',       'Whiskers Cat'],
+  Owl:      ['Rowland Owl',   'Powell Owl',    'Fowler Owl',    'Hooty Owl',     'Ollie Owl',      'Athena Owl'],
+  Deer:     ['Cheerful Deer', 'Sheer Deer',    'Pierre Deer',   'Dara Deer',     'Bambi Deer',     'Fawn Deer'],
+  Penguin:  ['Finn Penguin',  'Quinn Penguin', 'Guin Penguin',  'Pingu Penguin', 'Waddle Penguin', 'Gwen Penguin'],
+  Otter:    ['Otto Otter',    'Trotter Otter', 'Rudder Otter',  'Ripple Otter'],
+  Duck:     ['Chuck Duck',    'Buck Duck',     'Puddles Duck',  'Daffy Duck'],
+  Frog:     ['Froggy Frog',   'Kermit Frog',   'Ribbit Frog',   'Hopscotch Frog'],
+  Koala:    ['Kayla Koala',   'Kylie Koala',   'Cuddles Koala', 'Blue Koala'],
+  Moose:    ['Bruce Moose',   'Marcus Moose',  'Maple Moose',   'Bull Moose'],
+  Hedgehog: ['Sonic Hedgehog','Spike Hedgehog','Prickle Hedgehog','Quill Hedgehog'],
+  Seal:     ['Sheila Seal',   'Neal Seal',     'Pebble Seal',   'Sammy Seal'],
+  Turtle:   ['Myrtle Turtle', 'Shelly Turtle', 'Franklin Turtle','Squirt Turtle'],
 }
 
 export function generateInitialProfile() {
@@ -271,10 +282,89 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
         .update({ entry_org_id: userRow.org_id }).eq('id', identity.id)
       identity.entry_org_id = userRow.org_id
     }
+
+    // ── Profile sync (BYO groups only): keep name / email / animal / IBAN
+    // identical across every store in the group. Deposit groups keep their
+    // original per-store profiles, so this is gated on opts.syncProfile.
+    // The identity is the source of truth for name/email/animal; IBAN lives
+    // only on `users`, so it's shared by copying from whichever sibling row
+    // already has one. Two-way: backfill the identity from this row when it's
+    // missing a value, and backfill this row from the identity so a
+    // newly-visited store inherits the profile from the first store.
+    if (opts.syncProfile) try {
+      const canonName   = identity.display_name || userRow.display_name || null
+      const canonAnimal = (identity.animal_index != null ? identity.animal_index : userRow.animal_index) ?? 0
+      const canonEmail  = identity.email || userRow.email || null
+
+      // Backfill the identity from this row where it's blank.
+      const idPatch = {}
+      if (!identity.display_name && canonName)              idPatch.display_name = canonName
+      if (identity.animal_index == null && canonAnimal != null) idPatch.animal_index = canonAnimal
+      if (!identity.email && canonEmail)                    idPatch.email = canonEmail
+      if (Object.keys(idPatch).length) {
+        await supabase.from('customer_identities').update(idPatch).eq('id', identity.id)
+        Object.assign(identity, idPatch)
+      }
+
+      // A shared IBAN from any sibling row in this identity.
+      let canonIban = userRow.iban || null
+      if (!canonIban) {
+        const { data: sib } = await supabase.from('users')
+          .select('iban').eq('identity_id', identity.id).not('iban', 'is', null).limit(1)
+        canonIban = sib?.[0]?.iban || null
+      }
+
+      // Backfill THIS row so the store shows the same profile as the others.
+      const rowPatch = {}
+      if (!userRow.display_name && canonName)               rowPatch.display_name = canonName
+      if (userRow.animal_index == null && canonAnimal != null) rowPatch.animal_index = canonAnimal
+      if (!userRow.email && canonEmail)                     rowPatch.email = canonEmail
+      if (!userRow.iban && canonIban)                       rowPatch.iban = canonIban
+      if (Object.keys(rowPatch).length) {
+        await supabase.from('users').update(rowPatch).eq('id', userRow.id)
+        Object.assign(userRow, rowPatch)
+      }
+    } catch (e) {
+      console.warn('ensureIdentityForUser: profile sync (non-fatal):', e)
+    }
+
     return identity
   } catch (e) {
     console.warn('ensureIdentityForUser threw (non-fatal):', e)
     return null
+  }
+}
+
+// Push name/email/animal onto the shared identity so every OTHER store in
+// the group inherits them on their next load. Best-effort, never throws.
+export async function updateIdentityProfile(identityId, fields = {}) {
+  if (!identityId) return
+  const patch = {}
+  if (fields.displayName != null) patch.display_name = fields.displayName
+  if (fields.animalIndex != null) patch.animal_index = fields.animalIndex
+  if (fields.email != null)       patch.email = fields.email
+  if (!Object.keys(patch).length) return
+  try { await supabase.from('customer_identities').update(patch).eq('id', identityId) }
+  catch (e) { console.warn('updateIdentityProfile (non-fatal):', e) }
+}
+
+// Propagate a profile edit (name / email / IBAN) to the shared identity AND
+// every sibling `users` row in the same identity, so the account looks
+// identical across all stores. Best-effort, never throws.
+export async function propagateProfileToGroup(identityId, { displayName, animalIndex, email, iban } = {}) {
+  if (!identityId) return
+  try {
+    await updateIdentityProfile(identityId, { displayName, animalIndex, email })
+    const rowPatch = {}
+    if (displayName != null) rowPatch.display_name = displayName
+    if (animalIndex != null) rowPatch.animal_index = animalIndex
+    if (email != null)       rowPatch.email = email
+    if (iban != null)        rowPatch.iban = iban
+    if (Object.keys(rowPatch).length) {
+      await supabase.from('users').update(rowPatch).eq('identity_id', identityId)
+    }
+  } catch (e) {
+    console.warn('propagateProfileToGroup (non-fatal):', e)
   }
 }
 
@@ -531,10 +621,14 @@ export function parseCupQr(payload) {
   if (!payload || typeof payload !== 'string') return null
   let batch = null
   let cupsParam = null
+  let byo = null
+  let byoPath = null
   try {
     const url = new URL(payload)
     batch = url.searchParams.get('batch')
     cupsParam = url.searchParams.get('cups')
+    byo = url.searchParams.get('byo')
+    byoPath = url.pathname
   } catch {
     cupsParam = payload
   }
@@ -543,6 +637,12 @@ export function parseCupQr(payload) {
     const ids = cupsParam.split(',').map(s => s.trim()).filter(Boolean)
     if (ids.length > 0 && ids.every(id => UUID_RE.test(id))) return { cupIds: ids }
   }
+  // Phase 3 BYO stationary counter QR: /<slug>/?byo=1 — carries no cup UUIDs;
+  // it's credited by the byo-mint edge function (always +1 up to the per-store
+  // daily cap). Return the store-slug path so the caller can re-enter the
+  // stationary-QR flow on the CURRENT origin — the QR's own domain (vercel or
+  // perks.packback.app) is intentionally ignored so it works everywhere.
+  if (byo !== null) return { byo: true, byoPath: byoPath || '/' }
   return null
 }
 
@@ -684,6 +784,35 @@ export async function logCupScan(userId, { cupsAwarded = 1, photoUrl = null } = 
 }
 
 // ── Activity history ───────────────────────────────────────────────────────
+// Combined activity across every store in a group for one person, keyed by
+// their shared identity. Each item is tagged with the `storeName` it belongs
+// to. Best-effort — returns [] on any failure. Used by the "general" account
+// view opened from the Stores hub.
+export async function getGroupActivity(identityId, orgNameById = {}) {
+  if (!identityId) return []
+  try {
+    const { data: rows } = await supabase
+      .from('users').select('id, org_id').eq('identity_id', identityId).is('merged_into', null)
+    const userIds = (rows || []).map(r => r.id)
+    if (!userIds.length) return []
+    const orgByUser = {}
+    ;(rows || []).forEach(r => { orgByUser[r.id] = r.org_id })
+    const { data } = await supabase
+      .from('activity_history').select('user_id, type, label, created_at')
+      .in('user_id', userIds).order('created_at', { ascending: true })
+    return (data || []).map(row => ({
+      type: row.type,
+      label: row.label,
+      time: formatTime(row.created_at),
+      createdAt: row.created_at,
+      storeName: orgNameById[orgByUser[row.user_id]] || null,
+    }))
+  } catch (e) {
+    console.warn('getGroupActivity (non-fatal):', e)
+    return []
+  }
+}
+
 export async function getHistory(userId) {
   const { data, error } = await supabase
     .from('activity_history')

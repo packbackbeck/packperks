@@ -17,6 +17,7 @@ export default function FeaturedReward({
   onBudgetBlocked,
   onResetClaim,
   onOpenTerms,
+  onWhatIsIban,
   onOpenRefund,
   onViewDetail,
   onNudge,
@@ -156,6 +157,10 @@ export default function FeaturedReward({
                   ? 'Scan your receipt and enter your IBAN to receive your cashback. '
                   : <>Collect cups to earn cashback. Keep your purchase receipt — you'll need it to claim.</>}
                 <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the voucher terms</button>
+                {onWhatIsIban && (
+                  <><span style={{ margin: '0 4px' }}>·</span>
+                  <button className="featured-reward__info-link" onClick={onWhatIsIban}>What is IBAN?</button></>
+                )}
                 {onOpenRefund && (
                   <><span style={{ margin: '0 4px' }}>or</span>
                   <button className="featured-reward__info-link" onClick={onOpenRefund}>Get the direct refund</button></>
@@ -186,6 +191,12 @@ export default function FeaturedReward({
               </div>
             )}
             {error && <p className="featured-reward__error" id="iban-error" role="alert">{error}</p>}
+
+            {isUnlocked && !budgetBlocked && (
+              <p className="featured-reward__payout-note">
+                Cashback arrives within <strong>1–2 business days</strong>. Your IBAN is used only for this payout and deleted once it is confirmed — we keep just the last 4 digits.
+              </p>
+            )}
 
             <button
               className={`featured-reward__claim-btn ${(!isUnlocked || (isUnlocked && budgetBlocked)) ? 'featured-reward__claim-btn--locked' : ''}`}

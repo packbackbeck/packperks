@@ -619,6 +619,19 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             <Field label="Cookie policy URL">
               <input className="as-input as-input--mono" value={settings.cookieUrl} onChange={e => updateSetting('cookieUrl', e.target.value)} placeholder="https://packperks.nl/cookies" />
             </Field>
+
+            <Field
+              label="Privacy & cookie policy (in-app text)"
+              hint="Shown inside the app (account page + cookie banner). Markdown supported. Leave blank to use the built-in default."
+            >
+              <textarea
+                className="as-input as-input--textarea"
+                rows={8}
+                value={settings.privacyPolicyText || ''}
+                onChange={e => updateSetting('privacyPolicyText', e.target.value, 'privacy policy')}
+                placeholder="# Our Privacy Policy&#10;&#10;## What we collect …"
+              />
+            </Field>
           </SectionCard>
 
           {/* ── Limits & caps ── */}

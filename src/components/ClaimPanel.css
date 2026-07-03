@@ -21,6 +21,21 @@
   color: var(--gray-700);
 }
 
+/* Payout + retention transparency note shown at IBAN entry (GDPR item 43). */
+.claim-panel__payout-note {
+  font-size: var(--fs-xs);
+  color: var(--gray-500);
+  line-height: 1.5;
+  margin: 0 0 var(--sp-4);
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 10px;
+}
+.claim-panel__payout-note strong {
+  color: var(--gray-700);
+  font-weight: var(--fw-semibold);
+}
+
 /* ── IBAN input ── */
 .claim-panel__label {
   display: block;

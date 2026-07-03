@@ -1,0 +1,45 @@
+/* PrivacyPolicyView — full-screen scrollable policy. */
+.pp-overlay {
+  position: fixed; inset: 0; z-index: 2100;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  font-family: var(--font-primary, system-ui, sans-serif);
+}
+.pp-sheet {
+  width: 100%; max-width: 560px; height: 92vh;
+  background: var(--white, #fff);
+  border-radius: 22px 22px 0 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
+  animation: pp-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes pp-rise { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.pp-head {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 14px;
+  border-bottom: 1px solid #EFE9DC;
+}
+.pp-head__title { font-size: 16px; font-weight: 800; color: var(--black, #1a1a1a); }
+.pp-close {
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: #F3EEE4; color: var(--text-muted, #6C6259);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.pp-close:hover { background: #E9E2D4; }
+
+.pp-body {
+  flex: 1; overflow-y: auto;
+  padding: 16px 18px calc(env(safe-area-inset-bottom, 0px) + 28px);
+}
+
+/* Markdown */
+.pp-md__h2 { font-size: 20px; font-weight: 800; color: var(--black, #1a1a1a); margin: 18px 0 8px; }
+.pp-md__h3 { font-size: 15.5px; font-weight: 800; color: var(--bk-brown, #502314); margin: 16px 0 6px; }
+.pp-md__p  { font-size: 13.5px; line-height: 1.55; color: var(--text-muted, #5A554F); margin: 0 0 9px; }
+.pp-md__row { font-size: 12.5px; line-height: 1.5; color: var(--text-muted, #6C6259); margin: 0 0 4px; }
+.pp-md__ul { margin: 0 0 10px; padding-left: 18px; }
+.pp-md__ul li { font-size: 13.5px; line-height: 1.5; color: var(--text-muted, #5A554F); margin-bottom: 4px; }
+.pp-md strong { color: var(--black, #2A2724); font-weight: 700; }
+.pp-md__hr { border: none; border-top: 1px solid #EFE9DC; margin: 14px 0; }

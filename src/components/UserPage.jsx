@@ -5,8 +5,12 @@ import './UserPage.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
 import ActivityDetailModal from './ActivityDetailModal';
+import PrivacyPolicyView from './PrivacyPolicyView';
 import { validateIban } from '../utils/iban';
 import { getGlobalImpact } from '../lib/api';
+import { clearConsent } from '../lib/consent';
+
+const DSAR_EMAIL = 'privacy@packperks.app';
 
 /* Build timestamp, stamped at compile time by vite (see vite.config.js).
  * Shown subtly at the bottom of the profile so we can confirm which
@@ -221,6 +225,17 @@ function getBrowserInfo() {
   return 'Unknown Browser';
 }
 
+/* Mask an email so only the first + last letter of each part shows
+ * (e.g. b••••••e@g•••l.com), for the default (hidden) view. */
+function maskEmail(e) {
+  if (!e || !e.includes('@')) return e || '';
+  const mask = (s) => (s.length <= 2 ? (s[0] || '') + '•' : s[0] + '•'.repeat(Math.max(1, s.length - 2)) + s[s.length - 1]);
+  const [local, domain] = e.split('@');
+  const dot = domain.lastIndexOf('.');
+  if (dot < 1) return `${mask(local)}@${mask(domain)}`;
+  return `${mask(local)}@${mask(domain.slice(0, dot))}${domain.slice(dot)}`;
+}
+
 export default function UserPage({
   profile,
   onSaveProfile,
@@ -252,6 +267,8 @@ export default function UserPage({
   combinedNote,
   // The active store's name — used for the per-store balance caption.
   storeName,
+  // Admin-editable privacy policy text (falls back to the bundled default).
+  privacyPolicy,
 }) {
   // Refresh claim status when the user enters this page — admin approvals
   // that happened while the user wasn't looking get pulled in automatically.
@@ -307,6 +324,8 @@ export default function UserPage({
   const showSaveEmailBanner =
     cupCount >= 1 && !authEmail && !bannerSnoozed;
 
+  // Email is masked (first + last letter) by default; tap to reveal in full.
+  const [emailRevealed, setEmailRevealed] = useState(false);
   // IBAN state
   const [ibanValue, setIbanValue] = useState(profile.iban || '');
   const [ibanRevealed, setIbanRevealed] = useState(false);
@@ -327,6 +346,33 @@ export default function UserPage({
 
   const saveProfile = (updated) => {
     onSaveProfile(updated);
+  };
+
+  // ── Data & privacy controls (GDPR items 13, 19, 21) ──
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const handleManageCookies = () => { clearConsent(); window.location.reload(); };
+  const handleResetDevice = () => {
+    if (!window.confirm('Reset this device? Your cups stay safe in your account, but this browser will forget your local data and sign out.')) return;
+    try { localStorage.clear(); } catch { /* ignore */ }
+    window.location.reload();
+  };
+  const handleDeleteIban = () => {
+    if (!ibanValue) return;
+    if (!window.confirm('Delete your saved IBAN? You can add it again later to receive cashback.')) return;
+    setIbanValue('');
+    saveProfile({ iban: '' });
+  };
+  const dsar = (subject, extra = '') => {
+    const body = `Please handle the request below for my PackPerks account.\n\nDisplay name: ${profile.displayName}\n${email ? 'Email: ' + email : 'Email: (none saved)'}\n${extra}`;
+    window.location.href = `mailto:${DSAR_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+  const handleExportData = () => dsar('PackPerks — export my data (access request)');
+  const handleDeleteAccount = () => {
+    if (!window.confirm('Delete your account and personal data? This clears your saved email and IBAN now and requests full erasure. Your cups will be removed. This cannot be undone.')) return;
+    // Best-effort immediate scrub of identifiable data on this account.
+    setIbanValue('');
+    saveProfile({ email: '', iban: '' });
+    dsar('PackPerks — delete my account (erasure request)', 'I want my account and all associated personal data deleted.');
   };
 
   const handleRegenerate = () => {
@@ -567,13 +613,23 @@ export default function UserPage({
         <div className="user-page__row">
           <span className="user-page__row-label">Email</span>
           {emailSaved && email && !isEditingEmail ? (
-            <button
-              className="user-page__row-value user-page__row-value--editable"
-              onClick={() => setIsEditingEmail(true)}
-              title="Tap to edit"
-            >
-              {email}
-            </button>
+            emailRevealed ? (
+              <button
+                className="user-page__row-value user-page__row-value--editable"
+                onClick={() => setIsEditingEmail(true)}
+                title="Tap to edit"
+              >
+                {email}
+              </button>
+            ) : (
+              <button
+                className="user-page__row-value user-page__iban-blurred"
+                onClick={() => setEmailRevealed(true)}
+                title="Tap to reveal"
+              >
+                {maskEmail(email)}
+              </button>
+            )
           ) : (
             <span className="user-page__row-value user-page__row-value--unknown">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
@@ -656,6 +712,10 @@ export default function UserPage({
             Cancel
           </button>
           {ibanError && <span className="user-page__email-error" role="alert">{ibanError}</span>}
+          <p className="user-page__privacy-hint">
+            Used only to pay your cashback. Stored securely and deleted after payment.{' '}
+            <button type="button" className="user-page__privacy-hint-link" onClick={() => setPolicyOpen(true)}>Learn more</button>
+          </p>
         </div>
       )}
 
@@ -862,6 +922,10 @@ export default function UserPage({
                   </button>
                 )}
                 {emailError && <span className="user-page__email-error" role="alert">{emailError}</span>}
+                <p className="user-page__privacy-hint">
+                  Used only to save and restore your account across devices.{' '}
+                  <button type="button" className="user-page__privacy-hint-link" onClick={() => setPolicyOpen(true)}>Learn more</button>
+                </p>
 
                 {/* Upgrade CTA — only shown once the email looks valid
                  *  (or has already been saved), so we don't tease the
@@ -903,16 +967,51 @@ export default function UserPage({
         />
       )}
 
+      {/* ── Data & privacy control (GDPR items 13, 19, 21) ── */}
+      <div className="user-page__history">
+        <span className="user-page__section-title">Data &amp; privacy</span>
+        <div className="user-page__card user-page__card--list">
+          {[
+            { label: 'Privacy & cookie policy', on: () => setPolicyOpen(true) },
+            { label: 'Manage cookie choices', on: handleManageCookies },
+            { label: 'Export my data', on: handleExportData },
+            ...(ibanValue ? [{ label: 'Delete my saved IBAN', on: handleDeleteIban }] : []),
+            { label: 'Reset this device', on: handleResetDevice },
+            { label: 'Delete my account', on: handleDeleteAccount, danger: true },
+          ].map((row, i, arr) => (
+            <div key={row.label}>
+              {i > 0 && <div className="user-page__divider" />}
+              <button
+                type="button"
+                className={`user-page__data-row${row.danger ? ' user-page__data-row--danger' : ''}`}
+                onClick={row.on}
+              >
+                <span>{row.label}</span>
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="user-page__data-note">
+          You can view, export, correct or delete your data at any time. Requests are handled at{' '}
+          <strong>{DSAR_EMAIL}</strong>. Cups you’ve already earned stay in your account until you delete it.
+        </p>
+      </div>
+
+      {policyOpen && <PrivacyPolicyView text={privacyPolicy} onClose={() => setPolicyOpen(false)} />}
+
       {/* ── Footer ── */}
       {/* (ImpactCard helper component is declared at module scope below
            so the JSX above can render it inline.) */}
       <footer className="user-page__footer">
         <nav className="user-page__legal">
-          <button className="user-page__legal-link">Privacy Policy</button>
+          <button className="user-page__legal-link" onClick={() => setPolicyOpen(true)}>Privacy Policy</button>
           <span className="user-page__legal-sep">·</span>
-          <button className="user-page__legal-link">Terms of Service</button>
+          <button className="user-page__legal-link" onClick={() => setPolicyOpen(true)}>Terms of Service</button>
           <span className="user-page__legal-sep">·</span>
-          <button className="user-page__legal-link">Cookie Policy</button>
+          <button className="user-page__legal-link" onClick={() => setPolicyOpen(true)}>Cookie Policy</button>
         </nav>
         {onWithdraw && (
           <button className="user-page__withdraw-btn" onClick={onWithdraw} disabled={cupCount === 0}>

@@ -46,14 +46,17 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
   const [cameraError, setCameraError] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
   const streamRef = useRef(null);
+  // Two screens: 'rules' (what the receipt must be) → 'camera' (take the shot).
+  const [step, setStep] = useState('rules');
 
-  /* Scroll to top so the stepper + header are visible first */
+  /* Scroll to top so the stepper + header are visible first — on each screen. */
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
+  }, [step]);
 
-  /* Start camera on mount */
+  /* Start the camera only once the user reaches the camera screen. */
   useEffect(() => {
+    if (step !== 'camera') return;
     let mounted = true;
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
       .then(stream => {
@@ -69,7 +72,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
       mounted = false;
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
-  }, []);
+  }, [step]);
 
   /* Capture from video */
   const handleCapture = () => {
@@ -117,11 +120,13 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
         ))}
       </div>
 
-      {/* ── Title ── */}
+      {step === 'rules' ? (
+      <>
+      {/* ── Screen 1: what the receipt must be ── */}
       <div className="receipt-page__header">
-        <h1 className="receipt-page__title">Take a photo of your store receipt</h1>
+        <h1 className="receipt-page__title">Before you take the photo</h1>
         <p className="receipt-page__subtitle">
-          Use the printed receipt from buying your {itemName}. This is the till receipt from the shop, not your cup-return ticket.
+          You'll photograph the printed receipt from buying your {itemName} — the till receipt from the shop, not your cup-return ticket. Here's what it needs to show:
         </p>
       </div>
 
@@ -169,6 +174,19 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
           A short till receipt works as long as it lists your item. If it does not show the item,
           ask the cashier for the full receipt, otherwise the claim may be rejected.
         </p>
+      </div>
+
+      {/* Understood → move to the camera screen */}
+      <button className="receipt-page__understood" onClick={() => setStep('camera')}>
+        Understood — take the photo
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+      </>
+      ) : (
+      <>
+      {/* ── Screen 2: take the photo ── */}
+      <div className="receipt-page__header">
+        <h1 className="receipt-page__title">Take a photo of your store receipt</h1>
       </div>
 
       {/* ── Camera viewfinder ── */}
@@ -240,6 +258,14 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
         </svg>
         <span>Cashback is deposited to your IBAN <strong>within 24 hours</strong> after your receipt is approved.</span>
       </div>
+
+      {/* Privacy note — kept at the very bottom of the flow. */}
+      <p className="receipt-page__privacy-note">
+        Your photo is checked automatically to verify the purchase (processed by our
+        AI provider in the US, not used to train models) and deleted after review.
+      </p>
+      </>
+      )}
 
     </div>
   );

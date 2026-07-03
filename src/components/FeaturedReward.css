@@ -194,6 +194,16 @@
   color: var(--text-muted);
 }
 
+/* Payout + retention transparency note shown at IBAN entry. */
+.featured-reward__payout-note {
+  margin: 8px 0 0;
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-light);
+}
+.featured-reward__payout-note strong { color: var(--text-muted); font-weight: var(--fw-semibold, 600); }
+
 .featured-reward__claim-title {
   font-family: var(--font-primary);
   font-weight: var(--fw-bold);

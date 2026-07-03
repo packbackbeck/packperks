@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import cupIcon from '../assets/images/cup-icon.svg';
-import packperksLogo from '../assets/images/packperks-logo.svg';
+import packperksLogo from '../assets/images/packperks-wordmark.svg';
 import { getGlobalImpact } from '../lib/api';
 import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
 import './StoresPage.css';
@@ -274,7 +274,7 @@ function StoresImpact({ personalCups }) {
   );
   return (
     <div className="stores2__impact">
-      <span className="stores2__impact-title">Plastic saved by bringing your own cup</span>
+      <span className="stores2__impact-title">Plastic avoided</span>
       <div className="stores2__impact-squares">
         <div className="stores2__impact-sq">
           <span className="stores2__impact-icon"><LeafIcon /></span>
@@ -296,7 +296,7 @@ function StoresImpact({ personalCups }) {
   );
 }
 
-const DEFAULT_INTRO = 'Bring your own cup, scan the QR at the counter, and earn cashback rewards — your cups are saved separately at each participating store.';
+const DEFAULT_INTRO = 'Bring your own cup, scan the QR, and earn cashback at every participating venue.';
 
 export default function StoresPage({
   group,
@@ -345,8 +345,11 @@ export default function StoresPage({
         </div>
       </header>
 
-      {/* System explanation — full-width, editable per group (storesIntro). */}
-      <p className="stores2__intro">{intro || DEFAULT_INTRO}</p>
+      {/* Headline + system explanation — full-width; intro editable per group. */}
+      <div className="stores2__intro-block">
+        <h1 className="stores2__headline">Discover all venues</h1>
+        <p className="stores2__intro">{intro || DEFAULT_INTRO}</p>
+      </div>
 
       {/* View toggle */}
       <div className="stores2__viewtoggle" role="radiogroup" aria-label="View">

@@ -115,6 +115,32 @@
   color: var(--text-light);
   line-height: 1.5;
 }
+.receipt-page__privacy-note {
+  width: 330px; max-width: 100%;
+  margin: 16px auto 24px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-xs);
+  color: var(--text-faint, rgba(0, 0, 0, 0.45));
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* "Understood" CTA on the rules screen → advances to the camera. */
+.receipt-page__understood {
+  width: 330px; max-width: 100%;
+  margin: 4px auto 8px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 52px;
+  background: var(--bk-brown);
+  color: var(--white, #fff);
+  border: none; border-radius: var(--radius-sm, 14px);
+  font-family: var(--font-primary);
+  font-size: var(--fs-md); font-weight: var(--fw-bold, 700);
+  cursor: pointer;
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+.receipt-page__understood:hover { filter: brightness(1.06); }
+.receipt-page__understood:active { transform: scale(0.98); }
 
 /* ── Receipt requirements ── */
 .receipt-page__requirements {

@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { hasAnalyticsConsent } from '../lib/consent';
 
 const SESSION_ID = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
 
@@ -106,8 +107,11 @@ function track(eventName, props = {}) {
     payload,
   );
 
-  // ── Persist funnel events (fire-and-forget; never throws to caller) ──
-  if (PERSISTED.has(eventName)) {
+  // ── Persist behavioural events — ONLY with "Accept all" cookie consent.
+  //    Essential-only / undecided / rejected users are never tracked to
+  //    client_events (GDPR consent for non-essential analytics). Console
+  //    logging above is dev-only and hits no storage. ──
+  if (PERSISTED.has(eventName) && hasAnalyticsConsent()) {
     const { org_id, user_id, ...rest } = props;
     const orgId = org_id || _ctx.orgId || null;
     const rawUid = user_id || _ctx.userId || null;

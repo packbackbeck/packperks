@@ -53,7 +53,7 @@
 /* The top segment's bottom-left stays square so the fill reads as one snake
  * flowing down into the bottom row rather than two separate pills. */
 .cup-progress__snake-seg--top { top: 0; border-bottom-left-radius: 0; }
-.cup-progress__snake-seg--bottom { bottom: 0; }
+.cup-progress__snake-seg--bottom { bottom: 0; border-top-left-radius: 0; }
 .cup-progress__snake-seg--complete { background: var(--bk-green); }
 
 /* Rows wrapper — one row normally, two stacked rows for >5-cup rewards. */

@@ -16,6 +16,7 @@ import DirectRefundSheet from './components/DirectRefundSheet';
 import RefundSuccessPage from './components/RefundSuccessPage';
 import ShareCupSheet from './components/ShareCupSheet';
 import DonateSheet from './components/DonateSheet';
+import IbanInfoSheet from './components/IbanInfoSheet';
 import DonateSuccessPage from './components/DonateSuccessPage';
 import ReceiptVerifyingPage from './components/ReceiptVerifyingPage';
 import ReceiptRejectedPage from './components/ReceiptRejectedPage';
@@ -263,12 +264,26 @@ export default function App() {
   // ('chicken-sandwich') is a Burger King id; on other orgs we snap to the
   // featured reward (or the first) so the selection — and any claim made
   // from it — always references a reward that belongs to THIS org.
+  //
+  // Guard against a ONE-RENDER transient: while the published config refetches
+  // (e.g. right as you hit the cup goal) `liveRewards` can briefly swap in a
+  // stale/other list that doesn't contain your pick. We only snap when the
+  // selection is empty (initial) or was ALSO absent from the *previous* rewards
+  // set — a real invalidation (org switch / removed reward), not a blip — so a
+  // valid choice like the one you selected is never yanked out from under you.
+  const prevRewardIdsRef = useRef('');
   useEffect(() => {
     if (!liveRewards.length) return;
+    const idSet = liveRewards.map(r => r.id).join('|');
     if (!liveRewards.some(r => r.id === selectedRewardId)) {
-      const featured = liveRewards.find(r => r.featured) || liveRewards[0];
-      if (featured) setSelectedRewardId(featured.id);
+      const missingBefore = prevRewardIdsRef.current !== '' &&
+        !prevRewardIdsRef.current.split('|').includes(selectedRewardId);
+      if (!selectedRewardId || missingBefore) {
+        const featured = liveRewards.find(r => r.featured) || liveRewards[0];
+        if (featured) setSelectedRewardId(featured.id);
+      }
     }
+    prevRewardIdsRef.current = idSet;
   }, [liveRewards, selectedRewardId]);
   const [claimed, setClaimed] = usePersistedState('claimed', false); // transient UI flag, localStorage is fine
   // S1: a "visitor" only opened the app. This flips true the moment they do
@@ -311,6 +326,7 @@ export default function App() {
   const [refundCupCount, setRefundCupCount] = useState(0);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [donateSheetOpen, setDonateSheetOpen] = useState(false);
+  const [ibanInfoOpen, setIbanInfoOpen] = useState(false); // "What is IBAN?" explainer
   const [donatedCups, setDonatedCups] = useState(0);
 
   /* ── Derived values ── */
@@ -1310,6 +1326,45 @@ export default function App() {
     );
   }
 
+  // Shared donate sheet — both the account page and the store/home page open
+  // it via donateSheetOpen (the reward sheet's "Donate my cups" CTA opens it
+  // on the store page). Defined once so either return renders the same sheet.
+  const donateSheetNode = liveSettings.featureDonations ? (
+    <DonateSheet
+      open={donateSheetOpen}
+      orgName={activeOrg?.partner_brand_name || activeOrg?.name}
+      onClose={(cupsToDonate) => {
+        setDonateSheetOpen(false);
+        // Clamp so a stale cupsToDonate can't overdraw or fabricate history.
+        const actual = Math.max(0, Math.min(cupsToDonate, cupCount));
+        if (actual > 0) {
+          const newCount = cupCount - actual;
+          const label = `Donated ${actual} cup${actual !== 1 ? 's' : ''} to Plastic Soup Foundation`;
+          setCupCount(newCount);
+          setDonatedCups(actual);
+          addHistory('cups_donated', label);
+          setPage('donate-success');
+          if (userId) persist(
+            updateCupBalance(userId, newCount),
+            addHistoryEntry(userId, 'cups_donated', label),
+            addDonationClaim(userId, actual, actual * (liveSettings.refundRatePerCup || 1.00), activeOrg?.id),
+          );
+        }
+      }}
+      cupCount={cupCount}
+    />
+  ) : null;
+
+  // "What is IBAN?" explainer — opened from the claim UI (next to the voucher
+  // terms link); its "Donate my cups" CTA hands off to the donate sheet.
+  const ibanInfoNode = (
+    <IbanInfoSheet
+      open={ibanInfoOpen}
+      onClose={() => setIbanInfoOpen(false)}
+      onDonate={showDonate ? () => { setIbanInfoOpen(false); setDonateSheetOpen(true); } : null}
+    />
+  );
+
   if (page === 'user') {
     // Combined (from-Stores) account view: sum balances + merge activity
     // across every store in the group.
@@ -1325,6 +1380,7 @@ export default function App() {
           history={acctCombined ? combinedHistory : history}
           combined={acctCombined}
           storeName={acctCombined ? null : (activeOrg?.partner_brand_name || activeOrg?.name)}
+          privacyPolicy={liveSettings.privacyPolicyText}
           userClaims={userClaims}
           rewards={liveRewards}
           authEmail={authEmail}
@@ -1412,38 +1468,8 @@ export default function App() {
             cupCount={cupCount}
           />
         )}
-        {liveSettings.featureDonations && (
-          <DonateSheet
-            open={donateSheetOpen}
-            orgName={activeOrg?.partner_brand_name || activeOrg?.name}
-            onClose={(cupsToDonate) => {
-              setDonateSheetOpen(false);
-              // Donate has no server-side enforcement (vs. share-cups which
-              // does). The sheet itself blocks 0-balance opens, but clamp
-              // here too so a stale `cupsToDonate` from a race condition
-              // can never overdraw the balance or fabricate a history entry.
-              const actual = Math.max(0, Math.min(cupsToDonate, cupCount));
-              if (actual > 0) {
-                const newCount = cupCount - actual;
-                const label = `Donated ${actual} cup${actual !== 1 ? 's' : ''} to Plastic Soup Foundation`;
-                setCupCount(newCount);
-                setDonatedCups(actual);
-                addHistory('cups_donated', label);
-                setPage('donate-success');
-                if (userId) persist(
-                  updateCupBalance(userId, newCount),
-                  addHistoryEntry(userId, 'cups_donated', label),
-                  // Write a completed donation claim so the admin Donations
-                  // page can aggregate real cup + euro totals. Uses the refund
-                  // rate (€/cup) as the per-cup value — same basis used for
-                  // direct-refund claims.
-                  addDonationClaim(userId, actual, actual * (liveSettings.refundRatePerCup || 1.00), activeOrg?.id),
-                );
-              }
-            }}
-            cupCount={cupCount}
-          />
-        )}
+        {donateSheetNode}
+        {ibanInfoNode}
         {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
       </div>
     );
@@ -1515,6 +1541,7 @@ export default function App() {
         onBudgetBlocked={handleBudgetBlocked}
         onResetClaim={handleResetClaim}
         onOpenTerms={handleOpenTerms}
+        onWhatIsIban={() => setIbanInfoOpen(true)}
         onOpenRefund={showRefund ? handleOpenRefund : null}
         onViewDetail={() => handleViewDetail(selectedReward)}
         onNudge={handleNudge}
@@ -1552,6 +1579,11 @@ export default function App() {
         body={liveSettings?.budgetPausedBody}
       />
 
+      {/* Donate sheet + "What is IBAN?" explainer — opened from the claim UI
+          (audit item 44) as well as the account page. */}
+      {donateSheetNode}
+      {ibanInfoNode}
+
       <Modal open={termsOpen} onClose={() => setTermsOpen(false)} title="Voucher Terms">
         {groupCopy ? (
           /* Grouped org: use the group's mode-sensitive terms (BYO drops all
@@ -1564,18 +1596,17 @@ export default function App() {
           </>
         ) : (
           <>
-            <p><strong>How it works:</strong> Return your reusable PackBack cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} location. Each returned cup adds to your balance.</p>
+            <p><strong>How it works:</strong> Collect cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} venue — scan the QR each time to add a cup to your balance for that venue.</p>
             <ul>
-              <li>Rewards are digital vouchers — no app download needed.</li>
-              <li>One reward can be claimed per cup cycle.</li>
-              <li>Vouchers are valid for 30 days after claiming.</li>
-              {liveSettings?.featureDirectRefunds && (
-                <li>Cashback is sent to your IBAN within 1 to 2 business days.</li>
-              )}
-              <li>You can switch your reward goal at any time before claiming.</li>
+              <li>Collect enough cups to unlock a reward, then claim it as <strong>cashback</strong>.</li>
+              <li>To pay you, we ask for your IBAN and a photo of your <strong>printed store receipt</strong> for the item; the purchase is verified before payout.</li>
+              <li>Cashback reaches your IBAN normally within <strong>1–2 business days</strong> after your receipt is approved.</li>
+              <li>Your IBAN is used only for the payout and is deleted once it is confirmed — only the last 4 digits are kept as a record.</li>
+              <li>No IBAN? You can <strong>donate</strong> your cups to a good cause instead.</li>
+              <li>Cups are saved separately at each venue, and you can switch your reward goal any time before claiming.</li>
             </ul>
             {liveSettings?.featureDirectRefunds && (
-              <p><strong>Refund policy:</strong> If you prefer cash over a food reward, use &quot;Get the direct refund&quot; to withdraw your cup deposit instead.</p>
+              <p><strong>Direct refund:</strong> If you would rather take a plain cash refund than a food reward, use &quot;Get the direct refund&quot;.</p>
             )}
           </>
         )}

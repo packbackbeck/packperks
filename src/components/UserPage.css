@@ -1094,6 +1094,33 @@
   color: var(--text-light);
 }
 
+/* Just-in-time privacy hint under email / IBAN inputs (GDPR item 11) */
+.user-page__privacy-hint {
+  margin: 8px 2px 0; font-size: var(--fs-xs); line-height: 1.45; color: var(--text-light, #8A8175);
+}
+.user-page__privacy-hint-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font: inherit; color: var(--bk-green, #1A8737); font-weight: 700; text-decoration: underline;
+}
+
+/* Data & privacy control rows */
+.user-page__data-row {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 13px var(--sp-4);
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-primary); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--black, #1a1a1a); text-align: left;
+}
+.user-page__data-row svg { color: var(--text-faint, rgba(0, 0, 0, 0.3)); flex-shrink: 0; }
+.user-page__data-row:hover { color: var(--bk-green, #1A8737); }
+.user-page__data-row--danger { color: #C4321B; }
+.user-page__data-row--danger:hover { color: #A5240F; }
+.user-page__data-note {
+  margin: 10px 2px 0; font-size: var(--fs-xs); line-height: 1.5; color: var(--text-light, #8A8175);
+}
+.user-page__data-note strong { color: var(--text-muted, #6C6259); font-weight: 700; }
+
 /* Combined (from-Stores) account view: store name badge on each activity row. */
 .user-page__history-store {
   display: inline-block;

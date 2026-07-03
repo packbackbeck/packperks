@@ -123,6 +123,15 @@ export default function ClaimPanel({
           : 'You will receive your cashback after you return enough cups, scan your purchase receipt, and enter your IBAN.'}
       </p>
 
+      {/* Payout + retention transparency at the point of IBAN collection
+          (GDPR item 43): why we need it, when we pay, how long we keep it. */}
+      <p className="claim-panel__payout-note">
+        Your IBAN is used only to send this cashback. Payouts arrive within
+        <strong> 1 to 2 business days</strong>. We keep your IBAN only until the
+        payout is confirmed, then delete it — keeping just the last 4 digits on
+        your payment record.
+      </p>
+
       {showSavedSummary ? (
         <>
           <div className="claim-panel__saved-row">

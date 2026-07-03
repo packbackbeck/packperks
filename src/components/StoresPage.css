@@ -15,10 +15,12 @@
 .stores2__topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .stores2__brand-logo { height: 30px; width: auto; max-width: 200px; display: block; }
 /* System explanation — its own full-width row below the bar. */
-.stores2__intro { margin: 0; font-size: 16px; color: var(--text-light); line-height: 1.5; width: 100%; }
+.stores2__intro-block { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.stores2__headline { margin: 0; font-family: var(--font-primary); font-size: 24px; font-weight: 800; color: var(--black, #1a1a1a); line-height: 1.15; }
+.stores2__intro { margin: 0; font-size: 15px; color: var(--text-light); line-height: 1.45; width: 100%; }
 .stores2__topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .stores2__iconbtn {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 44px; height: 44px; border-radius: 14px;
   background: var(--white, #fff); border: none;
   display: flex; align-items: center; justify-content: center;
   color: var(--black, #1a1a1a); cursor: pointer;
@@ -33,7 +35,7 @@
 /* ── View toggle ─────────────────────────────────────────────────────── */
 .stores2__viewtoggle {
   display: flex; width: 100%; gap: 2px;
-  padding: 3px; background: rgba(0, 0, 0, 0.05); border-radius: 12px;
+  padding: 3px; background: rgba(0, 0, 0, 0.05); border-radius: 20px;
 }
 .stores2__viewopt {
   flex: 1;
@@ -43,7 +45,7 @@
   font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
   transition: background 0.14s ease, color 0.14s ease;
 }
-.stores2__viewopt.is-on { background: var(--white, #fff); color: #2A2724; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.stores2__viewopt.is-on { background: var(--white, #fff); color: #2A2724; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); border-radius: 20px; }
 
 /* ── Info card ───────────────────────────────────────────────────────── */
 .stores2__infocard {
@@ -76,6 +78,7 @@
 .stores2__hero-logo {
   position: relative; flex-shrink: 0; width: 116px; overflow: hidden;
   display: flex; align-items: center; justify-content: center; padding: 16px;
+  border-radius: 15px; margin: 10px;
 }
 .stores2__hero-logo::before {
   content: ''; position: absolute; inset: 0;
@@ -229,7 +232,7 @@
 
 /* ── Plastic-avoided impact (list view) ──────────────────────────────── */
 .stores2__impact { margin-top: 26px; }
-.stores2__impact-title { display: block; font-size: 15px; font-weight: 800; color: var(--black, #1a1a1a); margin-bottom: 10px; }
+.stores2__impact-title { display: block; font-size: 20px; font-weight: 800; color: var(--black, #1a1a1a); margin-bottom: 10px; }
 .stores2__impact-squares { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stores2__impact-sq {
   display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
@@ -238,7 +241,7 @@
 }
 /* Community square — bright, so "everyone together" pops next to the
  * neutral personal square. */
-.stores2__impact-sq--community { background: linear-gradient(135deg, #1FC77D 0%, #12A566 100%); }
+.stores2__impact-sq--community { background: linear-gradient(135deg, #57E29B 0%, #2FD183 100%); }
 .stores2__impact-sq--community .stores2__impact-val,
 .stores2__impact-sq--community .stores2__impact-cap { color: #fff; }
 .stores2__impact-icon {

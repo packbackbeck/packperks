@@ -261,6 +261,10 @@ Deno.serve(async (req) => {
   }
 
   // ── Delete absorbed cup_balances; soft-mark absorbed users ────────────
+  // Absorbed rows become linkage-only tombstones: null every PII field
+  // (email / IBAN / device_id / parsed device / display_name), keeping only
+  // merged_into. The survivor already captured the best profile values
+  // in-memory (pickMostRecentProfile) above. (Audit item 33 — dup scrub.)
   await supabase.from("cup_balances").delete().in("user_id", absorbed.map((a) => a.id));
   for (const a of absorbed) {
     await supabase
@@ -269,6 +273,8 @@ Deno.serve(async (req) => {
         device_id: null,
         email: null,
         iban: null,
+        device: null,
+        display_name: null,
         merged_into: survivor.id,
         updated_at: new Date().toISOString(),
       })

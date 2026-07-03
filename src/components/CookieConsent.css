@@ -1,0 +1,91 @@
+/* CookieConsent — PackPerks-styled first-run consent sheet + blocked screen. */
+
+.cc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  animation: cc-fade 0.2s ease both;
+}
+@keyframes cc-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.cc-sheet {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bk-cream, #F4EBDC);
+  border-radius: 22px;
+  padding: 20px 20px 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  font-family: var(--font-primary, system-ui, sans-serif);
+  animation: cc-rise 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes cc-rise { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.cc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.cc-mark {
+  flex-shrink: 0;
+  width: 52px; height: 52px; border-radius: 15px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--white, #fff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.cc-title { margin: 0; font-size: 19px; font-weight: 800; color: var(--black, #1a1a1a); }
+
+.cc-text {
+  margin: 4px 0 16px;
+  font-size: 13.5px; line-height: 1.5; color: var(--text-muted, #6C6259);
+}
+.cc-text strong { color: var(--black, #2A2724); font-weight: 700; }
+
+.cc-actions { display: flex; flex-direction: column; gap: 8px; }
+.cc-btn {
+  width: 100%;
+  padding: 13px 16px;
+  border: none; border-radius: 13px;
+  font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease, background 0.12s ease;
+}
+.cc-btn:active { transform: scale(0.985); }
+.cc-btn--primary { background: var(--bk-green, #1A8737); color: #fff; }
+.cc-btn--primary:hover { filter: brightness(1.06); }
+.cc-btn--secondary {
+  background: var(--white, #fff); color: var(--black, #2A2724);
+  box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.12);
+}
+.cc-btn--secondary:hover { background: #FBF7EF; }
+.cc-btn--ghost {
+  background: transparent; color: var(--text-light, #8A8175); font-weight: 700; font-size: 13.5px;
+  padding: 8px;
+}
+.cc-btn--ghost:hover { color: var(--black, #2A2724); }
+
+.cc-policy-link {
+  display: block; margin: 12px auto 0; padding: 4px;
+  background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--text-light, #8A8175); text-decoration: underline;
+}
+.cc-policy-link:hover { color: var(--black, #2A2724); }
+
+/* ── Blocked screen (after Reject) ── */
+.cc-blocked {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bk-cream, #F4EBDC);
+  padding: 24px;
+  font-family: var(--font-primary, system-ui, sans-serif);
+}
+.cc-blocked__card {
+  max-width: 360px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.cc-blocked__title { margin: 4px 0 0; font-size: 20px; font-weight: 800; color: var(--black, #1a1a1a); }
+.cc-blocked__text { margin: 0 0 6px; font-size: 13.5px; line-height: 1.55; color: var(--text-muted, #6C6259); }
+.cc-blocked .cc-btn--primary { max-width: 280px; }

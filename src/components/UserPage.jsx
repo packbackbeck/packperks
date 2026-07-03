@@ -10,7 +10,7 @@ import { validateIban } from '../utils/iban';
 import { getGlobalImpact } from '../lib/api';
 import { clearConsent } from '../lib/consent';
 
-const DSAR_EMAIL = 'privacy@packperks.app';
+const DSAR_EMAIL = 'support@packback.network';
 
 /* Build timestamp, stamped at compile time by vite (see vite.config.js).
  * Shown subtly at the bottom of the profile so we can confirm which
@@ -1006,13 +1006,8 @@ export default function UserPage({
       {/* (ImpactCard helper component is declared at module scope below
            so the JSX above can render it inline.) */}
       <footer className="user-page__footer">
-        <nav className="user-page__legal">
-          <button className="user-page__legal-link" onClick={() => setPolicyOpen(true)}>Privacy Policy</button>
-          <span className="user-page__legal-sep">·</span>
-          <button className="user-page__legal-link" onClick={() => setPolicyOpen(true)}>Terms of Service</button>
-          <span className="user-page__legal-sep">·</span>
-          <button className="user-page__legal-link" onClick={() => setPolicyOpen(true)}>Cookie Policy</button>
-        </nav>
+        {/* Privacy / cookie policy links live in the Data & privacy section
+            above — no separate legal footer needed. */}
         {onWithdraw && (
           <button className="user-page__withdraw-btn" onClick={onWithdraw} disabled={cupCount === 0}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none">

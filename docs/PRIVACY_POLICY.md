@@ -1,13 +1,13 @@
 # PackPerks Privacy Policy
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** [FILL: privacy contact email] · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
 
 **Last updated: (to be dated on adoption)**
 **Owner: PackPerks Privacy Owner**
 
 This policy explains, in plain language, what personal data PackPerks collects when you use our reusable-cup loyalty and cashback service, why we collect it, who we share it with, and the choices and rights you have. We have tried to be specific about how *our* app actually works rather than filling this with generic legal boilerplate.
 
-If anything here is unclear, please contact us at **privacy@packperks** and we will help.
+If anything here is unclear, please contact us at **support@packback.network** and we will help.
 
 ---
 
@@ -20,7 +20,7 @@ For the purposes of the EU General Data Protection Regulation (GDPR), **PackPerk
 Our partner stores are **not** given access to your personal data. Partners only ever see **aggregate statistics** through an admin-only dashboard (for example, how many cups were returned this month). Partners never see individual user histories, email addresses, IBANs, receipt images, or behavioural profiles.
 
 - **Controller:** PackPerks
-- **Privacy contact / DSAR:** privacy@packperks
+- **Privacy contact / DSAR:** support@packback.network
 - **Owner:** PackPerks Privacy Owner
 
 ---
@@ -108,7 +108,7 @@ If you use PackPerks in the **United Arab Emirates**, this section explains how 
 
 **On what basis we transfer your data.** These cross-border transfers are lawful because they are **necessary to provide the service you asked for** — the app simply cannot run without them — and, where needed, because you **consent** to them by choosing to use PackPerks after being told where your data goes. We back this with written data-processing agreements with our providers.
 
-**Your rights.** You have the right to **access**, **correct**, and **delete** your personal data, and to object to or restrict certain processing. You can do most of this yourself in the in-app **Data control** section (edit your email or IBAN, reset your device, or delete your account). For anything else, or to make a formal request, email **[FILL: privacy contact email]** and we will help. You may also complain to the **UAE Data Office**.
+**Your rights.** You have the right to **access**, **correct**, and **delete** your personal data, and to object to or restrict certain processing. You can do most of this yourself in the in-app **Data control** section (edit your email or IBAN, reset your device, or delete your account). For anything else, or to make a formal request, email **support@packback.network** and we will help. You may also complain to the **UAE Data Office**.
 
 For the full detail of how we handle UAE cross-border transfers, including the free-zone (DIFC / ADGM) position, see [`UAE_CROSS_BORDER.md`](UAE_CROSS_BORDER.md).
 
@@ -197,7 +197,7 @@ We make most of this self-service. In the app, open the **Data control** section
 - **Reset your device** (clear the local `device_id` and related keys)
 - **Delete your account** entirely
 
-You can also make a **Data Subject Access Request (DSAR)** or exercise any other right by emailing **privacy@packperks**. We'll respond within the timeframes required by law.
+You can also make a **Data Subject Access Request (DSAR)** or exercise any other right by emailing **support@packback.network**. We'll respond within the timeframes required by law.
 
 Note: deleting your account or resetting your device removes your data as described above, but we may retain the minimal claim records (amount, date, status, last-4) where the law requires us to.
 
@@ -207,7 +207,7 @@ If you believe we've mishandled your data, you have the right to complain to you
 
 ## Children
 
-PackPerks is not directed at children and is intended for adults who make purchases and receive cashback. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact **privacy@packperks** and we will delete it.
+PackPerks is not directed at children and is intended for adults who make purchases and receive cashback. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact **support@packback.network** and we will delete it.
 
 ---
 
@@ -217,5 +217,5 @@ We may update this policy as the service evolves or as legal requirements change
 
 ---
 
-**Owner: PackPerks Privacy Owner** · **Contact: privacy@packperks**
+**Owner: PackPerks Privacy Owner** · **Contact: support@packback.network**
 **Last updated: (to be dated on adoption)**

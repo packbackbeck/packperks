@@ -1,6 +1,6 @@
 # Record of Processing Activities (Article 30 GDPR)
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** [FILL: privacy contact email] · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
 
 **Controller:** PackPerks (sole controller for all activities below)
 **Owner:** PackPerks Privacy Owner

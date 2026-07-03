@@ -1,6 +1,6 @@
 # PackPerks — Data Protection Impact Assessment (DPIA-Lite)
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** [FILL: privacy contact email] · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
 
 **Status:** Draft for MVP adoption
 **Last updated:** (to be dated on adoption)

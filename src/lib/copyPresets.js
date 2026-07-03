@@ -119,12 +119,15 @@ export const COPY_PRESETS = {
     },
     howItWorks: {
       title: 'How does it work?',
+      // Each step carries its own illustration + palette (public/how-it-works/
+      // byo-N.png), so the BYO guide is fully self-contained rather than reusing
+      // the deposit-model artwork.
       steps: [
-        { title: 'Bring your own cup',    body: 'Visit a participating café with your reusable cup — no deposit, no single-use packaging.' },
-        { title: 'Scan the counter QR',   body: 'Spot the PackPerks card on the counter and scan it whenever you’d like to collect.' },
-        { title: 'Get +1 cup',            body: 'Each scan adds one cup to your balance at that venue.' },
-        { title: 'Collect across venues', body: 'Track your progress here and at every other participating store — each keeps its own balance.' },
-        { title: 'Redeem your reward',    body: 'Once you’ve collected enough cups, redeem your cashback reward at that venue.' },
+        { title: 'Bring your own cup',    body: 'Visit a participating café with your reusable cup — no deposit, no single-use packaging.', image: '/how-it-works/byo-1.png', bg: 'linear-gradient(165deg, #FBEDE4 0%, #F6D8C6 100%)', accent: '#E88E63', icon: 'cup' },
+        { title: 'Get +1 cup',            body: 'Scan the QR at the counter and one cup is added to your balance at that venue.', image: '/how-it-works/byo-2.png', bg: 'linear-gradient(165deg, #EAF6EC 0%, #D6ECD9 100%)', accent: '#5FA96E', icon: 'cup' },
+        { title: 'Collect across venues', body: 'Track your progress here and at every other participating store — each keeps its own balance.', image: '/how-it-works/byo-3.png', bg: 'linear-gradient(165deg, #ECEDFB 0%, #DCE0F8 100%)', accent: '#7C86D6', icon: 'store' },
+        { title: 'Scan your receipt',     body: 'Once you’ve collected enough cups, buy your reward and scan the store receipt so we can verify your purchase.', image: '/how-it-works/byo-4.png', bg: 'linear-gradient(165deg, #FCF3D2 0%, #F8E7B0 100%)', accent: '#E5B23A', icon: 'receipt' },
+        { title: 'Receive your cashback', body: 'After your receipt is approved, your cashback lands in the bank account (IBAN) you provided.', image: '/how-it-works/byo-5.png', bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)', accent: '#57C08D', icon: 'cash' },
       ],
     },
     terms: {

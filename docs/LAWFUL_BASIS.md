@@ -1,6 +1,6 @@
 # PackPerks — Lawful Basis Register
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** [FILL: privacy contact email] · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
 
 **Last updated:** (to be dated on adoption)
 **Owner:** PackPerks Privacy Owner

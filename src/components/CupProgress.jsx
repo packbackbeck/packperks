@@ -103,14 +103,25 @@ export default function CupProgress({ collected, target, nudgeCount = 0 }) {
   // row's cups are collected.
   const row0Cups = twoRow ? rows[0].filter(it => it.type === 'cup').length : 0;
   const row1Cups = twoRow ? rows[1].filter(it => it.type === 'cup').length : 0;
-  const row0Fill = row0Cups ? Math.min(1, collected / row0Cups) : 0;
-  const row1Fill = row1Cups ? Math.min(1, Math.max(0, collected - row0Cups) / row1Cups) : 0;
-  // Collected cups per row — each one nudges the snake ~5px wider so the fill
-  // sits comfortably past each cup rather than stopping right at its centre.
+  const row0Len = twoRow ? rows[0].length : 0;
+  const row1Len = twoRow ? rows[1].length : 0;
+  // Collected cups in each row — cups fill left→right; the end-goal star is the
+  // last slot of the bottom row and is never "collected".
   const row0Done = Math.min(collected, row0Cups);
   const row1Done = Math.min(row1Cups, Math.max(0, collected - row0Cups));
-  const snakeWidth = (fillFrac, doneCups) =>
-    doneCups > 0 ? `min(100%, calc(${fillFrac * 100}% + ${doneCups * 5}px))` : '0%';
+  // Snake fill width, derived from the real cup layout so it scales with the
+  // reward's cup count. Each row lays out `rowLen` equal CUP-wide slots with
+  // `justify-content: space-evenly` inside a region inset PAD on each side (see
+  // CupProgress.css). We stop the fill at the MIDPOINT between the last
+  // collected cup and the next slot: that fully covers the collected cups with
+  // a small margin yet never reaches a locked cup — for 8, 9, 12 or any count.
+  const CUP = 38, PAD = 10; // must match the two-row values in CupProgress.css
+  const snakeWidth = (done, rowCups, rowLen) => {
+    if (done <= 0 || rowCups <= 0) return '0%';
+    if (done >= rowCups) return '100%'; // whole row's cups collected → fill it
+    const gap = `(100% - ${2 * PAD}px - ${CUP * rowLen}px) / ${rowLen + 1}`;
+    return `calc(${PAD}px + ${(done + 0.5).toFixed(1)} * ${gap} + ${CUP * done}px)`;
+  };
 
   const renderItem = (it) =>
     it.type === 'star'
@@ -134,11 +145,11 @@ export default function CupProgress({ collected, target, nudgeCount = 0 }) {
           <div className="cup-progress__snake" aria-hidden="true">
             <div
               className={`cup-progress__snake-seg cup-progress__snake-seg--top${isComplete ? ' cup-progress__snake-seg--complete' : ''}`}
-              style={{ width: snakeWidth(row0Fill, row0Done) }}
+              style={{ width: snakeWidth(row0Done, row0Cups, row0Len) }}
             />
             <div
               className={`cup-progress__snake-seg cup-progress__snake-seg--bottom${isComplete ? ' cup-progress__snake-seg--complete' : ''}`}
-              style={{ width: snakeWidth(row1Fill, row1Done) }}
+              style={{ width: snakeWidth(row1Done, row1Cups, row1Len) }}
             />
           </div>
         )}

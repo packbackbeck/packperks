@@ -139,21 +139,22 @@ Each document below needs a small number of **inputs** filled in before adoption
 
 | Document | What it is | Why we need it | Inputs to fill |
 |---|---|---|---|
-| `PRIVACY_POLICY.md` | The customer-facing privacy policy (rendered in-app), incl. the UAE section. | GDPR Art. 12–14 transparency + UAE PDPL notice. | **3** |
-| `COOKIE_POLICY.md` | Storage/cookie & telemetry disclosure. | ePrivacy + consent for non-essential analytics. | **2** |
-| `LAWFUL_BASIS.md` | Purpose → legal-basis map, incl. the fraud purpose-limitation statement. | GDPR Art. 6 (a basis for every purpose). | **2** |
-| `RETENTION_SCHEDULE.md` | Retention & deletion schedule, incl. AI-derived data and payout-export deletion. | GDPR Art. 5 storage limitation. | **4** |
-| `ROPA.md` | Record of Processing Activities, incl. Supabase platform IP logs and the email relay. | GDPR Art. 30. | **8** |
-| `DPIA_LITE.md` | Risk assessment for financial data + receipts + AI + profiling, incl. the no-lottery note. | GDPR Art. 35. | **2** |
-| `BREACH_RUNBOOK.md` | 72-hour breach detect→notify runbook. | GDPR Art. 33–34. | **2** (+ per-incident form blanks) |
-| `DPA_STATUS.md` | Processor/DPA tracker (Supabase, Vercel, Anthropic, email relay). | GDPR Art. 28 processor terms. | **5** |
-| `UAE_CROSS_BORDER.md` | UAE cross-border transfer basis + the DIFC/ADGM free-zone applicability check. | UAE PDPL + free-zone laws. | **5** |
-| `INTERNAL_DATA_HANDLING.md` | Internal staff rule: no PII in Slack/screenshots/sheets; exports only via the sanctioned tool; short-lived signed URLs. | GDPR Art. 32 organisational measure. | **4** |
+| `PRIVACY_POLICY.md` | The customer-facing privacy policy (rendered in-app), incl. the UAE section. | GDPR Art. 12–14 transparency + UAE PDPL notice. | **1** |
+| `COOKIE_POLICY.md` | Storage/cookie & telemetry disclosure. | ePrivacy + consent for non-essential analytics. | **1** |
+| `LAWFUL_BASIS.md` | Purpose → legal-basis map, incl. the fraud purpose-limitation statement. | GDPR Art. 6 (a basis for every purpose). | **1** |
+| `RETENTION_SCHEDULE.md` | Retention & deletion schedule, incl. AI-derived data and payout-export deletion. | GDPR Art. 5 storage limitation. | **3** |
+| `ROPA.md` | Record of Processing Activities, incl. Supabase platform IP logs and the email relay. | GDPR Art. 30. | **7** |
+| `DPIA_LITE.md` | Risk assessment for financial data + receipts + AI + profiling, incl. the no-lottery note. | GDPR Art. 35. | **1** |
+| `BREACH_RUNBOOK.md` | 72-hour breach detect→notify runbook. | GDPR Art. 33–34. | **1** (+ per-incident form blanks) |
+| `DPA_STATUS.md` | Processor/DPA tracker (Supabase, Vercel, Anthropic, email relay). | GDPR Art. 28 processor terms. | **4** |
+| `UAE_CROSS_BORDER.md` | UAE cross-border transfer basis + the DIFC/ADGM free-zone applicability check. | UAE PDPL + free-zone laws. | **4** |
+| `INTERNAL_DATA_HANDLING.md` | Internal staff rule: no PII in Slack/screenshots/sheets; exports only via the sanctioned tool; short-lived signed URLs. | GDPR Art. 32 organisational measure. | **2** |
 
-**Total: 37 `[FILL:]` inputs** to complete across the ten documents. The single
-most common one is the privacy owner's name + contact (item 40), which repeats
-across the set. `BREACH_RUNBOOK.md` additionally contains per-incident form
-blanks to complete when an incident actually occurs.
+**Total: 25 `[FILL:]` inputs** to complete across the ten documents. The privacy
+contact email is already set to **support@packback.network** throughout; the
+main remaining input is the privacy owner's name (item 40), which repeats across
+the set. `BREACH_RUNBOOK.md` additionally contains per-incident form blanks to
+complete when an incident actually occurs.
 
 Non-document companions (analysis, no fill-ins): `SECURITY_PRIVACY_REMEDIATION.md`
 (ranked remediation plan) and `SECURITY_PER_PROBLEM_SOLUTIONS.md` (per-problem
@@ -186,8 +187,9 @@ permissive policies. Order of operations:
   older objects fold into the 029 lockdown work.
 
 ### Paperwork / process
-- **Fill the 37 `[FILL:]` inputs** across the `docs/` set — starting with naming a
-  **privacy owner** (item 40), the most-repeated input.
+- **Fill the 25 `[FILL:]` inputs** across the `docs/` set — starting with naming a
+  **privacy owner** (item 40), the most-repeated input. (The privacy contact email
+  is already set to support@packback.network.)
 - Sign/verify **DPAs** (Supabase, Vercel, Anthropic, email relay) — `docs/DPA_STATUS.md`.
 - Confirm **Anthropic no-training + zero-retention** + DPF/SCC in writing (item 8).
 - Adopt + date the privacy policy, ROPA, DPIA, breach runbook, retention

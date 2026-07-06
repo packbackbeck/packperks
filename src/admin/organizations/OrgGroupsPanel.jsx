@@ -278,6 +278,7 @@ function ModePicker({ value, onChange, disabled, idPrefix }) {
   );
 }
 
+
 export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
   const [creating, setCreating]   = useState(false);
   const [newName, setNewName]     = useState('');
@@ -574,6 +575,9 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
                         </button>
                       </div>
                     </div>
+
+                    {/* Future vendors ("coming soon" venues) now live on their own
+                        admin page — Sidebar → Future Vendors. */}
 
                     {/* Footer: rename / delete */}
                     <div className="og-card__foot">

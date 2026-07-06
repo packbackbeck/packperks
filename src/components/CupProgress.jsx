@@ -74,8 +74,8 @@ export default function CupProgress({ collected, target, nudgeCount = 0 }) {
   const isComplete = t > 0 && collected >= t;
   const progress = t > 0 ? Math.min(1, collected / t) : 0;
 
-  // Rule: rewards needing more than 5 cups render across two equal rows.
-  const twoRow = t > 5;
+  // Rule: rewards needing more than 6 cups render across two equal rows.
+  const twoRow = t > 6;
 
   // One descriptor per required cup.
   const items = [];

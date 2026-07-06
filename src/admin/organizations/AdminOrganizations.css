@@ -73,6 +73,13 @@
 }
 .ao-btn--danger:hover:not(:disabled) { background: #A32E29; }
 
+/* MockupMaster launcher — PackPerks purple, sits next to the primary CTA. */
+.ao-header__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ao-btn--mockup {
+  background: #fff; color: #672BFF; border-color: #D8CBFF;
+}
+.ao-btn--mockup:hover:not(:disabled) { background: #F3EEFF; border-color: #B79BFF; }
+
 /* ── Error + loading + empty ────────────────────────────────────────── */
 .ao-error {
   margin-bottom: 16px;
@@ -225,36 +232,60 @@
 .ao-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .ao-action {
-  background: transparent;
-  border: 1px solid #D6CFC2;
-  border-radius: 6px;
-  padding: 5px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #E2DBCD;
+  border-radius: 8px;
+  padding: 6px 11px;
   font-size: 12px;
   font-weight: 600;
   font-family: inherit;
-  color: #5A554F;
+  color: #4A453F;
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  white-space: nowrap;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
+.ao-action svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.72; }
 .ao-action:hover:not(:disabled) {
-  background: #F4EFE5;
+  background: #FBF8F2;
   color: #0F0F0F;
-  border-color: #B8B0A0;
+  border-color: #C9C0AE;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
 }
+.ao-action:hover:not(:disabled) svg { opacity: 1; }
 .ao-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Primary — the main per-row action (Open settings). Filled dark. */
+.ao-action--primary {
+  background: #2A2724;
+  border-color: #2A2724;
+  color: #fff;
+}
+.ao-action--primary svg { opacity: 0.9; }
+.ao-action--primary:hover:not(:disabled) {
+  background: #0F0F0F;
+  border-color: #0F0F0F;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.ao-action--primary:hover:not(:disabled) svg { opacity: 1; }
 
 .ao-action--danger {
   color: #C4413B;
-  border-color: #F6B5AD;
+  border-color: #F1C4BD;
 }
 .ao-action--danger:hover:not(:disabled) {
-  background: #FEE7E3;
+  background: #FDECE9;
   color: #8E1F12;
-  border-color: #C4413B;
+  border-color: #E08278;
 }
 
 /* ── Confirm modal ──────────────────────────────────────────────────── */
@@ -574,6 +605,36 @@
 .og-toggle input:checked + .og-toggle__track .og-toggle__thumb { transform: translateX(14px); }
 .og-toggle input:focus-visible + .og-toggle__track { box-shadow: 0 0 0 3px rgba(26, 135, 55, 0.3); }
 .og-toggle__label { font-size: 11.5px; font-weight: 600; color: #6C6259; min-width: 78px; }
+/* Group-level toggle sits on its own left-aligned row (not pushed to the right
+   like the per-member toggles). */
+.og-toggle--row { display: flex; margin-left: 0; margin-top: 12px; }
+.og-toggle--row .og-toggle__label { min-width: 0; }
+
+/* ── Future vendors (coming-soon venues) ─────────────────────────────── */
+.og-fv__head { display: flex; align-items: center; gap: 8px; }
+.og-fv__count { font-size: 11px; font-weight: 700; color: #6C6259; background: rgba(0, 0, 0, 0.06); border-radius: 999px; padding: 1px 8px; }
+.og-fv__stats { background: #F7F4EF; border-radius: 12px; padding: 10px 12px; margin: 8px 0 12px; }
+.og-fv__stats-title { display: block; font-size: 11px; font-weight: 800; color: #6C6259; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.og-fv__stat { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.og-fv__stat-name { flex: 0 0 40%; font-size: 12px; font-weight: 600; color: #2A2724; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.og-fv__stat-bar { flex: 1; height: 6px; background: rgba(0, 0, 0, 0.08); border-radius: 3px; overflow: hidden; }
+.og-fv__stat-bar > span { display: block; height: 100%; background: #1A8737; border-radius: 3px; }
+.og-fv__stat-n { flex-shrink: 0; font-size: 12px; font-weight: 800; color: #1A8737; min-width: 18px; text-align: right; }
+.og-fv__list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
+.og-fv__row { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid rgba(0, 0, 0, 0.07); border-radius: 10px; padding: 6px 8px; }
+.og-fv__swatch { flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 13px; }
+.og-fv__fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.og-fv__coords { display: flex; gap: 4px; }
+.og-fv__input { border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 6px; padding: 4px 7px; font-family: inherit; font-size: 12px; color: #2A2724; min-width: 0; }
+.og-fv__input--name { font-weight: 700; }
+.og-fv__input--num { width: 60px; }
+.og-fv__input--color { width: 76px; }
+.og-fv__reqs { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #C4321B; min-width: 26px; text-align: right; }
+.og-fv__del { flex-shrink: 0; width: 24px; height: 24px; border: none; border-radius: 6px; background: rgba(0, 0, 0, 0.06); color: #6C6259; font-size: 16px; line-height: 1; cursor: pointer; }
+.og-fv__del:hover { background: rgba(196, 50, 27, 0.12); color: #C4321B; }
+.og-fv__add { display: flex; flex-direction: column; gap: 6px; background: #F7F4EF; border-radius: 10px; padding: 10px; margin-top: 8px; }
+.og-fv__add-actions { display: flex; gap: 6px; }
+.og-fv__save { display: flex; gap: 6px; margin-top: 10px; }
 
 .og-remove {
   background: transparent;

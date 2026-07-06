@@ -5,7 +5,29 @@ import cupIcon from '../assets/images/cup-icon.svg';
 import packperksLogo from '../assets/images/packperks-wordmark.svg';
 import { getGlobalImpact } from '../lib/api';
 import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
+import { getNotYetStores } from '../lib/notYetStores';
+import { detectImageBg, useImageBg } from '../lib/imageBg';
 import './StoresPage.css';
+
+const LockIcon = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
+// A tasteful, distinct brand colour per venue when none is set, derived
+// deterministically from the name so it's stable across renders.
+const BRAND_PALETTE = ['#E88E63', '#5FA96E', '#7C86D6', '#E0A12B', '#57C08D', '#D97E9B', '#4FA3C7', '#B06CC9', '#E0714E', '#3FA98C', '#C08A3E', '#6C8AE0'];
+function colorForName(name) {
+  const s = String(name || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return BRAND_PALETTE[h % BRAND_PALETTE.length];
+}
+function truncName(name, n = 15) {
+  const s = String(name || '').trim();
+  return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
+}
 
 /* ─────────────────────────────────────────────────────────────────────
  * StoresPage — Phase 3 multi-venue home for a store group.
@@ -43,11 +65,44 @@ function StoreMark({ store, variant }) {
   );
 }
 
+/* Coming-soon venue mark. If the logo has a transparent background it's tinted
+ * white on the venue colour; an opaque logo shows in its own colours, filling
+ * the tile with no gaps. Letter monogram when there's no logo. */
+function NotYetMark({ store }) {
+  const bg = useImageBg(store.logo_url);
+  if (!store.logo_url) {
+    return (
+      <span className="stores2__mark stores2__mark--notyet" style={{ background: store.color, color: '#fff' }} aria-hidden="true">
+        {(store.name || 'S').charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+  const state = bg === 'opaque' ? 'is-opaque' : 'is-transparent';
+  return (
+    <span className={`stores2__mark stores2__mark--notyet stores2__mark--brand ${state}`} style={{ background: store.color }} aria-hidden="true">
+      <img className="stores2__mark-img" src={store.logo_url} alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+    </span>
+  );
+}
+
 function Cups({ n, tone }) {
   return (
     <span className={`stores2__cups${tone ? ` stores2__cups--${tone}` : ''}`}>
       <img src={cupIcon} alt="" className="stores2__cups-icon" aria-hidden="true" />
       <strong>{n}</strong> {n === 1 ? 'cup' : 'cups'}
+    </span>
+  );
+}
+
+/* City chip shown next to the cups count. City only — no country. */
+function LocationChip({ city }) {
+  if (!city) return null;
+  return (
+    <span className="stores2__loc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="2.6" />
+      </svg>
+      {city}
     </span>
   );
 }
@@ -154,18 +209,39 @@ function escapeHtml(s) {
 /* Real map via Leaflet + OpenStreetMap tiles (free, no API key). Plots a
  * marker at each store's actual coordinates; the marker popup shows the
  * store name, address and cups, with a button to open that store. */
-function MapView({ stores, highlightId, onSelectStore }) {
+function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const onSelectRef = useRef(onSelectStore);
   onSelectRef.current = onSelectStore;
+  const onRequestRef = useRef(onRequestStore);
+  onRequestRef.current = onRequestStore;
 
   const withCoords = stores.filter(s => s.location?.lat != null && s.location?.lng != null);
+  const notYetCoords = notYetStores.filter(s => s.location?.lat != null && s.location?.lng != null);
   // Stable signature so markers only rebuild when the data really changes.
-  const sig = withCoords
-    .map(s => `${s.id}:${s.location.lat},${s.location.lng}:${s.balance}:${s.id === highlightId}`)
-    .join('|');
+  const sig = [
+    ...withCoords.map(s => `${s.id}:${s.location.lat},${s.location.lng}:${s.balance}:${s.id === highlightId}`),
+    ...notYetCoords.map(s => `n:${s.id}:${s.location.lat},${s.location.lng}`),
+  ].join('|');
+
+  // Detect whether each not-yet logo has a transparent background so the pin
+  // can render it white (transparent) or in its own colours (opaque).
+  const [logoBg, setLogoBg] = useState({});
+  const notYetLogos = notYetCoords.map(s => s.logo_url).filter(Boolean);
+  const notYetLogosKey = [...new Set(notYetLogos)].join('|');
+  useEffect(() => {
+    const urls = [...new Set(notYetLogos)];
+    if (!urls.length) return undefined;
+    let alive = true;
+    Promise.all(urls.map(u => detectImageBg(u).then(bg => [u, bg]))).then(pairs => {
+      if (alive) setLogoBg(prev => ({ ...prev, ...Object.fromEntries(pairs) }));
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notYetLogosKey]);
+  const logoBgSig = notYetCoords.map(s => `${s.id}:${logoBg[s.logo_url] || ''}`).join('|');
 
   // Create the map once.
   useEffect(() => {
@@ -181,10 +257,18 @@ function MapView({ stores, highlightId, onSelectStore }) {
     layerRef.current = L.layerGroup().addTo(map);
     map.setView([52.13, 5.29], 7); // Netherlands, until markers fit
     map.on('popupopen', (e) => {
-      const btn = e.popup.getElement()?.querySelector('.stores2__popup-btn');
+      const root = e.popup.getElement();
+      const btn = root?.querySelector('.stores2__popup-btn');
       if (btn) btn.onclick = () => {
         const st = stores.find(x => x.id === btn.dataset.id);
         if (st) onSelectRef.current?.(st);
+      };
+      const req = root?.querySelector('.stores2__popup-request');
+      if (req && !req.classList.contains('is-done')) req.onclick = () => {
+        onRequestRef.current?.({ id: req.dataset.id, name: req.dataset.name, area: req.dataset.area });
+        req.textContent = 'Requested';
+        req.disabled = true;
+        req.classList.add('is-done');
       };
     });
     setTimeout(() => map.invalidateSize(), 80);
@@ -200,13 +284,17 @@ function MapView({ stores, highlightId, onSelectStore }) {
     const pts = [];
     withCoords.forEach(s => {
       const isTop = s.id === highlightId;
-      const label = (s.name || 'S').charAt(0).toUpperCase();
+      const letter = (s.name || 'S').charAt(0).toUpperCase();
+      const pinInner = s.logo_url
+        ? `<img class="stores2__leaflet-logo" src="${escapeHtml(s.logo_url)}" alt="" />`
+        : escapeHtml(letter);
       const icon = L.divIcon({
         className: 'stores2__leaflet-icon',
-        html: `<span class="stores2__leaflet-pin${isTop ? ' is-current' : ''}" style="background:${s.brand_color || '#1A8737'}">${escapeHtml(label)}</span>`,
-        iconSize: [38, 38], iconAnchor: [19, 19], popupAnchor: [0, -18],
+        html: `<div class="stores2__pinwrap"><span class="stores2__leaflet-pin${isTop ? ' is-current' : ''}" style="background:${s.brand_color || '#1A8737'}">${pinInner}</span><span class="stores2__pinlabel">${escapeHtml(truncName(s.name))}</span></div>`,
+        iconSize: [112, 56], iconAnchor: [56, 19], popupAnchor: [0, -18],
       });
-      const marker = L.marker([s.location.lat, s.location.lng], { icon }).addTo(layer);
+      // Participating stores sit ABOVE the not-yet placeholders.
+      const marker = L.marker([s.location.lat, s.location.lng], { icon, zIndexOffset: 600 }).addTo(layer);
       const n = s.balance || 0;
       // Reward image for the thumbnail: featured first, else the first live
       // reward that has an image.
@@ -232,17 +320,45 @@ function MapView({ stores, highlightId, onSelectStore }) {
       );
       pts.push([s.location.lat, s.location.lng]);
     });
+    // Not-yet (non-participating) venues — muted, locked pins so the map reads
+    // as a real, dense network without implying these are live yet.
+    notYetCoords.forEach(s => {
+      const color = s.color || colorForName(s.name);
+      const inner = s.logo_url
+        ? `<img class="stores2__leaflet-logo" src="${escapeHtml(s.logo_url)}" alt="" />`
+        : escapeHtml((s.name || 'S').charAt(0).toUpperCase());
+      const logoState = s.logo_url ? (logoBg[s.logo_url] === 'opaque' ? 'is-opaque' : 'is-transparent') : '';
+      const icon = L.divIcon({
+        className: 'stores2__leaflet-icon',
+        html: `<div class="stores2__pinwrap stores2__pinwrap--notyet"><span class="stores2__leaflet-pin stores2__leaflet-pin--notyet ${logoState}" style="background:${color}">${inner}</span><span class="stores2__pinlabel stores2__pinlabel--notyet">${escapeHtml(truncName(s.name))}</span></div>`,
+        iconSize: [104, 52], iconAnchor: [52, 16], popupAnchor: [0, -14],
+      });
+      const marker = L.marker([s.location.lat, s.location.lng], { icon, zIndexOffset: 0 }).addTo(layer);
+      marker.bindPopup(
+        `<div class="stores2__popcard stores2__popcard--notyet">
+           <div class="stores2__popcard-top">
+             <span class="stores2__popcard-logo stores2__popcard-logo--letter stores2__popcard-logo--notyet">${escapeHtml((s.name || 'S').charAt(0).toUpperCase())}</span>
+             <div class="stores2__popcard-info">
+               <strong class="stores2__popcard-name">${escapeHtml(s.name)}</strong>
+               <span class="stores2__popcard-notyet">Not available yet</span>
+             </div>
+           </div>
+           <button type="button" class="stores2__popup-request" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-area="${escapeHtml(s.area || '')}">Request it</button>
+         </div>`,
+      );
+      pts.push([s.location.lat, s.location.lng]);
+    });
     if (pts.length === 1) map.setView(pts[0], 15);
     else if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
     setTimeout(() => map.invalidateSize(), 80);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig, highlightId]);
+  }, [sig, highlightId, logoBgSig]);
 
   return (
     <div className="stores2__map">
       <div ref={containerRef} className="stores2__map-canvas" />
-      {withCoords.length === 0 && (
-        <p className="stores2__map-hint">No store locations set yet — add an address in each store’s settings to place it on the map.</p>
+      {withCoords.length === 0 && notYetCoords.length === 0 && (
+        <p className="stores2__map-hint">No store locations to show yet.</p>
       )}
     </div>
   );
@@ -252,6 +368,7 @@ function MapView({ stores, highlightId, onSelectStore }) {
  * the whole PackPerks community saved, with a tangible comparison. */
 function StoresImpact({ personalCups }) {
   const [communityCups, setCommunityCups] = useState(null);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     let alive = true;
     getGlobalImpact().then(r => { if (alive) setCommunityCups(r?.totalLifetimeCups || 0); }).catch(() => {});
@@ -273,50 +390,118 @@ function StoresImpact({ personalCups }) {
     </svg>
   );
   return (
-    <div className="stores2__impact">
-      <span className="stores2__impact-title">Plastic avoided</span>
-      <div className="stores2__impact-squares">
-        <div className="stores2__impact-sq">
-          <span className="stores2__impact-icon"><LeafIcon /></span>
-          <span className="stores2__impact-val">{formatGrams(personalG)}</span>
-          <span className="stores2__impact-cap">you’ve avoided</span>
-        </div>
-        <div className="stores2__impact-sq stores2__impact-sq--community">
-          <span className="stores2__impact-icon"><GroupIcon /></span>
-          <span className="stores2__impact-val">{communityCups == null ? '…' : formatGrams(communityG)}</span>
-          <span className="stores2__impact-cap">by all PackPerks users together</span>
+    <>
+      {/* Fade the list into the background at the bottom so the floating
+          impact bar clearly stands out above the scrolling cards. */}
+      <div className="stores2__impact-fade" aria-hidden="true" />
+    <div className={`stores2__impact stores2__impact--floating${open ? ' is-open' : ''}`}>
+      {/* Anchored to the bottom of the viewport; the panel sits ABOVE the bar
+          so expanding reveals it upwards. When open the bar's number is hidden
+          (the panel already shows it) — only the chevron handle remains. */}
+      <div className="stores2__impact-panel">
+        <div className="stores2__impact-panel-inner">
+          <div className="stores2__impact-panel-pad">
+            <div className="stores2__impact-squares">
+              <div className="stores2__impact-sq">
+                <span className="stores2__impact-icon"><LeafIcon /></span>
+                <span className="stores2__impact-val">{formatGrams(personalG)}</span>
+                <span className="stores2__impact-cap">you’ve avoided</span>
+              </div>
+              <div className="stores2__impact-sq stores2__impact-sq--community">
+                <span className="stores2__impact-icon"><GroupIcon /></span>
+                <span className="stores2__impact-val">{communityCups == null ? '…' : formatGrams(communityG)}</span>
+                <span className="stores2__impact-cap">by all PackPerks users together</span>
+              </div>
+            </div>
+            <p className="stores2__impact-compare">
+              {personalCups > 0
+                ? <>That’s {pickComparison(personalCups)}.</>
+                : 'Bring your cup and scan to start saving plastic.'}
+            </p>
+          </div>
         </div>
       </div>
-      <p className="stores2__impact-compare">
-        {personalCups > 0
-          ? <>That’s {pickComparison(personalCups)}.</>
-          : 'Bring your cup and scan to start saving plastic.'}
-      </p>
+      {/* Folded: one compact bar with the community total. Tap to expand the
+          panel above it (chevron points up when folded, down when open). When
+          open the icon + number hide (the panel repeats them) — chevron stays. */}
+      <button type="button" className="stores2__impact-bar" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={open ? 'Hide impact detail' : 'Show impact detail'}>
+        <span className="stores2__impact-bar-icon"><GroupIcon /></span>
+        <span className="stores2__impact-bar-text"><strong>{communityCups == null ? '…' : formatGrams(communityG)}</strong> plastic avoided together</span>
+        <svg className="stores2__impact-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
+      </button>
     </div>
+    </>
   );
 }
 
-const DEFAULT_INTRO = 'Bring your own cup, scan the QR, and earn cashback at every participating venue.';
+const DEFAULT_INTRO = 'Bring your own cup to any café below and scan the QR to collect cups — then turn them into real cashback. New here? Just pick a store to start.';
 
 export default function StoresPage({
   group,
   intro,
   stores = [],
   personalCups = 0,
+  region = 'NL',
+  showNotYet = true,
+  notYetStores = null,
   onSelectStore,
   onOpenAccount,
   onOpenGuide,
   onScanCup,
+  onRequestStore,
 }) {
   const [view, setView] = useState('list');
+  const [query, setQuery] = useState('');
+  const [requested, setRequested] = useState(() => new Set());
 
-  // The store you have the most cups at leads; the rest follow alphabetically.
-  const sorted = useMemo(
-    () => [...stores].sort((a, b) => (b.balance || 0) - (a.balance || 0) || (a.name || '').localeCompare(b.name || '')),
-    [stores],
-  );
-  const hero = sorted[0] || null;
-  const others = sorted.slice(1);
+  const q = query.trim().toLowerCase();
+  const matchQ = (s) => !q || `${s.name || ''} ${s.area || ''}`.toLowerCase().includes(q);
+
+  // Fixed order: most cups first, then alphabetical.
+  const cmpCupsThenName = (a, b) =>
+    (b.balance || 0) - (a.balance || 0) || (a.name || '').localeCompare(b.name || '');
+
+  // Participating stores — filtered by search, then ordered cups-first / A→Z.
+  const sortedStores = useMemo(() => {
+    return stores.filter(matchQ).sort(cmpCupsThenName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stores, q]);
+
+  // "Coming soon" venues — admin-edited list from the group config when present,
+  // otherwise the curated region defaults. Each gets a stable brand colour.
+  const notYet = useMemo(() => {
+    if (!showNotYet) return [];
+    const src = (Array.isArray(notYetStores) && notYetStores.length) ? notYetStores : getNotYetStores(region);
+    return src.map((v, i) => ({
+      id: v.id || `notyet-${region}-${i}`,
+      name: v.name,
+      area: v.area,
+      location: { lat: v.lat, lng: v.lng },
+      color: v.color || colorForName(v.name),
+      logo_url: v.logo_url || null,
+      notYet: true,
+      balance: 0,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [region, showNotYet, notYetStores]);
+  const filteredNotYet = useMemo(() => {
+    return notYet.filter(matchQ).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notYet, q]);
+
+  // The lead "hero" (your top store) only fits the default, unsearched view.
+  const showHero = !q;
+  const hero = showHero ? sortedStores[0] || null : null;
+  const others = hero ? sortedStores.slice(1) : sortedStores;
+  const topId = (stores.slice().sort((a, b) => (b.balance || 0) - (a.balance || 0))[0] || {}).id;
+
+  const handleRequest = (s) => {
+    const key = s.id || s.name;
+    setRequested(prev => { const n = new Set(prev); n.add(key); return n; });
+    onRequestStore?.(s);
+  };
+  const isRequested = (s) => requested.has(s.id || s.name);
+  const noResults = q && sortedStores.length === 0 && filteredNotYet.length === 0;
 
   return (
     <div className="stores2">
@@ -345,29 +530,64 @@ export default function StoresPage({
         </div>
       </header>
 
-      {/* Headline + system explanation — full-width; intro editable per group. */}
+      {/* Newcomer-focused headline + value prop — this is the entry page for
+          first-time users, so it sells the reward, not just "browse stores". */}
       <div className="stores2__intro-block">
-        <h1 className="stores2__headline">Discover all venues</h1>
+        <h1 className="stores2__headline">Get <span className="stores2__headline-accent">cashback</span> for your reusable cup</h1>
         <p className="stores2__intro">{intro || DEFAULT_INTRO}</p>
       </div>
 
-      {/* View toggle */}
-      <div className="stores2__viewtoggle" role="radiogroup" aria-label="View">
-        <button type="button" role="radio" aria-checked={view === 'list'} className={`stores2__viewopt ${view === 'list' ? 'is-on' : ''}`} onClick={() => setView('list')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-          List
-        </button>
-        <button type="button" role="radio" aria-checked={view === 'map'} className={`stores2__viewopt ${view === 'map' ? 'is-on' : ''}`} onClick={() => setView('map')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg>
-          Map
+      {/* Search + view switch — filters both the list and the map at once.
+          Stores are always ordered by your cups first, then alphabetically,
+          so there are no sort controls — just a rectangular Map/List toggle. */}
+      <div className="stores2__filterbar">
+        <div className={`stores2__search${q ? ' is-filled' : ''}`}>
+          <svg className="stores2__search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+          <input
+            type="text"
+            className="stores2__search-input"
+            placeholder="Search stores or areas…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search stores"
+          />
+          {query && (
+            <button type="button" className="stores2__search-clear" onClick={() => setQuery('')} aria-label="Clear search">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          className="stores2__mapbtn"
+          onClick={() => setView(view === 'map' ? 'list' : 'map')}
+          aria-pressed={view === 'map'}
+        >
+          {view === 'map' ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+              List view
+            </>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg>
+              Map view
+            </>
+          )}
         </button>
       </div>
 
       {view === 'map' ? (
-        <MapView stores={stores} highlightId={hero?.id} onSelectStore={onSelectStore} />
+        <MapView
+          stores={sortedStores}
+          notYetStores={filteredNotYet}
+          highlightId={topId}
+          onSelectStore={onSelectStore}
+          onRequestStore={handleRequest}
+        />
       ) : (
         <>
-          {/* Lead store — where you have the most cups */}
+          {/* Lead store — where you have the most cups (default view only) */}
           {hero && (
             <button type="button" className="stores2__hero" onClick={() => onSelectStore?.(hero)}>
               <div className="stores2__hero-logo" style={{ background: hero.brand_color || 'var(--bk-green, #1A8737)' }}>
@@ -377,7 +597,10 @@ export default function StoresPage({
               </div>
               <div className="stores2__hero-body">
                 <span className="stores2__hero-name">{hero.name}</span>
-                <Cups n={hero.balance || 0} tone="brand" />
+                <div className="stores2__chips">
+                  <Cups n={hero.balance || 0} tone="brand" />
+                  <LocationChip city={hero.location?.city} />
+                </div>
                 {(hero.rewards?.length || hero.featured) && (
                   <HeroFeatured
                     rewards={hero.rewards}
@@ -386,12 +609,12 @@ export default function StoresPage({
                   />
                 )}
               </div>
-              <svg className="stores2__hero-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18" /></svg>
             </button>
           )}
 
-          {/* Other stores */}
-          {others.length > 0 && (
+          {/* One unified list — participating stores first (cups, then A→Z),
+              then the curated coming-soon venues (alphabetical). */}
+          {(others.length > 0 || filteredNotYet.length > 0) && (
             <ul className="stores2__list">
               {others.map((s, idx) => (
                 <li key={s.id}>
@@ -399,18 +622,43 @@ export default function StoresPage({
                     <StoreMark store={s} />
                     <div className="stores2__card-body">
                       <span className="stores2__card-name">{s.name}</span>
-                      <Cups n={s.balance || 0} />
+                      <div className="stores2__chips">
+                        <Cups n={s.balance || 0} />
+                        <LocationChip city={s.location?.city} />
+                      </div>
                     </div>
                     <RewardThumb rewards={s.rewards} fallback={s.featured?.image} delay={(idx + 1) * 450} />
-                    <svg className="stores2__card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18" /></svg>
                   </button>
+                </li>
+              ))}
+              {filteredNotYet.map((s) => (
+                <li key={s.id}>
+                  <div className="stores2__card stores2__card--notyet">
+                    <NotYetMark store={s} />
+                    <div className="stores2__card-body">
+                      <span className="stores2__card-name">{s.name}</span>
+                      <span className="stores2__notyet-status"><LockIcon /> Not available yet</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`stores2__request-btn${isRequested(s) ? ' is-done' : ''}`}
+                      onClick={() => handleRequest(s)}
+                      disabled={isRequested(s)}
+                    >
+                      {isRequested(s) ? 'Requested' : 'Request it'}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
 
-          {/* Plastic-avoided impact (list view only) */}
-          <StoresImpact personalCups={personalCups} />
+          {noResults && <p className="stores2__noresults">No stores match “{query}”.</p>}
+
+          {/* Plastic-avoided impact — a fixed floating bar (list view only). The
+              spacer reserves scroll clearance so the last card clears the bar. */}
+          {!q && <div className="stores2__impact-spacer" aria-hidden="true" />}
+          {!q && <StoresImpact personalCups={personalCups} />}
         </>
       )}
     </div>

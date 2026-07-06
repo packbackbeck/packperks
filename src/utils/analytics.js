@@ -50,6 +50,7 @@ const EVENTS = {
   NAME_EDIT_OPENED:       'name_edit_opened',
   NAME_REGENERATED:       'name_regenerated',
   REWARD_CARD_OPENED:     'reward_card_opened',
+  STORE_REQUESTED:        'store_requested',   // "Request it" on a coming-soon venue
   // ── In-app browser redirect (Android) ──
   INAPP_PROMPT_SHOWN:     'inapp_prompt_shown',
   OPEN_IN_DEFAULT_BROWSER:'open_in_default_browser',
@@ -83,6 +84,7 @@ const PERSISTED = new Set([
   EVENTS.NAME_EDIT_OPENED,
   EVENTS.NAME_REGENERATED,
   EVENTS.REWARD_CARD_OPENED,
+  EVENTS.STORE_REQUESTED,
 ]);
 
 /**

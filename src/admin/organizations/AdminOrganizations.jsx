@@ -139,13 +139,26 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
             data is preserved and can be restored.
           </p>
         </div>
-        <button className="ao-btn ao-btn--primary" onClick={onAddOrg}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Add organisation
-        </button>
+        <div className="ao-header__actions">
+          <button
+            className="ao-btn ao-btn--mockup"
+            onClick={() => window.open('/mockup', '_blank', 'noopener')}
+            title="Open MockupMaster — build a pitch mockup without creating an org"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="6" y="2" width="12" height="20" rx="3" />
+              <line x1="10" y1="18" x2="14" y2="18" />
+            </svg>
+            MockupMaster
+          </button>
+          <button className="ao-btn ao-btn--primary" onClick={onAddOrg}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add organisation
+          </button>
+        </div>
       </header>
 
       {error && <div className="ao-error">{error}</div>}
@@ -231,12 +244,16 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                     <td onClick={e => e.stopPropagation()}>
                       <div className="ao-actions">
                         {!isDeleted && (
-                          <button className="ao-action" onClick={() => handleOpen(org.id)}>
-                            Open settings
+                          <button className="ao-action ao-action--primary" onClick={() => handleOpen(org.id)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>
+                            <span>Open settings</span>
                           </button>
                         )}
                         {!isDeleted && !isActive && (
-                          <button className="ao-action" onClick={() => handleSwitch(org.id)}>Switch to</button>
+                          <button className="ao-action" onClick={() => handleSwitch(org.id)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+                            <span>Switch to</span>
+                          </button>
                         )}
                         {!isDeleted && (
                           <button
@@ -245,7 +262,8 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                             disabled={duplicatingId === org.id}
                             title="Create a new org with this org's settings, copy, and rewards. Stats start empty."
                           >
-                            {duplicatingId === org.id ? 'Duplicating…' : 'Duplicate'}
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                            <span>{duplicatingId === org.id ? 'Duplicating…' : 'Duplicate'}</span>
                           </button>
                         )}
                         {!isDeleted && (
@@ -255,11 +273,15 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                             disabled={orgs.filter(o => !o.deleted_at).length <= 1}
                             title={orgs.filter(o => !o.deleted_at).length <= 1 ? "Can't delete the last active org" : ''}
                           >
-                            Soft delete
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                            <span>Soft delete</span>
                           </button>
                         )}
                         {isDeleted && (
-                          <button className="ao-action" onClick={() => handleRestore(org.id)}>Restore</button>
+                          <button className="ao-action" onClick={() => handleRestore(org.id)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                            <span>Restore</span>
+                          </button>
                         )}
                       </div>
                     </td>

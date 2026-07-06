@@ -141,6 +141,18 @@ const NAV_ITEMS = [
     ),
   },
   {
+    id: 'futurevendors',
+    label: 'Future Vendors',
+    /* Map pin + plus — nearby "coming soon" venues shown on the Stores map. */
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z" />
+        <path d="M12 7v6" />
+        <path d="M9 10h6" />
+      </svg>
+    ),
+  },
+  {
     id: 'reports',
     label: 'Reports',
     icon: (
@@ -194,7 +206,7 @@ const ROLE_VISIBLE_TABS = {
   // Manager + Checker also see the Org tab (read-only) so they know
   // where they work; the editing controls inside are gated by
   // PermissionGate so they're disabled.
-  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'reports', 'stats', 'behaviour']),
+  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'futurevendors', 'reports', 'stats', 'behaviour']),
   checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour']),
 };
 

@@ -108,7 +108,7 @@ export const COPY_PRESETS = {
     heroHeadline: 'Bring your cup, earn cashback',
     heroSubtext:  'Use your own reusable cup and collect rewards every time you refill.',
     // Intro line under the logo on the multi-venue Stores page.
-    storesIntro:  'Bring your own cup, scan the QR at the counter, and earn cashback rewards — your cups are saved separately at each participating store.',
+    storesIntro:  'Bring your own cup to any café below and scan the QR to collect cups — then turn them into real cashback. New here? Just pick a store to start.',
     designCopy: {
       badgeText:         'My Cups',
       shareButtonLabel:  'Share a cup',

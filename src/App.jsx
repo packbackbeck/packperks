@@ -1299,6 +1299,10 @@ export default function App() {
     // Total cups this person has collected across the group (lifetime), for
     // the plastic-avoided impact panel.
     const personalCups = Object.values(groupBalances).reduce((sum, b) => sum + (b?.lifetime || 0), 0);
+    // Region drives the curated "coming soon" venue list; admins can hide those
+    // via the group setting (default on).
+    const storesRegion = /uae|dubai|emirat|abu\s*dhabi/i.test(`${groupCtx?.group?.slug || ''} ${groupCtx?.group?.name || ''}`) ? 'UAE' : 'NL';
+    const showNotYetStores = groupCtx?.groupConfig?.settings?.showNotYetStores !== false;
     return (
       <>
         <StoresPage
@@ -1306,6 +1310,10 @@ export default function App() {
           intro={groupCopy?.storesIntro}
           stores={storeCards}
           personalCups={personalCups}
+          region={storesRegion}
+          showNotYet={showNotYetStores}
+          notYetStores={groupCtx?.groupConfig?.settings?.notYetVendors || null}
+          onRequestStore={(s) => track('store_requested', { name: s?.name, area: s?.area, region: storesRegion })}
           onSelectStore={(store) => {
             // Open the store within the group: /<groupSlug>/<orgSlug>.
             if (groupSlug && store?.slug) window.location.href = `/${groupSlug}/${store.slug}`;

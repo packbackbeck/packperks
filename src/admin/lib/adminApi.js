@@ -2542,6 +2542,59 @@ export async function saveGroupCopy(groupId, copy) {
   return value;
 }
 
+/* Toggle the group's curated "coming soon / not-yet" placeholder venues on the
+ * customer Stores map + list. Stored on the group config; the customer app
+ * reads settings.showNotYetStores (default on when unset). */
+export async function setGroupNotYetStores(groupId, show) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { settings: { mode: 'deposit' } };
+  value.settings = value.settings || {};
+  value.settings.showNotYetStores = !!show;
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
+/* Save the group's editable "Future vendors" list (the coming-soon venues shown
+ * on the customer Stores page). Stored on the group config; the customer app
+ * reads settings.notYetVendors, falling back to the curated region defaults. */
+export async function saveNotYetVendors(groupId, vendors) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { settings: { mode: 'deposit' } };
+  value.settings = value.settings || {};
+  value.settings.notYetVendors = Array.isArray(vendors) ? vendors : [];
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
+/* Count "Request it" taps per future vendor (from client_events), so admins can
+ * see which coming-soon venue customers want most. Returns { name: count }. */
+export async function getFutureVendorStats(region) {
+  const { data, error } = await supabase
+    .from('client_events').select('props').eq('event', 'store_requested');
+  if (error) return {};
+  const counts = {};
+  (data || []).forEach(r => {
+    const p = r.props || {};
+    if (region && p.region && p.region !== region) return;
+    if (p.name) counts[p.name] = (counts[p.name] || 0) + 1;
+  });
+  return counts;
+}
+
 /* Drop all copy overrides → the group reverts to its mode preset. */
 export async function resetGroupCopy(groupId) {
   const key = GROUP_CFG_KEY(groupId);

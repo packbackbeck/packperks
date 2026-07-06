@@ -12,6 +12,9 @@
     <!-- iOS home-screen bookmark icon (when users "Add to Home Screen").
          Re-uses the same SVG; iOS renders it at 180×180 on a white tile. -->
     <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- Self-hosted DM Sans (no third-party font CDN). Preload the primary
+         weight so first paint isn't blocked on the font. -->
+    <link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>

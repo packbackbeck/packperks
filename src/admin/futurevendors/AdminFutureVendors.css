@@ -45,6 +45,12 @@
 
 /* ── Toggle card ────────────────────────────────────────────────────── */
 .afv__togglecard { display: flex; align-items: center; gap: 16px; }
+.afv__thresh {
+  flex-shrink: 0; margin-left: auto; width: 76px; padding: 9px 10px; text-align: center;
+  border: 1px solid #DDD5C8; border-radius: 9px; background: #fff;
+  font-family: inherit; font-size: 16px; font-weight: 800; color: #672BFF;
+}
+.afv__thresh:focus { outline: none; border-color: #672BFF; box-shadow: 0 0 0 3px rgba(103, 43, 255, 0.14); }
 .afv__toggle-txt { display: flex; flex-direction: column; gap: 3px; }
 .afv__toggle-txt strong { font-size: 14px; font-weight: 700; color: #0F0F0F; }
 .afv__toggle-txt span { font-size: 12.5px; color: #6C6259; line-height: 1.45; }

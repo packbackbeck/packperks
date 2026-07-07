@@ -20,9 +20,10 @@ import './MockupMaster.css';
 export default function MockupMaster() {
   const [config, setConfig] = usePersistedState('mockup_draft', cloneConfig(DEFAULT_CONFIG));
   const [currentId, setCurrentId] = usePersistedState('mockup_current_id', null);
-  const [name, setName] = usePersistedState('mockup_current_name', 'Untitled mockup');
+  const [name, setName] = usePersistedState('mockup_current_name', '');
   const [framed, setFramed] = usePersistedState('mockup_framed', true);
-  const [zoom, setZoom] = usePersistedState('mockup_zoom', 0.85);
+  const [zoom, setZoom] = usePersistedState('mockup_zoom', 0.65);
+  const nameRef = useRef(null);
 
   const [session, setSession] = useState(undefined); // undefined = loading
   const [library, setLibrary] = useState([]);
@@ -71,8 +72,15 @@ export default function MockupMaster() {
     } catch { return null; }
   }
 
+  function requireName() {
+    if (name.trim()) return true;
+    flash('Give your mockup a name first.');
+    nameRef.current?.focus();
+    return false;
+  }
+
   async function handleSave() {
-    if (!requireSession()) return;
+    if (!requireName() || !requireSession()) return;
     setBusy(true);
     try {
       const thumb = await captureThumb();
@@ -88,7 +96,7 @@ export default function MockupMaster() {
   }
 
   async function handleSaveAsNew() {
-    if (!requireSession()) return;
+    if (!requireName() || !requireSession()) return;
     setBusy(true);
     try {
       const thumb = await captureThumb();
@@ -103,7 +111,7 @@ export default function MockupMaster() {
   }
 
   function handleNew() {
-    setConfig(cloneConfig(DEFAULT_CONFIG)); setCurrentId(null); setName('Untitled mockup');
+    setConfig(cloneConfig(DEFAULT_CONFIG)); setCurrentId(null); setName('');
   }
 
   async function handleDelete(m) {
@@ -180,11 +188,12 @@ export default function MockupMaster() {
         </div>
 
         <input
+          ref={nameRef}
           className="mockup-name"
           value={name}
           onChange={e => setName(e.target.value)}
           aria-label="Mockup name"
-          placeholder="Mockup name"
+          placeholder="Name your mockup…"
         />
 
         <div className="mockup-toolbar">
@@ -200,10 +209,6 @@ export default function MockupMaster() {
           <input ref={csvRef} type="file" accept=".csv,text/csv" hidden onChange={handleCsvUpload} />
           <button className="mockup-btn" onClick={copyPrompt} title="Copy an AI prompt that researches a business and returns a ready-to-upload CSV">Copy AI prompt</button>
           <span className="mockup-toolbar__sep" />
-          <label className="mockup-switch" title="Wrap the preview in an iPhone frame">
-            <input type="checkbox" checked={framed} onChange={e => setFramed(e.target.checked)} />
-            <span>iPhone frame</span>
-          </label>
           <button className="mockup-btn mockup-btn--accent" onClick={exportPng} disabled={busy}>Export PNG</button>
         </div>
       </header>
@@ -220,7 +225,12 @@ export default function MockupMaster() {
             <button className="mockup-zoombtn" onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))} aria-label="Zoom out">−</button>
             <span className="mockup-zoomval">{Math.round(zoom * 100)}%</span>
             <button className="mockup-zoombtn" onClick={() => setZoom(z => Math.min(1.6, +(z + 0.1).toFixed(2)))} aria-label="Zoom in">+</button>
-            <button className="mockup-zoombtn mockup-zoombtn--reset" onClick={() => setZoom(0.85)} title="Reset zoom">Reset</button>
+            <button className="mockup-zoombtn mockup-zoombtn--reset" onClick={() => setZoom(0.65)} title="Reset zoom">Reset</button>
+            <span className="mockup-zoombar__sep" />
+            <label className="mockup-switch" title="Wrap the preview in an iPhone frame">
+              <input type="checkbox" checked={framed} onChange={e => setFramed(e.target.checked)} />
+              <span>iPhone frame</span>
+            </label>
           </div>
           <div className="mockup-stage">
             <div className="mockup-zoomwrap" style={{ transform: `scale(${zoom})` }}>

@@ -1313,6 +1313,7 @@ export default function App() {
           region={storesRegion}
           showNotYet={showNotYetStores}
           notYetStores={groupCtx?.groupConfig?.settings?.notYetVendors || null}
+          notYetThreshold={groupCtx?.groupConfig?.settings?.notYetThreshold || 10}
           onRequestStore={(s) => track('store_requested', { name: s?.name, area: s?.area, region: storesRegion })}
           onSelectStore={(store) => {
             // Open the store within the group: /<groupSlug>/<orgSlug>.

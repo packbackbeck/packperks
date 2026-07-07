@@ -3,6 +3,7 @@ import { useOrg } from '../context/OrgContext';
 import {
   listOrgGroups,
   setGroupNotYetStores,
+  saveNotYetThreshold,
   saveNotYetVendors,
   getFutureVendorStats,
 } from '../lib/adminApi';
@@ -127,6 +128,13 @@ export default function AdminFutureVendors() {
             </label>
           </div>
 
+          <ThresholdSetting
+            key={`thresh-${group.id}`}
+            group={group}
+            busy={busy}
+            onSave={(n) => run(() => saveNotYetThreshold(group.id, n))}
+          />
+
           <VendorManager
             key={group.id}
             group={group}
@@ -136,6 +144,36 @@ export default function AdminFutureVendors() {
           />
         </>
       )}
+    </div>
+  );
+}
+
+/* The "request goal" — how many customer requests a venue needs before it
+ * reads as "Coming soon" on the customer Stores page. */
+function ThresholdSetting({ group, busy, onSave }) {
+  const current = group?.config?.settings?.notYetThreshold ?? 10;
+  const [val, setVal] = useState(String(current));
+  useEffect(() => { setVal(String(current)); }, [current]);
+  const commit = () => {
+    const n = Math.max(1, Math.round(Number(val) || 10));
+    setVal(String(n));
+    if (n !== current) onSave(n);
+  };
+  return (
+    <div className="afv__card afv__togglecard">
+      <div className="afv__toggle-txt">
+        <strong>Request goal</strong>
+        <span>How many “Request it” taps a venue needs before it reads as “Coming soon”. Shown as a progress bar (e.g. 4/{val || 10}) on each locked card.</span>
+      </div>
+      <input
+        type="number" className="afv__thresh" min="1" max="999"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+        disabled={busy}
+        aria-label="Request goal"
+      />
     </div>
   );
 }

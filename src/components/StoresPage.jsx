@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import packperksLogo from '../assets/images/packperks-wordmark.svg';
 import { getGlobalImpact } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
 import { getNotYetStores } from '../lib/notYetStores';
 import { detectImageBg, useImageBg } from '../lib/imageBg';
@@ -88,8 +89,11 @@ function NotYetMark({ store }) {
 function Cups({ n, tone }) {
   return (
     <span className={`stores2__cups${tone ? ` stores2__cups--${tone}` : ''}`}>
-      <img src={cupIcon} alt="" className="stores2__cups-icon" aria-hidden="true" />
-      <strong>{n}</strong> {n === 1 ? 'cup' : 'cups'}
+      <svg className="stores2__cups-icon" viewBox="0 0 33 32" fill="currentColor" aria-hidden="true">
+        <path d="M25.5327 6.54688H6.71919C5.97702 6.54688 5.37537 7.1331 5.37537 7.85624V10.475C5.37537 11.1981 5.97702 11.7843 6.71919 11.7843H25.5327C26.2749 11.7843 26.8765 11.1981 26.8765 10.475V7.85624C26.8765 7.1331 26.2749 6.54688 25.5327 6.54688Z" />
+        <path d="M8.06299 11.7843L10.0787 26.1873H22.1731L24.1889 11.7843Z" />
+      </svg>
+      <strong>{n}</strong>
     </span>
   );
 }
@@ -436,6 +440,12 @@ function StoresImpact({ personalCups }) {
 
 const DEFAULT_INTRO = 'Bring your own cup to any café below and scan the QR to collect cups — then turn them into real cashback. New here? Just pick a store to start.';
 
+/* Pull the city from a free-form area string ("De Pijp, Amsterdam" → "Amsterdam"). */
+function cityFromArea(area) {
+  const parts = String(area || '').split(',').map(s => s.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+
 export default function StoresPage({
   group,
   intro,
@@ -444,6 +454,7 @@ export default function StoresPage({
   region = 'NL',
   showNotYet = true,
   notYetStores = null,
+  notYetThreshold = 10,
   onSelectStore,
   onOpenAccount,
   onOpenGuide,
@@ -453,6 +464,21 @@ export default function StoresPage({
   const [view, setView] = useState('list');
   const [query, setQuery] = useState('');
   const [requested, setRequested] = useState(() => new Set());
+  // How many customers have tapped "Request it" per coming-soon venue (name →
+  // count), read from an aggregate RPC so it works for anonymous visitors.
+  const [reqCounts, setReqCounts] = useState({});
+  useEffect(() => {
+    let alive = true;
+    supabase.rpc('vendor_request_counts', { p_region: region })
+      .then(({ data }) => {
+        if (!alive || !Array.isArray(data)) return;
+        const m = {};
+        data.forEach(r => { if (r.name) m[r.name] = Number(r.count) || 0; });
+        setReqCounts(m);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [region]);
 
   const q = query.trim().toLowerCase();
   const matchQ = (s) => !q || `${s.name || ''} ${s.area || ''}`.toLowerCase().includes(q);
@@ -497,7 +523,10 @@ export default function StoresPage({
 
   const handleRequest = (s) => {
     const key = s.id || s.name;
+    if (requested.has(key)) return;
     setRequested(prev => { const n = new Set(prev); n.add(key); return n; });
+    // Optimistically count this tap so the progress bar moves immediately.
+    setReqCounts(prev => ({ ...prev, [s.name]: (prev[s.name] || 0) + 1 }));
     onRequestStore?.(s);
   };
   const isRequested = (s) => requested.has(s.id || s.name);
@@ -631,25 +660,45 @@ export default function StoresPage({
                   </button>
                 </li>
               ))}
-              {filteredNotYet.map((s) => (
-                <li key={s.id}>
-                  <div className="stores2__card stores2__card--notyet">
-                    <NotYetMark store={s} />
-                    <div className="stores2__card-body">
-                      <span className="stores2__card-name">{s.name}</span>
-                      <span className="stores2__notyet-status"><LockIcon /> Not available yet</span>
+              {filteredNotYet.map((s) => {
+                const threshold = Math.max(1, Number(notYetThreshold) || 10);
+                const count = reqCounts[s.name] || 0;
+                const reached = count >= threshold;
+                const pct = Math.min(100, Math.round((count / threshold) * 100));
+                const done = isRequested(s);
+                const city = cityFromArea(s.area);
+                return (
+                  <li key={s.id}>
+                    <div className="stores2__card stores2__card--notyet">
+                      <NotYetMark store={s} />
+                      <div className="stores2__card-body">
+                        <span className="stores2__card-name">{s.name}</span>
+                        <div className="stores2__notyet-meta">
+                          <span className="stores2__notyet-status"><LockIcon /> Not available yet</span>
+                          {city && <LocationChip city={city} />}
+                        </div>
+                      </div>
+                      <div className="stores2__notyet-cta">
+                        {/* The request goal fills the button background (grey → black). */}
+                        <button
+                          type="button"
+                          className={`stores2__request-btn${done ? ' is-done' : ''}`}
+                          onClick={() => handleRequest(s)}
+                          disabled={done}
+                        >
+                          <span className="stores2__request-fill" style={{ width: `${pct}%` }} aria-hidden="true" />
+                          <span className="stores2__request-label">{done ? 'Requested' : 'Request'}</span>
+                        </button>
+                        {reached
+                          ? <span className="stores2__request-count stores2__request-count--soon">Coming soon</span>
+                          : count > 0
+                            ? <span className="stores2__request-count">{count}/{threshold} · {threshold - count} to go</span>
+                            : null}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      className={`stores2__request-btn${isRequested(s) ? ' is-done' : ''}`}
-                      onClick={() => handleRequest(s)}
-                      disabled={isRequested(s)}
-                    >
-                      {isRequested(s) ? 'Requested' : 'Request it'}
-                    </button>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
 

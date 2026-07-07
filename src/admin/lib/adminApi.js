@@ -2561,6 +2561,24 @@ export async function setGroupNotYetStores(groupId, show) {
   return value;
 }
 
+/* How many customer "Request it" taps a coming-soon venue needs before it reads
+ * as "coming soon" on the Stores page. Stored on the group config (default 10). */
+export async function saveNotYetThreshold(groupId, threshold) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { settings: { mode: 'deposit' } };
+  value.settings = value.settings || {};
+  value.settings.notYetThreshold = Math.max(1, Math.round(Number(threshold) || 10));
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
 /* Save the group's editable "Future vendors" list (the coming-soon venues shown
  * on the customer Stores page). Stored on the group config; the customer app
  * reads settings.notYetVendors, falling back to the curated region defaults. */

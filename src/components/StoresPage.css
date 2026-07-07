@@ -94,15 +94,28 @@
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 12.5px; font-weight: 600; color: var(--text-light, #8A8175);
 }
+/* status + city chip share a row under the venue name. */
+.stores2__notyet-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* Right column: the Request button + the request-goal caption below it. */
+.stores2__notyet-cta { flex-shrink: 0; align-self: center; display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+/* The request goal fills the button background: grey track → black fill. The
+   label uses difference blend so it stays readable over both. */
 .stores2__request-btn {
-  flex-shrink: 0; align-self: center; padding: 8px 15px; border: none; border-radius: 999px;
-  background: #1A1A1A; color: #fff;
+  position: relative; overflow: hidden; min-width: 98px;
+  padding: 8px 16px; border: none; border-radius: 999px;
+  background: #484848; color: #fff;
   font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
-  transition: transform 0.14s ease, filter 0.14s ease, background 0.14s ease;
+  transition: transform 0.12s ease;
 }
-.stores2__request-btn:hover { filter: brightness(1.06); }
+.stores2__request-fill {
+  position: absolute; inset: 0; width: 0; background: #050505;
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.stores2__request-label { position: relative; z-index: 1; color: #fff; }
 .stores2__request-btn:active { transform: scale(0.96); }
-.stores2__request-btn.is-done { background: rgba(0, 0, 0, 0.06); color: var(--text-muted, #6C6259); cursor: default; }
+.stores2__request-btn.is-done { cursor: default; }
+.stores2__request-count { font-size: 11px; font-weight: 700; color: var(--text-light, #8A8175); text-align: center; white-space: nowrap; }
+.stores2__request-count--soon { color: #12703F; }
 .stores2__noresults { margin: 18px 0; text-align: center; font-size: 14px; color: var(--text-light, #8A8175); }
 
 /* Not-yet map pin — the venue's colour + initial (or logo), slightly smaller
@@ -244,16 +257,17 @@
 }
 .stores2__card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .stores2__card-name { font-size: 17px; font-weight: 800; color: var(--black, #1a1a1a); }
-/* cups + city chips sit on one row. */
-.stores2__chips { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* cups + city chips always sit on one row (no wrap). */
+.stores2__chips { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; min-width: 0; }
 /* Highlighted cups chip — a soft green pill so the count pops. */
 .stores2__cups {
-  display: inline-flex; align-items: center; gap: 5px;
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
   font-size: 13px; color: #2A2724;
-  background: rgba(26, 135, 55, 0.12); border-radius: 999px; padding: 3px 11px 3px 7px;
+  background: rgba(26, 135, 55, 0.12); border-radius: 999px; padding: 3px 10px 3px 7px;
 }
 .stores2__cups strong { font-size: 15px; color: #12703F; font-weight: 800; }
-.stores2__cups-icon { width: 17px; height: 17px; opacity: 0.95; }
+/* Filled cup glyph — dark green, matching the count colour. */
+.stores2__cups-icon { width: 15px; height: 15px; color: #12703F; display: block; }
 .stores2__cups--brand strong { color: #12703F; }
 /* City chip — neutral pill with a pin. */
 .stores2__loc {

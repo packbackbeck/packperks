@@ -31,8 +31,11 @@ const supabase = createClient(
   { auth: { persistSession: false } },
 );
 
-const API_KEY = Deno.env.get("TIKKIE_API_KEY") ?? "";
-const APP_TOKEN = Deno.env.get("TIKKIE_APP_TOKEN") ?? "";
+// .trim() is defensive: a secret pasted into the Supabase dashboard with a
+// trailing newline/space would otherwise be sent verbatim in the header and
+// rejected as "API Key is invalid for the requested resource".
+const API_KEY = (Deno.env.get("TIKKIE_API_KEY") ?? "").trim();
+const APP_TOKEN = (Deno.env.get("TIKKIE_APP_TOKEN") ?? "").trim();
 const BASE = (
   Deno.env.get("TIKKIE_API_BASE_URL") ||
   Deno.env.get("TIKKIE_API_URL") ||

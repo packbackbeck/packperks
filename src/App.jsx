@@ -183,6 +183,9 @@ export default function App() {
   // We surface it in the UserPage as "Signed in as …".
   const [authEmail, setAuthEmail] = useState(null);
   const [showSignIn, setShowSignIn] = useState(false);
+  // When a claim is attempted without an email, we open the sign-in sheet and
+  // remember to continue to the receipt step the moment the email verifies.
+  const [claimAfterSignIn, setClaimAfterSignIn] = useState(false);
 
   /* ── Live config from admin publish ── */
   const [liveRewards, setLiveRewards] = useState(rewards);
@@ -911,6 +914,14 @@ export default function App() {
       reward_name: selectedReward.name,
       cup_count: cupCount,
     });
+    // A verified email is REQUIRED to claim cashback (that's how we pay it out
+    // and reach the customer). No email yet → open the sign-in sheet; once the
+    // email verifies we continue straight to the receipt step (onVerified).
+    if (!(authEmail || profile?.email)) {
+      setClaimAfterSignIn(true);
+      setShowSignIn(true);
+      return;
+    }
     // No IBAN step anymore — go straight to the receipt scan. Cashback is
     // paid via a Tikkie link after the claim is reviewed.
     setPage('receipt');
@@ -1064,6 +1075,13 @@ export default function App() {
   const handleViewDetail = (reward) => setDetailReward(reward);
   const handleClaimFromDetail = async () => {
     if (!(await ensureRewardBudgetOk())) return;
+    // Same email gate as the main claim button.
+    if (!(authEmail || profile?.email)) {
+      setDetailReward(null);
+      setClaimAfterSignIn(true);
+      setShowSignIn(true);
+      return;
+    }
     setDetailReward(null);
     setPage('receipt');
   };
@@ -1430,7 +1448,7 @@ export default function App() {
         />
         <SignInSheet
           open={showSignIn}
-          onClose={() => setShowSignIn(false)}
+          onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); }}
           onLinked={async () => {
             // After a sign-out, refresh the local user back to anonymous
             // device mode so the in-memory state matches reality. Pass the
@@ -1439,6 +1457,17 @@ export default function App() {
               const refreshed = await getOrCreateUser(activeOrg?.id);
               setUserId(refreshed.id);
             } catch (e) { console.error(e); }
+          }}
+          /* Fired the moment the email is verified. If the user was mid-claim
+             (no email when they tapped "Get cashback"), continue straight to
+             the receipt step now that they're verified. */
+          onVerified={() => {
+            if (claimAfterSignIn) {
+              setClaimAfterSignIn(false);
+              setShowSignIn(false);
+              setDetailReward(null);
+              setPage('receipt');
+            }
           }}
           /* Email verification is ALWAYS required — every email (first time or
              changed) must be confirmed with the 6-digit code we email. No

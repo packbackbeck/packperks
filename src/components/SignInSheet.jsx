@@ -38,7 +38,7 @@ import './SignInSheet.css';
  * form. This is the only place in the user app where signing out is
  * exposed — outside the sheet there's no reason for them to do it.
  */
-export default function SignInSheet({ open, onClose, onLinked, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent }) {
+export default function SignInSheet({ open, onClose, onLinked, onVerified, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent }) {
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -179,6 +179,7 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
       setCurrentEmail(email.trim());
       setStatus('signedIn');
       onLinked?.();
+      onVerified?.(); // may auto-continue a claim that was waiting on an email
     } catch (err) {
       const code = err?.detail?.error || err?.message;
       const friendly =
@@ -385,8 +386,11 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
               You can sign in from any device with this email — your
               balance and history will be right there.
             </p>
+            <button className="signin-btn signin-btn--primary" onClick={onClose}>
+              Go back
+            </button>
             <button className="signin-btn signin-btn--ghost" onClick={handleSignOut}>
-              Sign out of this device
+              Log out
             </button>
           </div>
         )}

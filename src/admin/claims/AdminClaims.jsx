@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminClaims, updateClaimStatus, markClaim, getReceiptSignedUrl, deleteRecords, refreshTikkieStatus } from '../lib/adminApi';
+import { getAdminClaims, updateClaimStatus, markClaim, getReceiptSignedUrl, deleteRecords, refreshTikkieStatus, mintTikkieLink } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
 import PermissionGate from '../auth/PermissionGate';
 import { useAuth, hasPermission } from '../auth/AuthContext';
@@ -458,6 +458,15 @@ export default function AdminClaims({ onNavigate, draftState }) {
       const updated = await updateClaimStatus(claimId, newStatus, reason);
       // Merge in the approver reference for instant UI feedback.
       setClaims(prev => prev.map(c => c.id === claimId ? { ...c, ...updated } : c));
+
+      // Approve succeeded but the Tikkie mint failed → say so LOUDLY instead
+      // of silently showing nothing. The claim keeps payout_status='queued'
+      // and the error is stored on it; the Tikkie-status modal offers a retry.
+      if (updated?.tikkie_error) {
+        const te = updated.tikkie_error;
+        const msg = te.message || te.code || te.detail || te.error || 'unknown error';
+        setActionError(`Claim approved, but the Tikkie link could not be created: ${msg}. Click the "Link failed — retry" pill in the Tikkie status column to retry.`);
+      }
 
       /* AI human-override detection (P-13).
        *
@@ -1064,15 +1073,26 @@ export default function AdminClaims({ onNavigate, draftState }) {
  * collects the cash, or EXPIRED if the validity window passes first. Our claim
  * mirrors this in `tikkie_status`. No link (claim not approved) → empty cell. */
 const TIKKIE_STATUS_META = {
+  waiting:  { label: 'Waiting for approval', color: '#8A8175', bg: '#F1EBDF' },
   created:  { label: 'Created',  color: '#A85320', bg: '#FBEEDA' },
   redeemed: { label: 'Redeemed', color: '#1A8737', bg: '#DFF5E3' },
   expired:  { label: 'Expired',  color: '#B4463E', bg: '#FBE7E1' },
+  failed:   { label: 'Link failed — retry', color: '#B4463E', bg: '#FBE7E1' },
 };
 
 function tikkieStatusOf(claim) {
-  if (!claim?.tikkie_url) return null;
-  const s = String(claim.tikkie_status || 'created').toLowerCase();
-  return TIKKIE_STATUS_META[s] || TIKKIE_STATUS_META.created;
+  // Only cashback/refund claims pay via Tikkie; donations etc. show nothing.
+  const paysViaTikkie = claim?.type === 'cashback' || claim?.type === 'direct_refund';
+  if (!paysViaTikkie) return null;
+  if (claim.tikkie_url) {
+    const s = String(claim.tikkie_status || 'created').toLowerCase();
+    return TIKKIE_STATUS_META[s] || TIKKIE_STATUS_META.created;
+  }
+  // No link yet: default state is "Waiting for approval"; an approved claim
+  // without a link means the mint FAILED (error stored in tikkie_last_error).
+  if (claim.status === 'pending') return TIKKIE_STATUS_META.waiting;
+  if (claim.status === 'completed') return TIKKIE_STATUS_META.failed;
+  return null;
 }
 
 function fmtWhen(d) {
@@ -1115,6 +1135,33 @@ function TikkieStatusModal({ claim, onClose, onRefreshed }) {
       setBusy(false);
     }
   }
+
+  // Approved claim without a link → the mint failed earlier; retry it here.
+  async function handleMint() {
+    setBusy(true); setMsg(null);
+    try {
+      const res = await mintTikkieLink(claim.id);
+      if (res?.error) {
+        setMsg(res.message || res.code || res.error);
+      } else {
+        onRefreshed?.({
+          tikkie_url: res.url,
+          tikkie_cashback_id: res.cashbackId,
+          tikkie_status: res.tikkie_status || 'created',
+          tikkie_expires_at: res.expiryDateTime ?? null,
+          tikkie_last_error: null,
+          payout_status: 'sent',
+        });
+        setMsg('Tikkie link created.');
+      }
+    } catch (e) {
+      setMsg(e?.message || 'Could not create the link.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const mintFailed = !claim.tikkie_url && claim.status === 'completed';
 
   const steps = [
     {
@@ -1163,6 +1210,19 @@ function TikkieStatusModal({ claim, onClose, onRefreshed }) {
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
           </a>
+        ) : mintFailed ? (
+          <>
+            {claim.tikkie_last_error && (
+              <div className="ac-tk-error">
+                <strong>Tikkie could not create the link:</strong> {claim.tikkie_last_error}
+                {claim.tikkie_last_error_at ? <span className="ac-tk-error-at"> · {fmtWhen(claim.tikkie_last_error_at)}</span> : null}
+              </div>
+            )}
+            <button className="ac-tk-link ac-tk-link--btn" onClick={handleMint} disabled={busy}>
+              {busy ? 'Creating…' : 'Create Tikkie link'}
+            </button>
+            {msg && <p className="ac-tk-nolink">{msg}</p>}
+          </>
         ) : (
           <p className="ac-tk-nolink">No Tikkie link yet — approve the claim to mint one.</p>
         )}

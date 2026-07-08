@@ -1510,6 +1510,7 @@ export async function adminUpdateUser(userId, updates) {
 const CLAIMS_COLS = `
   id, user_id, type, reward_id, cups_redeemed, payout_amount,
   tikkie_url, tikkie_status, tikkie_cashback_id, tikkie_expires_at, tikkie_redeemed_at,
+  tikkie_last_error, tikkie_last_error_at,
   notify_email, notify_push, notified_at, flagged,
   receipt_photo_url, receipt_photo_path, status, payout_status, created_at,
   ai_verdict, ai_confidence, ai_is_receipt, ai_is_burger_king,

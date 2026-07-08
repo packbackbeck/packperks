@@ -48,10 +48,12 @@ Deno.serve(async (req) => {
 
   let email = "";
   let deviceId = "";
+  let orgId = "";
   try {
     const body = await req.json();
     email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
     deviceId = typeof body?.device_id === "string" ? body.device_id : "";
+    orgId = typeof body?.org_id === "string" ? body.org_id : "";
   } catch {
     return jsonResponse({ error: "invalid_json" }, 400);
   }
@@ -59,16 +61,22 @@ Deno.serve(async (req) => {
   if (!deviceId) return jsonResponse({ error: "missing_device_id" }, 400);
 
   // ── Resolve the device user ───────────────────────────────────────────
-  const { data: deviceUser, error: devErr } = await supabase
+  // A device can have ONE users row PER ORG (multi-venue groups), so a bare
+  // `.eq(device_id).maybeSingle()` explodes with "multiple (or no) rows
+  // returned". Scope by org when the client sends it; otherwise take the most
+  // recent non-merged row for this device.
+  let q = supabase
     .from("users")
-    .select("id, org_id, email, merged_into")
+    .select("id, org_id, email, merged_into, updated_at")
     .eq("device_id", deviceId)
-    .maybeSingle();
+    .is("merged_into", null);
+  if (orgId) q = q.eq("org_id", orgId);
+  const { data: deviceRows, error: devErr } = await q
+    .order("updated_at", { ascending: false })
+    .limit(1);
   if (devErr) return jsonResponse({ error: "db_error", detail: devErr.message }, 500);
+  const deviceUser = deviceRows?.[0];
   if (!deviceUser) return jsonResponse({ error: "device_user_not_found" }, 404);
-  if (deviceUser.merged_into) {
-    return jsonResponse({ error: "device_user_already_merged" }, 409);
-  }
 
   // ── Count OTHER same-email accounts in the same org ──────────────────
   // (case-insensitive; ignore tombstoned `merged_into` rows; exclude self)

@@ -266,25 +266,41 @@ Deno.serve(async (req) => {
       ...(loc.locationAddress ? { locationAddress: loc.locationAddress } : {}),
     };
 
+    // Every Tikkie call is logged (action, claim, amount, HTTP status) so the
+    // Supabase edge-function logs tell the full story of each payout attempt.
+    console.log(`[tikkie] create → claim=${claim.id} amount=${amountInCents}c url=${campaignBase}/cashbacks`);
+    const recordError = async (msg: string) => {
+      console.error(`[tikkie] create FAILED → claim=${claim.id}: ${msg}`);
+      await supabase.from("claims").update({
+        tikkie_last_error: msg.slice(0, 500),
+        tikkie_last_error_at: new Date().toISOString(),
+      }).eq("id", claim.id);
+    };
+
     let resp: Response;
     try {
       resp = await fetch(`${campaignBase}/cashbacks`, {
         method: "POST", headers: tikkieHeaders(), body: JSON.stringify(payload),
       });
     } catch (e) {
+      await recordError(`tikkie_unreachable: ${String(e)}`);
       return json({ error: "tikkie_unreachable", detail: String(e) }, 502);
     }
     if (!resp.ok) {
       const err = await readTikkieError(resp);
+      await recordError(`HTTP ${resp.status} ${err.code || ""} ${err.message || err.raw || ""}`.trim());
       return json({ error: "tikkie_create_failed", httpStatus: resp.status, code: err.code, message: err.message, detail: err.raw }, 502);
     }
     const cb = await resp.json() as TikkieCashback;
+    console.log(`[tikkie] create OK → claim=${claim.id} cashbackId=${cb.cashbackId} status=${cb.status}`);
 
     const update = {
       tikkie_url: cb.url,
       tikkie_cashback_id: cb.cashbackId,
       tikkie_status: String(cb.status || "CREATED").toLowerCase(),
       tikkie_expires_at: cb.expiryDateTime ?? null,
+      tikkie_last_error: null, // clear any earlier failed attempt
+      tikkie_last_error_at: null,
       payout_status: "sent",
       notified_at: new Date().toISOString(),
     };
@@ -329,18 +345,22 @@ Deno.serve(async (req) => {
     }
     if (!cashbackId) return json({ error: "no_cashback_id" }, 400);
 
+    console.log(`[tikkie] status → cashbackId=${cashbackId}`);
     let resp: Response;
     try {
       resp = await fetch(`${campaignBase}/cashbacks/${cashbackId}`, { headers: tikkieHeaders() });
     } catch (e) {
+      console.error(`[tikkie] status unreachable → ${String(e)}`);
       return json({ error: "tikkie_unreachable", detail: String(e) }, 502);
     }
     if (!resp.ok) {
       const err = await readTikkieError(resp);
+      console.error(`[tikkie] status FAILED → HTTP ${resp.status} ${err.code || ""} ${err.raw || ""}`);
       return json({ error: "tikkie_status_failed", httpStatus: resp.status, code: err.code, detail: err.raw }, 502);
     }
     const cb = await resp.json() as TikkieCashback;
     const tikkie_status = String(cb.status || "").toLowerCase();
+    console.log(`[tikkie] status OK → cashbackId=${cashbackId} status=${tikkie_status}`);
     const { error: uErr } = await supabase.from("claims").update({
       tikkie_status,
       tikkie_redeemed_at: cb.redeemedDateTime ?? null,

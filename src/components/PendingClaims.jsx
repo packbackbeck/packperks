@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { COLLECT_WINDOW_MS } from '../lib/collectedClaims';
+import { setClaimNotifyPrefs } from '../lib/api';
+import { requestPushPermission, isPushSupported } from '../lib/notify';
 import './PendingClaims.css';
 
 const money = (n) => `€${(Number(n) || 0).toFixed(2)}`;
@@ -150,8 +152,75 @@ function ClaimCard({ claim, onCollect, collected }) {
           </a>
         </>
       ) : (
-        <p className="pc-card__msg">A PackPerks team member checks every receipt by hand. Your Tikkie link to collect this cashback arrives within <strong>7 days</strong>.</p>
+        <>
+          <p className="pc-card__msg">A PackPerks team member checks every receipt by hand. Your Tikkie link to collect this cashback arrives within <strong>7 days</strong>.</p>
+          <NotifyOptions claim={claim} />
+        </>
       )}
     </article>
+  );
+}
+
+/* Two small opt-in checkboxes on an in-review claim: get told the moment the
+ * Tikkie link is ready, by email and/or browser push (push asks the browser
+ * for permission on first tick). Persisted per claim via set_claim_notify. */
+function NotifyOptions({ claim }) {
+  const [email, setEmail] = useState(!!claim.notify_email);
+  const [push, setPush]   = useState(!!claim.notify_push);
+  const [hint, setHint]   = useState(null);
+
+  const save = (e, p) => setClaimNotifyPrefs(claim.id, { email: e, push: p }).catch(() => {});
+
+  const toggleEmail = (checked) => {
+    setEmail(checked);
+    setHint(null);
+    save(checked, push);
+  };
+
+  const togglePush = async (checked) => {
+    setHint(null);
+    if (!checked) { setPush(false); save(email, false); return; }
+    if (!isPushSupported()) {
+      setHint('Push isn’t supported in this browser — email still works.');
+      return;
+    }
+    // Ask the browser for permission on first opt-in.
+    const perm = await requestPushPermission();
+    if (perm === 'granted') {
+      setPush(true);
+      save(email, true);
+    } else {
+      setPush(false);
+      setHint(perm === 'denied'
+        ? 'Notifications are blocked for this site — allow them in your browser settings.'
+        : 'Push permission wasn’t granted — email still works.');
+    }
+  };
+
+  return (
+    <div className="pc-notify">
+      <span className="pc-notify__label">Notify me when it’s ready:</span>
+      <div className="pc-notify__opts">
+        <label className="pc-notify__opt">
+          <input
+            type="checkbox"
+            className="pc-notify__box"
+            checked={email}
+            onChange={e => toggleEmail(e.target.checked)}
+          />
+          <span>via email</span>
+        </label>
+        <label className="pc-notify__opt">
+          <input
+            type="checkbox"
+            className="pc-notify__box"
+            checked={push}
+            onChange={e => togglePush(e.target.checked)}
+          />
+          <span>via push notification</span>
+        </label>
+      </div>
+      {hint && <span className="pc-notify__hint">{hint}</span>}
+    </div>
   );
 }

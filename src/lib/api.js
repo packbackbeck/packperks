@@ -79,6 +79,45 @@ function formatTime(ts) {
 // present (i.e. the user has signed in with their email at least once),
 // and falls back to the device path otherwise. Returning an existing
 // row by either lookup is always preferred over inserting a duplicate.
+
+/* The (device_id, org_id) slot is UNIQUE. When an insert hits that constraint
+ * (23505), some row already holds the slot — either a StrictMode double-insert,
+ * or (the real bug) a TOMBSTONE left behind after an email merge, whose
+ * `merged_into` points at the surviving account. Resolve to a usable live row:
+ *   • tombstone → follow `merged_into` to the survivor (and adopt the auth user
+ *     onto it if it's not linked yet),
+ *   • live but unlinked → adopt the auth user,
+ *   • otherwise → just return whoever holds the slot.
+ * Returns null only if the slot genuinely can't be resolved. */
+async function resolveDeviceOrgOccupant(deviceId, orgId, authUid = null, authEmail = null) {
+  let q = supabase.from('users').select('*').eq('device_id', deviceId)
+  if (orgId) q = q.eq('org_id', orgId)
+  const { data: occupant } = await q.maybeSingle()
+  if (!occupant) return null
+
+  // Tombstone → return the live survivor it was merged into.
+  if (occupant.merged_into) {
+    const { data: survivor } = await supabase
+      .from('users').select('*').eq('id', occupant.merged_into).maybeSingle()
+    if (!survivor) return null
+    if (authUid && !survivor.auth_user_id) {
+      const { data: linked } = await supabase.from('users')
+        .update({ auth_user_id: authUid, email: survivor.email || authEmail || null })
+        .eq('id', survivor.id).select().maybeSingle()
+      return linked || survivor
+    }
+    return survivor
+  }
+
+  // Live row holding the slot — adopt the auth user if it's still anonymous.
+  if (authUid && !occupant.auth_user_id) {
+    const { data: linked } = await supabase.from('users')
+      .update({ auth_user_id: authUid, email: occupant.email || authEmail || null })
+      .eq('id', occupant.id).select().maybeSingle()
+    return linked || occupant
+  }
+  return occupant
+}
 export async function getOrCreateUser(orgId) {
   const deviceId = getDeviceId()
 
@@ -98,7 +137,7 @@ export async function getOrCreateUser(orgId) {
   if (authUid) {
     // Per-org identity: scope every lookup to the active org so the same
     // person/device gets a separate row (and balance) in each org.
-    let byAuthQ = supabase.from('users').select('*').eq('auth_user_id', authUid)
+    let byAuthQ = supabase.from('users').select('*').eq('auth_user_id', authUid).is('merged_into', null)
     if (orgId) byAuthQ = byAuthQ.eq('org_id', orgId)
     const { data: byAuth } = await byAuthQ.maybeSingle()
 
@@ -113,7 +152,7 @@ export async function getOrCreateUser(orgId) {
 
     // Session exists but no users row for this org — check whether the
     // current device_id row (in this org) is unlinked, and adopt it.
-    let byDeviceQ = supabase.from('users').select('*').eq('device_id', deviceId)
+    let byDeviceQ = supabase.from('users').select('*').eq('device_id', deviceId).is('merged_into', null)
     if (orgId) byDeviceQ = byDeviceQ.eq('org_id', orgId)
     const { data: byDevice } = await byDeviceQ.maybeSingle()
 
@@ -144,7 +183,16 @@ export async function getOrCreateUser(orgId) {
       .insert(newRow)
       .select()
       .single()
-    if (createErr) throw createErr
+    if (createErr) {
+      // The (device_id, org_id) slot is already taken — StrictMode double-insert
+      // or a tombstone from an email merge. Resolve to the live row/survivor
+      // instead of crashing with "duplicate key … users_device_org_key".
+      if (createErr.code === '23505') {
+        const resolved = await resolveDeviceOrgOccupant(deviceId, orgId, authUid, authEmail)
+        if (resolved) return resolved
+      }
+      throw createErr
+    }
     const balRow = { user_id: created.id, balance: 0, lifetime_cups: 0 }
     if (orgId) balRow.org_id = orgId
     await supabase.from('cup_balances').insert(balRow)
@@ -152,8 +200,9 @@ export async function getOrCreateUser(orgId) {
   }
 
   // 2. Anonymous device path — scoped to the active org so each org keeps
-  //    its own customer/user row for this device.
-  let existingQ = supabase.from('users').select('*').eq('device_id', deviceId)
+  //    its own customer/user row for this device. Exclude tombstoned rows so a
+  //    merged-away row never masquerades as a live user.
+  let existingQ = supabase.from('users').select('*').eq('device_id', deviceId).is('merged_into', null)
   if (orgId) existingQ = existingQ.eq('org_id', orgId)
   const { data: existing } = await existingQ.maybeSingle()
 
@@ -167,13 +216,11 @@ export async function getOrCreateUser(orgId) {
     .select()
     .single()
 
-  // React StrictMode mounts twice — second insert hits the unique constraint.
-  // Just re-fetch the row that the first call created.
+  // Slot already taken — StrictMode double-insert, or a tombstone left by an
+  // email merge. Resolve to the live row / merge survivor rather than crashing.
   if (error?.code === '23505') {
-    let retryQ = supabase.from('users').select('*').eq('device_id', deviceId)
-    if (orgId) retryQ = retryQ.eq('org_id', orgId)
-    const { data: existing2 } = await retryQ.maybeSingle()
-    return existing2
+    const resolved = await resolveDeviceOrgOccupant(deviceId, orgId)
+    if (resolved) return resolved
   }
 
   if (error) throw error

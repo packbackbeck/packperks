@@ -1658,9 +1658,10 @@ export default function App() {
             <p><strong>How it works:</strong> Collect cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} venue — scan the QR each time to add a cup to your balance for that venue.</p>
             <ul>
               <li>Collect enough cups to unlock a reward, then claim it as <strong>cashback</strong>.</li>
-              <li>Upload a photo of your <strong>printed store receipt</strong> for the item; we verify the purchase before paying out.</li>
-              <li>Once approved, we send you a <strong>Tikkie link</strong> to collect your cashback — usually within a few days, and no later than 7.</li>
-              <li>We never ask for your bank details — you collect your cashback yourself through the secure Tikkie link.</li>
+              <li>To claim, add and <strong>verify your email</strong> (we send a 6-digit code), then upload a clear photo of the <strong>printed store receipt</strong> for the reward item.</li>
+              <li>We accept genuine printed store/till receipts that clearly show the reward item and are dated within the last 30 days.</li>
+              <li>We <strong>can’t accept</strong> screenshots, photos of a screen, edited or AI-generated images, blurry or unreadable photos, receipts that don’t show the reward item, or receipts dated before you collected your cups. Each receipt can be used once.</li>
+              <li>An automated check pre-screens your photo, but a person makes the final call. Once approved, we send a <strong>Tikkie link</strong> to collect your cashback yourself — usually within a few days, no later than 7. We never ask for your bank details; collect it promptly as links expire.</li>
               <li>Prefer not to take cashback? You can <strong>donate</strong> your cups to a good cause instead.</li>
               <li>Cups are saved separately at each venue, and you can switch your reward goal any time before claiming.</li>
             </ul>

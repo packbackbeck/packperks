@@ -95,28 +95,27 @@ async function resolveDeviceOrgOccupant(deviceId, orgId, authUid = null, authEma
   const { data: occupant } = await q.maybeSingle()
   if (!occupant) return null
 
-  // Tombstone → return the live survivor it was merged into.
-  if (occupant.merged_into) {
-    const { data: survivor } = await supabase
-      .from('users').select('*').eq('id', occupant.merged_into).maybeSingle()
-    if (!survivor) return null
-    if (authUid && !survivor.auth_user_id) {
-      const { data: linked } = await supabase.from('users')
-        .update({ auth_user_id: authUid, email: survivor.email || authEmail || null })
-        .eq('id', survivor.id).select().maybeSingle()
-      return linked || survivor
-    }
-    return survivor
+  // Follow the merge chain (tombstone → survivor → … → survivor) to the final
+  // live row. An email reused across MANY accounts can produce a multi-hop
+  // chain, so a single hop isn't enough. Cap the walk to avoid any cycle.
+  let row = occupant
+  let hops = 0
+  while (row?.merged_into && hops++ < 12) {
+    const { data: next } = await supabase
+      .from('users').select('*').eq('id', row.merged_into).maybeSingle()
+    if (!next) break
+    row = next
   }
+  if (!row) return occupant // never null when the slot is occupied
 
-  // Live row holding the slot — adopt the auth user if it's still anonymous.
-  if (authUid && !occupant.auth_user_id) {
+  // Adopt the auth user onto the resolved row if it's still anonymous.
+  if (authUid && !row.auth_user_id) {
     const { data: linked } = await supabase.from('users')
-      .update({ auth_user_id: authUid, email: occupant.email || authEmail || null })
-      .eq('id', occupant.id).select().maybeSingle()
-    return linked || occupant
+      .update({ auth_user_id: authUid, email: row.email || authEmail || null })
+      .eq('id', row.id).select().maybeSingle()
+    if (linked) return linked
   }
-  return occupant
+  return row
 }
 export async function getOrCreateUser(orgId) {
   const deviceId = getDeviceId()
@@ -139,7 +138,9 @@ export async function getOrCreateUser(orgId) {
     // person/device gets a separate row (and balance) in each org.
     let byAuthQ = supabase.from('users').select('*').eq('auth_user_id', authUid).is('merged_into', null)
     if (orgId) byAuthQ = byAuthQ.eq('org_id', orgId)
-    const { data: byAuth } = await byAuthQ.maybeSingle()
+    // order+limit(1): if a bad merge ever left two live rows for one
+    // (auth, org), take the newest instead of throwing PGRST116 "multiple rows".
+    const { data: byAuth } = await byAuthQ.order('updated_at', { ascending: false }).limit(1).maybeSingle()
 
     if (byAuth) {
       // Refresh the device_id binding so subsequent anonymous-path
@@ -154,7 +155,7 @@ export async function getOrCreateUser(orgId) {
     // current device_id row (in this org) is unlinked, and adopt it.
     let byDeviceQ = supabase.from('users').select('*').eq('device_id', deviceId).is('merged_into', null)
     if (orgId) byDeviceQ = byDeviceQ.eq('org_id', orgId)
-    const { data: byDevice } = await byDeviceQ.maybeSingle()
+    const { data: byDevice } = await byDeviceQ.order('updated_at', { ascending: false }).limit(1).maybeSingle()
 
     if (byDevice && !byDevice.auth_user_id) {
       const { data: linked } = await supabase
@@ -204,7 +205,7 @@ export async function getOrCreateUser(orgId) {
   //    merged-away row never masquerades as a live user.
   let existingQ = supabase.from('users').select('*').eq('device_id', deviceId).is('merged_into', null)
   if (orgId) existingQ = existingQ.eq('org_id', orgId)
-  const { data: existing } = await existingQ.maybeSingle()
+  const { data: existing } = await existingQ.order('updated_at', { ascending: false }).limit(1).maybeSingle()
 
   if (existing) return existing
 

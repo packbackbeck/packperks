@@ -405,7 +405,7 @@ export default function App() {
 
   /* ── Init: load user + state from Supabase ── */
   useEffect(() => {
-    async function init() {
+    async function init(attempt = 0) {
       try {
         // Preview mode short-circuit. We still need the per-org
         // config so the iframe paints with the right brand
@@ -704,6 +704,22 @@ export default function App() {
         }
       } catch (err) {
         console.error('PackPerks init failed:', err);
+        // Self-heal transient row collisions. A concurrent sign-in / email
+        // merge can race the per-(device,org) user insert (Postgres 23505
+        // "users_device_org_key") or briefly leave two rows for one slot
+        // (PostgREST PGRST116 "multiple rows"). By the time we retry, the
+        // row exists and getOrCreateUser resolves to it — so retry a couple
+        // of times with a short backoff instead of stranding the user on the
+        // "trouble loading your cups" screen.
+        const code = err?.code || '';
+        const msg = err?.message || '';
+        const recoverable =
+          code === '23505' || code === 'PGRST116' ||
+          /duplicate key|users_device_org_key|multiple \(or no\) rows|multiple rows returned/i.test(msg);
+        if (recoverable && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+          return init(attempt + 1);
+        }
         setInitError(err.message || 'Unknown error');
       } finally {
         setIsLoading(false);

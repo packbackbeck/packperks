@@ -8,6 +8,7 @@ import {
   finaliseRestore,
   checkEmailSaveOrMerge,
   mergeByEmail,
+  changeAuthEmail,
 } from '../lib/api';
 import './SignInSheet.css';
 
@@ -56,6 +57,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   // required checkbox — only a notice line below the field.
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [newEmail, setNewEmail] = useState(''); // for the change-email flow
   const [restoreResult, setRestoreResult] = useState(null); // { status, merged_balance? }
   const [error, setError] = useState(null);
   const [currentEmail, setCurrentEmail] = useState(null);
@@ -87,7 +89,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   useEffect(() => {
     if (!open) return;
     let t;
-    if (status === 'idle' || status === 'restore_email') {
+    if (status === 'idle' || status === 'restore_email' || status === 'change_email') {
       t = setTimeout(() => inputRef.current?.focus(), 220);
     } else if (status === 'restore_code' || status === 'sent') {
       t = setTimeout(() => codeRef.current?.focus(), 220);
@@ -99,6 +101,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   useEffect(() => {
     if (open) return;
     setOtpCode('');
+    setNewEmail('');
     setRestoreResult(null);
     setError(null);
   }, [open]);
@@ -192,6 +195,29 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
               : (code || 'Something went wrong verifying the code.');
       setError(friendly);
       setStatus('sent');
+    }
+  }
+
+  /* Change the email on the current account (keeps cups). Supabase emails a
+   * confirmation link to the new address; the change applies when it's opened. */
+  async function handleChangeEmail(e) {
+    e.preventDefault();
+    const email = newEmail.trim();
+    if (!email) return;
+    if (currentEmail && email.toLowerCase() === currentEmail.trim().toLowerCase()) {
+      setError('That’s already your email on this account.');
+      return;
+    }
+    setError(null);
+    setStatus('change_sending');
+    try {
+      await changeAuthEmail(email);
+      setStatus('change_sent');
+    } catch (err) {
+      setError(err.message === 'invalid_email'
+        ? "That email doesn't look quite right — try again."
+        : (err.message || 'Could not start the email change. Please try again.'));
+      setStatus('change_email');
     }
   }
 
@@ -389,9 +415,82 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             <button className="signin-btn signin-btn--primary" onClick={onClose}>
               Go back
             </button>
+            <button
+              className="signin-btn signin-btn--ghost"
+              onClick={() => { setNewEmail(''); setError(null); setStatus('change_email'); }}
+            >
+              Change email
+            </button>
             <button className="signin-btn signin-btn--ghost" onClick={handleSignOut}>
               Log out
             </button>
+          </div>
+        )}
+
+        {/* Change the email on THIS account (keeps your cups). Supabase sends a
+            confirmation to the new address; the change lands once it's opened. */}
+        {(status === 'change_email' || status === 'change_sending') && (
+          <form className="signin-state" onSubmit={handleChangeEmail}>
+            <div className="signin-art">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+            </div>
+            <h2 className="signin-title">Change your email</h2>
+            <p className="signin-sub">
+              Enter a new email for this account. We'll send a confirmation link to it —
+              your current email <strong>{currentEmail}</strong> stays active until you open it.
+            </p>
+
+            <label className="signin-label" htmlFor="change-email">New email</label>
+            <input
+              id="change-email"
+              ref={inputRef}
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              className="signin-input"
+              placeholder="new@example.com"
+              value={newEmail}
+              onChange={e => { setNewEmail(e.target.value); setError(null); }}
+              disabled={status === 'change_sending'}
+              required
+            />
+
+            {error && <p className="signin-error">{error}</p>}
+
+            <button
+              type="submit"
+              className="signin-btn signin-btn--primary"
+              disabled={status === 'change_sending' || !newEmail.trim()}
+            >
+              {status === 'change_sending' ? 'Sending…' : 'Send confirmation link'}
+            </button>
+            <button
+              type="button"
+              className="signin-btn signin-btn--ghost"
+              onClick={() => { setError(null); setStatus('signedIn'); }}
+            >
+              Cancel
+            </button>
+          </form>
+        )}
+
+        {status === 'change_sent' && (
+          <div className="signin-state">
+            <div className="signin-art signin-art--sent">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+            </div>
+            <h2 className="signin-title">Confirm the change</h2>
+            <p className="signin-sub">
+              We sent a confirmation link to <strong>{newEmail}</strong>. Open it to finish
+              switching your email. Until then, <strong>{currentEmail}</strong> stays on your account.
+            </p>
+            <button className="signin-btn signin-btn--primary" onClick={onClose}>Done</button>
           </div>
         )}
 

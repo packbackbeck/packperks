@@ -36,11 +36,15 @@ const supabase = createClient(
 // rejected as "API Key is invalid for the requested resource".
 const API_KEY = (Deno.env.get("TIKKIE_API_KEY") ?? "").trim();
 const APP_TOKEN = (Deno.env.get("TIKKIE_APP_TOKEN") ?? "").trim();
-const BASE = (
+let BASE = (
   Deno.env.get("TIKKIE_API_BASE_URL") ||
   Deno.env.get("TIKKIE_API_URL") ||
   "https://api.abnamro.com/v1/tikkie/cashback"
 ).replace(/\/+$/, "");
+// The Cashback API ALWAYS lives under .../tikkie/cashback. A base set to just
+// .../tikkie (a common mistake) makes every call hit a resource the API key
+// isn't entitled to → 401 ERR_2005_002. Append the missing segment defensively.
+if (!/\/cashback$/i.test(BASE)) BASE = `${BASE}/cashback`;
 const CAMPAIGN_RAW = (
   Deno.env.get("TIKKIE_API_CAMPAIGN_URL") ||
   Deno.env.get("TIKKIE_CAMPAIGN_ID") ||
@@ -291,8 +295,20 @@ Deno.serve(async (req) => {
     }
     if (!resp.ok) {
       const err = await readTikkieError(resp);
-      await recordError(`HTTP ${resp.status} ${err.code || ""} ${err.message || err.raw || ""}`.trim());
-      return json({ error: "tikkie_create_failed", httpStatus: resp.status, code: err.code, message: err.message, detail: err.raw }, 502);
+      // Self-diagnose with the SAME secrets: does a READ (GET campaign) work?
+      //   • read OK  + create fails → key/base are valid; create-specific entitlement.
+      //   • read ALSO fails         → the API key or base URL itself is wrong.
+      let selfTest = "skipped";
+      try {
+        const c = await fetch(campaignBase, { headers: tikkieHeaders() });
+        selfTest = `GETcampaign=HTTP${c.status}`;
+        if (!c.ok) selfTest += `(${(await readTikkieError(c)).code || "?"})`;
+      } catch (_e) {
+        selfTest = "GETcampaign=unreachable";
+      }
+      const cfg = `base=${BASE} | createURL=${campaignBase}/cashbacks | keyLen=${API_KEY.length} tokenLen=${APP_TOKEN.length} tokenUuid=${/^[0-9a-fA-F-]{36}$/.test(APP_TOKEN)}`;
+      await recordError(`HTTP ${resp.status} ${err.code || ""} ${err.message || err.raw || ""} || ${selfTest} || ${cfg}`.trim());
+      return json({ error: "tikkie_create_failed", httpStatus: resp.status, code: err.code, message: err.message, detail: err.raw, selfTest, cfg }, 502);
     }
     const cb = await resp.json() as TikkieCashback;
     console.log(`[tikkie] create OK → claim=${claim.id} cashbackId=${cb.cashbackId} status=${cb.status}`);

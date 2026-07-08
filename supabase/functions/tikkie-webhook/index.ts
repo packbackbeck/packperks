@@ -26,11 +26,14 @@ const supabase = createClient(
 
 const API_KEY = Deno.env.get("TIKKIE_API_KEY") ?? "";
 const APP_TOKEN = Deno.env.get("TIKKIE_APP_TOKEN") ?? "";
-const BASE = (
+let BASE = (
   Deno.env.get("TIKKIE_API_BASE_URL") ||
   Deno.env.get("TIKKIE_API_URL") ||
   "https://api.abnamro.com/v1/tikkie/cashback"
 ).replace(/\/+$/, "");
+// The Cashback API always lives under .../tikkie/cashback; tolerate a base set
+// to just .../tikkie (which otherwise 401s as ERR_2005_002).
+if (!/\/cashback$/i.test(BASE)) BASE = `${BASE}/cashback`;
 
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });

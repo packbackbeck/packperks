@@ -443,6 +443,17 @@ export async function sendMagicLink(email) {
   if (error) throw error
 }
 
+// Change the email on the CURRENT (signed-in) account, keeping the account and
+// its cups. Supabase sends a confirmation to the new address; the change only
+// takes effect once the customer opens that link. Account-preserving — unlike
+// signing in with a different email, which would start a separate account.
+export async function changeAuthEmail(newEmail) {
+  const email = (newEmail || '').trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('invalid_email')
+  const { error } = await supabase.auth.updateUser({ email })
+  if (error) throw error
+}
+
 export async function signOutUser() {
   const { error } = await supabase.auth.signOut()
   if (error) throw error

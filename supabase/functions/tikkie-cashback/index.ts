@@ -45,6 +45,13 @@ const CAMPAIGN_RAW = (
   ""
 ).trim();
 
+// Brevo transactional email (the "your cashback is ready" message). Sent on
+// approve when the customer opted into email. Sending is best-effort — a Brevo
+// hiccup never blocks the payout.
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
+const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") || "no-reply@packback.network";
+const BREVO_SENDER_NAME = Deno.env.get("BREVO_SENDER_NAME") || "PackPerks";
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -137,6 +144,81 @@ async function readTikkieError(resp: Response): Promise<{ code?: string; message
   }
 }
 
+function esc(s: unknown): string {
+  return String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
+/* PackPerks-branded "your cashback is ready" email. Table-based + inline styles
+ * so Gmail/Outlook render it faithfully; cream canvas, DM-Sans-first stack, a
+ * bulletproof orange CTA. Mirrors the in-app design language. */
+function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string; reward?: string; orgName?: string }): string {
+  const amount = `€${(opts.amount || 0).toFixed(2)}`;
+  const hi = opts.name ? `Hi ${esc(opts.name)},` : "Hi there,";
+  const rewardLine = opts.reward
+    ? `Your <strong>${esc(opts.reward)}</strong> cashback is approved and ready to collect.`
+    : `Your cashback is approved and ready to collect.`;
+  const font = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
+<body style="margin:0;padding:0;background:#F4EBDC;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4EBDC;padding:28px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:460px;background:#FFFFFF;border-radius:22px;overflow:hidden;box-shadow:0 8px 30px rgba(60,42,20,0.10);">
+        <tr><td style="background:#1A1512;padding:22px 28px;">
+          <span style="font-family:${font};font-size:19px;font-weight:800;color:#FFFFFF;letter-spacing:-0.01em;">Pack<span style="color:#E8B34A;">Perks</span></span>
+        </td></tr>
+        <tr><td style="padding:30px 28px 8px;">
+          <p style="margin:0 0 6px;font-family:${font};font-size:15px;color:#6B6154;">${hi}</p>
+          <h1 style="margin:0 0 10px;font-family:${font};font-size:23px;line-height:1.25;font-weight:800;color:#1A1512;">Your ${amount} cashback is ready 🎉</h1>
+          <p style="margin:0 0 22px;font-family:${font};font-size:15px;line-height:1.55;color:#5A5348;">${rewardLine} Tap below to collect it securely through <strong>Tikkie</strong>.</p>
+        </td></tr>
+        <tr><td align="center" style="padding:0 28px;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="border-radius:14px;background:#E24400;">
+              <a href="${esc(opts.url)}" target="_blank" style="display:inline-block;padding:15px 34px;font-family:${font};font-size:16px;font-weight:800;color:#FFFFFF;text-decoration:none;border-radius:14px;">Collect ${amount} via Tikkie</a>
+            </td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="padding:18px 28px 4px;">
+          <p style="margin:0;font-family:${font};font-size:12.5px;line-height:1.5;color:#9A9186;text-align:center;">The link opens in the Tikkie app. It's unique to you — please don't share it. Collect it soon, as cashback links expire.</p>
+        </td></tr>
+        <tr><td style="padding:22px 28px 26px;">
+          <div style="border-top:1px solid #EFE7D8;padding-top:16px;">
+            <p style="margin:0;font-family:${font};font-size:12px;line-height:1.55;color:#B4AC9E;">You're receiving this because you asked us to email you about this cashback. Questions? Just reply or reach us at <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a>.</p>
+          </div>
+        </td></tr>
+      </table>
+      <p style="margin:16px 0 0;font-family:${font};font-size:11px;color:#B4AC9E;">PackPerks · Bring your cup, earn cashback</p>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+// Best-effort Brevo transactional send. Never throws — email is a courtesy on
+// top of the in-app "Collect via Tikkie" card, so a send failure must not break
+// the payout. Returns a small status object for the response.
+async function sendBrevoEmail(to: string, subject: string, html: string, text: string): Promise<{ ok: boolean; error?: string }> {
+  if (!BREVO_API_KEY) return { ok: false, error: "brevo_not_configured" };
+  try {
+    const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": BREVO_API_KEY, "content-type": "application/json", "accept": "application/json" },
+      body: JSON.stringify({
+        sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+        textContent: text,
+        tags: ["tikkie-cashback"],
+      }),
+    });
+    if (!resp.ok) return { ok: false, error: `brevo_${resp.status}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -156,7 +238,7 @@ Deno.serve(async (req) => {
   if (body.action === "create") {
     if (!body.claim_id) return json({ error: "missing_claim_id" }, 400);
     const { data: claim, error: cErr } = await supabase.from("claims")
-      .select("id, org_id, type, status, payout_amount, tikkie_cashback_id, tikkie_url, tikkie_status")
+      .select("id, org_id, type, status, payout_amount, tikkie_cashback_id, tikkie_url, tikkie_status, notify_email, user_id, reward_id")
       .eq("id", body.claim_id).maybeSingle();
     if (cErr) return json({ error: "db_error", detail: cErr.message }, 500);
     if (!claim) return json({ error: "claim_not_found" }, 404);
@@ -209,7 +291,31 @@ Deno.serve(async (req) => {
     const { error: uErr } = await supabase.from("claims").update(update).eq("id", claim.id);
     if (uErr) return json({ error: "claim_update_failed", detail: uErr.message, cashback: cb }, 500);
 
-    return json({ status: "created", cashbackId: cb.cashbackId, url: cb.url, tikkie_status: update.tikkie_status, expiryDateTime: cb.expiryDateTime });
+    // Notify the customer by email (best-effort) when they opted in. The link is
+    // also on their in-app "Collect via Tikkie" card, so this never blocks.
+    let emailSent = false;
+    let emailError: string | undefined;
+    try {
+      if (claim.notify_email && claim.user_id) {
+        const { data: u } = await supabase.from("users")
+          .select("email, display_name").eq("id", claim.user_id).maybeSingle();
+        if (u?.email) {
+          const amount = Number(claim.payout_amount) || 0;
+          const html = tikkieReadyEmailHtml({ name: u.display_name, amount, url: cb.url });
+          const text =
+            `${u.display_name ? `Hi ${u.display_name},` : "Hi there,"}\n\n` +
+            `Your €${amount.toFixed(2)} cashback is approved and ready to collect via Tikkie:\n${cb.url}\n\n` +
+            `The link is unique to you — please don't share it, and collect it soon as cashback links expire.\n\nPackPerks`;
+          const r = await sendBrevoEmail(u.email, `Your €${amount.toFixed(2)} cashback is ready`, html, text);
+          emailSent = r.ok;
+          emailError = r.error;
+        }
+      }
+    } catch (e) {
+      emailError = String(e);
+    }
+
+    return json({ status: "created", cashbackId: cb.cashbackId, url: cb.url, tikkie_status: update.tikkie_status, expiryDateTime: cb.expiryDateTime, emailSent, emailError });
   }
 
   // ── status: sync one cashback's live status onto the claim ──────────────

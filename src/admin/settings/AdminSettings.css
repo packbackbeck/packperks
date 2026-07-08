@@ -657,3 +657,12 @@
   padding: 2px 7px;
   border-radius: 999px;
 }
+
+/* Always-on lock badge on the email-verification flag row. */
+.as-flag-row__lock {
+  display: inline-block; margin-left: 8px; vertical-align: middle;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em;
+  color: #1A8737; background: #DFF5E3;
+  padding: 2px 7px; border-radius: 999px;
+}
+.toggle-switch--locked { opacity: 0.7; cursor: not-allowed; }

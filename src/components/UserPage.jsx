@@ -369,19 +369,6 @@ export default function UserPage({
     setIsEditingName(false);
   };
 
-  const handleSaveEmail = () => {
-    if (!email.includes('@') || !email.includes('.')) {
-      setEmailError('Please enter a valid email address.');
-      return;
-    }
-    saveProfile({ email });
-    setEmailSaved(true);
-    setIsEditingEmail(false);
-    setEmailError('');
-    track('email_saved', { email_length: email.length });
-  };
-
-
   const handleShare = () => {
     track(EVENTS.SHARE_CUP);
     onOpenShare?.();
@@ -611,56 +598,20 @@ export default function UserPage({
           )}
         </div>
 
-        {/* Email management — inline editor when editing, otherwise a
-            "Manage email" / "Add your email" action row. */}
-        {isEditingEmail ? (
-          <>
-            <div className="user-page__divider" />
-            <div className="user-page__account-edit">
-              <div className="user-page__email-row">
-                <input
-                  type="email"
-                  className={`user-page__email-input${emailError ? ' user-page__email-input--error' : ''}`}
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setEmailError(''); }}
-                  aria-label="Your email address"
-                  autoFocus
-                />
-                <button className="user-page__email-btn" onClick={handleSaveEmail}>Save</button>
-              </div>
-              <button
-                className="user-page__email-cancel"
-                onClick={() => { setIsEditingEmail(false); setEmail(profile.email || ''); setEmailError(''); }}
-              >
-                Cancel
-              </button>
-              {emailError && <span className="user-page__email-error" role="alert">{emailError}</span>}
-              <p className="user-page__privacy-hint">
-                Used only to save and restore your account across devices.{' '}
-                <button type="button" className="user-page__privacy-hint-link" onClick={() => setPolicyOpen(true)}>Learn more</button>
-              </p>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="user-page__divider" />
-            <button
-              type="button"
-              className="user-page__data-row"
-              onClick={
-                authEmail ? onOpenSignIn
-                  : emailSaved ? () => { setEmail(profile.email || ''); setIsEditingEmail(true); }
-                  : onOpenSignIn
-              }
-            >
-              <span>{(emailSaved || authEmail) ? 'Manage email' : 'Add your email'}</span>
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </>
-        )}
+        {/* Email management — always routes through the verified sign-in sheet.
+            Adding OR changing an email always requires confirming the 6-digit
+            code we email; there is no unverified direct-save path. */}
+        <div className="user-page__divider" />
+        <button
+          type="button"
+          className="user-page__data-row"
+          onClick={onOpenSignIn}
+        >
+          <span>{(emailSaved || authEmail) ? 'Manage email' : 'Add your email'}</span>
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
 
         {/* Marketing emails — one toggle row (no description). */}
         {(emailSaved || authEmail) && !isEditingEmail && (

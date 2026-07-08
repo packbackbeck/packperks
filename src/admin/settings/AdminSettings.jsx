@@ -114,15 +114,16 @@ const FEATURE_FLAGS = [
 
 /* ── Reusable form atoms ─────────────────────────────────────────── */
 
-function ToggleSwitch({ checked, onChange, ariaLabel }) {
+function ToggleSwitch({ checked, onChange, ariaLabel, disabled = false }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
-      className={`toggle-switch ${checked ? 'toggle-switch--on' : ''}`}
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      className={`toggle-switch ${checked ? 'toggle-switch--on' : ''}${disabled ? ' toggle-switch--locked' : ''}`}
+      onClick={() => { if (!disabled) onChange(!checked); }}
     >
       <span className="toggle-switch__thumb" />
     </button>
@@ -552,17 +553,17 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
 
               <label className="as-flag-row">
                 <div className="as-flag-row__info">
-                  <div className="as-flag-row__label">Require email verification</div>
+                  <div className="as-flag-row__label">Require email verification <span className="as-flag-row__lock">Always on</span></div>
                   <div className="as-flag-row__desc">
-                    On: customers confirm a code the first time they add an email (current behaviour).
-                    Off: any email is saved instantly with no code, and customers can change it freely.
-                    Restoring an account on a new device always requires a code.
+                    Every email — the first time a customer adds one and any time they change it — must be
+                    confirmed with the 6-digit code we email. This is always enforced and can't be turned off.
                   </div>
                 </div>
                 <ToggleSwitch
-                  checked={settings.requireEmailVerification !== false}
-                  onChange={v => updateSetting('requireEmailVerification', v, 'email verification')}
-                  ariaLabel="Require email verification toggle"
+                  checked
+                  disabled
+                  onChange={() => {}}
+                  ariaLabel="Require email verification (always on)"
                 />
               </label>
             </div>

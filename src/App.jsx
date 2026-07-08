@@ -1440,13 +1440,11 @@ export default function App() {
               setUserId(refreshed.id);
             } catch (e) { console.error(e); }
           }}
-          requireVerification={liveSettings?.requireEmailVerification !== false}
+          /* Email verification is ALWAYS required — every email (first time or
+             changed) must be confirmed with the 6-digit code we email. No
+             unverified direct-save path. */
+          requireVerification={true}
           savedEmail={profile?.email || authEmail || null}
-          onSaveEmailDirect={async (em) => {
-            if (!userId) throw new Error('no_user');
-            await updateUserProfile(userId, { email: em });
-            setProfile(p => (p ? { ...p, email: em } : p));
-          }}
           onMarketingConsent={(consent) =>
             handleSaveProfile({ marketingConsent: consent, marketingConsentSource: 'signin_popup' })
           }

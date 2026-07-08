@@ -249,6 +249,7 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
+  const fitSigRef = useRef(null); // only refit the map when the geography changes
   const onSelectRef = useRef(onSelectStore);
   onSelectRef.current = onSelectStore;
   const onRequestRef = useRef(onRequestStore);
@@ -261,6 +262,12 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     ...withCoords.map(s => `${s.id}:${s.location.lat},${s.location.lng}:${s.balance}:${s.id === highlightId}`),
     ...notYetCoords.map(s => `n:${s.id}:${s.location.lat},${s.location.lng}`),
   ].join('|');
+  // Vote state (requested + count + threshold) for the not-yet popups. When
+  // this changes — a vote in the list OR the map, or the count RPC resolving —
+  // the popups rebuild so the map box stays in sync with the list box.
+  const notYetStateSig = notYetCoords
+    .map(s => `${s.id}:${requested.has(s.id || s.name) ? 1 : 0}:${reqCounts[s.name] || 0}`)
+    .join('|') + `|t${notYetThreshold}`;
 
   // Detect whether each not-yet logo has a transparent background so the pin
   // can render it white (transparent) or in its own colours (opaque).
@@ -380,11 +387,16 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
       marker.bindPopup(notYetPopupHtml(s, reqCounts[s.name] || 0, notYetThreshold, requested.has(s.id || s.name)));
       pts.push([s.location.lat, s.location.lng]);
     });
-    if (pts.length === 1) map.setView(pts[0], 15);
-    else if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
+    // Only (re)fit the map when the geography actually changed — NOT on a
+    // vote/state-only rebuild, or the map would jump every time someone votes.
+    if (sig !== fitSigRef.current) {
+      fitSigRef.current = sig;
+      if (pts.length === 1) map.setView(pts[0], 15);
+      else if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
+    }
     setTimeout(() => map.invalidateSize(), 80);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig, highlightId, logoBgSig]);
+  }, [sig, highlightId, logoBgSig, notYetStateSig]);
 
   return (
     <div className="stores2__map">

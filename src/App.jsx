@@ -228,6 +228,9 @@ export default function App() {
   // Phase 3: when the account page is opened FROM the Stores hub it shows a
   // combined view — summed balance + activity across every store.
   const [accountCombined, setAccountCombined] = useState(false);
+  // Where "add a cup" was launched from, so the cup-scan back button returns
+  // there (e.g. the combined Stores account) instead of always a store home.
+  const [cupScanReturn, setCupScanReturn] = useState(null);
   const [combinedHistory, setCombinedHistory] = useState([]);
   // Phase 3: per-store extras for the Stores page (org id → {featured, location}).
   const [groupStores, setGroupStores] = useState({});
@@ -815,7 +818,16 @@ export default function App() {
     if (userId) persist(updateUserProfile(userId, { selectedRewardId: id }));
   };
 
-  const handleAddCup = () => setPage('cup-scan');
+  const handleAddCup = () => { setCupScanReturn({ page, accountCombined }); setPage('cup-scan'); };
+  // Back from cup-scan → return to wherever "add a cup" was launched from.
+  // From the combined Stores account that's the account page (still combined);
+  // otherwise the store home.
+  const handleCupScanBack = () => {
+    const ret = cupScanReturn;
+    setCupScanReturn(null);
+    if (ret?.page === 'user') { setAccountCombined(!!ret.accountCombined); setPage('user'); return; }
+    setPage('home');
+  };
 
   // Open the account page as a COMBINED, group-wide view (from the Stores hub):
   // summed balance + activity across every store, each tagged with its store.
@@ -1224,7 +1236,7 @@ export default function App() {
 
   /* ── Pages ── */
   if (page === 'cup-scan') {
-    return <CupScanPage onScan={handleCupScan} onBack={() => setPage('home')} />;
+    return <CupScanPage onScan={handleCupScan} onBack={handleCupScanBack} />;
   }
 
   if (page === 'donate-success') {
@@ -1294,7 +1306,7 @@ export default function App() {
         onDone={handleSuccessDone}
         aiStatus={aiVerdict?.status}
         userName={profile?.displayName}
-        userEmail={profile?.email}
+        userEmail={profile?.email || authEmail}
         claimId={lastClaimId}
         onAddEmail={() => setShowSignIn(true)}
       />
@@ -1393,6 +1405,41 @@ export default function App() {
     />
   ) : null;
 
+  /* The sign-in / add-email sheet. Rendered on BOTH the account page and the
+   * home/store page so that a claim from the store (which requires a verified
+   * email) can actually open it — previously it lived only on the account page,
+   * so tapping "Get cashback" without an email did nothing. */
+  const signInSheetNode = (
+    <SignInSheet
+      open={showSignIn}
+      onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); }}
+      onLinked={async () => {
+        try {
+          const refreshed = await getOrCreateUser(activeOrg?.id);
+          setUserId(refreshed.id);
+        } catch (e) { console.error(e); }
+      }}
+      /* Fired the moment the email is verified. If the user was mid-claim
+         (no email when they tapped "Get cashback"), continue straight to the
+         receipt step now that they're verified. */
+      onVerified={() => {
+        if (claimAfterSignIn) {
+          setClaimAfterSignIn(false);
+          setShowSignIn(false);
+          setDetailReward(null);
+          setPage('receipt');
+        }
+      }}
+      /* Email verification is ALWAYS required — every email (first time or
+         changed) must be confirmed with the 6-digit code we email. */
+      requireVerification={true}
+      savedEmail={profile?.email || authEmail || null}
+      onMarketingConsent={(consent) =>
+        handleSaveProfile({ marketingConsent: consent, marketingConsentSource: 'signin_popup' })
+      }
+    />
+  );
+
   if (page === 'user') {
     // Combined (from-Stores) account view: sum balances + merge activity
     // across every store in the group.
@@ -1446,38 +1493,7 @@ export default function App() {
           }}
           onOpenHowItWorks={() => setHowItWorksOpen(true)}
         />
-        <SignInSheet
-          open={showSignIn}
-          onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); }}
-          onLinked={async () => {
-            // After a sign-out, refresh the local user back to anonymous
-            // device mode so the in-memory state matches reality. Pass the
-            // active org so we resolve THIS org's row, not a fresh orphan.
-            try {
-              const refreshed = await getOrCreateUser(activeOrg?.id);
-              setUserId(refreshed.id);
-            } catch (e) { console.error(e); }
-          }}
-          /* Fired the moment the email is verified. If the user was mid-claim
-             (no email when they tapped "Get cashback"), continue straight to
-             the receipt step now that they're verified. */
-          onVerified={() => {
-            if (claimAfterSignIn) {
-              setClaimAfterSignIn(false);
-              setShowSignIn(false);
-              setDetailReward(null);
-              setPage('receipt');
-            }
-          }}
-          /* Email verification is ALWAYS required — every email (first time or
-             changed) must be confirmed with the 6-digit code we email. No
-             unverified direct-save path. */
-          requireVerification={true}
-          savedEmail={profile?.email || authEmail || null}
-          onMarketingConsent={(consent) =>
-            handleSaveProfile({ marketingConsent: consent, marketingConsentSource: 'signin_popup' })
-          }
-        />
+        {signInSheetNode}
         {liveSettings.featureDirectRefunds && (
           <DirectRefundSheet
             open={directRefundOpen}
@@ -1682,6 +1698,9 @@ export default function App() {
           cashbackRate={liveSettings.cashbackRatePerCup}
         />
       )}
+      {/* Also mount the sign-in / add-email sheet here so "Get cashback" without
+          an email can open it from the store page (not just the account page). */}
+      {signInSheetNode}
     </div>
   );
 }

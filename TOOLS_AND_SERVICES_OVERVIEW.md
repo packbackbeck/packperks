@@ -19,7 +19,7 @@
 |---|---|---|---|---|
 | **Supabase** | Our database, login, file storage and server functions — the "engine room" | EU (Ireland region) | Almost everything: email, IBAN, device id, balances, receipts, activity | No (stays in EU) |
 | **Anthropic (Claude AI)** | Reads receipt photos to verify purchases | USA | Receipt photos and the details read from them | Yes |
-| **Resend** (email, via Supabase) | Sends the one-time login / verification emails | USA (EU region available) | Email address only | Yes — to be confirmed* |
+| **Brevo** (email, via Supabase SMTP) | Sends the login / verification / admin-invite emails | **EU (France)** | Email address only | **No (stays in EU)** |
 | **Tikkie** (payments & payouts — planned) | Will pay out cashback and handle payments | Netherlands (ABN AMRO) | Name, IBAN / phone, payout amount | No (stays in EU) |
 | **Web host / CDN** | Serves the website itself to visitors | Global CDN (US-based provider) | Technical logs only (IP, browser) — no stored profiles | Yes (logs) |
 | **Map tiles** (CARTO + OpenStreetMap) | The imagery on the store-finder map | CARTO / OSM (US/EU) | Visitor's IP address, only when the map is opened | Yes |
@@ -27,7 +27,7 @@
 | **App font (DM Sans)** | The app's typeface | **Our own servers (self-hosted)** | None sent to any third party | **No — resolved** (see below) |
 | **First-party analytics** | Our own in-app usage stats | Inside Supabase (EU) | Device id and in-app actions (consent-gated) | No |
 
-> *Resend can be configured to store data in an EU region — see the "Email" note below. The transfer question depends on which region we enable.
+> *Brevo (formerly Sendinblue) is an EU (France) company and sends from EU infrastructure, so login-email data does not leave the EU — see the "Email" note below.
 
 > **Good news up front:** PackPerks uses **no third-party advertising or tracking pixels** — no Google Analytics, no Meta/Facebook pixel, no Mixpanel, no Hotjar, and similar. Usage analytics are our own, stay in our EU database, and are only collected if the visitor accepts analytics cookies.
 
@@ -53,12 +53,15 @@ When a customer submits a receipt for cashback, the **photo is sent to Anthropic
 **Personal data:** the receipt image and the details read from it (date, total, items).
 **Important:** on Anthropic's standard API, inputs are **not used to train their models** and are **not kept after the request**. This is the one routine transfer of data outside the EU, so it needs a signed DPA plus a transfer safeguard (SCCs / Data Privacy Framework).
 
-### 3. Resend — sending emails (via Supabase)
-The optional "save my account" email sends a one-time code / magic link. We send these through **Resend**, connected to Supabase Auth as our email provider.
+### 3. Brevo — sending emails (via Supabase SMTP)
+The account-linking / login emails (one-time code + magic link), the admin
+invite and password-reset emails all go out through **Brevo** (formerly
+Sendinblue), connected to **Supabase Auth as our custom SMTP provider**
+(`smtp-relay.brevo.com`).
 
-**Where:** Resend is a US company, but it offers **EU data residency** — we should enable the EU region so email data stays in Europe.
-**Personal data:** the email address only (plus the email content, which is a login code).
-**Action:** sign the Resend DPA, verify our sending domain, and confirm the region setting.
+**Where:** Brevo is an **EU (France)** company and sends from EU infrastructure, so login-email data **stays in the EU** — no transfer outside the EU for these emails.
+**Personal data:** the email address only (plus the email content, which is a login code / link).
+**Action:** sign the Brevo DPA, authenticate our sending domain (SPF + DKIM), and confirm the From address matches our domain.
 
 ### 4. Tikkie — payments and payouts (planned, Netherlands)
 Cashback payouts will be handled through **Tikkie** (by ABN AMRO). Instead of paying each customer by hand, Tikkie lets us pay out to a customer's account and manage payments through a regulated Dutch bank.
@@ -134,15 +137,15 @@ Each reward shows a product photo. Some are hosted on **partners' own image serv
 |---|---|
 | The whole database, files and app logic (Supabase, EU region) | Receipt photos → Anthropic (US) for AI checks |
 | Payments and payouts (Tikkie / ABN AMRO, Netherlands) | Website delivery logs → hosting/CDN (US-based) |
-| Our own analytics | Login emails → Resend (US, unless the EU region is enabled) |
+| Our own analytics | Login emails → Brevo (EU, France) |
 | The app font (self-hosted) | Visitor IPs → map tiles and partner image servers |
 
 ---
 
 ## Compliance checklist (short version)
 
-1. **Sign/confirm DPAs** with Supabase, the web host, Anthropic, Resend, and Tikkie/ABN AMRO — tracked in `docs/DPA_STATUS.md`.
-2. **Enable the Resend EU region** (and verify our sending domain) so login-email data stays in Europe.
+1. **Sign/confirm DPAs** with Supabase, the web host, Anthropic, Brevo, and Tikkie/ABN AMRO — tracked in `docs/DPA_STATUS.md`.
+2. **Authenticate our Brevo sending domain** (SPF + DKIM) and confirm the From address is on our domain — Brevo is already EU-hosted, so login-email data stays in Europe.
 3. **Confirm** the exact web-hosting provider and its region and log retention.
 4. **Confirm in writing** Anthropic's no-training + no-retention terms and its EU→US transfer safeguard.
 5. **Disclose** the map tiles and partner image loads in the privacy policy (`docs/PRIVACY_POLICY.md`). The font is already self-hosted, so it no longer needs a Google disclosure.

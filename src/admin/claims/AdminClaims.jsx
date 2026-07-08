@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminClaims, updateClaimStatus, markClaim, getReceiptSignedUrl, deleteRecords } from '../lib/adminApi';
+import { getAdminClaims, updateClaimStatus, markClaim, getReceiptSignedUrl, deleteRecords, refreshTikkieStatus } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
 import PermissionGate from '../auth/PermissionGate';
 import { useAuth, hasPermission } from '../auth/AuthContext';
@@ -255,7 +255,6 @@ const COLUMN_CONFIG = [
   { id: 'amount',     label: 'Amount',      desc: 'Euro payout amount',                                                defaultOn: true  },
   { id: 'tikkie',     label: 'Tikkie status', desc: 'Tikkie link stage — Created / Redeemed / Expired (click for the timeline)', defaultOn: true  },
   { id: 'review',     label: 'Review',      desc: 'Pending / Approved / Rejected',                                     defaultOn: true  },
-  { id: 'payout',     label: 'Payout',      desc: 'Money state — Queued / Paid / Failed',                              defaultOn: true  },
   { id: 'decided_by', label: 'Decided by',  desc: 'Admin who made the call',                                           defaultOn: true  },
 ];
 const DEFAULT_VISIBLE_COLS = COLUMN_CONFIG.filter(c => c.defaultOn).map(c => c.id);
@@ -812,7 +811,6 @@ export default function AdminClaims({ onNavigate, draftState }) {
                   {isCol('tikkie')    && <ThCol label="Tikkie status" />}
                   <ThCol label="Date" sortable field="created_at" />
                   {isCol('review')    && <ThCol label="Review" sortable field="status" />}
-                  {isCol('payout')    && <ThCol label="Payout" />}
                   {isCol('decided_by') && <ThCol label="Decided by" />}
                   <th>Actions</th>
                 </tr>
@@ -946,7 +944,6 @@ export default function AdminClaims({ onNavigate, draftState }) {
                       )}
                       <td className="ac-muted ac-date">{formatDate(claim.created_at)}</td>
                       {isCol('review') && <td><ClaimStatusPill kind="review" claim={claim} /></td>}
-                      {isCol('payout') && <td><ClaimStatusPill kind="payout" claim={claim} /></td>}
                       {isCol('decided_by') && (
                         <td>
                           {claim.approver ? (
@@ -1046,7 +1043,14 @@ export default function AdminClaims({ onNavigate, draftState }) {
       )}
 
       {tikkieModal && (
-        <TikkieStatusModal claim={tikkieModal} onClose={() => setTikkieModal(null)} />
+        <TikkieStatusModal
+          claim={tikkieModal}
+          onClose={() => setTikkieModal(null)}
+          onRefreshed={(fields) => {
+            setClaims(prev => prev.map(c => c.id === tikkieModal.id ? { ...c, ...fields } : c));
+            setTikkieModal(prev => prev ? { ...prev, ...fields } : prev);
+          }}
+        />
       )}
 
       <QuickLinks currentPage="claims" onNavigate={onNavigate} />
@@ -1077,12 +1081,40 @@ function fmtWhen(d) {
   catch { return null; }
 }
 
-/* Popup timeline of a claim's Tikkie link status, plus the link itself. */
-function TikkieStatusModal({ claim, onClose }) {
+/* Popup timeline of a claim's Tikkie link status, plus the link itself.
+ * "Refresh" pulls the live CREATED|REDEEMED|EXPIRED status from the Tikkie
+ * Cashback API (via the tikkie-cashback edge function) and syncs it. */
+function TikkieStatusModal({ claim, onClose, onRefreshed }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg]   = useState(null);
+
   const s = String(claim.tikkie_status || 'created').toLowerCase();
   const redeemed = s === 'redeemed';
   const expired  = s === 'expired';
-  const createdAt = fmtWhen(claim.notified_at || claim.approved_at || claim.verified_at);
+  const createdAt  = fmtWhen(claim.notified_at || claim.approved_at || claim.verified_at);
+  const redeemedAt = fmtWhen(claim.tikkie_redeemed_at);
+  const expiresAt  = fmtWhen(claim.tikkie_expires_at);
+
+  async function handleRefresh() {
+    if (!claim.tikkie_cashback_id) { setMsg('No Tikkie cashback to check yet.'); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const res = await refreshTikkieStatus(claim.id);
+      if (res?.error) { setMsg(res.message || res.error); }
+      else {
+        onRefreshed?.({
+          tikkie_status: res.tikkie_status,
+          tikkie_redeemed_at: res.redeemedDateTime ?? null,
+          tikkie_expires_at: res.expiryDateTime ?? claim.tikkie_expires_at ?? null,
+        });
+        setMsg('Up to date.');
+      }
+    } catch (e) {
+      setMsg(e?.message || 'Could not refresh.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const steps = [
     {
@@ -1090,12 +1122,12 @@ function TikkieStatusModal({ claim, onClose }) {
       sub: 'We minted a Tikkie cashback link and sent it to the customer.',
     },
     redeemed
-      ? { key: 'redeemed', title: 'Redeemed', done: true, current: true, tone: 'good',
+      ? { key: 'redeemed', title: 'Redeemed', at: redeemedAt, done: true, current: true, tone: 'good',
           sub: 'The customer opened the link and collected the cashback.' }
       : expired
-        ? { key: 'expired', title: 'Expired', done: true, current: true, tone: 'bad',
+        ? { key: 'expired', title: 'Expired', at: expiresAt, done: true, current: true, tone: 'bad',
             sub: 'The link expired before it was collected. Reissue if needed.' }
-        : { key: 'awaiting', title: 'Awaiting collection', done: false, current: false,
+        : { key: 'awaiting', title: 'Awaiting collection', at: expiresAt ? `expires ${expiresAt}` : null, done: false, current: false,
             sub: 'Waiting for the customer to open the Tikkie link.' },
   ];
 
@@ -1133,6 +1165,15 @@ function TikkieStatusModal({ claim, onClose }) {
           </a>
         ) : (
           <p className="ac-tk-nolink">No Tikkie link yet — approve the claim to mint one.</p>
+        )}
+
+        {claim.tikkie_cashback_id && (
+          <div className="ac-tk-refresh-row">
+            <button className="ac-tk-refresh" onClick={handleRefresh} disabled={busy}>
+              {busy ? 'Checking…' : 'Refresh status'}
+            </button>
+            {msg && <span className="ac-tk-refresh-msg">{msg}</span>}
+          </div>
         )}
       </div>
     </div>,

@@ -4,8 +4,8 @@
  * This is the message a customer receives once an admin approves their
  * receipt and a Tikkie cashback link is minted. It's a pure render
  * function returning { subject, html, text } — NO sending happens here.
- * The Phase-2 sender edge function (Resend / SES / etc.) imports this and
- * ships the result, honouring the claim's notify_email preference.
+ * The sender edge function (Brevo — SMTP relay or transactional API) imports
+ * this and ships the result, honouring the claim's notify_email preference.
  *
  * Email-client constraints shaped every choice below:
  *   • Table-based layout + inline styles (Gmail/Outlook strip <style> and

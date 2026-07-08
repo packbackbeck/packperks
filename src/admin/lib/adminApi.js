@@ -1509,7 +1509,8 @@ export async function adminUpdateUser(userId, updates) {
 // status workflow.
 const CLAIMS_COLS = `
   id, user_id, type, reward_id, cups_redeemed, payout_amount,
-  tikkie_url, tikkie_status, notify_email, notify_push, notified_at, flagged,
+  tikkie_url, tikkie_status, tikkie_cashback_id, tikkie_expires_at, tikkie_redeemed_at,
+  notify_email, notify_push, notified_at, flagged,
   receipt_photo_url, receipt_photo_path, status, payout_status, created_at,
   ai_verdict, ai_confidence, ai_is_receipt, ai_is_burger_king,
   ai_contains_required_item, ai_failure_checks, ai_reason,
@@ -1554,6 +1555,20 @@ export async function getAdminClaims() {
   }));
 }
 
+/* Invoke an edge function and NORMALISE its result: on an HTTP error the
+ * Supabase client throws away the JSON body onto error.context — we recover it
+ * so callers always get the function's `{ error, ... }` payload instead of an
+ * opaque "non-2xx" message. Returns the parsed body (which may contain `error`). */
+async function invokeEdge(name, body) {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (!error) return data;
+  try {
+    const parsed = await error.context.json();
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch { /* fall through */ }
+  return { error: error.message || 'invoke_failed' };
+}
+
 /* Update a claim's status and record who decided. Returns the updated
  * row so callers can refresh their UI state. The decision audit (action
  * log row) is written by the caller via logAction so we don't tightly
@@ -1576,31 +1591,29 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
     update.approval_note = null;
   }
 
-  // P-02: derive payout_status from the review decision.
-  //   completed cashback → 'queued' (waiting for the payout pipeline)
-  //   completed direct refund → 'not_queued' (paid directly at claim time)
-  //   failed / pending → 'not_queued'
-  // We look up the claim's type first because the same status string
-  // means a different payout direction depending on type.
+  // Look up the claim's type + whether a Tikkie cashback was already minted,
+  // to decide the payout direction and whether to mint a link on approve.
+  let claimType = null;
+  let alreadyMinted = false;
   if (status === 'completed' || status === 'failed') {
     const { data: existing } = await applyOrgFilter(
       supabase
         .from('claims')
-        .select('type, tikkie_url')
+        .select('type, tikkie_cashback_id')
         .eq('id', claimId)
     ).maybeSingle();
-    if (status === 'completed' && (existing?.type === 'cashback' || existing?.type === 'direct_refund')) {
-      // Approved → "send" the customer a Tikkie link to collect their cashback.
-      // The link is a placeholder until the Tikkie edge function mints a real
-      // one (Phase 2); approving here is what flips the customer's claim to
-      // "Ready — collect via Tikkie".
-      update.payout_status = 'sent';
-      update.tikkie_status = 'created';
-      update.notified_at = new Date().toISOString();
-      if (!existing?.tikkie_url) update.tikkie_url = `https://tikkie.me/pay/demo/${claimId}`;
-    } else {
-      update.payout_status = 'not_queued';
-    }
+    claimType = existing?.type ?? null;
+    alreadyMinted = !!existing?.tikkie_cashback_id;
+  }
+  const payViaTikkie =
+    status === 'completed' && (claimType === 'cashback' || claimType === 'direct_refund');
+
+  // P-02: derive payout_status from the review decision.
+  //   approved cashback/refund → 'queued' until the Tikkie link is minted, then
+  //     the edge function flips it to 'sent' with the real url/id/status/expiry.
+  //   failed / pending / other → 'not_queued'.
+  if (payViaTikkie) {
+    update.payout_status = alreadyMinted ? 'sent' : 'queued';
   } else {
     update.payout_status = 'not_queued';
   }
@@ -1613,7 +1626,51 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
       .select('*')
   ).maybeSingle();
   if (error) throw error;
+
+  // Mint the REAL Tikkie cashback for a freshly approved cashback/refund. The
+  // edge function is the sole holder of the Tikkie secrets; it POSTs a cashback
+  // and writes the real tikkie_url/id/status/expiry back onto the claim. It is
+  // idempotent (returns the existing link if one was already minted).
+  if (payViaTikkie && !alreadyMinted) {
+    try {
+      const mint = await invokeEdge('tikkie-cashback', { action: 'create', claim_id: claimId });
+      if (mint?.error) {
+        // Approval stands; the payout link can be retried from the claim panel.
+        return { ...data, tikkie_error: mint };
+      }
+      return {
+        ...data,
+        tikkie_url: mint?.url ?? data.tikkie_url,
+        tikkie_cashback_id: mint?.cashbackId ?? data.tikkie_cashback_id,
+        tikkie_status: mint?.tikkie_status ?? data.tikkie_status ?? 'created',
+        tikkie_expires_at: mint?.expiryDateTime ?? data.tikkie_expires_at,
+        payout_status: 'sent',
+      };
+    } catch (e) {
+      return { ...data, tikkie_error: { error: 'tikkie_invoke_failed', detail: e?.message || String(e) } };
+    }
+  }
+
   return data;
+}
+
+/* Re-fetch a claim's live Tikkie cashback status (CREATED|REDEEMED|EXPIRED)
+ * from the Tikkie API and sync it onto the claim. Used by the Tikkie-status
+ * timeline modal's "Refresh" action. Returns { tikkie_status, ... } or { error }. */
+export async function refreshTikkieStatus(claimId) {
+  return invokeEdge('tikkie-cashback', { action: 'status', claim_id: claimId });
+}
+
+/* Re-mint a Tikkie cashback link for an already-approved claim whose earlier
+ * mint failed (e.g. the campaign was momentarily out of funds). Idempotent. */
+export async function mintTikkieLink(claimId) {
+  return invokeEdge('tikkie-cashback', { action: 'create', claim_id: claimId });
+}
+
+/* Cashback campaign funds/status for the admin dashboard. Returns
+ * { campaign: { remainingAmountInCents, status, ... } } or { error }. */
+export async function getTikkieCampaign() {
+  return invokeEdge('tikkie-cashback', { action: 'campaign' });
 }
 
 /* Toggle the admin "flag/mark" on a claim — highlights the row in the list so

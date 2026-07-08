@@ -18,7 +18,7 @@ customer app + admin console + Supabase backend as currently built.
 | Database, Auth, Storage, Edge Functions | **Supabase** (project `ozvcpbthnauitaphosfb`) | **`eu-west-1` (AWS Europe / Ireland)** | Postgres 17. Primary store of all personal data. |
 | Frontend hosting (SPA) | **Vercel** | Global edge/CDN (config-dependent) | Serves static JS/HTML only; no DB. Deploys from `main`. |
 | Receipt AI verification | **Anthropic (Claude API)** | **United States** (`api.anthropic.com`) | Receipt **images** sent for verification (see Flow C). Cross-border transfer. |
-| Transactional email (OTP / magic link) | **Supabase Auth** managed SMTP | Supabase-managed | Sends the 6-digit code / magic link to the user's email. |
+| Transactional email (OTP / magic link, invites, resets) | **Supabase Auth → Brevo** (custom SMTP, `smtp-relay.brevo.com`) | **EU (France)** | Sends the 6-digit code / magic link / invite / reset to the user's email. |
 | Source control | GitLab (`gitlab.com/packperks`) | — | Code only, no personal data. |
 
 **Data residency headline:** the customer database + file storage are **in the EU (Ireland)**.

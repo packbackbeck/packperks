@@ -149,6 +149,10 @@
 .stores2__pinlabel--notyet { color: #6C6259; font-weight: 600; background: rgba(255, 255, 255, 0.86); }
 .stores2__popcard--notyet .stores2__popcard-logo--notyet { background: #E7E2D9; color: #A79F92; }
 .stores2__popcard-notyet { display: block; font-size: 12px; color: #8A8175; margin-top: 2px; }
+/* Vote CTA inside the map popup — stretch the list-view request card to the
+   popup width so the count/progress reads the same as the list box. */
+.stores2__popcard--notyet .stores2__notyet-cta { margin-top: 10px; align-self: stretch; }
+.stores2__popcard--notyet .stores2__request-btn { width: 100%; }
 .stores2__popup-request {
   display: block; width: 100%; margin-top: 8px; padding: 8px 10px; border: none; border-radius: 8px;
   background: var(--bk-green, #1A8737); color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;

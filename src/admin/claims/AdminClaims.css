@@ -863,3 +863,16 @@
 }
 .ac-tk-link:hover { filter: brightness(0.96); }
 .ac-tk-nolink { margin: 16px 0 0; font-size: 12.5px; color: #9A9186; text-align: center; }
+
+.ac-tk-refresh-row {
+  display: flex; align-items: center; gap: 10px; justify-content: center;
+  margin-top: 12px; flex-wrap: wrap;
+}
+.ac-tk-refresh {
+  height: 34px; padding: 0 14px; border-radius: 10px;
+  border: 1px solid #E3DBCC; background: #fff; color: #5A5348;
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.ac-tk-refresh:hover:not(:disabled) { background: #F7F2E8; }
+.ac-tk-refresh:disabled { opacity: 0.6; cursor: default; }
+.ac-tk-refresh-msg { font-size: 12px; color: #9A9186; }

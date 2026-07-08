@@ -59,10 +59,10 @@ This register is reviewed on adoption, on any change of sub-processor, on DPA re
 
 ## 6. Email relay sub-processor (OTP / magic-link)
 
-Customer email addresses (for OTP / magic-link sign-in) are sent through the **email sender used by Supabase Auth**. This is a distinct relay step to pin down, because it determines which provider and region actually handle the outbound email:
+Customer email addresses (for OTP / magic-link sign-in, verification and account emails) are sent through **Brevo** (formerly Sendinblue), connected to **Supabase Auth as our custom SMTP provider** (`smtp-relay.brevo.com`). This pins down the provider and region that actually handle the outbound email:
 
-- **Provider:** [FILL: Supabase default email sub-processor or your custom SMTP provider]
-- **Region:** [FILL: email relay region]
-- **DPA status:** [FILL: email relay DPA status]
+- **Provider:** Brevo / Sendinblue SAS
+- **Region:** EU (France)
+- **DPA status:** ⚠️ Sign Brevo's DPA (available in the Brevo account → *Settings → Privacy/DPA*) and file the countersigned copy here.
 
-**Recommendation.** Bring your own **EU SMTP provider with a signed DPA** so the region where OTP / magic-link emails are relayed is certain and contractually covered, rather than relying on the default Supabase-managed sender whose underlying email sub-processor and region should be verified (see register row 4). This pairs with the matching recipient line in `ROPA.md` (Activity 4).
+**Status.** The "bring your own EU SMTP provider" recommendation is **done** — Brevo is EU-hosted, so OTP / magic-link relay stays within the EU (no US transfer for login emails). Remaining: (1) sign the Brevo DPA, (2) authenticate the sending domain in Brevo (SPF + DKIM), (3) confirm the From address is on our domain. This pairs with the matching recipient line in `ROPA.md` (Activity 4).

@@ -341,14 +341,16 @@ Functions). MVP assumption: IBANs are still stored and cashback is paid manually
 - **Recommendation:** A.
 - **Trade-offs:** Documentation only.
 
-### 31. Email OTP/magic-link relay transfer undocumented
-- **What:** Email addresses pass through Supabase-managed email; provider/sub-
-  processor, region, retention, DPA unknown.
-- **Why it exists:** Auth uses the default email sender.
-- **Solutions:** **A ★** Identify the relay sub-processor + region + DPA; document
-  it. **B** Bring your own SMTP with a known EU provider + DPA.
-- **Recommendation:** A now; B if you want control/region certainty.
-- **Trade-offs:** A is docs. B is setup work.
+### 31. Email OTP/magic-link relay transfer — RESOLVED (Brevo EU SMTP)
+- **What:** Email addresses pass through the outbound email relay for OTP /
+  magic-link / invite / reset messages.
+- **Status:** **DONE** — connected **Brevo** (Sendinblue SAS, EU/France) as
+  Supabase Auth's custom SMTP provider (`smtp-relay.brevo.com`), so the relay
+  sub-processor and region are now known and EU-resident (no US transfer for
+  login emails).
+- **Remaining:** sign the Brevo DPA, authenticate the sending domain (SPF +
+  DKIM), and confirm the From address is on our domain. Tracked in
+  `docs/DPA_STATUS.md` §6 and `docs/ROPA.md` Activity 4.
 
 ### 32. `app_config` is publicly readable
 - **What:** Public read is fine today (no PII), but it must never hold secrets,

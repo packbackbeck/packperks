@@ -161,11 +161,12 @@ top-admin role for IBAN visibility; audit logging of admin actions; separation o
   - Authentication events (OTP / magic-link issuance and sign-in) as handled by Supabase Auth.
 - **Recipients / sub-processors:**
   - Supabase Auth (identity management, EU).
-  - **Email relay** — customer email addresses (OTP / magic-link) are sent through the email
-    sender used by Supabase Auth. Provider: [FILL: Supabase default email sub-processor or your
-    custom SMTP provider]; region: [FILL: email relay region]; DPA status: [FILL: email relay DPA
-    status]. **Recommendation:** bring your own EU SMTP provider with a signed DPA for region
-    certainty over where OTP / magic-link emails are relayed.
+  - **Email relay** — customer email addresses (OTP / magic-link, verification, account) are sent
+    through **Brevo** (formerly Sendinblue), connected to Supabase Auth as the custom SMTP provider
+    (`smtp-relay.brevo.com`). Provider: **Brevo / Sendinblue SAS**; region: **EU (France)**; DPA
+    status: sign Brevo's DPA in the Brevo account (verify). Because Brevo is EU-hosted, OTP /
+    magic-link relay stays within the EU — the "bring your own EU SMTP provider" recommendation is
+    satisfied; the remaining step is confirming the signed DPA + domain authentication (SPF/DKIM).
 - **International transfers:** None specific to this activity beyond the email-delivery
   infrastructure managed by Supabase; core identity data resides in Supabase `eu-west-1`. The
   region and any onward transfer of the email relay are [FILL: email relay region] (see recipient

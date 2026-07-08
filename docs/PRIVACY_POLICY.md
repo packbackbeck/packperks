@@ -117,7 +117,7 @@ In addition, PackBack engages the following third parties to provide PackPerks:
 
 - Supabase, located in Ireland (EU). This runs almost the entire Service: our database, login functionality, storage of files such as receipts and cup photos, and the server functions that process claims and payouts. This is where most of your personal data is processed, including your email address, device id, balance, receipts and usage data.
 - Anthropic (Claude AI), located in the United States, to automatically assess receipts you submit for cashback. Anthropic does not use this data to train its models and does not retain it after the request has been processed.
-- Resend, a US company with an EU region, to send your login email.
+- Brevo (formerly Sendinblue), an EU company based in France, to send your login, verification and account emails.
 - Tikkie, a service of ABN AMRO Bank N.V., the Netherlands.
 - Our hosting provider, located in the United States, serves the PackPerks website. This party only processes technical logs, such as IP address and browser type, and no account data.
 - CARTO and OpenStreetMap, for the map imagery of the store finder, loaded when you open the map.
@@ -277,7 +277,7 @@ Daarnaast schakelt PackBack de volgende derde partijen in om PackPerks te kunnen
 
 - Supabase, gevestigd in Ierland (EU). Hierin draait vrijwel de gehele Dienst: onze database, inlogfunctionaliteit, opslag van bestanden zoals bonnetjes en foto's van bekers, en de serverfuncties die claims en uitbetalingen verwerken. Hier wordt het grootste deel van je persoonsgegevens verwerkt, waaronder je e-mailadres, device id, saldo, bonnetjes en gebruiksgegevens.
 - Anthropic (Claude AI), gevestigd in de Verenigde Staten, voor het automatisch beoordelen van bonnetjes die je indient voor cashback. Anthropic gebruikt deze gegevens niet om haar modellen te trainen en bewaart ze niet nadat het verzoek is afgehandeld.
-- Resend, een Amerikaans bedrijf met een EU regio, voor het versturen van je inlog e-mail.
+- Brevo (voorheen Sendinblue), een EU-bedrijf gevestigd in Frankrijk, voor het versturen van je inlog-, verificatie- en accounte-mails.
 - Tikkie, een dienst van ABN AMRO Bank N.V., Nederland.
 - Onze hostingpartij, gevestigd in de Verenigde Staten, voor het uitleveren van de PackPerks website. Deze partij verwerkt uitsluitend technische logs, zoals IP-adres en browsertype, en geen accountgegevens.
 - CARTO en OpenStreetMap, voor het kaartmateriaal van de winkelzoeker, geladen op het moment dat je de kaart opent.

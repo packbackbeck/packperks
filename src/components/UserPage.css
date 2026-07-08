@@ -7,7 +7,7 @@
   min-height: 100dvh;
   background: var(--bk-cream);
   /* Bottom padding matches the horizontal (side) padding. */
-  padding: var(--sp-5);
+  padding: var(--sp-2);
   gap: var(--sp-4);
   animation: page-slide-in 0.28s var(--ease-out-expo) both;
 }

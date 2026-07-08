@@ -210,10 +210,42 @@ function escapeHtml(s) {
   ));
 }
 
+/* Not-yet (coming-soon) map popup — mirrors the list-view request card exactly:
+ * a progress-fill "Request" button that becomes a disabled "Requested" once
+ * this device has voted, and the "{count}/{threshold} · N to go" (or "Coming
+ * soon") vote tally. Shared so the map box matches the list box 1:1. */
+function notYetPopupHtml(s, count, threshold, done) {
+  const c = Math.max(0, Number(count) || 0);
+  const t = Math.max(1, Number(threshold) || 10);
+  const pct = Math.min(100, Math.round((c / t) * 100));
+  const reached = c >= t;
+  const countLine = reached
+    ? '<span class="stores2__request-count stores2__request-count--soon">Coming soon</span>'
+    : c > 0
+      ? `<span class="stores2__request-count">${c}/${t} · ${t - c} to go</span>`
+      : '';
+  return `<div class="stores2__popcard stores2__popcard--notyet">
+      <div class="stores2__popcard-top">
+        <span class="stores2__popcard-logo stores2__popcard-logo--letter stores2__popcard-logo--notyet">${escapeHtml((s.name || 'S').charAt(0).toUpperCase())}</span>
+        <div class="stores2__popcard-info">
+          <strong class="stores2__popcard-name">${escapeHtml(s.name)}</strong>
+          <span class="stores2__popcard-notyet">Not available yet</span>
+        </div>
+      </div>
+      <div class="stores2__notyet-cta">
+        <button type="button" class="stores2__request-btn stores2__popup-request${done ? ' is-done' : ''}" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-area="${escapeHtml(s.area || '')}" data-count="${c}" data-threshold="${t}"${done ? ' disabled' : ''}>
+          <span class="stores2__request-fill" style="width:${pct}%"></span>
+          <span class="stores2__request-label">${done ? 'Requested' : 'Request'}</span>
+        </button>
+        ${countLine}
+      </div>
+    </div>`;
+}
+
 /* Real map via Leaflet + OpenStreetMap tiles (free, no API key). Plots a
  * marker at each store's actual coordinates; the marker popup shows the
  * store name, address and cups, with a button to open that store. */
-function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore }) {
+function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore, requested = new Set(), reqCounts = {}, notYetThreshold = 10 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -268,11 +300,14 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
         if (st) onSelectRef.current?.(st);
       };
       const req = root?.querySelector('.stores2__popup-request');
-      if (req && !req.classList.contains('is-done')) req.onclick = () => {
-        onRequestRef.current?.({ id: req.dataset.id, name: req.dataset.name, area: req.dataset.area });
-        req.textContent = 'Requested';
-        req.disabled = true;
-        req.classList.add('is-done');
+      if (req && !req.classList.contains('is-done') && !req.disabled) req.onclick = () => {
+        const store = { id: req.dataset.id, name: req.dataset.name, area: req.dataset.area };
+        onRequestRef.current?.(store);
+        // Reflect the vote in this popup AND on reopen: one vote only, with the
+        // count/progress bumped — mirroring the list card's "Requested" state.
+        const newCount = (Number(req.dataset.count) || 0) + 1;
+        const threshold = Number(req.dataset.threshold) || 10;
+        e.popup.setContent(notYetPopupHtml(store, newCount, threshold, true));
       };
     });
     setTimeout(() => map.invalidateSize(), 80);
@@ -338,18 +373,11 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
         iconSize: [104, 52], iconAnchor: [52, 16], popupAnchor: [0, -14],
       });
       const marker = L.marker([s.location.lat, s.location.lng], { icon, zIndexOffset: 0 }).addTo(layer);
-      marker.bindPopup(
-        `<div class="stores2__popcard stores2__popcard--notyet">
-           <div class="stores2__popcard-top">
-             <span class="stores2__popcard-logo stores2__popcard-logo--letter stores2__popcard-logo--notyet">${escapeHtml((s.name || 'S').charAt(0).toUpperCase())}</span>
-             <div class="stores2__popcard-info">
-               <strong class="stores2__popcard-name">${escapeHtml(s.name)}</strong>
-               <span class="stores2__popcard-notyet">Not available yet</span>
-             </div>
-           </div>
-           <button type="button" class="stores2__popup-request" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-area="${escapeHtml(s.area || '')}">Request it</button>
-         </div>`,
-      );
+      // Popup mirrors the list-view request card: vote count + "N to go" and a
+      // once-only Request button (already-voted → disabled "Requested"). State
+      // comes from the shared `requested` set + `reqCounts`, so map ↔ list stay
+      // in sync.
+      marker.bindPopup(notYetPopupHtml(s, reqCounts[s.name] || 0, notYetThreshold, requested.has(s.id || s.name)));
       pts.push([s.location.lat, s.location.lng]);
     });
     if (pts.length === 1) map.setView(pts[0], 15);
@@ -624,6 +652,9 @@ export default function StoresPage({
           highlightId={topId}
           onSelectStore={onSelectStore}
           onRequestStore={handleRequest}
+          requested={requested}
+          reqCounts={reqCounts}
+          notYetThreshold={notYetThreshold}
         />
       ) : (
         <>

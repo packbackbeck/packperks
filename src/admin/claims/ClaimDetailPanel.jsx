@@ -22,7 +22,7 @@ import '../receipts/AdminReceiptCheck.css';
  * identical to the old AdminReceiptCheck right pane:
  *
  *   • Receipt photo (signed URL, click to enlarge in a lightbox)
- *   • Claim metadata: claimant, IBAN, payout, dates, cup count
+ *   • Claim metadata: claimant, payout, dates, cup count
  *   • "Approved/Rejected by …" stamp (when status != pending)
  *   • Embedded AI check (3 checks with confidence)
  *   • Approve / Reject buttons (gated by claim.approve permission)
@@ -187,7 +187,7 @@ function AiVerdictPanel({ claim }) {
   );
 }
 
-export default function ClaimDetailPanel({ claim, onApprove, onFail, onClaimUpdate, updating }) {
+export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onClaimUpdate, updating }) {
   const { profile } = useAuth();
   const canHideImage = hasPermission(profile?.role, 'claim.hide_image');
   const [lightbox, setLightbox] = useState(false);
@@ -262,7 +262,11 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onClaimUpda
     );
   }
 
-  const canAct = claim.status === 'pending';
+  // The admin is the FINAL verdict on every claim. Actionable = still pending,
+  // OR the AI auto-marked it 'completed' but no Tikkie link has been sent yet
+  // (older behaviour) — in both cases a human hasn't approved the payout.
+  const canAct = claim.status === 'pending'
+    || (claim.status === 'completed' && !claim.tikkie_url);
 
   return (
     <div className="rc-detail">
@@ -387,13 +391,27 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onClaimUpda
           </div>
         )}
         <div className="rc-detail__row">
-          <span className="rc-detail__row-label">IBAN</span>
-          <span className="rc-detail__row-val rc-detail__row-val--mono">
-            {claim.iban
-              ? <PiiMask type="iban" value={claim.iban} targetType="claim" targetId={claim.id} />
-              : <span style={{ color: '#B8B2A8' }}>—</span>}
-          </span>
+          <span className="rc-detail__row-label">Payout method</span>
+          <span className="rc-detail__row-val">Tikkie link</span>
         </div>
+        {(claim.notify_email || claim.notify_push) && (
+          <div className="rc-detail__row">
+            <span className="rc-detail__row-label">Notify via</span>
+            <span className="rc-detail__row-val rc-detail__row-val--muted">
+              {[claim.notify_email && 'Email', claim.notify_push && 'Push'].filter(Boolean).join(' + ')}
+            </span>
+          </div>
+        )}
+        {claim.tikkie_url && (
+          <div className="rc-detail__row">
+            <span className="rc-detail__row-label">Tikkie link</span>
+            <span className="rc-detail__row-val rc-detail__row-val--mono">
+              <a href={claim.tikkie_url} target="_blank" rel="noopener noreferrer" style={{ color: '#1A8737', textDecoration: 'underline' }}>
+                {claim.tikkie_url.replace('https://', '')}
+              </a>
+            </span>
+          </div>
+        )}
 
         <div className="rc-detail__section-label" style={{ marginTop: 10 }}>Claim</div>
         <div className="rc-detail__row">
@@ -428,6 +446,20 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onClaimUpda
             </span>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => onFlag?.(claim.id, !claim.flagged)}
+          style={{
+            marginTop: 12, width: '100%', padding: '9px 12px', borderRadius: 10,
+            border: `1px solid ${claim.flagged ? '#E0A400' : '#E2DDD2'}`,
+            background: claim.flagged ? '#FDF4DA' : 'transparent',
+            color: claim.flagged ? '#8A6400' : '#6B645B',
+            fontWeight: 700, fontSize: 13, cursor: 'pointer',
+          }}
+        >
+          {claim.flagged ? '★ Marked for review — click to clear' : '☆ Mark for a second look'}
+        </button>
       </div>
 
       {canAct && (

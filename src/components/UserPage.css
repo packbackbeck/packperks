@@ -6,7 +6,8 @@
   width: 100%;
   min-height: 100dvh;
   background: var(--bk-cream);
-  padding: var(--sp-5) var(--sp-5) calc(var(--sp-6) * 2);
+  /* Bottom padding matches the horizontal (side) padding. */
+  padding: var(--sp-5);
   gap: var(--sp-4);
   animation: page-slide-in 0.28s var(--ease-out-expo) both;
 }
@@ -807,20 +808,6 @@
 }
 
 /* ── Email block ── */
-.user-page__card-title {
-  font-family: var(--font-primary);
-  font-weight: var(--fw-bold);
-  font-size: var(--fs-md);
-  color: var(--black);
-}
-
-.user-page__card-desc {
-  font-family: var(--font-primary);
-  font-size: var(--fs-sm);
-  color: var(--text-light);
-  line-height: 1.4;
-}
-
 .user-page__email-row {
   display: flex;
   gap: var(--sp-2);
@@ -862,25 +849,6 @@
   color: #E24400;
 }
 
-/* Tappable saved email — looks like a value but acts as a button */
-.user-page__row-value--editable {
-  font-family: var(--font-primary);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-style: dashed;
-  text-decoration-color: var(--border-light);
-}
-.user-page__row-value--editable:hover {
-  color: var(--black);
-  text-decoration-color: var(--text-muted);
-}
-
 .user-page__email-cancel {
   background: none;
   border: none;
@@ -894,8 +862,8 @@
 }
 .user-page__email-cancel:hover { color: var(--text-muted); }
 
-/* ── IBAN blurred display ── */
-.user-page__iban-blurred {
+/* ── Masked value (tap to reveal) — used for the email row ── */
+.user-page__masked-value {
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -909,26 +877,17 @@
   letter-spacing: 0.5px;
   user-select: none;
 }
-/* Blur only the dots portion via a wrapper span added in JSX */
-.user-page__iban-dots {
-  filter: blur(2.5px);
-  transition: filter var(--duration-fast) ease;
-  color: var(--text-light);
-}
-.user-page__iban-blurred:hover .user-page__iban-dots { filter: blur(1.5px); }
-
-.user-page__iban-last4 {
-  color: var(--black);
-  font-weight: var(--fw-medium);
-  filter: none;
-}
 
 /* ── Cup actions grid ── */
+/* Nested inside the value-box: inset from the card edges, separated from the
+   balance row by a hairline, and sitting above the card's bottom padding. */
 .user-page__actions {
-  width: 330px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
+  margin: var(--sp-4) var(--sp-4) 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 /* When the visible button count is odd, the last item stretches across both
@@ -1094,7 +1053,7 @@
   color: var(--text-light);
 }
 
-/* Just-in-time privacy hint under email / IBAN inputs (GDPR item 11) */
+/* Just-in-time privacy hint under the email input (GDPR item 11) */
 .user-page__privacy-hint {
   margin: 8px 2px 0; font-size: var(--fs-xs); line-height: 1.45; color: var(--text-light, #8A8175);
 }
@@ -1329,20 +1288,6 @@
 }
 .user-page__progress-upgrade:active { transform: translateY(1px); }
 
-/* "Save your progress" / "Account" section that now lives at the
- * bottom of the user page. Visually identical to the Activity section
- * above it — same section-title + white card — but with a touch
- * more breathing room and a full-width Manage button when the user
- * is already signed in. */
-.user-page__progress-section {
-  margin-top: 4px;
-}
-
-.user-page__progress-manage {
-  width: 100%;
-  margin-top: 6px;
-}
-
 /* ── "How does it work?" row (opens the Stories guide) ── */
 .user-page__howto {
   width: 330px;
@@ -1398,3 +1343,72 @@
   flex-shrink: 0;
   color: var(--text-light);
 }
+
+/* ── Visitor: two conversion CTAs (scan a cup OR save an email) ── */
+.user-page__visitor-ctas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.user-page__visitor-ctas .user-page__visitor-cta { width: 100%; }
+.user-page__visitor-cta--alt {
+  color: var(--bk-orange);
+  background: var(--white);
+  border: 1.5px solid var(--bk-orange);
+}
+.user-page__visitor-cta--alt:hover { filter: none; background: #FFF6F1; }
+
+/* ── Email preferences: marketing-consent toggle ── */
+.user-page__pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+}
+.user-page__pref-title {
+  font-family: var(--font-primary);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-sm);
+  color: var(--black);
+}
+.user-page__switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: #D8D2C6;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+.user-page__switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: transform 0.16s ease;
+}
+.user-page__switch:checked { background: #1A8737; }
+.user-page__switch:checked::after { transform: translateX(18px); }
+
+/* Inline email editor inside the padding-less Details list card. */
+.user-page__account-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+
+/* Manage-email row + marketing toggle as padded list rows (the base
+ * .user-page__pref has no padding of its own — needs it inside a list). */
+.user-page__pref--row { padding: 13px var(--sp-4); }

@@ -1,6 +1,6 @@
 # PackPerks — Internal Data-Handling Rule (Staff)
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** info@packback.network · **Last updated:** 2026-07-03
 
 This is a one-page internal rule for everyone who works on PackPerks. It exists to keep customer personal data inside the systems built to protect it, and out of the tools where it leaks — chat, screenshots, notes and spreadsheets. If in doubt, don't paste it; ask.
 
@@ -19,4 +19,4 @@ Customer trust and our GDPR/PDPL obligations depend on personal data staying in 
 
 ## If something goes wrong
 
-If customer PII has already been posted somewhere it shouldn't be (a full IBAN in Slack, a receipt image in a ticket, a signed URL in a log), **do not ignore it**: remove it if you can, and **escalate immediately** to **[FILL: internal escalation contact]** and the privacy owner (support@packback.network). Accidental exposure may be a reportable data breach — see `BREACH_RUNBOOK.md`. It is always better to flag it early.
+If customer PII has already been posted somewhere it shouldn't be (a full IBAN in Slack, a receipt image in a ticket, a signed URL in a log), **do not ignore it**: remove it if you can, and **escalate immediately** to **[FILL: internal escalation contact]** and the privacy owner (info@packback.network). Accidental exposure may be a reportable data breach — see `BREACH_RUNBOOK.md`. It is always better to flag it early.

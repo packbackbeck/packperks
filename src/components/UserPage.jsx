@@ -6,11 +6,12 @@ import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
 import ActivityDetailModal from './ActivityDetailModal';
 import PrivacyPolicyView from './PrivacyPolicyView';
-import { validateIban } from '../utils/iban';
+import PendingClaims from './PendingClaims';
 import { getGlobalImpact } from '../lib/api';
+import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
 import { clearConsent } from '../lib/consent';
 
-const DSAR_EMAIL = 'support@packback.network';
+const DSAR_EMAIL = 'info@packback.network';
 
 /* Build timestamp, stamped at compile time by vite (see vite.config.js).
  * Shown subtly at the bottom of the profile so we can confirm which
@@ -265,6 +266,9 @@ export default function UserPage({
   // the SUM across every store, history is combined + tagged with a store name.
   combined = false,
   combinedNote,
+  // Pre-summed € total for a combined balance, valued per store (orgs can have
+  // different €/cup rates). When provided, it overrides cupCount × cashbackRate.
+  cashbackTotal,
   // The active store's name — used for the per-store balance caption.
   storeName,
   // Admin-editable privacy policy text (falls back to the bundled default).
@@ -278,8 +282,17 @@ export default function UserPage({
   // them against the activity_history label ("Claimed: Chicken Sandwich").
   const enrichedClaims = userClaims.map(c => {
     const reward = rewards.find(r => r.id === c.reward_id);
-    return { ...c, rewardName: reward?.name || c.reward_id };
+    return { ...c, rewardName: reward?.name || c.reward_id, rewardImage: reward?.image || null, rewardBg: reward?.bgColor || null };
   });
+  // Claims whose Tikkie CTA has been tapped once — hidden from the pending
+  // block (but kept in Activity). Persisted in localStorage.
+  const [collectedClaims, setCollectedClaims] = useState(() => getCollectedMap());
+  const handleCollectClaim = (claim) => {
+    if (!claim?.id) return;
+    markClaimCollected(claim.id);
+    setCollectedClaims({ ...getCollectedMap() });
+  };
+
   const [email, setEmail] = useState(profile.email || '');
   const [emailSaved, setEmailSaved] = useState(!!profile.email);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -287,51 +300,21 @@ export default function UserPage({
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
 
-  /* ── "Save your cups" persistent banner ──
-   * Surfaces high in the page (right under the cup-count badge) when:
-   *   • The user has actually earned ≥1 cup (no point pestering an
-   *     empty account about backup), AND
-   *   • There's no auth email linked yet (so a fresh phone would
-   *     forget them), AND
-   *   • They haven't dismissed it in the last 14 days.
-   *
-   * Dismissal is a 14-day snooze, not a permanent kill, so we surface
-   * again later when they've likely accumulated more cups and the
-   * "save your progress" pitch lands harder. Stored locally — if they
-   * switch devices the banner reappears, which is the correct
-   * behaviour (we WANT them to set up backup on every new device). */
-  const SNOOZE_KEY = 'pp_email_banner_dismissed_until';
-  const SNOOZE_MS  = 14 * 24 * 60 * 60 * 1000;
-  const [bannerSnoozed, setBannerSnoozed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      const raw = localStorage.getItem(SNOOZE_KEY);
-      if (!raw) return false;
-      const until = parseInt(raw, 10);
-      return Number.isFinite(until) && until > Date.now();
-    } catch {
-      return false;
-    }
-  });
-  function dismissBanner() {
-    try {
-      localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
-    } catch { /* private-mode / quota — fine, banner stays gone in-memory */ }
-    setBannerSnoozed(true);
-  }
-  // The composite gate. Re-evaluated every render so a sign-in (which
-  // sets `authEmail`) hides the banner immediately without a refresh.
-  const showSaveEmailBanner =
-    cupCount >= 1 && !authEmail && !bannerSnoozed;
+  /* The old floating "Save your cups" banner is gone — its prompt now lives
+   * inline on the Email row below: when no email is saved the row itself is an
+   * "Add email" action that opens the standard add-email popup (SignInSheet),
+   * and the account card at the bottom carries the same "save across devices"
+   * message. One consistent entry point instead of a separate banner. */
 
   // Email is masked (first + last letter) by default; tap to reveal in full.
   const [emailRevealed, setEmailRevealed] = useState(false);
-  // IBAN state
-  const [ibanValue, setIbanValue] = useState(profile.iban || '');
-  const [ibanRevealed, setIbanRevealed] = useState(false);
-  const [isEditingIban, setIsEditingIban] = useState(false);
-  const [ibanInput, setIbanInput] = useState('');
-  const [ibanError, setIbanError] = useState('');
+  // Keep the local email fields in sync with the profile (e.g. after the
+  // add-email popup saves it) — but never clobber what the user is typing.
+  useEffect(() => {
+    if (isEditingEmail) return;
+    setEmail(profile.email || '');
+    setEmailSaved(!!profile.email);
+  }, [profile.email, isEditingEmail]);
 
   const [activeActivity, setActiveActivity] = useState(null);
   // Impact-detail modal — opens when the customer taps the Your-impact
@@ -356,22 +339,15 @@ export default function UserPage({
     try { localStorage.clear(); } catch { /* ignore */ }
     window.location.reload();
   };
-  const handleDeleteIban = () => {
-    if (!ibanValue) return;
-    if (!window.confirm('Delete your saved IBAN? You can add it again later to receive cashback.')) return;
-    setIbanValue('');
-    saveProfile({ iban: '' });
-  };
   const dsar = (subject, extra = '') => {
     const body = `Please handle the request below for my PackPerks account.\n\nDisplay name: ${profile.displayName}\n${email ? 'Email: ' + email : 'Email: (none saved)'}\n${extra}`;
     window.location.href = `mailto:${DSAR_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
   const handleExportData = () => dsar('PackPerks — export my data (access request)');
   const handleDeleteAccount = () => {
-    if (!window.confirm('Delete your account and personal data? This clears your saved email and IBAN now and requests full erasure. Your cups will be removed. This cannot be undone.')) return;
+    if (!window.confirm('Delete your account and personal data? This clears your saved email now and requests full erasure. Your cups will be removed. This cannot be undone.')) return;
     // Best-effort immediate scrub of identifiable data on this account.
-    setIbanValue('');
-    saveProfile({ email: '', iban: '' });
+    saveProfile({ email: '' });
     dsar('PackPerks — delete my account (erasure request)', 'I want my account and all associated personal data deleted.');
   };
 
@@ -405,22 +381,6 @@ export default function UserPage({
     track('email_saved', { email_length: email.length });
   };
 
-  const handleSaveIban = () => {
-    const trimmed = ibanInput.trim().toUpperCase();
-    if (!trimmed) {
-      setIbanError('Please enter your IBAN.');
-      return;
-    }
-    if (!validateIban(trimmed)) {
-      setIbanError('This IBAN is invalid. Please double-check the number.');
-      return;
-    }
-    saveProfile({ iban: trimmed });
-    setIbanValue(trimmed);
-    setIsEditingIban(false);
-    setIbanRevealed(false);
-    setIbanError('');
-  };
 
   const handleShare = () => {
     track(EVENTS.SHARE_CUP);
@@ -499,14 +459,24 @@ export default function UserPage({
             </svg>
             Visitor
           </span>
-          <h3 className="user-page__visitor-title">Add your first cup</h3>
-          <p className="user-page__visitor-sub">Scan a counter QR to start collecting — then unlock cashback rewards.</p>
-          <button type="button" className="user-page__visitor-cta" onClick={onAddCup}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add your first cup
-          </button>
+          <h3 className="user-page__visitor-title">Get started</h3>
+          <p className="user-page__visitor-sub">Two ways to begin — scan your first cup, or save your email. Either one sets up your account and unlocks cashback.</p>
+          <div className="user-page__visitor-ctas">
+            <button type="button" className="user-page__visitor-cta" onClick={onAddCup}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add your first cup
+            </button>
+            {onOpenSignIn && (
+              <button type="button" className="user-page__visitor-cta user-page__visitor-cta--alt" onClick={onOpenSignIn}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+                </svg>
+                Add your email
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -531,196 +501,14 @@ export default function UserPage({
           <span className="user-page__value-approx" aria-label="approximately">≈</span>
           <div className="user-page__value-option user-page__value-option--right">
             <span className="user-page__value-num user-page__value-num--euro">
-              €{(cupCount * (cashbackRate || 1.25)).toFixed(2)}
+              €{(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate || 1.25)).toFixed(2)}
             </span>
             <span className="user-page__value-label">in cashback</span>
           </div>
         </div>
-      </div>
 
-      {/* ── How it works ── opens the full-screen Stories-style guide ── */}
-      {onOpenHowItWorks && (
-        <button type="button" className="user-page__howto" onClick={() => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); }}>
-          <span className="user-page__howto-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M9.3 9.2a2.8 2.8 0 0 1 5.3 1c0 1.9-2.6 2.2-2.6 3.6" />
-              <line x1="12" y1="17.4" x2="12.01" y2="17.4" />
-            </svg>
-          </span>
-          <span className="user-page__howto-text">
-            <span className="user-page__howto-title">How does it work?</span>
-            <span className="user-page__howto-sub">A quick walkthrough of cups, rewards and cashback</span>
-          </span>
-          <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="9 6 15 12 9 18" />
-          </svg>
-        </button>
-      )}
-
-      {/* ── Save-your-cups banner ── persistent reminder for users with
-            ≥1 cup who haven't linked an email. Dismissible for 14 days. */}
-      {showSaveEmailBanner && (
-        <div className="user-page__save-banner" role="region" aria-label="Save your cups">
-          <div className="user-page__save-banner-icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-          </div>
-          <div className="user-page__save-banner-body">
-            <div className="user-page__save-banner-title">Save your cups</div>
-            <div className="user-page__save-banner-sub">
-              Keep your balance if you change phone or browser.
-            </div>
-          </div>
-          <div className="user-page__save-banner-actions">
-            <button
-              type="button"
-              className="user-page__save-banner-cta"
-              onClick={onOpenSignIn}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="user-page__save-banner-dismiss"
-              onClick={dismissBanner}
-              aria-label="Dismiss for two weeks"
-              title="Dismiss for two weeks"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Details ── */}
-      <div className="user-page__card user-page__card--list">
-        <div className="user-page__row">
-          <span className="user-page__row-label">Phone</span>
-          <span className="user-page__row-value">{profile.phone}</span>
-        </div>
-        <div className="user-page__divider" />
-        <div className="user-page__row">
-          <span className="user-page__row-label">Browser</span>
-          <span className="user-page__row-value">{browserInfo}</span>
-        </div>
-        <div className="user-page__divider" />
-        <div className="user-page__row">
-          <span className="user-page__row-label">Email</span>
-          {emailSaved && email && !isEditingEmail ? (
-            emailRevealed ? (
-              <button
-                className="user-page__row-value user-page__row-value--editable"
-                onClick={() => setIsEditingEmail(true)}
-                title="Tap to edit"
-              >
-                {email}
-              </button>
-            ) : (
-              <button
-                className="user-page__row-value user-page__iban-blurred"
-                onClick={() => setEmailRevealed(true)}
-                title="Tap to reveal"
-              >
-                {maskEmail(email)}
-              </button>
-            )
-          ) : (
-            <span className="user-page__row-value user-page__row-value--unknown">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="7" stroke="#E24400" strokeWidth="1.5"/>
-                <path d="M8 5v4" stroke="#E24400" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="8" cy="11.5" r="0.75" fill="#E24400"/>
-              </svg>
-              Unknown
-            </span>
-          )}
-        </div>
-        <div className="user-page__divider" />
-        <div className="user-page__row">
-          <span className="user-page__row-label">IBAN</span>
-          {ibanValue && !isEditingIban ? (
-            ibanRevealed ? (
-              /* Revealed — tap to edit */
-              <button
-                className="user-page__row-value user-page__row-value--editable"
-                onClick={() => { setIbanInput(ibanValue); setIsEditingIban(true); }}
-                title="Tap to change IBAN"
-              >
-                {ibanValue}
-              </button>
-            ) : (
-              /* Blurred — tap to reveal */
-              <button
-                className="user-page__row-value user-page__iban-blurred"
-                onClick={() => setIbanRevealed(true)}
-                title="Tap to reveal"
-              >
-                <span className="user-page__iban-dots">
-                  {ibanValue.replace(/\s/g, '').slice(0, -4).replace(/./g, '•').replace(/(.{4})/g, '$1 ').trim()}
-                </span>
-                <span className="user-page__iban-last4">{ibanValue.replace(/\s/g, '').slice(-4)}</span>
-              </button>
-            )
-          ) : (
-            <span className="user-page__row-value user-page__row-value--unknown">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="7" stroke="#E24400" strokeWidth="1.5"/>
-                <path d="M8 5v4" stroke="#E24400" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="8" cy="11.5" r="0.75" fill="#E24400"/>
-              </svg>
-              Not saved
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* "Save your progress" card has moved to the bottom of the page,
-       *  after the Activity block — the customer first reads their
-       *  recent actions, then sees the settings card. Restyled to match
-       *  the surrounding white cards rather than the cream-tinted
-       *  variant that used to live up here. */}
-
-      {/* ── IBAN edit card ── */}
-      {isEditingIban && (
-        <div className="user-page__card">
-          <span className="user-page__card-title">Update your IBAN</span>
-          <span className="user-page__card-desc">Your IBAN is used to pay out cashback. It is stored only on this device.</span>
-          <div className="user-page__email-row">
-            <input
-              type="text"
-              className={`user-page__email-input${ibanError ? ' user-page__email-input--error' : ''}`}
-              placeholder="NL 00 BANK 1020 3012 3456 78"
-              value={ibanInput}
-              onChange={e => { setIbanInput(e.target.value.toUpperCase()); setIbanError(''); }}
-              aria-label="Your IBAN"
-              autoFocus
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <button className="user-page__email-btn" onClick={handleSaveIban}>Save</button>
-          </div>
-          <button
-            className="user-page__email-cancel"
-            onClick={() => { setIsEditingIban(false); setIbanError(''); }}
-          >
-            Cancel
-          </button>
-          {ibanError && <span className="user-page__email-error" role="alert">{ibanError}</span>}
-          <p className="user-page__privacy-hint">
-            Used only to pay your cashback. Stored securely and deleted after payment.{' '}
-            <button type="button" className="user-page__privacy-hint-link" onClick={() => setPolicyOpen(true)}>Learn more</button>
-          </p>
-        </div>
-      )}
-
-      {/* ── Cup actions grid ── */}
-      <div className="user-page__actions">
+        {/* ── Cup actions — nested inside the balance box ── */}
+        <div className="user-page__actions">
 
         {onOpenShare && (
           <button className="user-page__action-btn" onClick={handleShare}>
@@ -763,6 +551,133 @@ export default function UserPage({
           </button>
         )}
 
+        </div>
+      </div>
+
+      <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} onCollect={handleCollectClaim} />
+
+      {/* ── How it works ── opens the full-screen Stories-style guide ── */}
+      {onOpenHowItWorks && (
+        <button type="button" className="user-page__howto" onClick={() => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); }}>
+          <span className="user-page__howto-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.3 9.2a2.8 2.8 0 0 1 5.3 1c0 1.9-2.6 2.2-2.6 3.6" />
+              <line x1="12" y1="17.4" x2="12.01" y2="17.4" />
+            </svg>
+          </span>
+          <span className="user-page__howto-text">
+            <span className="user-page__howto-title">How does it work?</span>
+            <span className="user-page__howto-sub">A quick walkthrough of cups, rewards and cashback</span>
+          </span>
+          <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="9 6 15 12 9 18" />
+          </svg>
+        </button>
+      )}
+
+      {/* Save-your-cups prompt now lives inline on the Email row below
+          (the empty-email state is an "Add email" action) — no separate banner. */}
+
+      {/* ── Details + account ── phone / browser / email, plus the email
+          management action and the marketing-email toggle, all in one card. */}
+      <div className="user-page__card user-page__card--list">
+        <div className="user-page__row">
+          <span className="user-page__row-label">Phone</span>
+          <span className="user-page__row-value">{profile.phone}</span>
+        </div>
+        <div className="user-page__divider" />
+        <div className="user-page__row">
+          <span className="user-page__row-label">Browser</span>
+          <span className="user-page__row-value">{browserInfo}</span>
+        </div>
+        <div className="user-page__divider" />
+        <div className="user-page__row">
+          <span className="user-page__row-label">Email</span>
+          {emailSaved && email ? (
+            emailRevealed ? (
+              <span className="user-page__row-value">{email}</span>
+            ) : (
+              <button
+                className="user-page__row-value user-page__masked-value"
+                onClick={() => setEmailRevealed(true)}
+                title="Tap to reveal"
+              >
+                {maskEmail(email)}
+              </button>
+            )
+          ) : (
+            <span className="user-page__row-value user-page__row-value--unknown">—</span>
+          )}
+        </div>
+
+        {/* Email management — inline editor when editing, otherwise a
+            "Manage email" / "Add your email" action row. */}
+        {isEditingEmail ? (
+          <>
+            <div className="user-page__divider" />
+            <div className="user-page__account-edit">
+              <div className="user-page__email-row">
+                <input
+                  type="email"
+                  className={`user-page__email-input${emailError ? ' user-page__email-input--error' : ''}`}
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setEmailError(''); }}
+                  aria-label="Your email address"
+                  autoFocus
+                />
+                <button className="user-page__email-btn" onClick={handleSaveEmail}>Save</button>
+              </div>
+              <button
+                className="user-page__email-cancel"
+                onClick={() => { setIsEditingEmail(false); setEmail(profile.email || ''); setEmailError(''); }}
+              >
+                Cancel
+              </button>
+              {emailError && <span className="user-page__email-error" role="alert">{emailError}</span>}
+              <p className="user-page__privacy-hint">
+                Used only to save and restore your account across devices.{' '}
+                <button type="button" className="user-page__privacy-hint-link" onClick={() => setPolicyOpen(true)}>Learn more</button>
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="user-page__divider" />
+            <button
+              type="button"
+              className="user-page__data-row"
+              onClick={
+                authEmail ? onOpenSignIn
+                  : emailSaved ? () => { setEmail(profile.email || ''); setIsEditingEmail(true); }
+                  : onOpenSignIn
+              }
+            >
+              <span>{(emailSaved || authEmail) ? 'Manage email' : 'Add your email'}</span>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </>
+        )}
+
+        {/* Marketing emails — one toggle row (no description). */}
+        {(emailSaved || authEmail) && !isEditingEmail && (
+          <>
+            <div className="user-page__divider" />
+            <label className="user-page__pref user-page__pref--row">
+              <span className="user-page__pref-title">Marketing emails</span>
+              <input
+                type="checkbox"
+                className="user-page__switch"
+                checked={!!profile.marketingConsent}
+                onChange={e => onSaveProfile({ marketingConsent: e.target.checked, marketingConsentSource: 'app_profile' })}
+                aria-label="Marketing emails"
+              />
+            </label>
+          </>
+        )}
       </div>
 
       {/* ── Lifetime impact card ──
@@ -867,88 +782,9 @@ export default function UserPage({
       </div>
       )}
 
-      {/* ── Save your progress / account ──
-       * Re-skinned to match the rest of the user-page cards: a section
-       * title above + a regular white card body, instead of the cream
-       * pill it used to be at the top of the page. Lives at the bottom
-       * so the customer scans their cup count + activity first and
-       * meets the "set up your account" prompt only after they've
-       * earned context to care. */}
-      {(!emailSaved || isEditingEmail || authEmail) && (
-        <div className="user-page__history user-page__progress-section">
-          <span className="user-page__section-title">
-            {authEmail ? 'Account' : 'Save your progress'}
-          </span>
-          <div className="user-page__card">
-            <span className="user-page__card-title">
-              {authEmail
-                ? 'Synced across devices'
-                : (isEditingEmail ? 'Update your email' : 'Add your email')}
-            </span>
-            <span className="user-page__card-desc">
-              {authEmail
-                ? <>Your cups are linked to <strong>{authEmail}</strong>. Sign in with this email on any device to pick up where you left off.</>
-                : 'Add your email so we can restore your cups if you switch phones or clear your browser.'}
-            </span>
-
-            {authEmail && onOpenSignIn ? (
-              <button
-                type="button"
-                className="user-page__email-btn user-page__progress-manage"
-                onClick={onOpenSignIn}
-              >
-                Manage account
-              </button>
-            ) : (
-              <>
-                <div className="user-page__email-row">
-                  <input
-                    type="email"
-                    className={`user-page__email-input${emailError ? ' user-page__email-input--error' : ''}`}
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={e => { setEmail(e.target.value); setEmailError(''); }}
-                    aria-label="Your email address"
-                    autoFocus={isEditingEmail}
-                  />
-                  <button className="user-page__email-btn" onClick={handleSaveEmail}>Save</button>
-                </div>
-                {isEditingEmail && (
-                  <button
-                    className="user-page__email-cancel"
-                    onClick={() => { setIsEditingEmail(false); setEmail(profile.email || ''); setEmailError(''); }}
-                  >
-                    Cancel
-                  </button>
-                )}
-                {emailError && <span className="user-page__email-error" role="alert">{emailError}</span>}
-                <p className="user-page__privacy-hint">
-                  Used only to save and restore your account across devices.{' '}
-                  <button type="button" className="user-page__privacy-hint-link" onClick={() => setPolicyOpen(true)}>Learn more</button>
-                </p>
-
-                {/* Upgrade CTA — only shown once the email looks valid
-                 *  (or has already been saved), so we don't tease the
-                 *  cross-device sign-in until the user has something
-                 *  to sign in with. */}
-                {onOpenSignIn && (emailSaved || (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) && (
-                  <button
-                    type="button"
-                    className="user-page__progress-upgrade"
-                    onClick={onOpenSignIn}
-                  >
-                    <span>Use this email to sign in on other devices</span>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* The Account (email management) + Marketing-emails toggle now live
+          in a single consolidated list card at the very bottom of the page,
+          just before the footer — see below. */}
 
       {activeActivity && (
         <ActivityDetailModal
@@ -975,10 +811,9 @@ export default function UserPage({
             { label: 'Privacy & cookie policy', on: () => setPolicyOpen(true) },
             { label: 'Manage cookie choices', on: handleManageCookies },
             { label: 'Export my data', on: handleExportData },
-            ...(ibanValue ? [{ label: 'Delete my saved IBAN', on: handleDeleteIban }] : []),
             { label: 'Reset this device', on: handleResetDevice },
             { label: 'Delete my account', on: handleDeleteAccount, danger: true },
-          ].map((row, i, arr) => (
+          ].map((row, i) => (
             <div key={row.label}>
               {i > 0 && <div className="user-page__divider" />}
               <button

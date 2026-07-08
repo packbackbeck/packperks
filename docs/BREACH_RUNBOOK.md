@@ -1,6 +1,6 @@
 # PackPerks — Data Breach Response Runbook
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** info@packback.network · **Last updated:** 2026-07-03
 
 **Last updated:** (to be dated on adoption)
 **Owner:** PackPerks Privacy Owner
@@ -29,7 +29,7 @@ Two regulatory clocks can run in parallel:
 
 **Fill in on adoption:**
 
-- Privacy Owner (Incident Lead): __________ — phone: __________ — email: support@packback.network
+- Privacy Owner (Incident Lead): __________ — phone: __________ — email: info@packback.network
 - Top admin (Technical Responder): __________ — phone: __________
 - Deputy Lead: __________ — phone: __________
 - Dutch AP breach-notification portal: `https://www.autoriteitpersoonsgegevens.nl` (Meldloket datalekken) — AP file/ref: __________

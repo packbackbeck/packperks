@@ -1,6 +1,6 @@
 # PackPerks Cookie & Local-Storage Policy
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** info@packback.network · **Last updated:** 2026-07-03
 
 **Last updated:** (to be dated on adoption)
 **Owner:** PackPerks Privacy Owner

@@ -9,7 +9,7 @@ import './AdminSupport.css';
  * Sections:
  *   1. Hero — quick "talk to us" CTA + jump links
  *   2. Resource cards — links to the public PackBack website / docs
- *   3. Contact form — generic question, mails support@packback.network
+ *   3. Contact form — generic question, mails info@packback.network
  *   4. Feedback form — what's working / what's not
  *   5. Feature request form — separated from feedback so PMs can triage
  *   6. Changelog — what we've shipped in the dashboard, sorted newest-first
@@ -21,7 +21,7 @@ import './AdminSupport.css';
  * required for this stage — and the structured subject prefix makes
  * inbound triage trivial. */
 
-const SUPPORT_EMAIL = 'support@packback.network';
+const SUPPORT_EMAIL = 'info@packback.network';
 const FEEDBACK_EMAIL = 'feedback@packback.network';
 const FEATURE_EMAIL = 'product@packback.network';
 
@@ -149,7 +149,7 @@ function detectClient() {
  *
  * The external review called out that the previous form sent a bare
  * mailto with only what the user typed — when a bug report lands at
- * support@packback.network the responder has no idea which org, which
+ * info@packback.network the responder has no idea which org, which
  * role, which page, or which browser the admin was using. This footer
  * solves that for ~10 lines of code. Nothing here is sensitive that
  * the admin wouldn't be willing to disclose to support. */

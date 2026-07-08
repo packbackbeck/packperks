@@ -6,7 +6,7 @@ import './PiiMask.css';
 /* ─────────────────────────────────────────────────────────────────────
  * PiiMask — click-to-reveal wrapper for customer PII.
  *
- * Wraps a raw value (email or IBAN) so it renders as a masked preview
+ * Wraps a raw value (email) so it renders as a masked preview
  * by default. Clicking the masked chip reveals the full value AND
  * writes an entry to the action log — every reveal is auditable.
  *
@@ -15,9 +15,8 @@ import './PiiMask.css';
  * through, so any glance at sensitive data leaves an audit trail.
  *
  * The mask itself is intentionally helpful — it shows the first 2 chars
- * of an email or the bank code prefix of an IBAN so admins doing
- * support can still recognise customers, but the bulk of the value is
- * hidden. */
+ * of an email so admins doing support can still recognise customers,
+ * but the bulk of the value is hidden. */
 
 function maskEmail(email) {
   if (!email) return '—';
@@ -29,20 +28,11 @@ function maskEmail(email) {
   return `${masked}@${domain}`;
 }
 
-function maskIban(iban) {
-  if (!iban) return '—';
-  const clean = iban.replace(/\s/g, '').toUpperCase();
-  if (clean.length < 8) return '••••';
-  // Keep the country + check digits (NL00) and the bank code (BANK)
-  // so admins can recognise the bank, mask the rest.
-  return `${clean.slice(0, 8)} •••• •••• ${clean.slice(-4)}`;
-}
-
-const MASKERS = { email: maskEmail, iban: maskIban };
+const MASKERS = { email: maskEmail };
 const ROLES_WITH_CLEAR_DEFAULT = new Set(['owner']);
 
 export default function PiiMask({
-  type,           // 'email' | 'iban'
+  type,           // 'email'
   value,
   targetType,     // 'user' | 'claim' — for the audit log
   targetId,
@@ -68,7 +58,7 @@ export default function PiiMask({
     setRevealed(true);
     // Audit: who viewed what, and on which record. Reveal events are
     // surprisingly useful when investigating a misconduct complaint —
-    // "did anyone look at this customer's IBAN before the leak?"
+    // "did anyone look at this customer's email before the leak?"
     logAction({
       action: 'pii.reveal',
       targetType: targetType || 'user',

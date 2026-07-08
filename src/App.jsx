@@ -16,7 +16,6 @@ import DirectRefundSheet from './components/DirectRefundSheet';
 import RefundSuccessPage from './components/RefundSuccessPage';
 import ShareCupSheet from './components/ShareCupSheet';
 import DonateSheet from './components/DonateSheet';
-import IbanInfoSheet from './components/IbanInfoSheet';
 import DonateSuccessPage from './components/DonateSuccessPage';
 import ReceiptVerifyingPage from './components/ReceiptVerifyingPage';
 import ReceiptRejectedPage from './components/ReceiptRejectedPage';
@@ -258,7 +257,14 @@ export default function App() {
   }, [activeOrg?.id]);
 
   /* ── UI preferences ── */
-  const [selectedRewardId, setSelectedRewardId] = useState(''); // set from the active org's rewards on load (see effect below)
+  // Persisted to localStorage (not just React state) so it survives the full
+  // page reload that a BYO counter-QR scan triggers. Without this, each added
+  // cup reloads the app, `selectedRewardId` starts empty while the async DB
+  // restore is still in flight, and the auto-select effect below snaps the
+  // pick to the featured reward — the "my 8-cup reward jumped to 12 cups" bug.
+  // localStorage is synchronous, so the pick is present on the very first
+  // render after a reload and never gets yanked.
+  const [selectedRewardId, setSelectedRewardId] = usePersistedState('selected_reward_id', ''); // set from the active org's rewards on load (see effect below)
 
   // Keep the selected reward valid for the active org. The default
   // ('chicken-sandwich') is a Burger King id; on other orgs we snap to the
@@ -287,8 +293,8 @@ export default function App() {
   }, [liveRewards, selectedRewardId]);
   const [claimed, setClaimed] = usePersistedState('claimed', false); // transient UI flag, localStorage is fine
   // S1: a "visitor" only opened the app. This flips true the moment they do
-  // anything real this session (scan attempt, name/email/IBAN edit, reward
-  // pick); persisted signals (cups, email, IBAN) cover it across reloads.
+  // anything real this session (scan attempt, name/email edit, reward
+  // pick); persisted signals (cups, email) cover it across reloads.
   const [didEngage, setDidEngage] = useState(false);
   // Android in-app browser hit a cup deeplink: hold the claim and offer to
   // reopen in the default browser. { parsed } = the cup payload, kept unclaimed.
@@ -304,11 +310,6 @@ export default function App() {
     track(EVENTS.SCREEN_VIEW, { screen: page });
   }, [page]);
 
-  /* ── Transient claim state ── */
-  const [claimedIban, setClaimedIban] = useState('');
-  // (was previously the placeholder for the +1 photo-scan flow; now driven
-  // by lastCupsScanned which comes from the QR claim response.)
-
   /* ── Detail sheet ── */
   const [detailReward, setDetailReward] = useState(null);
 
@@ -322,11 +323,9 @@ export default function App() {
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [hiwSeen, setHiwSeen] = usePersistedState('hiw_seen', false);
   const [directRefundOpen, setDirectRefundOpen] = useState(false);
-  const [refundIban, setRefundIban] = useState('');
   const [refundCupCount, setRefundCupCount] = useState(0);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [donateSheetOpen, setDonateSheetOpen] = useState(false);
-  const [ibanInfoOpen, setIbanInfoOpen] = useState(false); // "What is IBAN?" explainer
   const [donatedCups, setDonatedCups] = useState(0);
 
   /* ── Derived values ── */
@@ -342,8 +341,17 @@ export default function App() {
     (cupCount || 0) === 0 &&
     (lifetimeCups || 0) === 0 &&
     !(profile?.email && String(profile.email).trim()) &&
-    !(profile?.iban && String(profile.iban).trim()) &&
     !didEngage;
+
+  // Header user-tile indicator: green "!" once a claim is approved (admin sent
+  // the Tikkie link), amber timer while any claim is still in review.
+  const claimStatus = (() => {
+    const cs = userClaims || [];
+    const isCash = c => c.type === 'cashback' || c.type === 'direct_refund';
+    if (cs.some(c => isCash(c) && c.status === 'completed' && c.tikkie_url && c.tikkie_status !== 'redeemed')) return 'ready';
+    if (cs.some(c => isCash(c) && (c.status === 'pending' || (c.status === 'completed' && !c.tikkie_url)))) return 'pending';
+    return null;
+  })();
 
   /* Effective section flags: an action button is visible only when
    * BOTH the feature flag (sidebar Quick Settings) AND the design
@@ -409,8 +417,8 @@ export default function App() {
             displayName: 'Preview',
             animalIndex: 0,
             email: '',
-            iban: '',
             phone: 'Preview device',
+            marketingConsent: false,
           });
           setCupCount(2);
           setLifetimeCups(0);
@@ -477,7 +485,7 @@ export default function App() {
 
         // Phase 3: resolve the group + shared identity FIRST, so a store the
         // customer is visiting for the first time inherits the SAME name /
-        // email / IBAN they already have at their first store (rather than
+        // email they already have at their first store (rather than
         // minting a fresh random profile). ensureIdentityForUser backfills
         // `user` in place; returns null for ungrouped orgs.
         const gctx = await getGroupContext(org?.id);
@@ -535,8 +543,8 @@ export default function App() {
           displayName,
           animalIndex,
           email: user.email || '',
-          iban: user.iban || '',
           phone: device,
+          marketingConsent: !!user.marketing_consent,
         });
         if (user.selected_reward_id) setSelectedRewardId(user.selected_reward_id);
 
@@ -657,13 +665,19 @@ export default function App() {
         if (urlByo && org?.id) {
           window.history.replaceState({}, '', window.location.pathname);
           const gcopy = gctx ? composeGroupCopy(gctx) : null;
+          // Test-only: the counter QR can carry ?cups=N to add several cups
+          // per scan (the admin generator sets this). The edge mint remains the
+          // authority (+1, cap-aware); any extra test cups are credited client-side.
+          const testCups = Math.max(1, Math.min(50, parseInt(sp.get('cups'), 10) || 1));
           mintByoCup(user.id, org.id)
             .then(res => {
               if (res?.status === 'credited') {
                 // Show the SAME success popup as a normal cup claim
                 // (CupScanSuccess) rather than a bespoke BYO modal.
-                setCupCount(res.newBalance);
-                setLastCupsScanned(1);
+                const total = testCups > 1 ? res.newBalance + (testCups - 1) : res.newBalance;
+                if (testCups > 1) persist(updateCupBalance(user.id, total));
+                setCupCount(total);
+                setLastCupsScanned(testCups);
                 setPage('cup-scan-success');
               } else if (res?.status === 'pending_review') {
                 setByoResult({
@@ -771,18 +785,18 @@ export default function App() {
 
   /* ── Profile handler ── */
   const handleSaveProfile = (updates) => {
-    setDidEngage(true); // editing name / email / IBAN means they're no longer just a visitor
+    setDidEngage(true); // editing name / email means they're no longer just a visitor
     setProfile((prev) => ({ ...prev, ...updates }));
     if (userId) persist(updateUserProfile(userId, updates));
     // Phase 3 (BYO groups only): keep the account identical across every store
-    // in the group — push name / email / IBAN edits to the shared identity +
+    // in the group — push name / email edits to the shared identity +
     // sibling rows.
     if (identityIdRef.current && byoGroupRef.current) {
       persist(propagateProfileToGroup(identityIdRef.current, {
         displayName: updates.displayName,
         animalIndex: updates.animalIndex,
         email: updates.email,
-        iban: updates.iban,
+        marketingConsent: updates.marketingConsent,
       }));
     }
   };
@@ -858,12 +872,11 @@ export default function App() {
   const handleWithdraw = () => setDirectRefundOpen(true);
 
   /* ── Direct refund ── */
-  const handleDirectRefundConfirm = (iban) => {
+  const handleDirectRefundConfirm = () => {
     track(EVENTS.WITHDRAW_ALL_CUPS, { cups_withdrawn: cupCount, deposit_value: (cupCount * 1.00).toFixed(2) });
     const count = cupCount;
     const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''} — €${(count * 1.00).toFixed(2)}`;
     addHistory('cups_withdrawn', label);
-    setRefundIban(iban);
     setRefundCupCount(count);
     setCupCount(0);
     setClaimed(false);
@@ -873,7 +886,7 @@ export default function App() {
     if (userId) {
       persist(
         updateCupBalance(userId, 0),
-        createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: count * 1.00, iban, orgId: activeOrg?.id }),
+        createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: count * 1.00, orgId: activeOrg?.id }),
         addHistoryEntry(userId, 'cups_withdrawn', label)
       );
     }
@@ -891,16 +904,15 @@ export default function App() {
   };
 
   /* ── Cashback claim ── */
-  const handleClaim = async (iban) => {
+  const handleClaim = async () => {
     if (!(await ensureRewardBudgetOk())) return;
     track(EVENTS.REWARD_CLAIM_ATTEMPTED, {
       reward_id: selectedRewardId,
       reward_name: selectedReward.name,
-      iban_length: iban.length,
       cup_count: cupCount,
     });
-    setClaimedIban(iban);
-    handleSaveProfile({ iban }); // persist IBAN for future auto-fill
+    // No IBAN step anymore — go straight to the receipt scan. Cashback is
+    // paid via a Tikkie link after the claim is reviewed.
     setPage('receipt');
   };
 
@@ -943,7 +955,6 @@ export default function App() {
         rewardId: selectedReward.id,
         cupsRedeemed: selectedReward.cupsNeeded,
         payoutAmount: selectedReward.euros,
-        iban: claimedIban,
         orgId: activeOrg?.id,
         // Set receipt_photo_path at insert time — anon users can't UPDATE
         // claims afterwards (no SELECT policy → 0 rows updated). The upload
@@ -1262,11 +1273,12 @@ export default function App() {
     return (
       <SuccessPage
         reward={selectedReward}
-        claimedIban={claimedIban}
         onDone={handleSuccessDone}
         aiStatus={aiVerdict?.status}
         userName={profile?.displayName}
         userEmail={profile?.email}
+        claimId={lastClaimId}
+        onAddEmail={() => setShowSignIn(true)}
       />
     );
   }
@@ -1275,7 +1287,6 @@ export default function App() {
     return (
       <RefundSuccessPage
         cupCount={refundCupCount}
-        iban={refundIban}
         onDone={() => { setPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
       />
     );
@@ -1364,20 +1375,16 @@ export default function App() {
     />
   ) : null;
 
-  // "What is IBAN?" explainer — opened from the claim UI (next to the voucher
-  // terms link); its "Donate my cups" CTA hands off to the donate sheet.
-  const ibanInfoNode = (
-    <IbanInfoSheet
-      open={ibanInfoOpen}
-      onClose={() => setIbanInfoOpen(false)}
-      onDonate={showDonate ? () => { setIbanInfoOpen(false); setDonateSheetOpen(true); } : null}
-    />
-  );
-
   if (page === 'user') {
     // Combined (from-Stores) account view: sum balances + merge activity
     // across every store in the group.
     const combinedBalance = Object.values(groupBalances).reduce((s, b) => s + (b?.balance || 0), 0);
+    // Value the combined balance store-by-store: each org has its OWN €/cup
+    // rate, so we can't just multiply the total cups by a single rate.
+    const combinedCashback = Object.entries(groupBalances).reduce((s, [orgId, b]) => {
+      const rate = groupStores[orgId]?.cashbackRate ?? (liveSettings.cashbackRatePerCup || 1.25);
+      return s + (b?.balance || 0) * rate;
+    }, 0);
     const acctCombined = accountCombined && !!groupCtx;
     return (
       <div className="app">
@@ -1386,6 +1393,7 @@ export default function App() {
           onSaveProfile={handleSaveProfile}
           cupCount={acctCombined ? combinedBalance : cupCount}
           cashbackRate={liveSettings.cashbackRatePerCup}
+          cashbackTotal={acctCombined ? combinedCashback : undefined}
           history={acctCombined ? combinedHistory : history}
           combined={acctCombined}
           storeName={acctCombined ? null : (activeOrg?.partner_brand_name || activeOrg?.name)}
@@ -1439,6 +1447,9 @@ export default function App() {
             await updateUserProfile(userId, { email: em });
             setProfile(p => (p ? { ...p, email: em } : p));
           }}
+          onMarketingConsent={(consent) =>
+            handleSaveProfile({ marketingConsent: consent, marketingConsentSource: 'signin_popup' })
+          }
         />
         {liveSettings.featureDirectRefunds && (
           <DirectRefundSheet
@@ -1478,7 +1489,6 @@ export default function App() {
           />
         )}
         {donateSheetNode}
-        {ibanInfoNode}
         {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
       </div>
     );
@@ -1523,10 +1533,11 @@ export default function App() {
         onAddCup={handleAddCup}
         org={activeOrg}
         design={design}
+        claimStatus={claimStatus}
       />
 
       <section className="app__hero">
-        <h1 className="app__headline">{heroHeadline}</h1>
+        <h1 className="app__headline">{(heroHeadline || '').replace(/,\s*/g, ',\n')}</h1>
         <p className="app__subtext">{heroSubtext}</p>
       </section>
 
@@ -1543,14 +1554,12 @@ export default function App() {
         cupsRemaining={cupsRemaining}
         cupsCollected={cupCount}
         claimed={claimed}
-        savedIban={profile?.iban}
         onClaim={handleClaim}
         onClaimAttempt={handleClaimAttempt}
         budgetBlocked={rewardBudgetBlocked}
         onBudgetBlocked={handleBudgetBlocked}
         onResetClaim={handleResetClaim}
         onOpenTerms={handleOpenTerms}
-        onWhatIsIban={() => setIbanInfoOpen(true)}
         onOpenRefund={showRefund ? handleOpenRefund : null}
         onViewDetail={() => handleViewDetail(selectedReward)}
         onNudge={handleNudge}
@@ -1588,12 +1597,10 @@ export default function App() {
         body={liveSettings?.budgetPausedBody}
       />
 
-      {/* Donate sheet + "What is IBAN?" explainer — opened from the claim UI
-          (audit item 44) as well as the account page. */}
+      {/* Donate sheet — opened from the claim UI as well as the account page. */}
       {donateSheetNode}
-      {ibanInfoNode}
 
-      <Modal open={termsOpen} onClose={() => setTermsOpen(false)} title="Voucher Terms">
+      <Modal open={termsOpen} onClose={() => setTermsOpen(false)} title="Cashback terms">
         {groupCopy ? (
           /* Grouped org: use the group's mode-sensitive terms (BYO drops all
            * deposit/return wording). */
@@ -1608,10 +1615,10 @@ export default function App() {
             <p><strong>How it works:</strong> Collect cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} venue — scan the QR each time to add a cup to your balance for that venue.</p>
             <ul>
               <li>Collect enough cups to unlock a reward, then claim it as <strong>cashback</strong>.</li>
-              <li>To pay you, we ask for your IBAN and a photo of your <strong>printed store receipt</strong> for the item; the purchase is verified before payout.</li>
-              <li>Cashback reaches your IBAN normally within <strong>1–2 business days</strong> after your receipt is approved.</li>
-              <li>Your IBAN is used only for the payout and is deleted once it is confirmed — only the last 4 digits are kept as a record.</li>
-              <li>No IBAN? You can <strong>donate</strong> your cups to a good cause instead.</li>
+              <li>Upload a photo of your <strong>printed store receipt</strong> for the item; we verify the purchase before paying out.</li>
+              <li>Once approved, we send you a <strong>Tikkie link</strong> to collect your cashback — usually within a few days, and no later than 7.</li>
+              <li>We never ask for your bank details — you collect your cashback yourself through the secure Tikkie link.</li>
+              <li>Prefer not to take cashback? You can <strong>donate</strong> your cups to a good cause instead.</li>
               <li>Cups are saved separately at each venue, and you can switch your reward goal any time before claiming.</li>
             </ul>
             {liveSettings?.featureDirectRefunds && (

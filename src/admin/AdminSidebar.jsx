@@ -130,7 +130,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'byorequests',
-    label: 'BYO Requests',
+    label: 'BYO QR Codes',
     /* Cup + check glyph — the bring-your-own approval queue. */
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

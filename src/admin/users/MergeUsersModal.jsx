@@ -127,7 +127,7 @@ export default function MergeUsersModal({ open, users, onClose, onMerged }) {
 
         <p className="mum__section-title">Which account should survive?</p>
         <p className="mum__hint">
-          The survivor keeps the merged balance. Profile fields (name, email, IBAN, …)
+          The survivor keeps the merged balance. Profile fields (name, email, …)
           default to the most-recently-updated non-empty value across all selected accounts.
         </p>
 

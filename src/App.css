@@ -19,8 +19,11 @@
   font-size: var(--fs-3xl);
   font-weight: var(--fw-bold);
   color: var(--black);
-  line-height: 1;
+  line-height: 1.05;
   letter-spacing: 0;
+  /* Honour the newline inserted after a comma so a two-clause headline
+     ("Bring your cup, earn cashback") stacks on two lines. */
+  white-space: pre-line;
 }
 
 .app__subtext {

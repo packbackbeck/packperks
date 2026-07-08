@@ -49,7 +49,7 @@ function OrgMark({ org }) {
  * (per the design brief) — they're two visual entry points to the
  * same destination. The middle tile triggers the add-more-cups scan
  * flow without taking the user off the home screen first. */
-export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }) {
+export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, claimStatus }) {
   const cupTileRef = useRef(null);
   const prevCount = useRef(cupCount);
 
@@ -114,12 +114,31 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design }
           type="button"
           className="header__tile header__tile--user"
           onClick={() => { track(EVENTS.ACCOUNT_OPENED); onBadgeClick?.(); }}
-          aria-label="Open your profile"
+          aria-label={claimStatus === 'ready'
+            ? 'Cashback ready to collect — open your profile'
+            : claimStatus === 'pending'
+              ? 'Cashback claim in review — open your profile'
+              : 'Open your profile'}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
             <circle cx="12" cy="7" r="4" />
           </svg>
+          {/* Claim-status indicator: yellow timer while in review, green "!"
+              once an admin approves and the Tikkie link is ready. */}
+          {claimStatus && (
+            <span className={`header__tile-badge header__tile-badge--${claimStatus}`} aria-hidden="true">
+              {claimStatus === 'ready' ? (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="6" x2="12" y2="13" /><line x1="12" y1="17.5" x2="12" y2="17.6" />
+                </svg>
+              ) : (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" /><polyline points="12 8 12 12 15 13.5" />
+                </svg>
+              )}
+            </span>
+          )}
         </button>
       </div>
     </header>

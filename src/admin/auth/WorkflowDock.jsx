@@ -231,7 +231,6 @@ const SETTINGS_LABELS = {
   heroSubtext:           'Hero subtext',
   donationRecipient:     'Donation recipient',
   donationDescription:   'Donation description',
-  minIbanLength:         'Min IBAN length',
   maxCupsPerScan:        'Cups per scan',
   maxCupsToShare:        'Max cups per share',
   featureCupSharing:     'Cup sharing feature',

@@ -10,27 +10,18 @@ export default function FeaturedReward({
   cupsRemaining,
   cupsCollected,
   claimed,
-  savedIban,
   onClaim,
   onClaimAttempt,
   budgetBlocked = false,
   onBudgetBlocked,
   onResetClaim,
   onOpenTerms,
-  onWhatIsIban,
   onOpenRefund,
   onViewDetail,
   onNudge,
   onAddCup,
   onExplain,
 }) {
-  // If the user has a saved IBAN (from profile), pre-fill the input —
-  // the field UI is identical to "they just typed it", just already
-  // populated. This keeps the unlock screen consistent whether or not
-  // they've claimed before.
-  const normalizedSaved = (savedIban || '').replace(/\s/g, '').toUpperCase();
-  const [iban, setIban] = useState(normalizedSaved);
-  const [error, setError] = useState('');
   const [nudgeVisible, setNudgeVisible] = useState(false);
   const isComplete = cupsCollected >= reward.cupsNeeded;
   const cashbackAmount = reward.euros?.toFixed(2) ?? (reward.cupsNeeded * 1.25).toFixed(2);
@@ -48,18 +39,8 @@ export default function FeaturedReward({
     // Rewards paused for this org (budget cap reached) — explain via popup,
     // never reveal the amount.
     if (budgetBlocked) { onBudgetBlocked?.(); return; }
-    const toUse = iban.trim().toUpperCase();
-    if (!toUse) {
-      setError('Please enter your IBAN to continue.');
-      return;
-    }
-    if (toUse.length < 15) {
-      setError('That IBAN looks too short. Double-check it?');
-      return;
-    }
-    setError('');
     setNudgeVisible(false);
-    onClaim(toUse);
+    onClaim();
   };
 
   return (
@@ -140,8 +121,8 @@ export default function FeaturedReward({
             <span className="featured-reward__success-icon">🎉</span>
             <h3 className="featured-reward__success-title">Reward claimed!</h3>
             <p className="featured-reward__success-desc">
-              Your <strong>{reward.name}</strong> voucher is on its way.
-              Cashback will arrive within 1 to 2 business days.
+              Your <strong>{reward.name}</strong> cashback is on its way.
+              We'll send you a Tikkie link to collect it once your receipt is approved.
             </p>
             <button className="featured-reward__success-btn" onClick={onResetClaim}>
               Claim another reward
@@ -154,47 +135,19 @@ export default function FeaturedReward({
               <h3 className="featured-reward__claim-title">Unlock your reward via cashback</h3>
               <p className="featured-reward__claim-desc">
                 {isUnlocked
-                  ? 'Scan your receipt and enter your IBAN to receive your cashback. '
+                  ? 'Scan your receipt and we\'ll send you a Tikkie link to collect your cashback. '
                   : <>Collect cups to earn cashback. Keep your purchase receipt — you'll need it to claim.</>}
-                <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the voucher terms</button>
-                {onWhatIsIban && (
-                  <><span style={{ margin: '0 4px' }}>·</span>
-                  <button className="featured-reward__info-link" onClick={onWhatIsIban}>What is IBAN?</button></>
-                )}
+                <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the cashback terms</button>
                 {onOpenRefund && (
                   <><span style={{ margin: '0 4px' }}>or</span>
                   <button className="featured-reward__info-link" onClick={onOpenRefund}>Get the direct refund</button></>
                 )}
               </p>
-              {isUnlocked && !budgetBlocked && (
-                <label className="featured-reward__claim-label" htmlFor="iban-input">
-                  Your IBAN:
-                </label>
-              )}
             </div>
 
             {isUnlocked && !budgetBlocked && (
-              <div className="featured-reward__iban-wrap">
-                <input
-                  id="iban-input"
-                  type="text"
-                  inputMode="text"
-                  autoComplete="off"
-                  spellCheck="false"
-                  placeholder="NL 00 BANK 102030 12345678"
-                  value={iban}
-                  onChange={(e) => { setIban(e.target.value); if (error) setError(''); }}
-                  className={`featured-reward__iban-input ${error ? 'featured-reward__iban-input--error' : ''}`}
-                  aria-describedby={error ? 'iban-error' : undefined}
-                  aria-invalid={!!error}
-                />
-              </div>
-            )}
-            {error && <p className="featured-reward__error" id="iban-error" role="alert">{error}</p>}
-
-            {isUnlocked && !budgetBlocked && (
               <p className="featured-reward__payout-note">
-                Cashback arrives within <strong>1–2 business days</strong>. Your IBAN is used only for this payout and deleted once it is confirmed — we keep just the last 4 digits.
+                Once your receipt is approved, we'll send you a <strong>Tikkie link</strong> to collect your cashback — usually within a few days.
               </p>
             )}
 

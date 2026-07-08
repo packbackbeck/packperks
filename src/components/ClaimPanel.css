@@ -21,7 +21,7 @@
   color: var(--gray-700);
 }
 
-/* Payout + retention transparency note shown at IBAN entry (GDPR item 43). */
+/* Payout + retention transparency note shown at the claim step (GDPR item 43). */
 .claim-panel__payout-note {
   font-size: var(--fs-xs);
   color: var(--gray-500);
@@ -34,76 +34,6 @@
 .claim-panel__payout-note strong {
   color: var(--gray-700);
   font-weight: var(--fw-semibold);
-}
-
-/* ── IBAN input ── */
-.claim-panel__label {
-  display: block;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--gray-700);
-  margin-bottom: var(--sp-2);
-}
-
-.claim-panel__input {
-  width: 100%;
-  padding: var(--sp-3) var(--sp-4);
-  border: 1.5px solid var(--gray-200);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-base);
-  color: var(--gray-700);
-  background: var(--white);
-  outline: none;
-  min-height: 48px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.claim-panel__input::placeholder {
-  color: var(--gray-300);
-}
-
-.claim-panel__input:focus {
-  border-color: var(--bk-orange);
-  box-shadow: 0 0 0 3px rgba(232, 106, 16, 0.1);
-}
-
-.claim-panel__input--error {
-  border-color: var(--bk-red);
-  box-shadow: 0 0 0 3px rgba(214, 35, 0, 0.08);
-}
-
-.claim-panel__input--saved {
-  border-color: #1A8737;
-  background: #F0FBF3;
-}
-
-.claim-panel__error {
-  font-size: var(--fs-xs);
-  color: var(--bk-red);
-  margin-top: var(--sp-1);
-  font-weight: var(--fw-medium);
-}
-
-.claim-panel__iban-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-.claim-panel__iban-label-row .claim-panel__label {
-  margin-bottom: 0;
-}
-
-.claim-panel__iban-saved {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #1A8737;
-  background: rgba(26, 135, 55, 0.1);
-  padding: 2px 8px;
-  border-radius: 20px;
 }
 
 /* ── CTA button ── */

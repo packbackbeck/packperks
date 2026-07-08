@@ -40,14 +40,24 @@ function liveStatusForClaim(item, userClaims) {
   }
   if (!bestMatch) return null;
 
+  const tikkieUrl = bestMatch.tikkie_url || null;
+  const expired = bestMatch.tikkie_status === 'expired';
+
   switch (bestMatch.status) {
     case 'completed':
-      return { label: 'Cashback paid', color: '#1A8737' };
+      // "Ready" only once an admin has minted the Tikkie link. A claim the AI
+      // auto-passed (completed, but no link yet) is still under human review.
+      if (tikkieUrl) {
+        return bestMatch.tikkie_status === 'redeemed'
+          ? { label: 'Collected', color: '#1A8737', tikkieUrl, expired }
+          : { label: 'Ready — collect via Tikkie', color: '#1A8737', tikkieUrl, expired };
+      }
+      return { label: 'In review by our team', color: '#B8922A' };
     case 'failed':
-      return { label: 'Rejected by review', color: '#C73E1D' };
+      return { label: 'Not approved', color: '#C73E1D' };
     case 'pending':
     default:
-      return { label: 'Awaiting review', color: '#B8922A' };
+      return { label: 'In review by our team', color: '#B8922A' };
   }
 }
 
@@ -141,6 +151,23 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
 
           <div className="adm-row"><span className="adm-row__label">Status</span><span className="adm-row__val" style={{ color: statusColor }}>{statusLabel}</span></div>
         </div>
+
+        {/* Persistent Tikkie CTA — stays available from the activity record
+            forever, even after the pending block is gone and even if the link
+            has expired (kept outside the card so it isn't captured in the PDF). */}
+        {liveStatus?.tikkieUrl && (
+          <div className="adm-collect-wrap">
+            <a className="adm-collect" href={liveStatus.tikkieUrl} target="_blank" rel="noopener noreferrer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              </svg>
+              Collect via Tikkie
+            </a>
+            {liveStatus.expired && (
+              <p className="adm-collect-note">If this link no longer opens, it may have expired — contact us and we’ll reissue it.</p>
+            )}
+          </div>
+        )}
 
         <div className="adm-actions">
           <button className="adm-btn adm-btn--ghost" onClick={handleDownloadPdf}>

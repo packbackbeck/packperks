@@ -283,14 +283,13 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
       identity.entry_org_id = userRow.org_id
     }
 
-    // ── Profile sync (BYO groups only): keep name / email / animal / IBAN
+    // ── Profile sync (BYO groups only): keep name / email / animal
     // identical across every store in the group. Deposit groups keep their
     // original per-store profiles, so this is gated on opts.syncProfile.
-    // The identity is the source of truth for name/email/animal; IBAN lives
-    // only on `users`, so it's shared by copying from whichever sibling row
-    // already has one. Two-way: backfill the identity from this row when it's
-    // missing a value, and backfill this row from the identity so a
-    // newly-visited store inherits the profile from the first store.
+    // The identity is the source of truth for name/email/animal. Two-way:
+    // backfill the identity from this row when it's missing a value, and
+    // backfill this row from the identity so a newly-visited store inherits
+    // the profile from the first store.
     if (opts.syncProfile) try {
       const canonName   = identity.display_name || userRow.display_name || null
       const canonAnimal = (identity.animal_index != null ? identity.animal_index : userRow.animal_index) ?? 0
@@ -306,20 +305,11 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
         Object.assign(identity, idPatch)
       }
 
-      // A shared IBAN from any sibling row in this identity.
-      let canonIban = userRow.iban || null
-      if (!canonIban) {
-        const { data: sib } = await supabase.from('users')
-          .select('iban').eq('identity_id', identity.id).not('iban', 'is', null).limit(1)
-        canonIban = sib?.[0]?.iban || null
-      }
-
       // Backfill THIS row so the store shows the same profile as the others.
       const rowPatch = {}
       if (!userRow.display_name && canonName)               rowPatch.display_name = canonName
       if (userRow.animal_index == null && canonAnimal != null) rowPatch.animal_index = canonAnimal
       if (!userRow.email && canonEmail)                     rowPatch.email = canonEmail
-      if (!userRow.iban && canonIban)                       rowPatch.iban = canonIban
       if (Object.keys(rowPatch).length) {
         await supabase.from('users').update(rowPatch).eq('id', userRow.id)
         Object.assign(userRow, rowPatch)
@@ -343,23 +333,30 @@ export async function updateIdentityProfile(identityId, fields = {}) {
   if (fields.displayName != null) patch.display_name = fields.displayName
   if (fields.animalIndex != null) patch.animal_index = fields.animalIndex
   if (fields.email != null)       patch.email = fields.email
+  if (fields.marketingConsent != null) {
+    patch.marketing_consent = !!fields.marketingConsent
+    patch.marketing_consent_at = fields.marketingConsentAt || new Date().toISOString()
+  }
   if (!Object.keys(patch).length) return
   try { await supabase.from('customer_identities').update(patch).eq('id', identityId) }
   catch (e) { console.warn('updateIdentityProfile (non-fatal):', e) }
 }
 
-// Propagate a profile edit (name / email / IBAN) to the shared identity AND
+// Propagate a profile edit (name / email) to the shared identity AND
 // every sibling `users` row in the same identity, so the account looks
 // identical across all stores. Best-effort, never throws.
-export async function propagateProfileToGroup(identityId, { displayName, animalIndex, email, iban } = {}) {
+export async function propagateProfileToGroup(identityId, { displayName, animalIndex, email, marketingConsent, marketingConsentAt } = {}) {
   if (!identityId) return
   try {
-    await updateIdentityProfile(identityId, { displayName, animalIndex, email })
+    await updateIdentityProfile(identityId, { displayName, animalIndex, email, marketingConsent, marketingConsentAt })
     const rowPatch = {}
     if (displayName != null) rowPatch.display_name = displayName
     if (animalIndex != null) rowPatch.animal_index = animalIndex
     if (email != null)       rowPatch.email = email
-    if (iban != null)        rowPatch.iban = iban
+    if (marketingConsent != null) {
+      rowPatch.marketing_consent = !!marketingConsent
+      rowPatch.marketing_consent_at = marketingConsentAt || new Date().toISOString()
+    }
     if (Object.keys(rowPatch).length) {
       await supabase.from('users').update(rowPatch).eq('identity_id', identityId)
     }
@@ -519,14 +516,26 @@ export function onAuthStateChange(callback) {
   return () => data?.subscription?.unsubscribe?.()
 }
 
+// Version of the privacy statement users accept when they record consent.
+// Bump this when the policy materially changes so consent proof stays auditable.
+export const CONSENT_POLICY_VERSION = '2026-07'
+
 export async function updateUserProfile(userId, updates) {
   const dbUpdates = { updated_at: new Date().toISOString() }
   if ('displayName' in updates) dbUpdates.display_name = updates.displayName
   if ('animalIndex' in updates) dbUpdates.animal_index = updates.animalIndex
   if ('email' in updates) dbUpdates.email = updates.email
-  if ('iban' in updates) dbUpdates.iban = updates.iban
   if ('selectedRewardId' in updates) dbUpdates.selected_reward_id = updates.selectedRewardId
   if ('device' in updates) dbUpdates.device = updates.device
+  // Marketing-email consent (optional opt-in). Service email itself needs no
+  // consent (contract / legitimate interest), so only the marketing flag is
+  // stored — with proof metadata (when, where, which policy version).
+  if ('marketingConsent' in updates) {
+    dbUpdates.marketing_consent = !!updates.marketingConsent
+    dbUpdates.marketing_consent_at = updates.marketingConsentAt || new Date().toISOString()
+    dbUpdates.marketing_consent_source = updates.marketingConsentSource || 'app'
+    dbUpdates.consent_policy_version = updates.consentPolicyVersion || CONSENT_POLICY_VERSION
+  }
 
   const { error } = await supabase
     .from('users')
@@ -985,14 +994,26 @@ export async function saveAppConfig(config, orgId) {
 // Fetch the claims belonging to this device's user. Used by the user-side
 // activity feed to surface live status (pending / completed / failed) from
 // admin actions, since activity_history is append-only and doesn't update.
-export async function getMyClaims(userId) {
-  const { data, error } = await supabase
-    .from('claims')
-    .select('id, type, reward_id, cups_redeemed, payout_amount, status, created_at, verified_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+export async function getMyClaims(userIds) {
+  // Anon device users can't SELECT `claims` under RLS, so read via a
+  // security-definer RPC that returns only non-sensitive fields (status,
+  // Tikkie link, amount — not the receipt photo). Accepts one id or an
+  // array (a person can have a row per store in a BYO group).
+  const ids = (Array.isArray(userIds) ? userIds : [userIds]).filter(Boolean)
+  if (!ids.length) return []
+  const { data, error } = await supabase.rpc('get_customer_claims', { p_user_ids: ids })
   if (error) throw error
   return data || []
+}
+
+// Record the customer's notify-channel choice for a claim (set on the verdict
+// screen). Anon can't UPDATE claims, so this goes through a security-definer RPC.
+export async function setClaimNotifyPrefs(claimId, { email = false, push = false } = {}) {
+  if (!claimId) return
+  const { error } = await supabase.rpc('set_claim_notify', {
+    p_claim_id: claimId, p_email: !!email, p_push: !!push,
+  })
+  if (error) throw error
 }
 
 // Record a completed donation claim so the admin Donations page can
@@ -1012,7 +1033,7 @@ export async function addDonationClaim(userId, cupsCount, payoutAmount, orgId) {
   if (error) throw error
 }
 
-export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, iban, receiptPhotoUrl, receiptPhotoPath, attachReceiptPhoto, orgId }) {
+export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, receiptPhotoUrl, receiptPhotoPath, attachReceiptPhoto, orgId }) {
   // Generate the claim id client-side and insert WITHOUT a RETURNING
   // select. Why: the anonymous user app has INSERT on `claims` but no
   // SELECT policy (locked down in C-1), so `.insert().select().single()`
@@ -1021,7 +1042,7 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
   const id = safeUUID()
   // Set receipt_photo_path AT INSERT TIME. An anonymous user cannot UPDATE
   // the claim afterwards: PostgREST only mutates rows the role can also
-  // SELECT, and anon has no SELECT policy on claims (they hold IBAN/payout),
+  // SELECT, and anon has no SELECT policy on claims (they hold payout data),
   // so an UPDATE silently affects 0 rows and the path never sticks — which
   // made verify-receipt report "no photo" and the whole claim fail for
   // anonymous users. The photo path is deterministic (`<id>.jpg`, since the
@@ -1034,7 +1055,6 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
     reward_id: rewardId ?? null,
     cups_redeemed: cupsRedeemed,
     payout_amount: payoutAmount,
-    iban,
     receipt_photo_url: receiptPhotoUrl ?? null,
     receipt_photo_path: photoPath,
     status: 'pending',

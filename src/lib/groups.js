@@ -169,6 +169,9 @@ export async function getGroupStores(orgIds) {
       out[orgId] = out[orgId] || {}
       out[orgId].featured = featured ? { name: featured.name, image: featured.image || '', cupsNeeded: featured.cupsNeeded } : null
       out[orgId].rewardCount = rewards.length
+      // Per-org cashback rate (€ per cup). Rates differ per org, not per group,
+      // so a combined balance must be valued store-by-store, not with one rate.
+      out[orgId].cashbackRate = Number(c.value?.settings?.cashbackRatePerCup) || null
       // All live rewards that have an image — for the auto-cycling thumbnail.
       // Featured first so the slideshow opens on it.
       out[orgId].rewards = [...rewards]

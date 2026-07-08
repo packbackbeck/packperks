@@ -86,7 +86,7 @@ const DEFAULT_STEPS = [
   {
     key: 'verify',
     title: 'Verify your purchase',
-    text: 'Snap a photo of your receipt and enter your IBAN so we can confirm the purchase.',
+    text: 'Snap a photo of your receipt so we can confirm the purchase.',
     image: '/how-it-works/step-4.png',
     bg: 'linear-gradient(165deg, #E6EAFC 0%, #D2DBF8 100%)',
     accent: '#5468C8',
@@ -95,7 +95,7 @@ const DEFAULT_STEPS = [
   {
     key: 'cashback',
     title: 'Get your cashback',
-    text: 'Once it is verified, your cashback lands in your bank account within 1 to 2 business days.',
+    text: 'Once it is verified, we send you a Tikkie link to collect your cashback — usually within a few days.',
     image: '/how-it-works/step-5.png',
     bg: 'linear-gradient(165deg, #ECF8F1 0%, #DAF1E6 100%)',
     accent: '#2EA785',

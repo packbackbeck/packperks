@@ -465,3 +465,45 @@
 /* Keep the hover state distinct from selected — slightly cooler grey
  * so the eye can tell "I'm pointing here" from "I clicked here". */
 .au-table__row:hover { background: #F5F2EE; }
+
+/* ── Marketing-consent indicator (table cell) ── */
+.au-consent {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.au-consent--on { background: #E3F3E8; color: #1A8737; }
+.au-consent--off { color: #B8B2A8; }
+
+/* ── Marketing-consent toggle (detail panel) ── */
+.udp__consent { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; }
+.udp__consent-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 23px;
+  border-radius: 999px;
+  background: #D8D2C6;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+.udp__consent-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.16s ease;
+}
+.udp__consent-switch:checked { background: #1A8737; }
+.udp__consent-switch:checked::after { transform: translateX(17px); }
+.udp__consent-state { font-size: 13px; font-weight: 600; color: #4A4540; }

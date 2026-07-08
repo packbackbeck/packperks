@@ -33,7 +33,6 @@ export const DEFAULT_SETTINGS = {
   heroSubtext: 'We pool your cup deposits into one cashback payout — worth more than a standard refund.',
   donationRecipient: 'Plastic Soup Foundation',
   donationDescription: 'Your return helps fund campaigns against plastic pollution in rivers and oceans.',
-  minIbanLength: 15,
   maxCupsPerScan: 1,
   maxCupsToShare: 10,
   featureCupSharing: true,

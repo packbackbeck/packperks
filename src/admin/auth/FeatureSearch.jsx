@@ -144,7 +144,7 @@ const FEATURES = [
   // ── Customers ──────────────────────────────────────────────────────
   { id: 'f-customers',    name: 'Customers',               desc: 'All app users + balances',          group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'users people accounts balance cups consumers' },
   { id: 'f-adjust-bal',   name: 'Adjust cup balance',      desc: 'Manually credit / debit cups',      group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'balance adjust credit debit manual override cups' },
-  { id: 'f-edit-cust',    name: 'Edit customer email',     desc: 'Update name / email / IBAN',        group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'edit update email iban name customer' },
+  { id: 'f-edit-cust',    name: 'Edit customer email',     desc: 'Update name / email',               group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'edit update email name customer' },
   { id: 'f-cust-device',  name: 'Customer device',         desc: 'Phone or web client used',          group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'device iphone android ipad mac phone agent' },
 
   // ── Organisation ──────────────────────────────────────────────────

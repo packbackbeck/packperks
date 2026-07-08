@@ -33,6 +33,7 @@ export default function MockupMaster() {
   const [promptOpen, setPromptOpen] = useState(false);
 
   const phoneRef = useRef(null);
+  const zoomRef = useRef(null);
   const csvRef = useRef(null);
 
   const flash = (msg) => { setNotice(msg); setTimeout(() => setNotice(n => (n === msg ? null : n)), 2600); };
@@ -58,17 +59,77 @@ export default function MockupMaster() {
     return true;
   };
 
+  // Capture the phone preview to an image data-URL at a given pixel ratio.
+  //
+  // We use html-to-image (toPng/toJpeg), not html2canvas: html2canvas
+  // renders flex-centered text with a shifted baseline (the "barista" /
+  // cashback pills dropped their text) and mis-draws the phone frame's
+  // transforms / pseudo-element notch. html-to-image clones the node and
+  // renders it faithfully via an SVG foreignObject, so the export matches the
+  // preview 1:1.
+  //
+  // The on-screen preview lives inside `.mockup-zoomwrap`, which carries a
+  // `transform: scale(zoom)` purely for the zoom control. We neutralise that
+  // for the duration of the capture (always restoring it) and pin the crop to
+  // the phone's natural box so the export is the un-zoomed preview at any zoom.
+  async function captureImage(pixelRatio, format = 'png') {
+    const node = phoneRef.current;
+    const wrap = zoomRef.current;
+    if (!node) return null;
+    if (document.fonts?.ready) { try { await document.fonts.ready; } catch { /* ignore */ } }
+    const prevTransform = wrap ? wrap.style.transform : '';
+    if (wrap) { wrap.style.transform = 'none'; void wrap.offsetHeight; }
+    try {
+      const canvas = await html2canvas(node, {
+        scale: pixelRatio,
+        useCORS: true,
+        logging: false,
+        backgroundColor: framed ? '#0b0b0d' : '#ECEBF1',
+        // Pin the crop to the phone's own box (offsetWidth/Height are the layout
+        // size, unaffected by the temporary transform) so nothing off-screen leaks.
+        width: node.offsetWidth,
+        height: node.offsetHeight,
+        onclone: (clonedDoc) => {
+          // html2canvas quirk 1 — flex-centred text that also sets an explicit
+          // line-height (the reward tags/buttons/chips) sinks below centre in
+          // the capture. Forcing line-height:normal keeps it centred, matching
+          // the on-screen preview.
+          const PILLS = [
+            '.featured-reward__tag', '.featured-reward__tag--cups',
+            '.featured-reward__claim-btn', '.featured-reward__claim-label',
+            '.featured-reward__add-cups-btn', '.featured-reward__success-btn',
+            '.reward-card__tag', '.reward-card__price', '.reward-card__price-chip',
+            '.reward-card__cups-label',
+          ].join(',');
+          clonedDoc.querySelectorAll(PILLS).forEach((el) => { el.style.lineHeight = 'normal'; });
+
+          // html2canvas quirk 2 — it mis-renders `translateX(-50%)` centring, so
+          // the notch + home indicator drift. Re-centre them with explicit px
+          // offsets (frame is 375px wide; notch 112px, home bar 134px).
+          const recentre = (sel, half) => {
+            clonedDoc.querySelectorAll(sel).forEach((el) => {
+              el.style.left = `${187.5 - half}px`;
+              el.style.transform = 'none';
+            });
+          };
+          recentre('.mockup-phone__notch', 56);
+          recentre('.mockup-phone__homebar', 67);
+        },
+      });
+      if (!canvas) return null;
+      return format === 'jpeg'
+        ? canvas.toDataURL('image/jpeg', 0.62)
+        : canvas.toDataURL('image/png');
+    } finally {
+      if (wrap) wrap.style.transform = prevTransform;
+    }
+  }
+
   // Small JPEG snapshot of the current preview, stored with the mockup so the
   // library list can show a thumbnail of each saved design.
   async function captureThumb() {
-    const node = phoneRef.current;
-    if (!node) return null;
     try {
-      if (document.fonts?.ready) { try { await document.fonts.ready; } catch { /* ignore */ } }
-      const canvas = await html2canvas(node, {
-        scale: 0.4, useCORS: true, logging: false, backgroundColor: framed ? '#0b0b0d' : '#ECEBF1',
-      });
-      return canvas.toDataURL('image/jpeg', 0.62);
+      return await captureImage(0.4, 'jpeg');
     } catch { return null; }
   }
 
@@ -155,12 +216,10 @@ export default function MockupMaster() {
     try {
       // Ensure the brand font is ready so text renders correctly, then race
       // the capture against a timeout so a stuck resource can't hang the UI.
-      if (document.fonts?.ready) { try { await document.fonts.ready; } catch { /* ignore */ } }
-      // html2canvas draws text with the page's already-loaded DM Sans (no font
-      // inlining), which is both reliable and correct-font here.
-      const capture = html2canvas(node, {
-        scale: 2, useCORS: true, logging: false, backgroundColor: framed ? '#0b0b0d' : '#ECEBF1',
-      }).then(canvas => canvas.toDataURL('image/png'));
+      // Capture at natural scale with the zoom neutralised (see captureImage),
+      // so the PNG matches the preview exactly regardless of the zoom level.
+      // 3× device pixels → crisp text/edges in the exported image.
+      const capture = captureImage(3, 'png');
       const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 25000));
       const dataUrl = await Promise.race([capture, timeout]);
       const a = document.createElement('a');
@@ -233,7 +292,7 @@ export default function MockupMaster() {
             </label>
           </div>
           <div className="mockup-stage">
-            <div className="mockup-zoomwrap" style={{ transform: `scale(${zoom})` }}>
+            <div className="mockup-zoomwrap" ref={zoomRef} style={{ transform: `scale(${zoom})` }}>
               <PhoneFrame ref={phoneRef} framed={framed} bg={config.palette?.background}>
                 <MockupPreview config={config} />
               </PhoneFrame>

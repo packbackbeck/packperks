@@ -404,7 +404,7 @@
 }
 
 /* ── PII dataset gating ────────────────────────────────────────────
- * The Users + Claims datasets carry email/IBAN. Roles without
+ * The Users + Claims datasets carry customer email. Roles without
  * `data.export_pii` (everyone below Admin) see them as locked buttons
  * with a small explainer. The lock chip on the button name is the
  * universal cue for "you can't get to this". */

@@ -287,28 +287,13 @@ function decideStatus(v: ThreeCheckVerdict, byo = false): {
   eval_("is_receipt", v.check_is_receipt);
   eval_("is_authentic_burger_king", v.check_is_authentic_burger_king);
   eval_("contains_required_item", v.check_contains_required_item);
-  const ranAndPassed =
-    v.check_is_receipt?.passed === true &&
-    v.check_is_authentic_burger_king?.passed === true &&
-    v.check_contains_required_item?.passed === true;
-  const confidence = v.confidence ?? 0;
-
-  // BYO venues: the AI CLASSIFIES, it doesn't auto-reject. Reject ONLY a photo
-  // that isn't a receipt at all; every real receipt goes to the admin claims
-  // queue as 'pending' with the AI's full verdict, and the admin decides.
-  // (Duplicate / timestamp fraud checks below still apply.)
-  if (byo) {
-    if (v.check_is_receipt?.passed === false) {
-      return { status: "failed", failureChecks, skippedChecks };
-    }
-    return { status: "pending", failureChecks, skippedChecks };
-  }
-
-  if (failureChecks.length > 0 && confidence < 0.5) {
+  // The AI CLASSIFIES; it NEVER auto-approves. Reject ONLY a photo that isn't a
+  // receipt at all — every real receipt (any venue) goes to the admin claims
+  // queue as 'pending' with the AI's full verdict, and a human makes the final
+  // call. Duplicate / timestamp checks below only FLAG for the admin.
+  void byo;
+  if (v.check_is_receipt?.passed === false) {
     return { status: "failed", failureChecks, skippedChecks };
-  }
-  if (ranAndPassed && confidence >= 0.92) {
-    return { status: "completed", failureChecks, skippedChecks };
   }
   return { status: "pending", failureChecks, skippedChecks };
 }
@@ -637,9 +622,9 @@ Deno.serve(async (req) => {
       };
       failureChecks = passed ? [] : ["contains_required_item"];
       skippedChecks = [];
-      status = passed ? "completed" : "pending";
+      status = "pending";
       postAiReason = passed
-        ? "Accepted: PackPerks verified test receipt."
+        ? "PackPerks verified test receipt — sent to admin review."
         : !itemPresent
           ? "PackPerks test receipt, but the claimed reward isn't on it — sent to review."
           : `PackPerks test receipt shows only ${genQty} of ${requiredQty} required ${requiredItem} — sent to review.`;
@@ -660,7 +645,7 @@ Deno.serve(async (req) => {
       failureChecks = ["duplicate_receipt", ...failureChecks];
       postAiReason =
         "This receipt's transaction number has already been used for a cashback claim.";
-      if (!byo) status = "failed";
+      // Flag only — the admin makes the final call (status stays 'pending').
     }
   }
 
@@ -683,7 +668,7 @@ Deno.serve(async (req) => {
             receiptDate.getTime() < cupReturnDate.getTime()
           ) {
             failureChecks = ["is_newer_than_cup_return", ...failureChecks];
-            if (!byo) status = "failed";
+            // Flag only — the admin makes the final call (status stays 'pending').
             postAiReason =
               `Receipt is dated ${receiptDate.toISOString()}, but your most recent ` +
               `cup return was ${cupReturnDate.toISOString()}. The receipt must be ` +

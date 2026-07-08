@@ -1,0 +1,198 @@
+/* ── Pending cashback claims — prominent block near the top of the profile.
+ * One card per active claim; several scroll horizontally (peeking the next). */
+
+.pc {
+  width: 330px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.pc__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 2px 8px;
+}
+.pc__title {
+  font-family: var(--font-primary);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--black);
+  letter-spacing: -0.01em;
+}
+.pc__count {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8A857C;
+}
+
+.pc__rail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  /* No horizontal inset so a card is the full 330px, matching the other
+     account cards. */
+  padding: 0 0 2px;
+  scrollbar-width: none;
+}
+.pc__rail::-webkit-scrollbar { display: none; }
+
+.pc-card {
+  scroll-snap-align: start;
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  background: var(--white);
+  border: 1px solid #EAE2D4;
+  border-radius: var(--radius-lg);
+  padding: 15px 16px 16px;
+  /* Match the other account cards' shadow (no heavy drop shadow). */
+  box-shadow: var(--shadow-screen);
+  display: flex;
+  flex-direction: column;
+}
+/* One card per view (full width), whichever count — swipe between them. */
+
+/* Pagination dots (only when there's more than one claim). */
+.pc__dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+.pc__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: #D9D0C0;
+  cursor: pointer;
+  transition: background 0.16s ease, width 0.16s ease;
+}
+.pc__dot.is-active { background: #1A8737; width: 18px; border-radius: 999px; }
+
+.pc-card__top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.pc-card__thumb {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FEA01E;
+}
+.pc-card__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pc-card__thumb-euro { color: #fff; font-weight: 800; font-size: 20px; }
+
+.pc-card__meta { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-card__name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #2A2724;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pc-card__amount { font-size: 12.5px; color: #8A857C; font-weight: 600; }
+
+.pc-card__badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #FBEEDA;
+  color: #A85320;
+}
+.pc-card__badge.is-ready { background: #E3F3E8; color: #1A8737; }
+
+.pc-card__msg {
+  margin: 13px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #57534C;
+}
+.pc-card__msg strong { color: #2A2724; font-weight: 800; }
+
+/* ── 3-step tracker (Submitted → Team review → Ready) ── */
+.pc-steps {
+  display: flex;
+  margin-top: 14px;
+}
+.pc-step {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.pc-step__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  background: #F1EADD;
+  color: #B3A794;
+  position: relative;
+  z-index: 1;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.pc-step.is-active .pc-step__dot {
+  background: #F0B44E;
+  color: #6B3F1F;
+  box-shadow: 0 0 0 4px rgba(240, 180, 78, 0.22);
+}
+.pc-step.is-done .pc-step__dot { background: #1A8737; color: #fff; }
+.pc-step__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #A0968A;
+  white-space: nowrap;
+}
+.pc-step.is-active .pc-step__label { color: #A85320; }
+.pc-step.is-done .pc-step__label { color: #1A8737; }
+/* Connector between adjacent step dots. */
+.pc-step__bar {
+  position: absolute;
+  top: 11px;
+  left: 60%;
+  width: 80%;
+  height: 2px;
+  background: #EBE3D6;
+  z-index: 0;
+}
+.pc-step.is-done .pc-step__bar { background: #1A8737; }
+
+.pc-card__collect {
+  margin-top: 12px;
+  height: 46px;
+  border-radius: 23px;
+  background: #1A8737;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: filter 0.14s ease, transform 0.08s ease;
+}
+.pc-card__collect:hover { filter: brightness(0.96); }
+.pc-card__collect:active { transform: translateY(1px); }

@@ -6,7 +6,8 @@
   width: 100%;
   min-height: 100dvh;
   background: var(--bk-cream);
-  padding: var(--sp-5) var(--sp-5) calc(var(--sp-6) * 2);
+  /* Big top gap so the notch / front camera never overlaps the content. */
+  padding: calc(env(safe-area-inset-top, 0px) + 100px) var(--sp-5) calc(var(--sp-6) * 2);
   gap: var(--sp-5);
   animation: page-slide-in 0.28s var(--ease-out-expo) both;
   position: relative;
@@ -23,7 +24,7 @@
   align-items: flex-start;
   justify-content: center;
   width: 330px;
-  padding-top: var(--sp-5);
+  padding-top: var(--sp-2);
   position: relative;
 }
 
@@ -372,7 +373,7 @@
 /* ── Exit / Cancel button ── */
 .receipt-page__exit {
   position: absolute;
-  top: var(--sp-4);
+  top: calc(env(safe-area-inset-top, 10px) + 60px);
   left: var(--sp-4);
   display: flex;
   align-items: center;

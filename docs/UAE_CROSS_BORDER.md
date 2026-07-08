@@ -1,6 +1,6 @@
 # PackPerks — UAE PDPL Cross-Border Transfer & Notice
 
-**Privacy owner:** [FILL: privacy owner name] · **Contact:** support@packback.network · **Last updated:** 2026-07-03
+**Privacy owner:** [FILL: privacy owner name] · **Contact:** info@packback.network · **Last updated:** 2026-07-03
 
 **Last updated: (to be dated on adoption)**
 **Owner: PackPerks Privacy Owner**
@@ -79,7 +79,7 @@ The following notice is the **UAE-specific cross-border disclosure**. It should 
 >
 > We rely on the EU's data-protection standards, on written data-processing agreements with our providers, and — where needed — on **your consent** to these transfers. If you do not agree to your data being transferred outside the UAE in this way, you will not be able to use PackPerks, because the app cannot run without them.
 >
-> You can exercise your rights (see below) or ask us anything about these transfers at **support@packback.network**.
+> You can exercise your rights (see below) or ask us anything about these transfers at **info@packback.network**.
 > **Owner:** PackPerks Privacy Owner.
 
 **Implementation note:** PackPerks does not currently geolocate users, so the simplest compliant approach is to make this UAE-facing wording **part of the standard privacy notice shown to everyone**, with the EU/US destinations stated plainly. If geo-targeting is added later, this block can be shown specifically to UAE users. Do not gate essential app data on a separate "analytics" consent — the app-use transfers described here are covered by the same "Essential only" path as our cookie banner (essential cookies/data are required to use the app; behavioural analytics remain a separate "Accept all" choice).
@@ -93,7 +93,7 @@ UAE users have rights under the PDPL that map closely to the rights we already o
 | PDPL right | How PackPerks delivers it |
 |---|---|
 | **Right to information** (Art. 13) | This document + the Privacy Policy + the in-app notice at Section 3. |
-| **Right of access** (Art. 13) | In-app **"Data control"** section, plus a manual DSAR by email to **support@packback.network**. |
+| **Right of access** (Art. 13) | In-app **"Data control"** section, plus a manual DSAR by email to **info@packback.network**. |
 | **Right to correction** (Art. 15) | Edit specific data in **"Data control"** (e.g. change email, update IBAN); DSAR email for anything not self-service. |
 | **Right to erasure / deletion** (Art. 15) | **"Data control"** lets a user delete specific data, reset their device, or **delete their account**; deletion cascades to activity history, balances and scans. Receipt/cup images are already on automatic deletion timers (see below). |
 | **Right to restrict / stop processing** (Art. 16) | Choose **"Essential only"** (no behavioural analytics), or **"Reject"** which blocks app use but **never deletes cups/claims already earned**. |
@@ -103,7 +103,7 @@ UAE users have rights under the PDPL that map closely to the rights we already o
 ### 4.1 Correction and deletion route (concrete)
 
 1. **Self-service first.** UAE users use the in-app **"Data control"** section: correct email/IBAN, reset the local `device_id`, clear device-local `localStorage` keys, or delete the account.
-2. **Manual DSAR.** For anything beyond self-service, email **support@packback.network**. The PackPerks Privacy Owner handles UAE DSARs on the **same timeline and log** as GDPR requests.
+2. **Manual DSAR.** For anything beyond self-service, email **info@packback.network**. The PackPerks Privacy Owner handles UAE DSARs on the **same timeline and log** as GDPR requests.
 3. **Automatic deletion already running.** Even without a request: **receipt images** are deleted **90 days after the claim is resolved**; **cup-scan images** **90 days after the scan**; **behavioural analytics** at **14 months**; inactive accounts (**24 months** inactivity) are deleted. Reward claims are kept **7 years** for NL accounting as amount/date/status + **IBAN last-4 only** (raw IBAN deleted on payout confirmation). These same timers apply to UAE users' data held in the EU.
 
 ### 4.2 Complaints

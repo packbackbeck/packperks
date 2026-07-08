@@ -109,6 +109,33 @@
 
 .header__tile--user {
   background: var(--bk-brown);
+  position: relative;
+}
+
+/* Claim-status indicator on the user tile: amber timer while a claim is in
+ * review, green "!" once an admin approves and the Tikkie link is ready. */
+.header__tile-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border: 2px solid var(--bk-cream);
+  box-sizing: border-box;
+}
+.header__tile-badge--pending { background: #E89E2C; }
+.header__tile-badge--ready {
+  background: #1A8737;
+  animation: header-badge-pulse 1.9s ease-in-out infinite;
+}
+@keyframes header-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 135, 55, 0.5); }
+  55%      { box-shadow: 0 0 0 5px rgba(26, 135, 55, 0); }
 }
 
 /* Bump animation — fires when cup count changes. Same effect as the

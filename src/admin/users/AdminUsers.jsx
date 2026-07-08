@@ -70,7 +70,7 @@ function DeviceBadge({ device }) {
 
 function TypeTag({ visitor }) {
   return (
-    <span className={`au-type au-type--${visitor ? 'visitor' : 'user'}`} title={visitor ? 'Opened the app but took no action yet' : 'Did something real (cup, scan, email, IBAN, or reward)'}>
+    <span className={`au-type au-type--${visitor ? 'visitor' : 'user'}`} title={visitor ? 'Opened the app but took no action yet' : 'Did something real (cup, scan, email, or reward)'}>
       {visitor ? (
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
       ) : (
@@ -108,7 +108,6 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
   const [editMode, setEditMode] = useState(false);
   const [editName, setEditName] = useState(user.display_name || '');
   const [editEmail, setEditEmail] = useState(user.email || '');
-  const [editIban, setEditIban] = useState(user.iban || '');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -116,7 +115,6 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
     setAdjustVal(user.cupBalance);
     setEditName(user.display_name || '');
     setEditEmail(user.email || '');
-    setEditIban(user.iban || '');
     setEditMode(false);
     setEditError(null);
     getUserActivity(user.id).then(setActivity).catch(() => {});
@@ -161,18 +159,28 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
       await adminUpdateUser(user.id, {
         display_name: editName.trim(),
         email: editEmail.trim(),
-        iban: editIban.trim(),
       });
       onUpdateUser(user.id, {
         display_name: editName.trim(),
         email: editEmail.trim(),
-        iban: editIban.trim(),
       });
       setEditMode(false);
     } catch (err) {
       setEditError(err?.message || 'Update failed');
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  // Instant toggle for the marketing-email opt-in (records proof + source
+  // 'admin' server-side). Separate from the Edit form so it's one tap.
+  async function handleToggleMarketing() {
+    const next = !user.marketing_consent;
+    try {
+      await adminUpdateUser(user.id, { marketing_consent: next });
+      onUpdateUser(user.id, { marketing_consent: next });
+    } catch (err) {
+      console.error('marketing consent toggle failed', err);
     }
   }
 
@@ -214,16 +222,21 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
             <span className="udp__meta-val">{timeAgo(user.updated_at)}</span>
           </div>
           <div className="udp__meta-item udp__meta-item--wide">
-            <span className="udp__meta-label">IBAN</span>
-            <span className="udp__meta-val udp__meta-val--mono">
-              {user.iban
-                ? <PiiMask type="iban" value={user.iban} targetType="user" targetId={user.id} />
-                : <span style={{ color: '#B8B2A8' }}>—</span>}
-            </span>
-          </div>
-          <div className="udp__meta-item udp__meta-item--wide">
             <span className="udp__meta-label">Device / Browser</span>
             <span className="udp__meta-val udp__meta-val--muted">{user.device || 'Not detected'}</span>
+          </div>
+          <div className="udp__meta-item udp__meta-item--wide">
+            <span className="udp__meta-label">Marketing email</span>
+            <label className="udp__consent">
+              <input
+                type="checkbox"
+                className="udp__consent-switch"
+                checked={!!user.marketing_consent}
+                onChange={handleToggleMarketing}
+                aria-label="Marketing email consent"
+              />
+              <span className="udp__consent-state">{user.marketing_consent ? 'Opted in' : 'Not opted in'}</span>
+            </label>
           </div>
         </div>
 
@@ -244,8 +257,6 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
               <input className="udp__edit-input" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Display name" />
               <label className="udp__edit-label">Email</label>
               <input className="udp__edit-input" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email address" type="email" />
-              <label className="udp__edit-label">IBAN</label>
-              <input className="udp__edit-input" value={editIban} onChange={e => setEditIban(e.target.value)} placeholder="IBAN" />
               <button className="udp__adjust-confirm" style={{ width: '100%', marginTop: 4 }} onClick={handleEditSave} disabled={editSaving}>
                 {editSaving ? 'Saving…' : 'Save Changes'}
               </button>
@@ -333,6 +344,7 @@ const SORT_KEYS = {
   name:    (u) => (u.display_name || '').toLowerCase(),
   type:    (u) => (u.isVisitor ? 1 : 0),
   email:   (u) => (u.email || '').toLowerCase(),
+  marketing:(u) => (u.marketing_consent ? 1 : 0),
   device:  (u) => (u.device || '').toLowerCase(),
   cups:    (u) => u.cupBalance,
   lifetime:(u) => u.lifetimeCups,
@@ -461,6 +473,7 @@ export default function AdminUsers({ onNavigate }) {
                     <ThCol label="User" sortKey="name" />
                     <ThCol label="Type" sortKey="type" style={{ width: 110 }} />
                     <ThCol label="Email" sortKey="email" />
+                    <ThCol label="Marketing" sortKey="marketing" style={{ width: 110 }} />
                     <ThCol label="Device" sortKey="device" style={{ width: 160 }} />
                     <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />
                     <ThCol label="Lifetime" sortKey="lifetime" style={{ width: 90 }} />
@@ -470,7 +483,7 @@ export default function AdminUsers({ onNavigate }) {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={9} className="au-table__empty">
+                    <tr><td colSpan={10} className="au-table__empty">
                       {users.length === 0 ? (
                         <EmptyState
                           icon={
@@ -530,6 +543,11 @@ export default function AdminUsers({ onNavigate }) {
                       <td><TypeTag visitor={user.isVisitor} /></td>
                       <td className="au-muted" onClick={e => e.stopPropagation()}>
                         <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
+                      </td>
+                      <td>
+                        {user.marketing_consent
+                          ? <span className="au-consent au-consent--on">Opted in</span>
+                          : <span className="au-consent au-consent--off">—</span>}
                       </td>
                       <td className="au-device-cell">
                         <DeviceBadge device={user.device} />

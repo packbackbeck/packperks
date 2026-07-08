@@ -97,7 +97,6 @@ export default function MockupPreview({ config }) {
           cupsRemaining={cupsRemaining}
           cupsCollected={cupCount}
           claimed={false}
-          savedIban=""
         />
 
         {otherRewards.length > 0 && (

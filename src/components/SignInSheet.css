@@ -223,3 +223,46 @@
   color: #9E9A93;
   white-space: nowrap;
 }
+
+/* ── Consent block ──────────────────────────────────────────────────────
+ * Service email is lawful without consent, so it's shown as a plain notice
+ * line. Marketing is a genuine opt-in: an unticked checkbox by default. */
+.signin-notice {
+  align-self: flex-start;
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #6E6A63;
+  text-align: left;
+}
+
+.signin-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  margin-bottom: 4px;
+  background: #FAFAF8;
+  border: 1px solid #E5DECF;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.signin-consent:hover { background: #FFFFFF; border-color: #D8CFBB; }
+.signin-consent__box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: #E24400;
+  cursor: pointer;
+}
+.signin-consent__text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #4A4540;
+}
+.signin-consent__muted { color: #9E9A93; }

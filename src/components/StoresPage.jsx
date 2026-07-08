@@ -463,7 +463,14 @@ export default function StoresPage({
 }) {
   const [view, setView] = useState('list');
   const [query, setQuery] = useState('');
-  const [requested, setRequested] = useState(() => new Set());
+  // Vendors this device has already requested — persisted so a page refresh
+  // can't let the same person vote for the same venue again.
+  const [requested, setRequested] = useState(() => {
+    try {
+      const a = JSON.parse(localStorage.getItem('packperks_requested_vendors') || '[]');
+      return new Set(Array.isArray(a) ? a : []);
+    } catch { return new Set(); }
+  });
   // How many customers have tapped "Request it" per coming-soon venue (name →
   // count), read from an aggregate RPC so it works for anonymous visitors.
   const [reqCounts, setReqCounts] = useState({});
@@ -524,7 +531,11 @@ export default function StoresPage({
   const handleRequest = (s) => {
     const key = s.id || s.name;
     if (requested.has(key)) return;
-    setRequested(prev => { const n = new Set(prev); n.add(key); return n; });
+    setRequested(prev => {
+      const n = new Set(prev); n.add(key);
+      try { localStorage.setItem('packperks_requested_vendors', JSON.stringify([...n])); } catch { /* quota / private mode */ }
+      return n;
+    });
     // Optimistically count this tap so the progress bar moves immediately.
     setReqCounts(prev => ({ ...prev, [s.name]: (prev[s.name] || 0) + 1 }));
     onRequestStore?.(s);

@@ -291,29 +291,91 @@
   color: #1A8737;
 }
 
-/* ETA pill */
-.sp-receipt__eta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-primary);
-  font-size: 10px;
-  color: #1A8737;
-  background: rgba(26,135,55,0.07);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  line-height: 1.4;
-}
-
 /* ── Pending review variant ──────────────────────────────────────────────
- * Same layout as the approved success page, but switches the green
- * accent for an amber/orange one so the user can tell at a glance that
- * the cashback hasn't been finalised yet. */
+ * Amber/orange accent (vs. the green approved state) so the user can tell
+ * at a glance the cashback isn't finalised yet. Anchored to the top (not
+ * vertically centred) with a roomier rhythm so the screen doesn't feel
+ * cramped when the receipt card + notify options stack up. */
+.success-page--pending {
+  justify-content: flex-start;
+  /* Big top gap so the notch / front camera clears the checkmark. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 76px);
+  padding-bottom: var(--sp-6);
+}
 .success-page--pending .success-page__glow {
   background: radial-gradient(circle, rgba(232,158,44,0.18) 0%, rgba(232,158,44,0) 70%);
 }
+.success-page--pending .success-page__text  { margin-bottom: var(--sp-5); }
+.success-page--pending .sp-receipt          { margin-bottom: var(--sp-4); }
+.success-page--pending .sp-notify           { margin: var(--sp-4) 0 0; }
+/* The key fix — a clear breathing gap above the "Back to home" button. */
+.success-page--pending .success-page__btn   { margin-top: var(--sp-5); margin-bottom: var(--sp-6); }
 
-.sp-receipt__eta--pending {
-  color: #A85320;
-  background: rgba(232,158,44,0.10);
+/* ── Notify-me options (Tikkie link ready) ── */
+.sp-notify {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 1.25rem 0 0.25rem;
+}
+.sp-notify__title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9E9A93;
+  text-align: left;
+  margin-bottom: 2px;
+}
+.sp-notify__opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #EAE2D4;
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.sp-notify__opt:hover:not(:disabled) { border-color: #D8CFBB; }
+.sp-notify__opt:disabled { opacity: 0.55; cursor: not-allowed; }
+.sp-notify__opt-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FBF1E6;
+  color: #C56A1E;
+}
+.sp-notify__opt-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sp-notify__opt-label { font-size: 0.95rem; font-weight: 700; color: #2A2724; }
+.sp-notify__opt-sub { font-size: 0.78rem; line-height: 1.35; color: #8A857C; }
+/* Round check that fills in when the option is on. */
+.sp-notify__check {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #D8D2C6;
+  position: relative;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.sp-notify__check.is-on { background: #1A8737; border-color: #1A8737; }
+.sp-notify__check.is-on::after {
+  content: '';
+  position: absolute;
+  left: 7px; top: 3px;
+  width: 6px; height: 11px;
+  border: solid #fff;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
 }

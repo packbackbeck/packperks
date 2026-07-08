@@ -38,7 +38,7 @@ import './SignInSheet.css';
  * form. This is the only place in the user app where signing out is
  * exposed — outside the sheet there's no reason for them to do it.
  */
-export default function SignInSheet({ open, onClose, onLinked, requireVerification = true, savedEmail = null, onSaveEmailDirect }) {
+export default function SignInSheet({ open, onClose, onLinked, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent }) {
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -51,6 +51,10 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
   const [mode, setMode] = useState('save'); // 'save' | 'restore'
   const [status, setStatus] = useState('idle'); // see comments per-mode below
   const [email, setEmail] = useState('');
+  // Optional marketing-email opt-in (default OFF — a valid GDPR/PDPL opt-in is
+  // unticked by default). Service email needs no consent, so there is no
+  // required checkbox — only a notice line below the field.
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [restoreResult, setRestoreResult] = useState(null); // { status, merged_balance? }
   const [error, setError] = useState(null);
@@ -111,6 +115,11 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
     e.preventDefault();
     if (!email.trim()) return;
     setError(null);
+
+    // Record the marketing-email choice on submit — independent of email
+    // verification. Service email is lawful without consent; marketing is what
+    // the user has just explicitly opted into (or left unchecked).
+    try { onMarketingConsent?.(marketingConsent); } catch { /* non-fatal */ }
 
     // No-verification mode: check first whether this email is already on
     // ANOTHER PackPerks account in the same org. If clean → save directly
@@ -468,6 +477,25 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
               required
             />
 
+            <p className="signin-notice">
+              We use your email to sign you in, restore your cups, and send
+              reward status and important service messages.
+            </p>
+
+            <label className="signin-consent">
+              <input
+                type="checkbox"
+                className="signin-consent__box"
+                checked={marketingConsent}
+                onChange={e => setMarketingConsent(e.target.checked)}
+                disabled={status === 'sending'}
+              />
+              <span className="signin-consent__text">
+                Send me PackPerks offers, reward reminders and participating-venue updates by email.
+                <span className="signin-consent__muted"> Optional — unsubscribe anytime.</span>
+              </span>
+            </label>
+
             {error && <p className="signin-error">{error}</p>}
 
             <button
@@ -481,8 +509,7 @@ export default function SignInSheet({ open, onClose, onLinked, requireVerificati
             </button>
 
             <p className="signin-fine">
-              We'll only use this address to sign you in. No marketing,
-              ever.
+              You must be 16 or older to use PackPerks. See our Privacy Policy for how we handle your data.
             </p>
 
             {/* Restore entry — sits at the bottom so the primary CTA

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminClaims, updateClaimStatus, getReceiptSignedUrl, deleteRecords } from '../lib/adminApi';
+import { getAdminClaims, updateClaimStatus, markClaim, getReceiptSignedUrl, deleteRecords } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
 import PermissionGate from '../auth/PermissionGate';
 import { useAuth, hasPermission } from '../auth/AuthContext';
@@ -253,7 +253,7 @@ const COLUMN_CONFIG = [
   { id: 'reward',     label: 'Reward / Type', desc: 'Which reward the customer picked, or "Direct refund"',           defaultOn: false },
   { id: 'cups',       label: 'Cups',        desc: 'Cups spent on this claim',                                          defaultOn: false },
   { id: 'amount',     label: 'Amount',      desc: 'Euro payout amount',                                                defaultOn: true  },
-  { id: 'iban',       label: 'IBAN',        desc: 'Customer bank account (masked)',                                    defaultOn: true  },
+  { id: 'tikkie',     label: 'Tikkie status', desc: 'Tikkie link stage — Created / Redeemed / Expired (click for the timeline)', defaultOn: true  },
   { id: 'review',     label: 'Review',      desc: 'Pending / Approved / Rejected',                                     defaultOn: true  },
   { id: 'payout',     label: 'Payout',      desc: 'Money state — Queued / Paid / Failed',                              defaultOn: true  },
   { id: 'decided_by', label: 'Decided by',  desc: 'Admin who made the call',                                           defaultOn: true  },
@@ -265,49 +265,6 @@ function SortIcon({ active, dir }) {
     <span className={`ac-sort-icon${active ? ' ac-sort-icon--active' : ''}`}>
       {active ? (dir === 'asc' ? '↑' : '↓') : '↕'}
     </span>
-  );
-}
-
-/* Compact IBAN cell. Renders only the last 4 chars; clicking the pill
- * copies the full IBAN to clipboard and flashes a brief "Copied" state.
- * Keeps the column narrow so the whole table fits without horizontal scroll. */
-function IbanPill({ iban }) {
-  const [copied, setCopied] = useState(false);
-  if (!iban) return <span className="ac-iban-pill ac-iban-pill--empty">—</span>;
-
-  const clean = iban.replace(/\s/g, '').toUpperCase();
-  const last4 = clean.slice(-4);
-
-  async function handleCopy(e) {
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(clean);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      // Clipboard API blocked — silently no-op rather than fall back to prompt.
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      className={`ac-iban-pill${copied ? ' ac-iban-pill--copied' : ''}`}
-      onClick={handleCopy}
-      title={copied ? 'Copied!' : `Click to copy ${clean}`}
-    >
-      <span className="ac-iban-pill__last4">···{last4}</span>
-      {copied ? (
-        <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 10L8 14L16 6"/>
-        </svg>
-      ) : (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="9" y="9" width="11" height="11" rx="2"/>
-          <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
-        </svg>
-      )}
-    </button>
   );
 }
 
@@ -407,6 +364,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
    * keeps the user on the same record. */
   const [viewMode, setViewMode] = useState('table');
   const [selectedId, setSelectedId] = useState(null);
+  const [tikkieModal, setTikkieModal] = useState(null); // claim whose Tikkie timeline is open
 
   /* Column visibility (user-toggleable).
    *
@@ -418,7 +376,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
    * their job:
    *
    *   • Always-on (not toggleable): checkbox, Receipt, User, Date, Actions
-   *   • On by default: Validation, Amount, IBAN, Review, Payout, Decided by
+   *   • On by default: Validation, Amount, Tikkie, Review, Payout, Decided by
    *   • Off by default: Reward / Type, Cups
    *
    * Hidden columns persist in localStorage so an admin's chosen view
@@ -477,6 +435,20 @@ export default function AdminClaims({ onNavigate, draftState }) {
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('desc'); }
+  }
+
+  /* Toggle the admin "mark for a second look" flag on a claim. Optimistic:
+   * we flip the row immediately, then reconcile with the DB write. On
+   * failure we roll the row back and surface the error. */
+  async function handleFlag(claimId, flagged) {
+    setClaims(prev => prev.map(c => c.id === claimId ? { ...c, flagged } : c));
+    try {
+      const updated = await markClaim(claimId, flagged);
+      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, ...updated } : c));
+    } catch (err) {
+      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, flagged: !flagged } : c));
+      setActionError(err.message || 'Could not update the flag.');
+    }
   }
 
   async function handleStatusUpdate(claimId, newStatus, reason = '') {
@@ -625,8 +597,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
       list = list.filter(c =>
         c.user?.display_name?.toLowerCase().includes(q) ||
         c.user?.email?.toLowerCase().includes(q) ||
-        c.id?.toLowerCase().includes(q) ||
-        c.iban?.toLowerCase().includes(q)
+        c.id?.toLowerCase().includes(q)
       );
     }
     return [...list].sort((a, b) => {
@@ -757,7 +728,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
           </svg>
           <input
             className="ac-search-input"
-            placeholder="Search user, email, IBAN…"
+            placeholder="Search user, email, claim ID…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -838,7 +809,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                   {isCol('reward')    && <ThCol label="Reward / Type" />}
                   {isCol('cups')      && <ThCol label="Cups" sortable field="cups_redeemed" />}
                   {isCol('amount')    && <ThCol label="Amount" sortable field="payout_amount" />}
-                  {isCol('iban')      && <ThCol label="IBAN" />}
+                  {isCol('tikkie')    && <ThCol label="Tikkie status" />}
                   <ThCol label="Date" sortable field="created_at" />
                   {isCol('review')    && <ThCol label="Review" sortable field="status" />}
                   {isCol('payout')    && <ThCol label="Payout" />}
@@ -894,6 +865,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                         'ac-table__row',
                         selected.has(claim.id) ? 'ac-table__row--selected' : '',
                         viewMode === 'review' && selectedId === claim.id ? 'ac-table__row--active' : '',
+                        claim.flagged ? 'ac-table__row--flagged' : '',
                       ].filter(Boolean).join(' ')}
                       onClick={() => viewMode === 'review' && setSelectedId(claim.id)}
                       style={viewMode === 'review' ? { cursor: 'pointer' } : undefined}
@@ -953,7 +925,25 @@ export default function AdminClaims({ onNavigate, draftState }) {
                       )}
                       {isCol('cups')   && <td className="ac-center ac-bold">{claim.cups_redeemed ?? '—'}</td>}
                       {isCol('amount') && <td className="ac-bold">€{(claim.payout_amount || 0).toFixed(2)}</td>}
-                      {isCol('iban')   && <td className="ac-iban-cell"><IbanPill iban={claim.iban} /></td>}
+                      {isCol('tikkie') && (
+                        <td onClick={e => e.stopPropagation()}>
+                          {(() => {
+                            const meta = tikkieStatusOf(claim);
+                            // Not approved yet → no Tikkie link → empty cell.
+                            return meta ? (
+                              <button
+                                type="button"
+                                className="ac-tikkie-status"
+                                style={{ background: meta.bg, color: meta.color }}
+                                onClick={() => setTikkieModal(claim)}
+                                title="View the Tikkie link status timeline"
+                              >
+                                {meta.label}
+                              </button>
+                            ) : null;
+                          })()}
+                        </td>
+                      )}
                       <td className="ac-muted ac-date">{formatDate(claim.created_at)}</td>
                       {isCol('review') && <td><ClaimStatusPill kind="review" claim={claim} /></td>}
                       {isCol('payout') && <td><ClaimStatusPill kind="payout" claim={claim} /></td>}
@@ -1023,6 +1013,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
             updating={updating !== null}
             onApprove={(id, reason) => handleStatusUpdate(id, 'completed', reason)}
             onFail={(id, reason) => handleStatusUpdate(id, 'failed', reason)}
+            onFlag={handleFlag}
             onClaimUpdate={(updated) => {
               // Merge a partial update (e.g. from hide/unhide image) back
               // into the table state so the panel + row stay in sync
@@ -1054,8 +1045,98 @@ export default function AdminClaims({ onNavigate, draftState }) {
         />
       )}
 
+      {tikkieModal && (
+        <TikkieStatusModal claim={tikkieModal} onClose={() => setTikkieModal(null)} />
+      )}
+
       <QuickLinks currentPage="claims" onNavigate={onNavigate} />
     </div>
+  );
+}
+
+/* ── Tikkie link status ──
+ * The Tikkie Cashback link lifecycle (per the Tikkie Cashback API): a link is
+ * CREATED when we mint it on approval, then becomes REDEEMED once the customer
+ * collects the cash, or EXPIRED if the validity window passes first. Our claim
+ * mirrors this in `tikkie_status`. No link (claim not approved) → empty cell. */
+const TIKKIE_STATUS_META = {
+  created:  { label: 'Created',  color: '#A85320', bg: '#FBEEDA' },
+  redeemed: { label: 'Redeemed', color: '#1A8737', bg: '#DFF5E3' },
+  expired:  { label: 'Expired',  color: '#B4463E', bg: '#FBE7E1' },
+};
+
+function tikkieStatusOf(claim) {
+  if (!claim?.tikkie_url) return null;
+  const s = String(claim.tikkie_status || 'created').toLowerCase();
+  return TIKKIE_STATUS_META[s] || TIKKIE_STATUS_META.created;
+}
+
+function fmtWhen(d) {
+  if (!d) return null;
+  try { return new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+  catch { return null; }
+}
+
+/* Popup timeline of a claim's Tikkie link status, plus the link itself. */
+function TikkieStatusModal({ claim, onClose }) {
+  const s = String(claim.tikkie_status || 'created').toLowerCase();
+  const redeemed = s === 'redeemed';
+  const expired  = s === 'expired';
+  const createdAt = fmtWhen(claim.notified_at || claim.approved_at || claim.verified_at);
+
+  const steps = [
+    {
+      key: 'created', title: 'Link created', at: createdAt, done: true, current: !redeemed && !expired,
+      sub: 'We minted a Tikkie cashback link and sent it to the customer.',
+    },
+    redeemed
+      ? { key: 'redeemed', title: 'Redeemed', done: true, current: true, tone: 'good',
+          sub: 'The customer opened the link and collected the cashback.' }
+      : expired
+        ? { key: 'expired', title: 'Expired', done: true, current: true, tone: 'bad',
+            sub: 'The link expired before it was collected. Reissue if needed.' }
+        : { key: 'awaiting', title: 'Awaiting collection', done: false, current: false,
+            sub: 'Waiting for the customer to open the Tikkie link.' },
+  ];
+
+  return createPortal(
+    <div className="ac-tk-overlay" onClick={onClose}>
+      <div className="ac-tk-modal" onClick={e => e.stopPropagation()}>
+        <div className="ac-tk-head">
+          <span className="ac-tk-title">Tikkie link status</span>
+          <button className="ac-tk-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        <ol className="ac-tk-timeline">
+          {steps.map(st => (
+            <li
+              key={st.key}
+              className={`ac-tk-step${st.done ? ' is-done' : ''}${st.current ? ' is-current' : ''}${st.tone ? ` is-${st.tone}` : ''}`}
+            >
+              <span className="ac-tk-dot" />
+              <div className="ac-tk-body">
+                <span className="ac-tk-step-title">
+                  {st.title}{st.at ? <span className="ac-tk-at"> · {st.at}</span> : null}
+                </span>
+                <span className="ac-tk-step-sub">{st.sub}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {claim.tikkie_url ? (
+          <a className="ac-tk-link" href={claim.tikkie_url} target="_blank" rel="noopener noreferrer">
+            Open Tikkie link
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
+        ) : (
+          <p className="ac-tk-nolink">No Tikkie link yet — approve the claim to mint one.</p>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 

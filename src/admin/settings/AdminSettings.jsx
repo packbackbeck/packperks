@@ -58,7 +58,7 @@ export const SECTIONS = [
   {
     id: 'rules',
     title: 'Cup rules',
-    desc: 'Limits around scans, shares, and IBAN validation.',
+    desc: 'Limits around scans and shares.',
     tone: 'cream',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -530,15 +530,6 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                   onChange={e => updateSetting('maxCupsToShare', parseInt(e.target.value) || 1)}
                 />
               </Field>
-
-              <Field label="Min IBAN length" hint="Validates the IBAN on profile setup.">
-                <input
-                  className="as-input as-input--short"
-                  type="number" min="10" max="34"
-                  value={settings.minIbanLength}
-                  onChange={e => updateSetting('minIbanLength', parseInt(e.target.value) || 15)}
-                />
-              </Field>
             </div>
           </SectionCard>
 
@@ -757,11 +748,6 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 <li>
                   <span>Max cups per share</span>
                   <strong>{settings.maxCupsToShare ?? 1}</strong>
-                  <em>Cup rules</em>
-                </li>
-                <li>
-                  <span>Min IBAN length</span>
-                  <strong>{settings.minIbanLength ?? 15}</strong>
                   <em>Cup rules</em>
                 </li>
                 <li>

@@ -109,13 +109,13 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               <li className="rds-step">
                 <span className="rds-step__num">3</span>
                 <span className="rds-step__text">
-                  Enter your IBAN and upload a <strong>photo of the receipt</strong> to verify your purchase.
+                  Upload a <strong>photo of your receipt</strong> to verify your purchase — we'll send your cashback via a Tikkie link.
                 </span>
               </li>
               <li className="rds-step">
                 <span className="rds-step__num">4</span>
                 <span className="rds-step__text">
-                  Once verified, you receive <strong>€{reward.euros?.toFixed(2)} cashback</strong> in your account within <strong>1 to 2 business days</strong>.
+                  Once verified, we'll send you a <strong>Tikkie link</strong> to collect your <strong>€{reward.euros?.toFixed(2)} cashback</strong> — usually within a few days.
                 </span>
               </li>
             </ol>

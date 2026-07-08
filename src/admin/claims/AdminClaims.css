@@ -174,7 +174,6 @@
 .ac-bold  { font-weight: 700; color: #1A1A1A; }
 .ac-center{ text-align: center; }
 .ac-date  { font-size: 11px; white-space: nowrap; }
-.ac-iban  { font-size: 11px; max-width: 180px; word-break: break-all; white-space: normal; }
 
 /* User cell */
 .ac-user-cell { display: flex; align-items: center; gap: 8px; }
@@ -560,42 +559,31 @@
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
 }
 
-/* ── Compact IBAN pill in claims table ──────────────────────────────────
- * Replaces the wide multi-line IBAN cell. Shows last 4 chars; click copies
- * the full IBAN to clipboard. Narrow enough that the whole table fits the
- * panel without horizontal scroll. */
-.ac-iban-cell { width: 92px; }
-
-.ac-iban-pill {
+/* ── Tikkie payout-state pill in claims table ───────────────────────────
+ * Shows whether a Tikkie cashback link has been sent for this claim.
+ * "Pending" (grey) before approval; "Link sent" (green) once a dummy/real
+ * tikkie_url is stored on approve. */
+.ac-tikkie-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid #E8E2D9;
-  background: #FAFAF8;
-  font-family: ui-monospace, monospace;
+  border: 1px solid transparent;
   font-size: 11px;
-  font-weight: 600;
-  color: #4A4540;
-  cursor: pointer;
-  transition: all 0.15s;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
 }
-.ac-iban-pill:hover { background: #F0EDE8; border-color: #C8C4BC; }
-.ac-iban-pill--copied {
+.ac-tikkie-pill--pending {
+  background: #F3F0EB;
+  border-color: #E8E2D9;
+  color: #7A7166;
+}
+.ac-tikkie-pill--sent {
   background: #DFF5E3;
   border-color: #BDE5C6;
   color: #1A8737;
 }
-.ac-iban-pill--empty {
-  border: none;
-  background: none;
-  color: #6C6259;
-  cursor: default;
-  padding-left: 0;
-}
-
-.ac-iban-pill__last4 { letter-spacing: 0.5px; }
 
 /* Trim other columns slightly so the whole table fits at typical sidebar widths */
 .ac-table th, .ac-table td { padding-left: 8px; padding-right: 8px; }
@@ -681,6 +669,12 @@
 /* Highlight the row whose detail is open on the right */
 .ac-table__row--active { background: #FFF8F1 !important; }
 .ac-table__row--active td { box-shadow: inset 3px 0 0 #FD6F46; }
+
+/* Admin "marked for a second look" — an amber wash + left accent so
+ * flagged claims stand out in the list at a glance. */
+.ac-table__row--flagged { background: #FEF6E7 !important; }
+.ac-table__row--flagged td:first-child { box-shadow: inset 3px 0 0 #E89E2C; }
+.ac-table__row--flagged.ac-table__row--active { background: #FDF1E0 !important; }
 
 /* ── Column picker (table head) ───────────────────────────────────
  * Lives at the right edge of the toolbar. Toggle button with a small
@@ -807,3 +801,65 @@
   color: #7A7166;
   line-height: 1.4;
 }
+
+/* ── Clickable Tikkie-status pill in the claims table ── */
+.ac-tikkie-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.12s ease;
+}
+.ac-tikkie-status:hover { filter: brightness(0.95); }
+
+/* ── Tikkie link status timeline modal ── */
+.ac-tk-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(20, 16, 10, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.ac-tk-modal {
+  width: 100%; max-width: 380px;
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+  padding: 18px 18px 20px;
+}
+.ac-tk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.ac-tk-title { font-size: 15px; font-weight: 800; color: #1D1D1D; }
+.ac-tk-close { background: none; border: none; font-size: 22px; line-height: 1; color: #9A9186; cursor: pointer; padding: 0 4px; }
+.ac-tk-close:hover { color: #1D1D1D; }
+
+.ac-tk-timeline { list-style: none; margin: 0; padding: 0; }
+.ac-tk-step { position: relative; display: flex; gap: 12px; padding-bottom: 16px; }
+.ac-tk-step:last-child { padding-bottom: 0; }
+.ac-tk-step:not(:last-child)::before {
+  content: ''; position: absolute; left: 6px; top: 16px; bottom: 0; width: 2px; background: #EAE3D6;
+}
+.ac-tk-step.is-done:not(:last-child)::before { background: #C9DFCF; }
+.ac-tk-dot {
+  flex: none; width: 14px; height: 14px; margin-top: 2px; border-radius: 50%;
+  background: #EAE3D6; box-shadow: 0 0 0 1px #DDD3C4; z-index: 1;
+}
+.ac-tk-step.is-done .ac-tk-dot,
+.ac-tk-step.is-good .ac-tk-dot { background: #1A8737; box-shadow: 0 0 0 1px #1A8737; }
+.ac-tk-step.is-current .ac-tk-dot { background: #E89E2C; box-shadow: 0 0 0 1px #E89E2C; }
+.ac-tk-step.is-bad .ac-tk-dot { background: #C4321B; box-shadow: 0 0 0 1px #C4321B; }
+.ac-tk-body { display: flex; flex-direction: column; gap: 2px; }
+.ac-tk-step-title { font-size: 13.5px; font-weight: 700; color: #2A2620; }
+.ac-tk-at { font-weight: 500; color: #9A9186; }
+.ac-tk-step-sub { font-size: 12px; line-height: 1.4; color: #7A7166; }
+
+.ac-tk-link {
+  margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 7px;
+  height: 44px; border-radius: 12px; background: #1A8737; color: #fff;
+  font-size: 14px; font-weight: 800; text-decoration: none;
+}
+.ac-tk-link:hover { filter: brightness(0.96); }
+.ac-tk-nolink { margin: 16px 0 0; font-size: 12.5px; color: #9A9186; text-align: center; }

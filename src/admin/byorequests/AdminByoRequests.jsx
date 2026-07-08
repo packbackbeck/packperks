@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
+import RewardsReceiptGenerator from '../cupqr/RewardsReceiptGenerator';
 import './AdminByoRequests.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -48,6 +49,11 @@ export default function AdminByoRequests() {
   const [savingCap, setSavingCap] = useState(false);
   const [capMsg, setCapMsg]   = useState(null);
 
+  // TEST ONLY: how many cups this QR adds per scan. Encoded as ?cups=N on the
+  // counter URL; the customer app credits N cups on scan (for demoing).
+  const [testCups, setTestCups] = useState('1');
+  const testCupsN = Math.max(1, Math.min(50, parseInt(testCups, 10) || 1));
+
   useEffect(() => {
     let alive = true;
     if (!activeOrgId) return undefined;
@@ -87,7 +93,9 @@ export default function AdminByoRequests() {
 
   useEffect(() => { load(); }, [load]);
 
-  const byoUrl = activeOrgSlug ? `${PROD_URL}${activeOrgSlug}/?byo=1` : null;
+  const byoUrl = activeOrgSlug
+    ? `${PROD_URL}${activeOrgSlug}/?byo=1${testCupsN > 1 ? `&cups=${testCupsN}` : ''}`
+    : null;
   useEffect(() => {
     if (!byoUrl || !qrRef.current) return;
     QRCode.toCanvas(qrRef.current, byoUrl, {
@@ -165,6 +173,24 @@ export default function AdminByoRequests() {
                 {savingCap ? 'Saving…' : 'Save limit'}
               </button>
               {capMsg && <span className="byoreq__cap-msg">{capMsg}</span>}
+            </div>
+          </div>
+
+          {/* TEST ONLY — how many cups the QR adds per scan (encoded on the URL). */}
+          <div className="byoreq__cap">
+            <label className="byoreq__cap-label" htmlFor="byo-testcups">
+              Cups per scan <span className="byoreq__cap-badge">test</span>
+              <span className="byoreq__cap-hint">How many cups this QR adds each scan — for testing/demos only. The live URL updates automatically.</span>
+            </label>
+            <div className="byoreq__cap-row">
+              <input
+                id="byo-testcups"
+                className="byoreq__cap-input"
+                type="number" min="1" max="50" step="1"
+                value={testCups}
+                onChange={e => setTestCups(e.target.value)}
+              />
+              <span className="byoreq__cap-msg">{testCupsN === 1 ? 'Default — 1 cup per scan' : `Adds ${testCupsN} cups per scan`}</span>
             </div>
           </div>
         </div>
@@ -251,6 +277,19 @@ export default function AdminByoRequests() {
           </table>
         </div>
       )}
+
+      {/* ── Rewards receipt generator ──
+       * The exact same generator used on the main dashboard's Receipt
+       * Generator page, embedded here so BYO stores can mint test reward
+       * receipts without leaving this page. It's the shared component
+       * (not a copy), so the two always stay in sync. */}
+      <section className="byoreq__generator">
+        <div className="byoreq__generator-head">
+          <h2 className="byoreq__generator-title">Rewards receipt generator</h2>
+          <p className="byoreq__generator-sub">Mint a test reward receipt for this store — same tool as the main dashboard.</p>
+        </div>
+        <RewardsReceiptGenerator />
+      </section>
     </div>
   );
 }

@@ -12,11 +12,6 @@ function getUserName() {
     return p.displayName || 'PackPerks User';
   } catch { return 'PackPerks User'; }
 }
-function maskIban(iban = '') {
-  const clean = iban.replace(/\s/g, '');
-  if (clean.length < 8) return iban;
-  return clean.slice(0, 4) + ' •••• •••• ' + clean.slice(-4);
-}
 
 const Row = ({ label, value, bold, green }) => (
   <div className="rsp__row">
@@ -25,7 +20,7 @@ const Row = ({ label, value, bold, green }) => (
   </div>
 );
 
-export default function RefundSuccessPage({ cupCount, iban, onDone }) {
+export default function RefundSuccessPage({ cupCount, onDone }) {
   const now = new Date();
   const refundId = 'RF-' + Date.now().toString(36).toUpperCase().slice(-6);
   const total = (cupCount * 1.00).toFixed(2);
@@ -68,7 +63,6 @@ export default function RefundSuccessPage({ cupCount, iban, onDone }) {
           <Row label="Name"        value={userName} />
           <Row label="Cups refunded" value={`${cupCount} cup${cupCount !== 1 ? 's' : ''}`} />
           <Row label="Rate"        value="€1.00 per cup" />
-          <Row label="IBAN"        value={maskIban(iban)} />
         </div>
 
         <div className="rsp__dashed" />

@@ -203,9 +203,6 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
   }
 
   const canAct = claim.status === 'pending';
-  const ibanDisplay = claim.iban
-    ? claim.iban.replace(/\s/g,'').replace(/(.{4})/g,'$1 ').trim().slice(0,-8) + '•••• ••••'
-    : '—';
 
   return (
     <div className="rc-detail">
@@ -276,8 +273,8 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
           </div>
         )}
         <div className="rc-detail__row">
-          <span className="rc-detail__row-label">IBAN</span>
-          <span className="rc-detail__row-val rc-detail__row-val--mono">{ibanDisplay}</span>
+          <span className="rc-detail__row-label">Payout</span>
+          <span className="rc-detail__row-val rc-detail__row-val--muted">Tikkie link</span>
         </div>
 
         <div className="rc-detail__section-label" style={{ marginTop: 10 }}>Claim</div>

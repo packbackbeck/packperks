@@ -45,7 +45,6 @@ export default function CupScanPage({ onScan, onBack, onError }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const fileRef = useRef(null);
   const rafRef = useRef(null);
   const lastTickRef = useRef(0);
   const handledRef = useRef(false);
@@ -54,70 +53,6 @@ export default function CupScanPage({ onScan, onBack, onError }) {
   const [cameraActive, setCameraActive] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [hint, setHint] = useState(null);
-
-  /* Decode a QR from a still image picked by the user — covers the case
-   * where they snapped the bin receipt instead of standing in front of
-   * it, or scanned the smart-bin print earlier. Mirrors the live-camera
-   * decode path: image → canvas → jsQR → claim flow. */
-  async function handleFileChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setHint(null);
-    try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = ev => resolve(ev.target.result);
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      });
-      const img = await new Promise((resolve, reject) => {
-        const i = new Image();
-        i.onload = () => resolve(i);
-        i.onerror = reject;
-        i.src = dataUrl;
-      });
-      // Cap the working size — 1600px is plenty for QR decoding and keeps
-      // jsQR fast on large camera photos.
-      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      let canvas = canvasRef.current;
-      if (!canvas) {
-        canvas = document.createElement('canvas');
-        canvasRef.current = canvas;
-      }
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      const imgData = ctx.getImageData(0, 0, w, h);
-      // Some gallery photos have inverted contrast — try both modes.
-      const code =
-        jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' });
-      if (!code?.data) {
-        setHint("Couldn't find a QR code in that image.");
-        e.target.value = ''; // allow re-selecting the same file
-        return;
-      }
-      const parsed = parseCupQr(code.data);
-      if (!parsed) {
-        setHint("That QR isn't a valid PackPerks cup code.");
-        e.target.value = '';
-        return;
-      }
-      handledRef.current = true;
-      const photoDataUrl = compressToJpeg(canvas);
-      setPendingCount(
-        (parsed.byo || parsed.batchId) ? 1 : parsed.cupIds.length,
-      );
-      streamRef.current?.getTracks().forEach(t => t.stop());
-      onScan?.(parsed, { scanType: 'gallery', photoDataUrl });
-    } catch (err) {
-      console.error('Image QR decode failed:', err);
-      setHint("Couldn't read that image. Try another photo.");
-      e.target.value = '';
-    }
-  }
 
   // ── Start camera + decode loop ─────────────────────────────────────────
   useEffect(() => {
@@ -249,31 +184,8 @@ export default function CupScanPage({ onScan, onBack, onError }) {
 
       {hint && <p className="cup-scan__hint">{hint}</p>}
 
-      <div className="cup-scan__gallery">
-        <span className="cup-scan__gallery-or">or</span>
-        <button
-          className="cup-scan__gallery-btn"
-          type="button"
-          onClick={() => fileRef.current?.click()}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21 15 16 10 5 21"/>
-          </svg>
-          Upload QR from gallery
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="cup-scan__file-input"
-          onChange={handleFileChange}
-        />
-      </div>
-
       <p className="cup-scan__caption">
-        Hold the receipt in good light, or upload the photo if you already snapped it.
+        Point your camera at the QR code on the counter and hold steady in good light.
       </p>
     </div>
   );

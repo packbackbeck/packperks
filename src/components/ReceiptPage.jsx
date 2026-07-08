@@ -4,18 +4,10 @@ import './ReceiptPage.css';
 /* ── Step icons (inline SVG) ── */
 const CupStepIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
-    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
-    <line x1="6" y1="1" x2="6" y2="4"/>
-    <line x1="10" y1="1" x2="10" y2="4"/>
-    <line x1="14" y1="1" x2="14" y2="4"/>
-  </svg>
-);
-
-const IbanStepIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="5" width="20" height="14" rx="2"/>
-    <line x1="2" y1="10" x2="22" y2="10"/>
+    {/* Takeaway/reusable cup with a lid — on-theme for "collect cups". */}
+    <path d="M6 8h12l-1.15 11.13A2 2 0 0 1 14.86 21H9.14a2 2 0 0 1-1.99-1.87L6 8z"/>
+    <path d="M5 8h14"/>
+    <path d="M8.5 4h7l.9 4H7.6l.9-4z"/>
   </svg>
 );
 
@@ -32,10 +24,18 @@ const CheckIcon = () => (
   </svg>
 );
 
+const CashStepIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="6" width="20" height="12" rx="2"/>
+    <circle cx="12" cy="12" r="2.5"/>
+    <path d="M6 12h.01M18 12h.01"/>
+  </svg>
+);
+
 const STEPS = [
   { icon: <CupStepIcon />, label: 'Collect cups', done: true },
-  { icon: <IbanStepIcon />, label: 'Type IBAN', done: true },
   { icon: <PhotoStepIcon />, label: 'Photo receipt', done: false, active: true },
+  { icon: <CashStepIcon />, label: 'Get cashback', done: false },
 ];
 
 export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
@@ -125,9 +125,6 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
       {/* ── Screen 1: what the receipt must be ── */}
       <div className="receipt-page__header">
         <h1 className="receipt-page__title">Before you take the photo</h1>
-        <p className="receipt-page__subtitle">
-          You'll photograph the printed receipt from buying your {itemName} — the till receipt from the shop, not your cup-return ticket. Here's what it needs to show:
-        </p>
       </div>
 
       {/* ── Receipt requirements ── */}
@@ -170,10 +167,6 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
             <span>A <strong>photo of the checkout screen</strong> at a self-service till</span>
           </li>
         </ul>
-        <p className="receipt-page__req-note">
-          A short till receipt works as long as it lists your item. If it does not show the item,
-          ask the cashier for the full receipt, otherwise the claim may be rejected.
-        </p>
       </div>
 
       {/* Understood → move to the camera screen */}
@@ -256,7 +249,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12 6 12 12 16 14"/>
         </svg>
-        <span>Cashback is deposited to your IBAN <strong>within 24 hours</strong> after your receipt is approved.</span>
+        <span>We'll review your receipt and send you a Tikkie link to collect your cashback — <strong>within 7 days maximum</strong>.</span>
       </div>
 
       {/* Privacy note — kept at the very bottom of the flow. */}

@@ -114,6 +114,34 @@
   text-transform: capitalize;
 }
 
+/* Persistent "Collect via Tikkie" CTA — always available from the record. */
+.adm-collect-wrap { margin-top: 14px; }
+.adm-collect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 48px;
+  border-radius: 14px;
+  background: #1A8737;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: filter 0.14s ease, transform 0.08s ease;
+}
+.adm-collect:hover { filter: brightness(0.96); }
+.adm-collect:active { transform: translateY(1px); }
+.adm-collect-note {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8A857C;
+  text-align: center;
+}
+
 .adm-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

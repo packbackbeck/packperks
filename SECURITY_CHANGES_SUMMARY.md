@@ -151,7 +151,7 @@ Each document below needs a small number of **inputs** filled in before adoption
 | `INTERNAL_DATA_HANDLING.md` | Internal staff rule: no PII in Slack/screenshots/sheets; exports only via the sanctioned tool; short-lived signed URLs. | GDPR Art. 32 organisational measure. | **2** |
 
 **Total: 25 `[FILL:]` inputs** to complete across the ten documents. The privacy
-contact email is already set to **support@packback.network** throughout; the
+contact email is already set to **info@packback.network** throughout; the
 main remaining input is the privacy owner's name (item 40), which repeats across
 the set. `BREACH_RUNBOOK.md` additionally contains per-incident form blanks to
 complete when an incident actually occurs.
@@ -189,7 +189,7 @@ permissive policies. Order of operations:
 ### Paperwork / process
 - **Fill the 25 `[FILL:]` inputs** across the `docs/` set — starting with naming a
   **privacy owner** (item 40), the most-repeated input. (The privacy contact email
-  is already set to support@packback.network.)
+  is already set to info@packback.network.)
 - Sign/verify **DPAs** (Supabase, Vercel, Anthropic, email relay) — `docs/DPA_STATUS.md`.
 - Confirm **Anthropic no-training + zero-retention** + DPF/SCC in writing (item 8).
 - Adopt + date the privacy policy, ROPA, DPIA, breach runbook, retention

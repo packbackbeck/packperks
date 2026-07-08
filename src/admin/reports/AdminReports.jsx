@@ -15,7 +15,6 @@ const DATASETS = {
       { key: 'id',            label: 'User ID',       type: 'text' },
       { key: 'display_name',  label: 'Name',          type: 'text',    default: true },
       { key: 'email',         label: 'Email',         type: 'text',    default: true },
-      { key: 'iban',          label: 'IBAN',          type: 'text' },
       { key: 'cup_balance',   label: 'Cup Balance',   type: 'number',  default: true, sum: true },
       { key: 'lifetime_cups', label: 'Lifetime Cups', type: 'number',  sum: true },
       { key: 'created_at',    label: 'Joined',        type: 'date',    default: true },
@@ -34,7 +33,6 @@ const DATASETS = {
       { key: 'reward_id',      label: 'Reward',       type: 'text' },
       { key: 'cups_redeemed',  label: 'Cups',         type: 'number', default: true, sum: true },
       { key: 'payout_amount',  label: 'Payout (€)',   type: 'currency', default: true, sum: true },
-      { key: 'iban',           label: 'IBAN',         type: 'text' },
       { key: 'status',         label: 'Status',       type: 'text',   default: true },
       { key: 'created_at',     label: 'Created',      type: 'date',   default: true },
     ],
@@ -88,7 +86,7 @@ const FORMATS = [
   { id: 'pdf',      label: 'PDF',          ext: 'pdf',  mime: 'application/pdf' },
 ];
 
-/* Which datasets contain PII (email + IBAN columns). Only roles with
+/* Which datasets contain PII (email columns). Only roles with
  * the `data.export_pii` permission can export these — others see the
  * non-PII reports only. Activity is borderline (it joins user names)
  * but the column shape is shallow so we treat it as safe. */
@@ -224,7 +222,7 @@ async function loadDataset(dataset, fromIso, toIso) {
   // (KFC's report would include BK's users/claims).
   if (dataset === 'users') {
     const [{ data: users }, { data: balances }] = await Promise.all([
-      applyOrgFilter(supabase.from('users').select('id, display_name, email, iban, created_at, updated_at')),
+      applyOrgFilter(supabase.from('users').select('id, display_name, email, created_at, updated_at')),
       applyOrgFilter(supabase.from('cup_balances').select('user_id, balance, lifetime_cups')),
     ]);
     const balMap = Object.fromEntries((balances || []).map(b => [b.user_id, b]));
@@ -240,7 +238,7 @@ async function loadDataset(dataset, fromIso, toIso) {
   if (dataset === 'claims' || dataset === 'cup_scans' || dataset === 'activity') {
     const table = dataset === 'activity' ? 'activity_history' : dataset;
     const cols  = dataset === 'claims'
-      ? 'id, user_id, type, reward_id, cups_redeemed, payout_amount, iban, status, created_at'
+      ? 'id, user_id, type, reward_id, cups_redeemed, payout_amount, status, created_at'
       : dataset === 'cup_scans'
       ? 'id, user_id, cups_awarded, status, created_at'
       : 'id, user_id, type, label, created_at';
@@ -265,7 +263,7 @@ async function loadDataset(dataset, fromIso, toIso) {
 /* ── Component ── */
 export default function AdminReports({ onNavigate }) {
   // Role-gated PII export: Owners + Admins can export the full Users
-  // and Claims reports including email + IBAN columns. Everyone else
+  // and Claims reports including email columns. Everyone else
   // sees the safe datasets (cup_scans, activity) only. We resolve the
   // role once here and reuse it through the rest of the page.
   const { profile } = useAuth();
@@ -388,7 +386,7 @@ export default function AdminReports({ onNavigate }) {
     // The UI already disables the dataset selector for those roles, but
     // this is a defence-in-depth check in case the state slipped through.
     if (PII_DATASETS.has(dataset) && !canExportPii) {
-      alert("Your role can't export reports that include emails or IBANs. Ask an Owner or Admin for help.");
+      alert("Your role can't export reports that include emails. Ask an Owner or Admin for help.");
       return;
     }
     const stamp = new Date().toISOString().slice(0, 10);
@@ -508,7 +506,7 @@ export default function AdminReports({ onNavigate }) {
                     className={`rep-dataset-btn${dataset === id ? ' rep-dataset-btn--active' : ''}${locked ? ' rep-dataset-btn--locked' : ''}`}
                     onClick={() => !locked && setDataset(id)}
                     disabled={locked}
-                    title={locked ? 'This dataset contains email + IBAN. Only Owners and Admins can export it.' : undefined}
+                    title={locked ? 'This dataset contains email. Only Owners and Admins can export it.' : undefined}
                   >
                     <span className="rep-dataset-btn__name">
                       {d.label}

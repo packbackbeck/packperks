@@ -78,7 +78,7 @@ export const COPY_PRESETS = {
       steps: [
         { title: 'Return your packaging', body: 'Drop your cup or packaging into the SmartBin at the counter.' },
         { title: 'Scan to collect',       body: 'Scan the receipt or QR you get so the cup lands in your balance.' },
-        { title: 'Earn cashback',         body: 'Every returned cup counts toward real cashback, paid to your bank.' },
+        { title: 'Earn cashback',         body: 'Every returned cup counts toward real cashback, sent to you via a Tikkie link.' },
       ],
     },
     terms: {
@@ -86,7 +86,7 @@ export const COPY_PRESETS = {
       intro: 'By collecting cups you agree to a few simple rules:',
       points: [
         'Cups are added when you return your packaging and scan the receipt or QR you receive.',
-        'Cups convert to cashback in euros, paid to the bank account (IBAN) you provide.',
+        'Cups convert to cashback in euros, paid via a Tikkie link we send you.',
         'One cup is credited per returned item; abuse or automated scanning may be reviewed.',
       ],
     },
@@ -127,7 +127,7 @@ export const COPY_PRESETS = {
         { title: 'Get +1 cup',            body: 'Scan the QR at the counter and one cup is added to your balance at that venue.', image: '/how-it-works/byo-2.png', bg: 'linear-gradient(165deg, #EAF6EC 0%, #D6ECD9 100%)', accent: '#5FA96E', icon: 'cup' },
         { title: 'Collect across venues', body: 'Track your progress here and at every other participating store — each keeps its own balance.', image: '/how-it-works/byo-3.png', bg: 'linear-gradient(165deg, #ECEDFB 0%, #DCE0F8 100%)', accent: '#7C86D6', icon: 'store' },
         { title: 'Scan your receipt',     body: 'Once you’ve collected enough cups, buy your reward and scan the store receipt so we can verify your purchase.', image: '/how-it-works/byo-4.png', bg: 'linear-gradient(165deg, #FCF3D2 0%, #F8E7B0 100%)', accent: '#E5B23A', icon: 'receipt' },
-        { title: 'Receive your cashback', body: 'After your receipt is approved, your cashback lands in the bank account (IBAN) you provided.', image: '/how-it-works/byo-5.png', bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)', accent: '#57C08D', icon: 'cash' },
+        { title: 'Receive your cashback', body: 'After your receipt is approved, we send you a Tikkie link to collect your cashback.', image: '/how-it-works/byo-5.png', bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)', accent: '#57C08D', icon: 'cash' },
       ],
     },
     terms: {
@@ -137,7 +137,7 @@ export const COPY_PRESETS = {
         'This is a bring-your-own-cup programme — there is no deposit to pay and nothing to return to a machine.',
         'Scan the counter QR once per drink served in your own reusable cup.',
         'To keep things fair, up to 2 cups are added automatically per 24 hours; anything beyond that is held for a quick review before it’s credited.',
-        'Cups convert to cashback in euros, paid to the bank account (IBAN) you provide.',
+        'Cups convert to cashback in euros, paid via a Tikkie link we send you.',
         'Each store keeps its own cup balance — cups you collect at one venue stay with that venue.',
       ],
     },

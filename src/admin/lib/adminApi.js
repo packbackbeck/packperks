@@ -864,7 +864,7 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
 
   // ── Visitor vs. user (S1) ──
   // A "visitor" only opened the app. The moment someone adds a cup, tries a
-  // scan (even an already-claimed one), sets an email/IBAN, picks a reward,
+  // scan (even an already-claimed one), sets an email, picks a reward,
   // or edits/regenerates their name, they're a real user. Derived from
   // persisted state + scan rows + action events so it survives reloads.
   const scanUserIds = new Set(scans.map(s => s.user_id).filter(Boolean));
@@ -875,7 +875,6 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
   const eventEngagedIds = new Set(ev.filter(e => ENGAGE_EVENTS.has(e.event) && e.user_id).map(e => e.user_id));
   const isEngagedUser = (u) =>
     !!(u.email && String(u.email).trim()) ||
-    !!(u.iban && String(u.iban).trim()) ||
     !!u.selected_reward_id ||
     scanUserIds.has(u.id) ||
     eventEngagedIds.has(u.id);
@@ -1024,7 +1023,7 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
     M({ id: 'active_users', group: 'primary', label: 'Active users (not just visitors)',
         numerator: engagedUsers, denominator: totalUsers,
         numLabel: 'Active users', denLabel: 'All profiles',
-        desc: 'Profiles that did something real — added a cup, tried a scan (even an already-claimed one), set an email or IBAN, picked a reward, or edited their name. The rest are visitors who only opened the app (e.g. via a shared/poster link), which inflates the raw user count.' }),
+        desc: 'Profiles that did something real — added a cup, tried a scan (even an already-claimed one), set an email, picked a reward, or edited their name. The rest are visitors who only opened the app (e.g. via a shared/poster link), which inflates the raw user count.' }),
 
     // ── Secondary ──
     M({ id: 'emails_input', group: 'secondary', label: 'Emails input rate',
@@ -1199,7 +1198,7 @@ async function fetchBehaviourRows(orgIds) {
     applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at'), orgIds),
     applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at'), orgIds),
     applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed, created_at'), orgIds),
-    applyOrgFilter(supabase.from('users').select('id, email, iban, selected_reward_id, created_at'), orgIds),
+    applyOrgFilter(supabase.from('users').select('id, email, selected_reward_id, created_at'), orgIds),
     applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props'), orgIds),
   ]);
   return {
@@ -1393,7 +1392,7 @@ export async function getAdminUsers() {
   const { data: users, error } = await applyOrgFilter(
     supabase
       .from('users')
-      .select('id, display_name, email, iban, device, selected_reward_id, created_at, updated_at')
+      .select('id, display_name, email, device, selected_reward_id, marketing_consent, marketing_consent_at, created_at, updated_at')
       .order('created_at', { ascending: false })
   );
 
@@ -1420,11 +1419,10 @@ export async function getAdminUsers() {
     const cupBalance = balanceMap[u.id]?.balance || 0;
     const lifetimeCups = balanceMap[u.id]?.lifetime || 0;
     // Visitor = only opened the app; becomes a user on any real action
-    // (a cup, a scan attempt, an email/IBAN, or an explicit reward pick).
+    // (a cup, a scan attempt, an email, or an explicit reward pick).
     const isVisitor = !(
       lifetimeCups > 0 || cupBalance > 0 ||
       (u.email && String(u.email).trim()) ||
-      (u.iban && String(u.iban).trim()) ||
       u.selected_reward_id ||
       scanUserIds.has(u.id)
     );
@@ -1472,7 +1470,7 @@ export async function adjustUserBalance(userId, newBalance) {
 /* Merge multiple PackPerks user accounts into one (admin tool).
  * Sums every cup balance + lifetime, repoints history/claims/scans/cups
  * onto the survivor, and keeps the most-recent non-empty profile values
- * (display_name, email, iban, …). Soft-marks absorbed rows with
+ * (display_name, email, …). Soft-marks absorbed rows with
  * merged_into so they can't be hit by anonymous reads any more. Audited
  * server-side. Returns { status:'merged', survivor_id, absorbed_ids,
  * merged_balance, merged_lifetime, profile_update, repoint_errors }. */
@@ -1489,8 +1487,14 @@ export async function mergeUsers(survivorId, absorbedIds) {
 }
 
 export async function adminUpdateUser(userId, updates) {
-  const allowed = ['display_name', 'email', 'iban'];
+  const allowed = ['display_name', 'email', 'marketing_consent'];
   const filtered = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)));
+  // Stamp consent proof whenever an admin changes the marketing flag.
+  if ('marketing_consent' in filtered) {
+    filtered.marketing_consent = !!filtered.marketing_consent;
+    filtered.marketing_consent_at = new Date().toISOString();
+    filtered.marketing_consent_source = 'admin';
+  }
   const { error } = await applyOrgFilter(
     supabase
       .from('users')
@@ -1504,7 +1508,8 @@ export async function adminUpdateUser(userId, updates) {
 // reviewer can see *why* Claude flagged the claim, alongside the existing
 // status workflow.
 const CLAIMS_COLS = `
-  id, user_id, type, reward_id, cups_redeemed, payout_amount, iban,
+  id, user_id, type, reward_id, cups_redeemed, payout_amount,
+  tikkie_url, tikkie_status, notify_email, notify_push, notified_at, flagged,
   receipt_photo_url, receipt_photo_path, status, payout_status, created_at,
   ai_verdict, ai_confidence, ai_is_receipt, ai_is_burger_king,
   ai_contains_required_item, ai_failure_checks, ai_reason,
@@ -1581,11 +1586,18 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
     const { data: existing } = await applyOrgFilter(
       supabase
         .from('claims')
-        .select('type')
+        .select('type, tikkie_url')
         .eq('id', claimId)
     ).maybeSingle();
-    if (status === 'completed' && existing?.type === 'cashback') {
-      update.payout_status = 'queued';
+    if (status === 'completed' && (existing?.type === 'cashback' || existing?.type === 'direct_refund')) {
+      // Approved → "send" the customer a Tikkie link to collect their cashback.
+      // The link is a placeholder until the Tikkie edge function mints a real
+      // one (Phase 2); approving here is what flips the customer's claim to
+      // "Ready — collect via Tikkie".
+      update.payout_status = 'sent';
+      update.tikkie_status = 'created';
+      update.notified_at = new Date().toISOString();
+      if (!existing?.tikkie_url) update.tikkie_url = `https://tikkie.me/pay/demo/${claimId}`;
     } else {
       update.payout_status = 'not_queued';
     }
@@ -1599,6 +1611,16 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
       .update(update)
       .eq('id', claimId)
       .select('*')
+  ).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/* Toggle the admin "flag/mark" on a claim — highlights the row in the list so
+ * a reviewer can set it aside for a second look. Returns the updated row. */
+export async function markClaim(claimId, flagged) {
+  const { data, error } = await applyOrgFilter(
+    supabase.from('claims').update({ flagged: !!flagged }).eq('id', claimId).select('*')
   ).maybeSingle();
   if (error) throw error;
   return data;
@@ -2187,7 +2209,6 @@ export async function createOrganization(payload) {
     heroSubtext:        copy.heroSubtext        || 'Return your packaging and earn cashback.',
     donationRecipient:  copy.donationRecipient  || '',
     donationDescription: copy.donationDescription || '',
-    minIbanLength:      15,
     maxCupsPerScan:     economics.maxCupsPerScan ?? 1,
     maxCupsToShare:     economics.maxCupsToShare ?? 10,
     featureCupSharing:    features.featureCupSharing    ?? false,

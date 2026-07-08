@@ -1,240 +1,193 @@
-.rj-page {
+/* ─────────────────────────────────────────────────────────────────────
+ * ReceiptRejectedPage — cream canvas, DM Sans. A tight verdict hero, then
+ * a clean vertical stack of labelled cards (Why → cups safe → what next),
+ * with the actions pinned to the bottom. Sleek, senior, low-chrome.
+ * ───────────────────────────────────────────────────────────────────── */
+
+.rj {
   position: fixed;
   inset: 0;
-  background: #FFF8F4;
-  padding: 3.5rem 1.5rem 2.5rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: var(--bk-cream);
+  font-family: var(--font-primary);
+  color: var(--black);
+}
+
+.rj__scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: calc(env(safe-area-inset-top, 0px) + 3rem) 1.375rem 1rem;
+}
+
+/* ── 1. Verdict hero ── */
+.rj__hero {
+  width: 100%;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  overflow-y: auto;
-  z-index: 10;
+  margin-bottom: 0.35rem;
 }
-
-.rj-page__icon-wrap {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #FFE5DA;
+.rj__badge {
+  width: 68px;
+  height: 68px;
+  border-radius: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
-  font-size: 2.25rem;
+  font-size: 1.9rem;
+  line-height: 1;
+  margin-bottom: 0.95rem;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.07);
 }
+.rj__badge--reject { background: #FCE7E0; }
+.rj__badge--warn   { background: #FDECD6; }
 
-.rj-page__title {
-  font-size: 1.375rem;
+.rj__title {
+  font-size: 1.55rem;
   font-weight: 800;
-  color: #1A1A1A;
-  margin: 0 0 0.5rem;
-  max-width: 320px;
-  line-height: 1.25;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--black);
 }
 
-.rj-page__hint {
-  font-size: 0.875rem;
-  color: #7A7166;
-  margin: 0 0 1.5rem;
-  max-width: 320px;
-  line-height: 1.45;
-}
-
-.rj-checks {
+/* ── Labelled cards (Why / What to do next) ── */
+.rj__card {
   width: 100%;
-  max-width: 340px;
-  background: white;
-  border-radius: 14px;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.rj-checks__title {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #9E9A93;
+  max-width: 360px;
+  background: var(--white);
+  border: 1px solid #EFE8DA;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(30, 20, 10, 0.05);
+  padding: 0.95rem 1.05rem 1.05rem;
   text-align: left;
-  margin-bottom: 0.625rem;
 }
 
-.rj-check {
+.rj__eyebrow {
+  display: block;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #B4AA9A;
+  margin-bottom: 0.4rem;
+}
+
+.rj__lead {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #2C2823;
+}
+
+/* Failed-check chips under the reason. */
+.rj__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.7rem;
+}
+.rj__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: #FBE7E1;
+  color: #C0391A;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.rj__chip svg { flex-shrink: 0; }
+
+/* ── 3. Cups-safe strip ── */
+.rj__safe {
+  width: 100%;
+  max-width: 360px;
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 0.375rem 0;
-  text-align: left;
+  gap: 10px;
+  padding: 11px 13px;
+  background: rgba(26, 135, 55, 0.08);
+  border: 1px solid rgba(26, 135, 55, 0.2);
+  border-radius: 14px;
 }
-
-.rj-check__dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+.rj__safe-ic {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-}
-
-.rj-check--pass .rj-check__dot {
-  background: #DFF5E3;
+  background: rgba(26, 135, 55, 0.14);
   color: #1A8737;
 }
-
-.rj-check--fail .rj-check__dot {
-  background: #FFE0DC;
-  color: #C73E1D;
+.rj__safe-txt {
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: #2C6B3E;
 }
+.rj__safe-txt strong { color: #14602F; font-weight: 800; }
 
-.rj-check__label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #1A1A1A;
-}
-
-.rj-check--fail .rj-check__label {
-  color: #C73E1D;
-}
-
-/* "Your cups are safe" reassurance banner. Pinned high in the layout
- * (between title and check list) so users see it before they read any
- * fine print. Soft green to convey "all good" without competing with
- * the success-state colour palette. */
-.rj-cups-safe {
-  width: 100%;
-  max-width: 340px;
+/* ── 5. Bottom-anchored actions ── */
+.rj__actions {
+  flex-shrink: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  margin-bottom: 1rem;
-  background: rgba(26, 135, 55, 0.10);
-  border: 1px solid rgba(26, 135, 55, 0.30);
-  border-radius: 12px;
-  font-size: 0.82rem;
-  color: #14532D;
-  line-height: 1.4;
-}
-.rj-cups-safe svg {
-  flex-shrink: 0;
-  color: #1A8737;
+  gap: 0.55rem;
+  padding: 0.85rem 1.375rem calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+  background: linear-gradient(to top, var(--bk-cream) 74%, rgba(244, 235, 220, 0));
 }
 
-/* "What to do next" — actionable copy tailored to the failure code.
- * Visually distinct from the optional "Why" reason block (which is
- * the verbose AI summary) so it draws the eye even on a long page. */
-.rj-next {
+.rj__btn {
   width: 100%;
-  max-width: 340px;
-  background: #FFFFFF;
-  border: 1px solid #E7DDD0;
-  border-radius: 12px;
-  padding: 0.75rem 0.875rem;
-  margin-bottom: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  text-align: left;
-}
-.rj-next__label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6B645B;
-}
-.rj-next__text {
-  font-size: 0.9rem;
-  color: #1A1A1A;
-  line-height: 1.45;
-}
-
-.rj-reason {
-  width: 100%;
-  max-width: 340px;
-  background: #FFF1E8;
-  border: 1px solid #FFE0CC;
-  border-radius: 12px;
-  padding: 0.75rem 0.875rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  text-align: left;
-}
-
-.rj-reason__label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #A85320;
-}
-
-.rj-reason__text {
-  font-size: 0.85rem;
-  color: #6B3F1F;
-  line-height: 1.4;
-}
-
-.rj-actions {
-  width: 100%;
-  max-width: 340px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: auto;
-}
-
-.rj-actions__primary {
+  max-width: 360px;
   height: 52px;
-  border: none;
   border-radius: 26px;
-  background: #E24400;
-  color: white;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 1rem;
   font-weight: 700;
-  cursor: pointer;
-  transition: filter 0.15s;
+  transition: filter 0.15s ease, transform 0.08s ease, background 0.15s ease;
 }
-.rj-actions__primary:hover { filter: brightness(0.95); }
-
-.rj-actions__secondary {
-  height: 44px;
-  border: none;
-  background: transparent;
-  color: #7A7166;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
+.rj__btn--primary {
+  background: #E24400;
+  color: #fff;
 }
-.rj-actions__secondary:hover { color: #1A1A1A; }
+.rj__btn--primary:hover { filter: brightness(0.96); }
+.rj__btn--primary:active { transform: translateY(1px); }
 
-/* "Still stuck? Get help" link — opens mailto: with pre-filled claim
- * metadata. Lives below the primary CTAs so it's available but never
- * competes with the recommended action ("Try a different receipt"). */
-.rj-help {
-  display: inline-block;
-  margin-top: 12px;
-  padding: 6px 10px;
+/* White "Back to home" — a clean secondary button, not a ghost link. */
+.rj__btn--white {
+  background: #fff;
+  color: var(--black);
+  border: 1px solid #E7DECF;
+  box-shadow: 0 2px 10px rgba(30, 20, 10, 0.05);
+}
+.rj__btn--white:hover { background: #FBF7F0; }
+.rj__btn--white:active { transform: translateY(1px); }
+
+.rj__help {
+  margin-top: 1px;
+  padding: 4px 10px;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #7A7166;
+  color: #A0968A;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.rj-help:hover { color: #1A1A1A; }
-
-
-.rj-checks__skipped {
-  margin-top: 0.625rem;
-  padding-top: 0.625rem;
-  border-top: 1px dashed #E8E2D9;
-  font-size: 0.75rem;
-  color: #9E9A93;
-  font-style: italic;
-  text-align: left;
-  line-height: 1.4;
-}
+.rj__help:hover { color: #6E675E; }

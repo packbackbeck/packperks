@@ -1,0 +1,78 @@
+/* Root-path venue-model chooser — deliberately minimal (logo, prompt, 2 tiles). */
+.mc {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5);
+  background: var(--pb-cream);
+}
+
+.mc__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.mc__logo {
+  width: 148px;
+  height: auto;
+}
+
+.mc__prompt {
+  font-family: var(--font-primary);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--black);
+  margin: 0;
+}
+
+.mc__tiles {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.mc__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 26px 18px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-screen);
+  color: var(--black);
+  text-decoration: none;
+  transition: transform 0.14s var(--ease-out-expo), box-shadow 0.14s ease;
+}
+.mc__tile:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.10); }
+.mc__tile:active { transform: scale(0.99); }
+
+.mc__tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  margin-bottom: 4px;
+}
+.mc__tile--byo .mc__tile-icon { color: var(--pb-green-500); background: var(--pb-green-100); }
+.mc__tile--bin .mc__tile-icon { color: var(--pb-brown); background: #F1E7DF; }
+
+.mc__tile-title {
+  font-family: var(--font-primary);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+}
+.mc__tile-sub {
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  color: var(--text-light);
+}

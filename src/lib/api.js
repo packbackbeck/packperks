@@ -120,11 +120,12 @@ async function resolveDeviceOrgOccupant(deviceId, orgId, authUid = null, authEma
 export async function getOrCreateUser(orgId) {
   const deviceId = getDeviceId()
 
-  // Safety net: never resolve a user without an org. A device can now have
-  // one row PER org (per-org identity), so an org-less lookup hits multiple
-  // rows, errors, and mints a fresh orphan user — fragmenting the balance.
-  // Fall back to the default org so we always land on a real per-org row.
+  // Never resolve a user without an org. A device can have one row PER org, so
+  // an org-less insert mints an orphan (org_id = null) row that fragments the
+  // balance and can collide downstream. getDefaultOrgId() no longer falls back
+  // to Burger King — if there's genuinely no org, bail rather than mint junk.
   if (!orgId) orgId = await getDefaultOrgId()
+  if (!orgId) return null
 
   // 1. Auth path — if a Supabase session is in scope, look the user up
   //    by auth_user_id. This is the only path that survives a fresh
@@ -934,18 +935,12 @@ export async function addHistoryEntry(userId, type, label) {
 // the admin context layer in Phase 2 can reuse the same logic before
 // the user has picked an active org.
 export async function getDefaultOrgId() {
-  try {
-    const { data } = await supabase
-      .from('organizations')
-      .select('id')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    return data?.id || null
-  } catch {
-    return null
-  }
+  // There is NO global "default org" in the multi-venue model. This used to
+  // return the OLDEST org — which is Burger King — so any slug-less or
+  // unresolved visitor was silently dropped into Burger King (its rewards, and
+  // a users row in the wrong org that then collided on users_device_org_key).
+  // Callers must resolve a real org from the URL; the root path is a chooser.
+  return null
 }
 
 // Fetch an organisation row by its URL slug. Used by the user-facing
@@ -1002,18 +997,10 @@ export async function getOrgById(orgId) {
 // Fetch the default (oldest non-deleted) organisation row. Used as a
 // fallback when the URL has no slug.
 export async function getDefaultOrg() {
-  try {
-    const { data } = await supabase
-      .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    return data || null
-  } catch {
-    return null
-  }
+  // No global default org (see getDefaultOrgId). Returning the oldest org here
+  // is what dropped unresolved visitors into Burger King. Return null; the
+  // caller redirects an unresolved venue to the root chooser.
+  return null
 }
 
 export async function getAppConfig(orgId) {

@@ -161,6 +161,23 @@ function haptic(kind = 'tap') {
   } catch { /* ignore */ }
 }
 
+// Placeholder reward used only in the brief window before a venue's real rewards
+// arrive from its published config (there is no Burger King default any more —
+// `rewards` is empty). Numeric fields are 0 so the progress math is safe; the
+// home screen shows a skeleton while isLoading, so a venue that has rewards
+// never actually shows this.
+const EMPTY_REWARD = {
+  id: null,
+  name: '',
+  description: '',
+  image: null,
+  cupsNeeded: 0,
+  euros: 0,
+  bgColor: 'var(--pb-cream)',
+  tags: [],
+  displayLines: [],
+};
+
 export default function App() {
   /* ── Supabase-backed state ── */
   const [userId, setUserId] = useState(null);
@@ -340,7 +357,11 @@ export default function App() {
   const [donatedCups, setDonatedCups] = useState(0);
 
   /* ── Derived values ── */
-  const selectedReward = liveRewards.find((r) => r.id === selectedRewardId) || liveRewards[0];
+  // Harmless fallback for the window before a venue's rewards load (there is no
+  // Burger King default any more — `rewards` is empty). Keeps every downstream
+  // `selectedReward.*` access safe instead of crashing on undefined; the real
+  // reward replaces it as soon as the published config arrives.
+  const selectedReward = liveRewards.find((r) => r.id === selectedRewardId) || liveRewards[0] || EMPTY_REWARD;
   const otherRewards = liveRewards.filter((r) => r.id !== selectedRewardId);
   const isUnlocked = cupCount >= selectedReward.cupsNeeded;
   const cupsRemaining = Math.max(0, selectedReward.cupsNeeded - cupCount);
@@ -575,11 +596,18 @@ export default function App() {
               org = grp.members[0] || null;
             }
           } else {
-            org = await getOrgBySlug(seg0);
+            // seg0 wasn't a group — try it as an org slug, then (defensively)
+            // seg1, so /<group>/<venue> still resolves the venue even if the
+            // group lookup hiccups.
+            org = (await getOrgBySlug(seg0)) || (seg1 ? await getOrgBySlug(seg1) : null);
           }
         }
-        if (!org) org = await getDefaultOrg();
-        if (org) setActiveOrg(org);
+        // No venue resolved from the URL. Do NOT fall back to a default org —
+        // that silently dropped visitors into Burger King (its rewards + a
+        // wrong-org users row that crashed on users_device_org_key). Send them
+        // to the root venue chooser instead.
+        if (!org) { window.location.replace('/'); return; }
+        setActiveOrg(org);
         if (hubRoute) setPage('stores'); // /<groupSlug> lands on the Stores hub
 
         const user = await getOrCreateUser(org?.id);

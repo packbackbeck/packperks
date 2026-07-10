@@ -433,9 +433,16 @@ export async function sendMagicLink(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
     options: {
-      // Land them back at the user app — Supabase exchanges the code
-      // for a session automatically when this URL is hit.
-      emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      // Land them back on THEIR VENUE, not the bare origin. Tapping the magic
+      // link on a phone used to redirect to '/' (no slug) → the app fell back
+      // to the default org (Burger King) and crashed on load ("trouble loading
+      // your cups"). Desktop users who type the 6-digit code instead stay on
+      // the venue, which is why this only bit phones. Include the current path
+      // so the link returns to /<group>/<venue>. (Supabase must allow this URL
+      // in Auth → URL Configuration → Redirect URLs, e.g. origin + '/**'.)
+      emailRedirectTo: typeof window !== 'undefined'
+        ? window.location.origin + window.location.pathname
+        : undefined,
       // Allow creating new auth.users rows on first signin. Existing
       // PackPerks customers who never had an email will get a fresh
       // auth row that we link to their device-side user row.

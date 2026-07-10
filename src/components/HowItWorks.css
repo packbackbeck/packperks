@@ -51,7 +51,7 @@
   display: block;
   height: 100%;
   width: 0;
-  background: var(--bk-brown, #502314);
+  background: var(--pb-brown, #502314);
   border-radius: 3px;
   transition: width 0.08s linear;
 }
@@ -185,7 +185,7 @@
   padding: 0 24px;
   border-radius: var(--radius-sm, 10px);
   border: none;
-  background: var(--bk-brown, #502314);
+  background: var(--pb-brown, #502314);
   color: var(--white, #FFFFFF);
   font-family: inherit;
   font-size: var(--fs-md, 16px);

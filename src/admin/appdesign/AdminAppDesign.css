@@ -16,7 +16,7 @@
 .aad__eyebrow {
   font-size: 11px;
   font-weight: 700;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
@@ -44,7 +44,7 @@
 .aad__ok {
   font-size: 12px;
   font-weight: 700;
-  color: #1A8737;
+  color: var(--pb-green);
   background: rgba(26, 135, 55, 0.12);
   border: 1px solid rgba(26, 135, 55, 0.25);
   padding: 5px 10px;
@@ -75,7 +75,7 @@
   transition: all 0.14s ease;
 }
 .aad__btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.aad__btn--primary { background: #FD6F46; color: #FFFFFF; }
+.aad__btn--primary { background: var(--pb-orange-warm); color: #FFFFFF; }
 .aad__btn--primary:hover:not(:disabled) { background: #E8542B; }
 .aad__btn--ghost { background: transparent; color: #5A554F; border-color: #D6CFC2; }
 .aad__btn--ghost:hover:not(:disabled) { background: #F4EFE5; color: #0F0F0F; }
@@ -83,7 +83,7 @@
 .aad__link {
   background: transparent;
   border: none;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -282,7 +282,7 @@
   background: #FFFFFF;
   text-transform: uppercase;
 }
-.aad-color__hex:focus { outline: none; border-color: #FD6F46; }
+.aad-color__hex:focus { outline: none; border-color: var(--pb-orange-warm); }
 .aad-color__hint {
   margin: 0;
   font-size: 11px;
@@ -368,7 +368,7 @@
   color: #0F0F0F;
   background: #FFFFFF;
 }
-.aad-copy__input:focus { outline: none; border-color: #FD6F46; }
+.aad-copy__input:focus { outline: none; border-color: var(--pb-orange-warm); }
 .aad-copy__input--overflow {
   border-color: #C73E1D;
   box-shadow: 0 0 0 2px rgba(199, 62, 29, 0.12);
@@ -426,7 +426,7 @@
   flex-shrink: 0;
   transition: background 0.16s ease;
 }
-.aad-toggle--on { background: #1A8737; }
+.aad-toggle--on { background: var(--pb-green); }
 .aad-toggle__dot {
   position: absolute;
   top: 2px;

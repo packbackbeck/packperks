@@ -49,7 +49,7 @@ function truncName(name, n = 15) {
 
 function StoreMark({ store, variant }) {
   const cls = `stores2__mark${variant ? ` stores2__mark--${variant}` : ''}`;
-  const bg = store?.brand_color || 'var(--bk-green, #1A8737)';
+  const bg = store?.brand_color || 'var(--pb-green, #1A8737)';
   if (store?.logo_url) {
     // Brand-coloured tile with a diagonal light→dark sheen (works on any hue)
     // and the logo tinted white — mirrors the hero logo panel.
@@ -545,8 +545,11 @@ export default function StoresPage({
   const notYet = useMemo(() => {
     if (!showNotYet) return [];
     const src = (Array.isArray(notYetStores) && notYetStores.length) ? notYetStores : getNotYetStores(region);
-    return src.map((v, i) => ({
-      id: v.id || `notyet-${region}-${i}`,
+    return src.map((v) => ({
+      // E.14.9: derive the id from a STABLE name-slug, not the list index —
+      // otherwise reordering the list reassigned the saved "Requested" state
+      // (persisted by id in localStorage) to whichever venue now sits in that slot.
+      id: v.id || `notyet-${region}-${(v.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`,
       name: v.name,
       area: v.area,
       location: { lat: v.lat, lng: v.lng },
@@ -673,7 +676,7 @@ export default function StoresPage({
           {/* Lead store — where you have the most cups (default view only) */}
           {hero && (
             <button type="button" className="stores2__hero" onClick={() => onSelectStore?.(hero)}>
-              <div className="stores2__hero-logo" style={{ background: hero.brand_color || 'var(--bk-green, #1A8737)' }}>
+              <div className="stores2__hero-logo" style={{ background: hero.brand_color || 'var(--pb-green, #1A8737)' }}>
                 {hero.logo_url
                   ? <img className="stores2__hero-logo-img" src={hero.logo_url} alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
                   : <span className="stores2__hero-logo-letter">{(hero.name || 'S').charAt(0).toUpperCase()}</span>}

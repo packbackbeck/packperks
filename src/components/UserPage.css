@@ -5,7 +5,7 @@
   align-items: center;
   width: 100%;
   min-height: 100dvh;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   /* Bottom padding matches the horizontal (side) padding. */
   padding: var(--sp-2);
   gap: var(--sp-4);
@@ -121,7 +121,7 @@
 }
 
 .user-page__save-banner-cta {
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
   border: none;
   font-family: var(--font-primary);
@@ -200,7 +200,7 @@
   justify-content: center;
   background: #F6F2EA;
 }
-.user-page__impact-icon--green { background: #DFF4E4; color: #1A8737; }
+.user-page__impact-icon--green { background: #DFF4E4; color: var(--pb-green); }
 .user-page__impact-icon--blue  { background: #DCEAF7; color: #2F6FB5; }
 
 .user-page__impact-label {
@@ -264,7 +264,7 @@
    * resize gracefully (URL bar shrink/grow on iOS Safari). */
   max-height: 92dvh;
   overflow-y: auto;
-  background: var(--bk-cream, #F4EBDC);
+  background: var(--pb-cream, #F4EBDC);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   z-index: 901;
   /* Safe-area inset on bottom so the share button doesn't sit under
@@ -442,7 +442,7 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  background: var(--bk-brown, #502314);
+  background: var(--pb-brown, #502314);
   color: var(--white);
   border: none;
   border-radius: 26px;
@@ -475,7 +475,7 @@
   flex-direction: column;
   box-sizing: border-box;
   font-family: var(--font-primary);
-  color: var(--bk-brown, #502314);
+  color: var(--pb-brown, #502314);
 }
 .impact-share-card__brand {
   display: flex;
@@ -506,7 +506,7 @@
   font-weight: 900;
   line-height: 0.95;
   letter-spacing: -0.04em;
-  color: var(--bk-brown, #502314);
+  color: var(--pb-brown, #502314);
 }
 .impact-share-card__big-label {
   font-size: 22px;
@@ -582,7 +582,7 @@
   flex-shrink: 0;
   border-radius: 50%;
   overflow: hidden;
-  border: 2.5px solid var(--bk-orange);
+  border: 2.5px solid var(--pb-orange);
   align-self: center;
 }
 
@@ -621,7 +621,7 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
@@ -635,8 +635,8 @@
 .user-page__name-icon-btn:active { transform: scale(0.93); }
 
 .user-page__name-icon-btn--save {
-  background: #1A8737;
-  border-color: #1A8737;
+  background: var(--pb-green);
+  border-color: var(--pb-green);
   color: white;
 }
 .user-page__name-icon-btn--save:hover { background: #22a447; color: white; }
@@ -653,8 +653,8 @@
   font-weight: var(--fw-bold);
   font-size: var(--fs-md);
   color: var(--black);
-  background: var(--bk-cream);
-  border: 1.5px solid var(--bk-orange);
+  background: var(--pb-cream);
+  border: 1.5px solid var(--pb-orange);
   border-radius: var(--radius-sm);
   padding: 4px 8px;
   width: 160px;
@@ -666,7 +666,7 @@
 .user-page__visitor {
   width: 330px;
   background: var(--white);
-  border: 1.5px dashed var(--bk-orange);
+  border: 1.5px dashed var(--pb-orange);
   border-radius: var(--radius-lg);
   padding: var(--sp-4);
   box-shadow: var(--shadow-screen);
@@ -684,7 +684,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--bk-orange);
+  color: var(--pb-orange);
   background: rgba(253, 111, 70, 0.12);
   padding: 4px 10px;
   border-radius: 999px;
@@ -711,7 +711,7 @@
   font-size: 15px;
   font-weight: 800;
   color: var(--white);
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   border: none;
   border-radius: var(--radius-lg);
   padding: 13px 18px;
@@ -760,7 +760,7 @@
   color: var(--text-muted);
 }
 .user-page__value-num--euro {
-  color: #1A8737;
+  color: var(--pb-green);
 }
 .user-page__value-label {
   font-family: var(--font-primary);
@@ -817,7 +817,7 @@
   flex: 1;
   height: 36px;
   padding: 0 var(--sp-3);
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   font-family: var(--font-primary);
@@ -826,13 +826,13 @@
   outline: none;
   transition: border-color var(--duration-fast) ease;
 }
-.user-page__email-input:focus { border-color: var(--bk-orange); }
+.user-page__email-input:focus { border-color: var(--pb-orange); }
 .user-page__email-input--error { border-color: #E24400; }
 
 .user-page__email-btn {
   height: 36px;
   padding: 0 var(--sp-4);
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
   border-radius: var(--radius-sm);
   font-family: var(--font-primary);
@@ -970,7 +970,7 @@
 }
 
 .user-page__history-signin-btn {
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: #fff;
   border: none;
   border-radius: 20px;
@@ -1059,7 +1059,7 @@
 }
 .user-page__privacy-hint-link {
   background: none; border: none; padding: 0; cursor: pointer;
-  font: inherit; color: var(--bk-green, #1A8737); font-weight: 700; text-decoration: underline;
+  font: inherit; color: var(--pb-green, var(--pb-green)); font-weight: 700; text-decoration: underline;
 }
 
 /* Data & privacy control rows */
@@ -1072,7 +1072,7 @@
   color: var(--black, #1a1a1a); text-align: left;
 }
 .user-page__data-row svg { color: var(--text-faint, rgba(0, 0, 0, 0.3)); flex-shrink: 0; }
-.user-page__data-row:hover { color: var(--bk-green, #1A8737); }
+.user-page__data-row:hover { color: var(--pb-green, var(--pb-green)); }
 .user-page__data-row--danger { color: #C4321B; }
 .user-page__data-row--danger:hover { color: #A5240F; }
 .user-page__data-note {
@@ -1087,7 +1087,7 @@
   padding: 1px 7px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.06);
-  color: var(--bk-brown, #502314);
+  color: var(--pb-brown, #502314);
   font-weight: 700;
 }
 
@@ -1191,7 +1191,7 @@
   height: 38px;
   border-radius: 10px;
   background: rgba(83, 51, 165, 0.14);
-  color: #5333A5;
+  color: var(--pb-purple-600);
   display: grid;
   place-items: center;
 }
@@ -1207,7 +1207,7 @@
 .user-page__signin-btn {
   flex-shrink: 0;
   padding: 9px 14px;
-  background: #5333A5;
+  background: var(--pb-purple-600);
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
@@ -1218,7 +1218,7 @@
   cursor: pointer;
   transition: background 0.14s ease, transform 0.08s ease;
 }
-.user-page__signin-btn:hover { background: #42298B; }
+.user-page__signin-btn:hover { background: var(--pb-purple-700); }
 .user-page__signin-btn:active { transform: translateY(1px); }
 
 /* ── Save your progress (merged email + cross-device card) ─────────
@@ -1251,7 +1251,7 @@
   height: 38px;
   border-radius: 10px;
   background: rgba(83, 51, 165, 0.14);
-  color: #5333A5;
+  color: var(--pb-purple-600);
   display: grid;
   place-items: center;
 }
@@ -1273,12 +1273,12 @@
   margin-top: 10px;
   padding: 8px 12px;
   background: transparent;
-  border: 1px dashed #5333A5;
+  border: 1px dashed var(--pb-purple-600);
   border-radius: 10px;
   font-family: inherit;
   font-size: 12.5px;
   font-weight: 600;
-  color: #5333A5;
+  color: var(--pb-purple-600);
   cursor: pointer;
   transition: background 0.14s ease, color 0.14s ease, border-style 0.14s ease;
 }
@@ -1319,7 +1319,7 @@
   height: 40px;
   border-radius: 12px;
   background: #FFF3E9;
-  color: var(--bk-orange, #FD6F46);
+  color: var(--pb-orange, var(--pb-orange-warm));
 }
 .user-page__howto-text {
   display: flex;
@@ -1354,9 +1354,9 @@
 }
 .user-page__visitor-ctas .user-page__visitor-cta { width: 100%; }
 .user-page__visitor-cta--alt {
-  color: var(--bk-orange);
+  color: var(--pb-orange);
   background: var(--white);
-  border: 1.5px solid var(--bk-orange);
+  border: 1.5px solid var(--pb-orange);
 }
 .user-page__visitor-cta--alt:hover { filter: none; background: #FFF6F1; }
 
@@ -1398,7 +1398,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
   transition: transform 0.16s ease;
 }
-.user-page__switch:checked { background: #1A8737; }
+.user-page__switch:checked { background: var(--pb-green); }
 .user-page__switch:checked::after { transform: translateX(18px); }
 
 /* Inline email editor inside the padding-less Details list card. */

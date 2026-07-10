@@ -210,15 +210,8 @@ function NotifyOptions({ claim }) {
           />
           <span>via email</span>
         </label>
-        <label className="pc-notify__opt">
-          <input
-            type="checkbox"
-            className="pc-notify__box"
-            checked={push}
-            onChange={e => togglePush(e.target.checked)}
-          />
-          <span>via push notification</span>
-        </label>
+        {/* C.4: the "via push notification" option was removed — no push sender
+            exists yet, so it delivered nothing. Email works (via Brevo). */}
       </div>
       {hint && <span className="pc-notify__hint">{hint}</span>}
     </div>

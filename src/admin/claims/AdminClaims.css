@@ -153,7 +153,7 @@
 .ac-th--sortable:hover { color: #4A4540; }
 
 .ac-sort-icon { margin-left: 4px; opacity: 0.4; }
-.ac-sort-icon--active { opacity: 1; color: #FD6F46; }
+.ac-sort-icon--active { opacity: 1; color: var(--pb-orange-warm); }
 
 .ac-table__row { border-bottom: 1px solid #F8F6F3; transition: background 0.1s; height: 52px; }
 .ac-table__row:hover { background: #FAFAF8; }
@@ -166,7 +166,7 @@
   width: 15px;
   height: 15px;
   cursor: pointer;
-  accent-color: #FD6F46;
+  accent-color: var(--pb-orange-warm);
 }
 
 .ac-mono  { font-family: monospace; font-size: 12px; }
@@ -204,7 +204,7 @@
 .ac-reward-link {
   background: none; border: none; padding: 0;
   font-family: inherit; font-size: 13px;
-  color: #FD6F46; cursor: pointer;
+  color: var(--pb-orange-warm); cursor: pointer;
   font-weight: 600;
   text-decoration: underline;
   text-decoration-color: transparent;
@@ -213,10 +213,10 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   display: inline-block;
 }
-.ac-reward-link:hover { text-decoration-color: #FD6F46; }
+.ac-reward-link:hover { text-decoration-color: var(--pb-orange-warm); }
 
 .ac-type-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
-.ac-type-badge--cashback     { background: rgba(124,92,215,0.12); color: #5333A5; }
+.ac-type-badge--cashback     { background: rgba(124,92,215,0.12); color: var(--pb-purple-600); }
 .ac-type-badge--direct_refund { background: rgba(167,139,250,0.12); color: #7C3AED; }
 
 .ac-status { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; text-transform: capitalize; white-space: nowrap; }
@@ -446,8 +446,8 @@
   text-transform: uppercase;
 }
 
-.ac-verdict-check--pass .ac-verdict-check__dot { background: #DFF5E3; color: #1A8737; }
-.ac-verdict-check--pass .ac-verdict-check__state { color: #1A8737; }
+.ac-verdict-check--pass .ac-verdict-check__dot { background: #DFF5E3; color: var(--pb-green); }
+.ac-verdict-check--pass .ac-verdict-check__state { color: var(--pb-green); }
 
 .ac-verdict-check--fail { background: #FFF5F2; }
 .ac-verdict-check--fail .ac-verdict-check__dot { background: #FFE0DC; color: #C73E1D; }
@@ -582,7 +582,7 @@
 .ac-tikkie-pill--sent {
   background: #DFF5E3;
   border-color: #BDE5C6;
-  color: #1A8737;
+  color: var(--pb-green);
 }
 
 /* Trim other columns slightly so the whole table fits at typical sidebar widths */
@@ -668,7 +668,7 @@
 
 /* Highlight the row whose detail is open on the right */
 .ac-table__row--active { background: #FFF8F1 !important; }
-.ac-table__row--active td { box-shadow: inset 3px 0 0 #FD6F46; }
+.ac-table__row--active td { box-shadow: inset 3px 0 0 var(--pb-orange-warm); }
 
 /* Admin "marked for a second look" — an amber wash + left accent so
  * flagged claims stand out in the list at a glance. */
@@ -757,14 +757,14 @@
 .ac-col-picker__reset {
   background: none;
   border: none;
-  color: #5333A5;
+  color: var(--pb-purple-600);
   font-family: inherit;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   padding: 0;
 }
-.ac-col-picker__reset:hover { color: #42298B; text-decoration: underline; }
+.ac-col-picker__reset:hover { color: var(--pb-purple-700); text-decoration: underline; }
 
 .ac-col-picker__row {
   display: flex;
@@ -781,7 +781,7 @@
   margin-top: 2px;
   width: 14px;
   height: 14px;
-  accent-color: #5333A5;
+  accent-color: var(--pb-purple-600);
   cursor: pointer;
 }
 
@@ -848,7 +848,7 @@
   background: #EAE3D6; box-shadow: 0 0 0 1px #DDD3C4; z-index: 1;
 }
 .ac-tk-step.is-done .ac-tk-dot,
-.ac-tk-step.is-good .ac-tk-dot { background: #1A8737; box-shadow: 0 0 0 1px #1A8737; }
+.ac-tk-step.is-good .ac-tk-dot { background: var(--pb-green); box-shadow: 0 0 0 1px var(--pb-green); }
 .ac-tk-step.is-current .ac-tk-dot { background: #E89E2C; box-shadow: 0 0 0 1px #E89E2C; }
 .ac-tk-step.is-bad .ac-tk-dot { background: #C4321B; box-shadow: 0 0 0 1px #C4321B; }
 .ac-tk-body { display: flex; flex-direction: column; gap: 2px; }
@@ -858,7 +858,7 @@
 
 .ac-tk-link {
   margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 7px;
-  height: 44px; border-radius: 12px; background: #1A8737; color: #fff;
+  height: 44px; border-radius: 12px; background: var(--pb-green); color: #fff;
   font-size: 14px; font-weight: 800; text-decoration: none;
 }
 .ac-tk-link:hover { filter: brightness(0.96); }

@@ -20,6 +20,6 @@
 }
 .arg-tab:hover { color: #3A352F; }
 .arg-tab--active {
-  color: #1A8737;
-  border-bottom-color: #1A8737;
+  color: var(--pb-green);
+  border-bottom-color: var(--pb-green);
 }

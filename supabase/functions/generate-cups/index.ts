@@ -59,8 +59,8 @@ async function logGeneration(
   }
 }
 
-// Returns the active admin's row ({ id, org_id }) or null.
-async function getActiveAdmin(req: Request): Promise<{ id: string; org_id: string | null } | null> {
+// Returns the active admin's row ({ id, org_id, role }) or null.
+async function getActiveAdmin(req: Request): Promise<{ id: string; org_id: string | null; role: string } | null> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
   const jwt = authHeader.replace("Bearer ", "");
@@ -70,12 +70,12 @@ async function getActiveAdmin(req: Request): Promise<{ id: string; org_id: strin
 
   const { data: admin } = await supabase
     .from("admin_profiles")
-    .select("id, org_id")
+    .select("id, org_id, role")
     .eq("id", user.id)
     .eq("status", "active")
     .maybeSingle();
 
-  return admin ? { id: admin.id, org_id: admin.org_id ?? null } : null;
+  return admin ? { id: admin.id, org_id: admin.org_id ?? null, role: admin.role || "member" } : null;
 }
 
 Deno.serve(async (req) => {
@@ -85,6 +85,11 @@ Deno.serve(async (req) => {
   const admin = await getActiveAdmin(req);
   if (!admin) {
     return jsonResponse({ error: "forbidden" }, 403);
+  }
+  // A.7: minting spendable cups is restricted to owner/admin (managers excluded).
+  // Any active admin may still mint for any org (cross-org control is allowed).
+  if (admin.role !== "owner" && admin.role !== "admin") {
+    return jsonResponse({ error: "insufficient_role", detail: `role=${admin.role}` }, 403);
   }
 
   let count = 1;

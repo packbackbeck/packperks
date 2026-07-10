@@ -6,6 +6,10 @@ export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm, 
   const directTotal = (cupCount * refundRate).toFixed(2);
   const rewardTotal = (cupCount * cashbackRate).toFixed(2);
   const difference  = (cupCount * (cashbackRate - refundRate)).toFixed(2);
+  // E.13.2: compute the bonus from the venue's LIVE rates instead of a hardcoded
+  // "25%" (only true at the old 1.25/1.00 defaults). If the reward isn't actually
+  // worth more (e.g. equal rates), we don't claim a bonus.
+  const bonusPct = refundRate > 0 ? Math.round((cashbackRate / refundRate - 1) * 100) : 0;
 
   const handleClose = () => { onClose(); };
   const handleConfirm = () => { onConfirm(); };
@@ -30,7 +34,11 @@ export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm, 
 
           <h2 className="drs__title">Are you sure?</h2>
           <p className="drs__desc">
-            Choosing a food reward gives you <strong>25% more value</strong> per cup than a direct cash refund.
+            {bonusPct > 0 ? (
+              <>Choosing a food reward gives you <strong>{bonusPct}% more value</strong> per cup than a direct cash refund.</>
+            ) : (
+              <>A food reward can give you more value per cup than a direct cash refund.</>
+            )}
           </p>
 
           {/* Big number comparison */}

@@ -36,7 +36,7 @@ export default function RewardsReceiptGenerator() {
   const [customName, setCustomName] = useState('');
   const [customPrice, setCustomPrice] = useState('');
   const [receiptDate, setReceiptDate] = useState(nowLocalDatetime);
-  const [venue, setVenue] = useState(`${orgName} — Titaan`);
+  const [venue, setVenue] = useState(orgName || '');  // D.11.2: dropped the "— Titaan" pilot suffix
 
   const [receipt, setReceipt] = useState(null);        // { token, items, total, date, venue }
   const [generating, setGenerating] = useState(false);

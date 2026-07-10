@@ -239,7 +239,7 @@
 .stats-modal__toggle:hover { background: #F7F4EF; }
 .stats-modal__tablewrap { overflow: auto; padding: 8px 20px 20px; }
 .stats-modal__row--bad { background: rgba(220,38,38,0.04); }
-.stats-sev--ok { color: #1A8737; background: rgba(26,135,55,0.10); }
+.stats-sev--ok { color: var(--pb-green); background: rgba(26,135,55,0.10); }
 .stats-sev--muted { color: #6C6259; background: rgba(108,98,89,0.10); }
 
 /* ── Charts ── */
@@ -402,7 +402,7 @@
 .stats-danger__ok {
   margin-top: 12px;
   font-size: 13px;
-  color: #1A8737;
+  color: var(--pb-green);
   font-weight: 600;
 }
 

@@ -11,16 +11,17 @@
 // Survivor selection: auth_user_id row if any in the set, else the
 // most-recently-updated. All other rows are absorbed.
 //
-// Merge logic (same as admin-merge-users):
-//   • SUM balance + lifetime_cups onto the survivor.
-//   • Repoint activity_history / claims / cup_scans / cups
-//     (shared_by_user_id, activated_by_user_id) FKs.
-//   • Soft-mark absorbed rows (merged_into set; device_id / email / iban
-//     cleared) so anonymous reads can't accidentally hit them.
+// Merge logic (A.10/A.12 — shared atomic routine):
+//   • The whole SUM-balance → repoint-FKs → delete-absorbed-balance →
+//     tombstone sequence runs inside ONE transaction via the
+//     merge_user_rows() security-definer RPC, so a mid-way failure can never
+//     double-count cups or orphan claims. The RPC also enforces the cross-org
+//     guard uniformly.
 //   • Profile fields on the survivor = most-recently-updated non-empty
-//     value across all candidates.
+//     value across all candidates (best-effort, applied after the merge).
 //   • Survivor's auth_user_id is set so subsequent magic-link / OTP sign-ins
 //     resolve back to this row.
+//   • No IBAN is carried (D.1 — the field is retired).
 //
 // Cross-org merges are refused (everything must share survivor's org). The
 // merged-balance write uses an explicit "row exists? update : insert"
@@ -52,7 +53,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 const PROFILE_FIELDS = [
-  "display_name", "iban", "selected_reward_id", "device",
+  "display_name", "selected_reward_id", "device",
 ] as const;
 type ProfileField = typeof PROFILE_FIELDS[number];
 
@@ -62,7 +63,6 @@ interface UserRow {
   display_name: string | null;
   email: string | null;
   email_verified: boolean | null;
-  iban: string | null;
   selected_reward_id: string | null;
   device: string | null;
   device_id: string | null;
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
   // ── Resolve the device user (needed for org-scope) ────────────────────
   const { data: deviceRow } = await supabase
     .from("users")
-    .select("id, org_id, display_name, email, email_verified, iban, selected_reward_id, device, device_id, auth_user_id, merged_into, updated_at, created_at")
+    .select("id, org_id, display_name, email, email_verified, selected_reward_id, device, device_id, auth_user_id, merged_into, updated_at, created_at")
     .eq("device_id", deviceId)
     .maybeSingle();
 
@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
   // (or, if there's no device user, the auth row's org_id) below.
   const { data: emailRows, error: emailErr } = await supabase
     .from("users")
-    .select("id, org_id, display_name, email, email_verified, iban, selected_reward_id, device, device_id, auth_user_id, merged_into, updated_at, created_at")
+    .select("id, org_id, display_name, email, email_verified, selected_reward_id, device, device_id, auth_user_id, merged_into, updated_at, created_at")
     .ilike("email", authEmail)
     .is("merged_into", null);
   if (emailErr) return jsonResponse({ error: "db_error", detail: emailErr.message }, 500);
@@ -200,86 +200,27 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ── Sum balances ──────────────────────────────────────────────────────
+  // ── Capture pre-merge balances (for the audit before_state only) ──────
   const allIds = [survivor.id, ...absorbed.map((a) => a.id)];
   const { data: balances } = await supabase
     .from("cup_balances")
     .select("user_id, balance, lifetime_cups")
     .in("user_id", allIds);
-  let mergedBalance = 0;
-  let mergedLifetime = 0;
-  for (const b of balances || []) {
-    mergedBalance += b.balance || 0;
-    mergedLifetime += b.lifetime_cups || 0;
-  }
 
-  // cup_balances.user_id has no UNIQUE — explicit "exists? update : insert".
-  const { data: survBalRow } = await supabase
-    .from("cup_balances")
-    .select("user_id")
-    .eq("user_id", survivor.id)
-    .maybeSingle();
-  if (survBalRow) {
-    const { error } = await supabase
-      .from("cup_balances")
-      .update({
-        balance: mergedBalance,
-        lifetime_cups: mergedLifetime,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", survivor.id);
-    if (error) return jsonResponse({ error: "merge_balance_failed", detail: error.message }, 500);
-  } else {
-    const { error } = await supabase
-      .from("cup_balances")
-      .insert({
-        user_id: survivor.id,
-        org_id: survivor.org_id,
-        balance: mergedBalance,
-        lifetime_cups: mergedLifetime,
-      });
-    if (error) return jsonResponse({ error: "merge_balance_failed", detail: error.message }, 500);
+  // ── Atomic merge (A.10/A.12) ──────────────────────────────────────────
+  // One transaction: sum balances → repoint FKs → delete absorbed balances →
+  // tombstone absorbed users. Cross-org is already restricted above; the RPC
+  // re-enforces it as a guard. No half-merged state, no double-count.
+  const { data: mergeRes, error: mergeErr } = await supabase.rpc("merge_user_rows", {
+    p_survivor: survivor.id,
+    p_absorbed: absorbed.map((a) => a.id),
+    p_enforce_same_org: true,
+  });
+  if (mergeErr) {
+    return jsonResponse({ error: "merge_failed", detail: mergeErr.message }, 500);
   }
-
-  // ── Repoint FKs ───────────────────────────────────────────────────────
-  const repointTargets: Array<{ table: string; col: string }> = [
-    { table: "activity_history", col: "user_id" },
-    { table: "claims",           col: "user_id" },
-    { table: "cup_scans",        col: "user_id" },
-    { table: "cups",             col: "shared_by_user_id" },
-    { table: "cups",             col: "activated_by_user_id" },
-  ];
-  const repointErrors: Array<{ table: string; col: string; id: string; message: string }> = [];
-  for (const a of absorbed) {
-    for (const { table, col } of repointTargets) {
-      const { error } = await supabase
-        .from(table)
-        .update({ [col]: survivor.id })
-        .eq(col, a.id);
-      if (error) repointErrors.push({ table, col, id: a.id, message: error.message });
-    }
-  }
-
-  // ── Delete absorbed cup_balances; soft-mark absorbed users ────────────
-  // Absorbed rows become linkage-only tombstones: null every PII field
-  // (email / IBAN / device_id / parsed device / display_name), keeping only
-  // merged_into. The survivor already captured the best profile values
-  // in-memory (pickMostRecentProfile) above. (Audit item 33 — dup scrub.)
-  await supabase.from("cup_balances").delete().in("user_id", absorbed.map((a) => a.id));
-  for (const a of absorbed) {
-    await supabase
-      .from("users")
-      .update({
-        device_id: null,
-        email: null,
-        iban: null,
-        device: null,
-        display_name: null,
-        merged_into: survivor.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", a.id);
-  }
+  const mergedBalance = (mergeRes as { merged_balance?: number })?.merged_balance ?? 0;
+  const mergedLifetime = (mergeRes as { merged_lifetime?: number })?.merged_lifetime ?? 0;
 
   // ── Update survivor: profile fields + email + auth link + device_id ──
   const profileUpdate = pickMostRecentProfile(candidates);
@@ -319,7 +260,7 @@ Deno.serve(async (req) => {
       merged_balance: mergedBalance,
       merged_lifetime: mergedLifetime,
       profile_update: profileUpdate,
-      repoint_errors: repointErrors,
+      atomic: true,
     },
     ip: req.headers.get("x-forwarded-for") || null,
     user_agent: req.headers.get("user-agent") || null,
@@ -331,6 +272,5 @@ Deno.serve(async (req) => {
     absorbed_count: absorbed.length,
     merged_balance: mergedBalance,
     merged_lifetime: mergedLifetime,
-    repoint_errors: repointErrors,
   });
 });

@@ -45,7 +45,7 @@
 }
 
 .ah-version__dot--latest {
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   box-shadow: 0 0 0 3px rgba(214,35,0,0.2);
 }
 
@@ -99,7 +99,7 @@
   font-weight: 700;
   padding: 2px 8px;
   background: rgba(214,35,0,0.1);
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   border-radius: 20px;
 }
 

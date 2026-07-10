@@ -82,10 +82,10 @@
   transition: background 0.18s ease;
 }
 .oow-progress__seg--active {
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
 }
 .oow-progress__seg--done {
-  background: #1A8737;
+  background: var(--pb-green);
 }
 
 /* ── Body ───────────────────────────────────────────────────────────── */
@@ -151,7 +151,7 @@
 .oow-field select:focus,
 .oow-field textarea:focus {
   outline: none;
-  border-color: #FD6F46;
+  border-color: var(--pb-orange-warm);
   background: #FFFFFF;
 }
 .oow-field input:disabled { background: #F0EBE0; color: #999; }
@@ -222,7 +222,7 @@
 .oow-skip {
   background: none;
   border: none;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   font-size: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -256,7 +256,7 @@
   flex-shrink: 0;
   transition: background 0.16s ease;
 }
-.oow-toggle--on { background: #1A8737; }
+.oow-toggle--on { background: var(--pb-green); }
 .oow-toggle__dot {
   position: absolute;
   top: 2px;
@@ -337,7 +337,7 @@
 .oow-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .oow-btn--primary {
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: #FFFFFF;
 }
 .oow-btn--primary:hover:not(:disabled) { background: #E8542B; }

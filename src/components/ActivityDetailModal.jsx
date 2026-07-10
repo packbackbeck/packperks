@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import './ActivityDetailModal.css';
 
 const TYPE_META = {
-  cup_added:       { title: 'Cup returned',      tone: 'green',  icon: 'plus',  statusLabel: 'Added to balance',   statusColor: '#1A8737' },
+  cup_added:       { title: 'Cup collected',     tone: 'green',  icon: 'plus',  statusLabel: 'Added to balance',   statusColor: '#1A8737' },
   reward_claimed:  { title: 'Reward claimed',    tone: 'amber',  icon: 'check', statusLabel: 'Submitted',          statusColor: '#B8922A' },
-  cups_withdrawn:  { title: 'Direct refund',     tone: 'red',    icon: 'minus', statusLabel: 'Refund issued',      statusColor: '#1A8737' },
+  // E.14.5: tone was 'red' but statusColor was green — make them agree (direct
+  // refund = money out → red). Title 'Cup returned' → 'Cup collected' (D.7).
+  cups_withdrawn:  { title: 'Direct refund',     tone: 'red',    icon: 'minus', statusLabel: 'Refund issued',      statusColor: '#C0392B' },
   cups_shared:     { title: 'Cup shared',        tone: 'blue',   icon: 'share', statusLabel: 'Sent via QR code',   statusColor: '#1E5BB8' },
   cups_donated:    { title: 'Cups donated',      tone: 'green',  icon: 'heart', statusLabel: 'Donated',            statusColor: '#1A8737' },
 };

@@ -31,7 +31,7 @@
   width: 100%;
   max-width: 350px;
   padding: 28px 22px 22px;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   border-radius: 26px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.30);
   overflow: hidden;
@@ -157,7 +157,7 @@
   font-family: var(--font-primary);
   font-size: 48px;
   font-weight: var(--fw-bold);
-  color: #1A8737;
+  color: var(--pb-green);
   line-height: 1;
 }
 
@@ -210,7 +210,7 @@
 }
 
 .css-card__value--green {
-  color: #1A8737;
+  color: var(--pb-green);
   font-weight: var(--fw-bold);
 }
 
@@ -240,7 +240,7 @@
 .css-page__btn:active { transform: scale(0.97); }
 
 .css-page__btn--primary {
-  background: #1A8737;
+  background: var(--pb-green);
   color: var(--white);
   border: none;
 }

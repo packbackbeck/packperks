@@ -23,7 +23,7 @@ technical and organisational measures.
 PackPerks is the **sole controller** for every activity. Commercial partners (the cafés and
 venues whose cups are tracked) are **not** controllers or joint controllers: they receive only
 aggregate statistics through the admin-only dashboard and never receive user-level histories,
-emails, IBANs, receipt images, or behavioural profiles.
+emails, payout data, receipt images, or behavioural profiles.
 
 **Common recipients / sub-processors across activities** (detailed per activity below):
 
@@ -34,8 +34,12 @@ emails, IBANs, receipt images, or behavioural profiles.
 - **Anthropic (Claude API)** — AI receipt verification only; processing in the **United States**.
   Processor. Standard Anthropic API: inputs are not used for model training and are not retained
   beyond the request (zero-retention default).
-- **Supabase-managed email infrastructure** — delivery of OTP / magic-link authentication emails.
-  Processor.
+- **ABN AMRO / Tikkie (Cashback API)** — creation of the self-service cashback payout link the
+  customer opens to receive their money. Processor; EU (Netherlands). Receives the payout amount
+  and campaign reference; **PackPerks never sends or holds a customer bank account number (IBAN).**
+- **Brevo (Sendinblue SAS)** — transactional email delivery: OTP / magic-link authentication mail
+  and the "your cashback is ready" notification. Processor; EU (France). Connected to Supabase Auth
+  as the custom SMTP provider (`smtp-relay.brevo.com`).
 
 No Google Analytics, Meta Pixel, or advertising/marketing trackers are used anywhere in the
 service.
@@ -43,9 +47,9 @@ service.
 **Baseline technical and organisational security measures** (apply to all activities unless
 a stronger measure is noted): TLS in transit; encryption at rest for the Postgres database and
 Storage buckets; Supabase Row Level Security (RLS) scoping every table to the owning
-device/account; private Storage buckets served only via short-lived signed URLs; restricted
-Edge-Function-only access to the payout table; least-privilege admin roles with a distinguished
-top-admin role for IBAN visibility; audit logging of admin actions; separation of the anonymous
+device/account; private Storage buckets served only via short-lived signed URLs; cashback payout
+performed via the Tikkie self-service link so **no bank account number (IBAN) is collected or
+held**; least-privilege admin roles; audit logging of admin actions; separation of the anonymous
 `device_id` from any behavioural analytics.
 
 ---
@@ -85,32 +89,34 @@ top-admin role for IBAN visibility; audit logging of admin actions; separation o
 
 ## Activity 2 — Reward claim and cashback payout
 
-- **Purpose:** Let a customer claim a reward against their cup balance and receive a manual
-  cashback payout to their bank account; keep the accounting record of paid claims.
+- **Purpose:** Let a customer claim a reward against their cup balance and receive a cashback
+  payout via a self-service **Tikkie** link (ABN AMRO Cashback API); keep the accounting record
+  of paid claims.
 - **Lawful basis (Art. 6):**
   - Reward claim: Contract.
-  - IBAN payout: Contract.
+  - Cashback payout via Tikkie: Contract.
   - Retention of the claim record for 7 years: Legal obligation (Netherlands accounting/tax
     retention).
 - **Data-subject categories:** Customers.
 - **Personal-data categories:**
-  - IBAN (bank account for payout).
   - Reward claims: amount, date, status.
-  - Derived accounting record: amount, date, status, and IBAN **last-4** only.
-- **Recipients / sub-processors:** Supabase (database, EU). The **top admin** exports IBANs to
-  execute the manual payment (logged export). Partners never receive IBANs or claim-level data.
-- **International transfers:** None — data resides in Supabase `eu-west-1`. IBAN handling and
-  export are performed by the top admin.
+  - Payout link reference (Tikkie cashback id / URL) associated with the claim.
+  - Customer email address (to notify the customer their cashback link is ready — see Activity 4).
+  - **No IBAN / bank account number is collected.** The customer supplies their own bank details
+    directly to Tikkie when they open the link; PackPerks never sees or stores them.
+- **Recipients / sub-processors:** Supabase (database, EU); **ABN AMRO / Tikkie** (creates the
+  payout link, EU); **Brevo** (sends the "cashback ready" email, EU). Partners never receive
+  claim-level data.
+- **International transfers:** None — Supabase, Tikkie and Brevo all process in the EU.
 - **Retention:**
-  - Raw IBAN: consolidated into one restricted payout table; **deleted** after the admin exports
-    and confirms that claim's payout.
-  - Claim record: kept **7 years** (NL accounting) as amount / date / status plus IBAN last-4.
+  - Claim record: kept **7 years** (NL accounting) as amount / date / status plus the Tikkie
+    payout reference.
+  - No raw bank identifier is retained by PackPerks at any point.
 - **Security measures (data-minimisation by design):**
-  - IBAN consolidated into a **single restricted payout table** reachable only by Edge Functions;
-    application/UI code cannot read it directly.
-  - Full IBAN viewable **only by the top admin**; masked everywhere else in the system.
-  - IBAN export is a **logged export** action; raw IBAN is deleted on payment confirmation, leaving
-    only the last-4 in the retained accounting record.
+  - **PackPerks holds no bank account numbers.** The Tikkie link model removes the entire IBAN
+    data category the legacy manual-transfer flow required.
+  - Payout-link creation runs **server-side in an Edge Function** using campaign secrets never
+    exposed to the client; the client only receives the finished link.
   - Baseline measures (encryption at rest/in transit, RLS, least-privilege admin roles).
 
 ---
@@ -152,7 +158,8 @@ top-admin role for IBAN visibility; audit logging of admin actions; separation o
 ## Activity 4 — Email authentication (account save / restore)
 
 - **Purpose:** Let a customer optionally sign in with email (magic-link / OTP) to save their
-  account across devices, view and add their IBAN, and change their email address.
+  account across devices, receive the "cashback ready" notification, and change their email
+  address.
 - **Lawful basis (Art. 6):** Contract / consent — the user chooses to create a persistent account;
   authentication is necessary to provide that account-linking feature.
 - **Data-subject categories:** Customers.
@@ -241,14 +248,15 @@ top-admin role for IBAN visibility; audit logging of admin actions; separation o
 - **Personal-data categories:**
   - Admin login history.
   - Audit logs: before/after state of changed records, admin **IP address** and **user agent**.
-  - IBAN export events (logged, tied to the top admin) — see Activity 2.
+  - Claim-approval and payout-link (Tikkie) actions, logged per admin — see Activity 2.
 - **Recipients / sub-processors:** Supabase (database, EU). No partner or external recipient.
 - **International transfers:** None — data resides in Supabase `eu-west-1`.
 - **Retention:** Admin audit logs and login history: **12 months** (retained longer only for the
   duration of an active investigation).
-- **Security measures:** Least-privilege admin roles with a distinguished **top-admin** role for
-  full-IBAN visibility and payout export; all admin mutations recorded with before/after state,
-  IP and user agent; IBAN export gated to the top admin and logged; baseline measures.
+- **Security measures:** Least-privilege admin roles; approving a claim and issuing its Tikkie
+  payout link are gated by role and recorded; all admin mutations recorded with before/after state,
+  IP and user agent; baseline measures. **No IBAN visibility or export exists** — the payout model
+  no longer involves a bank account number.
 
 ---
 
@@ -262,7 +270,7 @@ top-admin role for IBAN visibility; audit logging of admin actions; separation o
 - **Data-subject categories:** Customers (as the source population; only aggregates are disclosed).
 - **Personal-data categories disclosed to partners:** **None at user level.** Partners receive only
   aggregate statistics (e.g. total cups, total claims, totals over a period). Partners **never**
-  receive user-level histories, emails, IBANs, receipt images, or behavioural profiles.
+  receive user-level histories, emails, payout data, receipt images, or behavioural profiles.
 - **Recipients / sub-processors:** Commercial **partners** receive aggregate output via the
   admin-only dashboard. Supabase (underlying data, EU).
 - **International transfers:** None — underlying data resides in Supabase `eu-west-1`; only

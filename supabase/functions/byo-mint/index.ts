@@ -131,20 +131,16 @@ Deno.serve(async (req) => {
     return json({ status: "pending_review", preBalance, newBalance: preBalance });
   }
 
-  // ── Under the cap → auto-credit +1 ───────────────────────────────────
-  const newBalance  = preBalance + 1;
-  const newLifetime = (balRow?.lifetime_cups || 0) + 1;
-  if (balRow) {
-    const { error: balErr } = await supabase
-      .from("cup_balances")
-      .update({ balance: newBalance, lifetime_cups: newLifetime, updated_at: new Date().toISOString() })
-      .eq("user_id", userId);
-    if (balErr) return json({ error: "balance_update_failed", detail: balErr.message }, 500);
-  } else {
-    await supabase.from("cup_balances").insert({
-      user_id: userId, org_id: orgId, balance: newBalance, lifetime_cups: newLifetime,
-    });
-  }
+  // ── Under the cap → auto-credit +1 (A.9: ATOMIC increment) ───────────
+  // Previously this wrote preBalance+1 (a stale absolute), so two concurrent
+  // scans both wrote the same value and a cup was lost. The RPC does
+  // `balance = balance + 1` inside one statement, so concurrent scans each
+  // apply. Multi-redeem up to the per-store daily cap is unchanged; the cap is
+  // a soft cap (3rd+ still holds for review), so a rare double-scan crediting
+  // one extra is acceptable.
+  const { data: newBalance, error: incErr } = await supabase
+    .rpc("increment_cup_balance", { p_user_id: userId, p_org_id: orgId, p_delta: 1 });
+  if (incErr) return json({ error: "balance_update_failed", detail: incErr.message }, 500);
 
   await supabase.from("cup_scans").insert({
     user_id: userId, org_id: orgId, scan_type: "byo", source: "byo_qr",

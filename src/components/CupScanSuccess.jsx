@@ -70,7 +70,7 @@ export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome 
       {/* Title */}
       <div className="css-page__text">
         <h1 className="css-page__title">Cup added! ♻️</h1>
-        <p className="css-page__subtitle">Your return has been registered.</p>
+        <p className="css-page__subtitle">Your cup has been added to your balance.</p>
       </div>
 
       {/* Info card */}

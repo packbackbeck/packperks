@@ -52,7 +52,7 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
       style={{ cursor: 'pointer' }}
     >
       <div className="reward-card__inner">
-        <div className="reward-card__image-wrap" style={{ background: reward.bgColor || 'var(--bk-orange)' }}>
+        <div className="reward-card__image-wrap" style={{ background: reward.bgColor || 'var(--pb-orange)' }}>
           <img
             src={reward.image}
             alt=""

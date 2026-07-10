@@ -16,7 +16,6 @@ import AdminHistory from './history/AdminHistory';
 import AdminReports from './reports/AdminReports';
 import AdminStats from './stats/AdminStats';
 import AdminUserBehaviour from './behaviour/AdminUserBehaviour';
-import AdminReceiptCheck from './receipts/AdminReceiptCheck';
 import AdminReceiptGenerator from './cupqr/AdminReceiptGenerator';
 import AdminTransactions from './transactions/AdminTransactions';
 import AdminActivityLog from './activity/AdminActivityLog';
@@ -79,13 +78,18 @@ export default function AdminApp() {
 const VALID_PAGES = new Set([
   'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
   'transactions', 'donations', 'byorequests', 'futurevendors', 'org', 'organizations', 'settings',
-  'history', 'reports', 'stats', 'behaviour', 'support', 'receipts',
+  'history', 'reports', 'stats', 'behaviour', 'support',
 ]);
 const DEFAULT_PAGE = 'overview';
 
 function readHashPage() {
   if (typeof window === 'undefined') return DEFAULT_PAGE;
-  const raw = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim();
+  let raw = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim();
+  // B6: #receipts is a legacy bookmark for the old Receipt Check tab, now merged
+  // into Claims (its "Review" view). Translate it to claims instead of mounting a
+  // second, desync-prone AdminClaims copy. Do this BEFORE the validity check so
+  // the old link still resolves rather than falling back to the default page.
+  if (raw === 'receipts') raw = 'claims';
   const resolved = VALID_PAGES.has(raw) ? raw : DEFAULT_PAGE;
   // Settings and Organisation are now one merged page; #org redirects to it.
   return resolved === 'org' ? 'settings' : resolved;
@@ -219,13 +223,10 @@ function AdminShell() {
           <KeepAlive id="support" activeId={page} visited={visited}>
             <AdminSupport onNavigate={setPage} />
           </KeepAlive>
-          {/* `receipts` was the old standalone Receipt Check tab — it
-           *  redirects to Claims (which now has a "Review" view mode
-           *  covering the same workflow). Keep it as its own keep-alive
-           *  slot in case the URL hash has #receipts from old bookmarks. */}
-          <KeepAlive id="receipts" activeId={page} visited={visited}>
-            <AdminClaims onNavigate={setPage} draftState={draftState} />
-          </KeepAlive>
+          {/* B6: the old `#receipts` slot mounted a SECOND live AdminClaims copy
+              (its own data + approve actions, desynced from #claims). Removed —
+              readHashPage() now translates #receipts → claims, so old bookmarks
+              land on the single Claims instance. */}
         </main>
       </div>
 

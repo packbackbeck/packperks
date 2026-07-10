@@ -35,7 +35,7 @@
   z-index: 30;
   margin: 0 0 20px;
   padding: 10px 0;
-  background: var(--bk-bg, #FBF7F0);
+  background: var(--pb-bg, #FBF7F0);
   border-bottom: 1px solid #EBE5DA;
 }
 .wkspace-toc__inner {

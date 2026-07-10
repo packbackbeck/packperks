@@ -19,7 +19,7 @@
   height: 72px;
   border-radius: 50%;
   border: 6px solid rgba(253, 111, 70, 0.15);
-  border-top-color: #FD6F46;
+  border-top-color: var(--pb-orange-warm);
   animation: admin-spinner-rot 0.9s linear infinite;
 }
 

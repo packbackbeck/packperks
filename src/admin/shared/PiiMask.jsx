@@ -29,7 +29,10 @@ function maskEmail(email) {
 }
 
 const MASKERS = { email: maskEmail };
-const ROLES_WITH_CLEAR_DEFAULT = new Set(['owner']);
+// B5: owner + admin see clear-text by default — matches the docstring above and
+// the Reports PII gate (canExportPii = owner||admin). Managers/checkers still
+// click-to-reveal (logged).
+const ROLES_WITH_CLEAR_DEFAULT = new Set(['owner', 'admin']);
 
 export default function PiiMask({
   type,           // 'email'
@@ -49,7 +52,11 @@ export default function PiiMask({
     return <span className={`pii-mask pii-mask--empty ${className}`}>—</span>;
   }
 
-  const display = revealed ? value : MASKERS[type](value);
+  // B9: guard the masker lookup so an unregistered PII type (phone/IBAN/…) can't
+  // crash the whole admin screen at render. Unknown types fall back to a FULL
+  // mask (privacy-safe), never the raw value.
+  const masker = MASKERS[type];
+  const display = revealed ? value : (masker ? masker(value) : '••••••');
 
   function handleReveal(e) {
     e.preventDefault();

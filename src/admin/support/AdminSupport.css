@@ -34,7 +34,7 @@
   gap: 32px;
   align-items: center;
   padding: 36px 40px;
-  background: linear-gradient(135deg, #5333A5 0%, #6D45C8 100%);
+  background: linear-gradient(135deg, var(--pb-purple-600) 0%, #6D45C8 100%);
   border-radius: 20px;
   color: #FFFFFF;
 }
@@ -92,7 +92,7 @@
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   display: grid;
   place-items: center;
   color: #FFFFFF;
@@ -127,16 +127,16 @@
 .sup-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .sup-btn--primary {
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: #FFFFFF;
 }
 .sup-btn--primary:hover:not(:disabled) { background: #E55A30; }
 
 .sup-btn--secondary {
-  background: #5333A5;
+  background: var(--pb-purple-600);
   color: #FFFFFF;
 }
-.sup-btn--secondary:hover:not(:disabled) { background: #42298B; }
+.sup-btn--secondary:hover:not(:disabled) { background: var(--pb-purple-700); }
 
 .sup-btn--ghost {
   background: rgba(255, 255, 255, 0.10);
@@ -218,9 +218,9 @@
   place-items: center;
   flex-shrink: 0;
 }
-.sup-resource--purple .sup-resource__icon { background: rgba(83, 51, 165, 0.10);  color: #5333A5; }
-.sup-resource--orange .sup-resource__icon { background: rgba(253, 111, 70, 0.12); color: #FD6F46; }
-.sup-resource--cream  .sup-resource__icon { background: #ECE5D8;                   color: #5333A5; }
+.sup-resource--purple .sup-resource__icon { background: rgba(83, 51, 165, 0.10);  color: var(--pb-purple-600); }
+.sup-resource--orange .sup-resource__icon { background: rgba(253, 111, 70, 0.12); color: var(--pb-orange-warm); }
+.sup-resource--cream  .sup-resource__icon { background: #ECE5D8;                   color: var(--pb-purple-600); }
 .sup-resource--slate  .sup-resource__icon { background: rgba(71, 85, 105, 0.10);  color: #475569; }
 
 .sup-resource__body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
@@ -267,9 +267,9 @@
   place-items: center;
   flex-shrink: 0;
 }
-.sup-form__icon--purple { background: rgba(83, 51, 165, 0.10);  color: #5333A5; }
-.sup-form__icon--orange { background: rgba(253, 111, 70, 0.12); color: #FD6F46; }
-.sup-form__icon--cream  { background: #ECE5D8;                   color: #5333A5; }
+.sup-form__icon--purple { background: rgba(83, 51, 165, 0.10);  color: var(--pb-purple-600); }
+.sup-form__icon--orange { background: rgba(253, 111, 70, 0.12); color: var(--pb-orange-warm); }
+.sup-form__icon--cream  { background: #ECE5D8;                   color: var(--pb-purple-600); }
 
 .sup-form__title { margin: 0 0 2px; font-size: 15px; font-weight: 800; color: #1A1A1A; letter-spacing: -0.005em; }
 .sup-form__sub   { margin: 0; font-size: 12.5px; color: #7A7166; line-height: 1.4; }
@@ -294,7 +294,7 @@
 .sup-input:hover { background: #FFFFFF; }
 .sup-input:focus {
   background: #FFFFFF;
-  border-color: #5333A5;
+  border-color: var(--pb-purple-600);
   box-shadow: 0 0 0 3px rgba(83, 51, 165, 0.14);
 }
 
@@ -320,7 +320,7 @@ select.sup-input {
 
 /* "Feature request" gets the ghost button — promote text contrast a bit. */
 .sup-form .sup-btn--ghost {
-  color: #5333A5;
+  color: var(--pb-purple-600);
 }
 
 /* ── Changelog timeline ──────────────────────────────────────────── */
@@ -355,8 +355,8 @@ select.sup-input {
   flex-shrink: 0;
   box-shadow: 0 0 0 4px #F8F4EC;
 }
-.sup-changelog__dot--purple { background: #5333A5; }
-.sup-changelog__dot--orange { background: #FD6F46; }
+.sup-changelog__dot--purple { background: var(--pb-purple-600); }
+.sup-changelog__dot--orange { background: var(--pb-orange-warm); }
 .sup-changelog__dot--cream  { background: #DCD3C1; }
 .sup-changelog__dot--slate  { background: #475569; }
 
@@ -385,7 +385,7 @@ select.sup-input {
   font-weight: 700;
   letter-spacing: 0.01em;
 }
-.sup-changelog__tag--purple { background: rgba(83, 51, 165, 0.10);  color: #5333A5; }
+.sup-changelog__tag--purple { background: rgba(83, 51, 165, 0.10);  color: var(--pb-purple-600); }
 .sup-changelog__tag--orange { background: rgba(253, 111, 70, 0.14); color: #C84A26; }
 .sup-changelog__tag--cream  { background: #ECE5D8;                   color: #6C5E47; }
 .sup-changelog__tag--slate  { background: rgba(71, 85, 105, 0.10);  color: #475569; }
@@ -432,8 +432,8 @@ select.sup-input {
 .sup-contact__link {
   font-size: 13.5px;
   font-weight: 600;
-  color: #5333A5;
+  color: var(--pb-purple-600);
   text-decoration: none;
   transition: color 0.14s ease;
 }
-.sup-contact__link:hover { color: #42298B; text-decoration: underline; text-underline-offset: 3px; }
+.sup-contact__link:hover { color: var(--pb-purple-700); text-decoration: underline; text-underline-offset: 3px; }

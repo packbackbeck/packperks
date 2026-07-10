@@ -647,26 +647,36 @@ export async function getUserStats(userId) {
 // permits authenticated reads (same as `getCupBalance` already does)
 // so anonymous users count too.
 export async function getGlobalImpact(orgId) {
-  let query = supabase.from('cup_balances').select('lifetime_cups')
-  if (orgId) query = query.eq('org_id', orgId)
-  const { data, error } = await query
+  // C.8.4: use the server-side aggregate RPC so the total is accurate (the old
+  // phone-side sum was capped at PostgREST's ~1000-row default and under-counted).
+  const { data, error } = await supabase.rpc('impact_totals', { p_org_id: orgId ?? null })
   if (error) throw error
-  let totalLifetime = 0
-  let userCount = 0
-  for (const row of data || []) {
-    totalLifetime += row?.lifetime_cups || 0
-    if ((row?.lifetime_cups || 0) > 0) userCount += 1
+  const row = Array.isArray(data) ? data[0] : data
+  return {
+    totalLifetimeCups: Number(row?.total_lifetime_cups || 0),
+    returningUsers: Number(row?.returning_users || 0),
   }
-  return { totalLifetimeCups: totalLifetime, returningUsers: userCount }
 }
 
 export async function updateCupBalance(userId, newBalance) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('cup_balances')
     .update({ balance: newBalance, updated_at: new Date().toISOString() })
     .eq('user_id', userId)
-
+    .select('user_id')
   if (error) throw error
+
+  // C.8.5: normal users already have a balance row, so the UPDATE above just
+  // works (behaviour unchanged). But if the best-effort insert at account
+  // creation ever failed, the UPDATE matches 0 rows and the balance would be
+  // stuck at 0 forever. In that case, create the row so the new balance sticks.
+  if (!data || data.length === 0) {
+    const { data: u } = await supabase.from('users').select('org_id').eq('id', userId).maybeSingle()
+    const row = { user_id: userId, balance: newBalance }
+    if (u?.org_id) row.org_id = u.org_id
+    const { error: insErr } = await supabase.from('cup_balances').insert(row)
+    if (insErr) throw insErr
+  }
 }
 
 // ── Cup claim via QR scan (new flow) ───────────────────────────────────────

@@ -34,7 +34,7 @@
 .bulkbar__danger:hover:not(:disabled) { background: #B42318; }
 .bulkbar__primary {
   padding: 7px 14px; border-radius: 8px; border: none;
-  background: #5333A5; color: #fff; font-family: inherit; font-size: 12px;
+  background: var(--pb-purple-600); color: #fff; font-family: inherit; font-size: 12px;
   font-weight: 700; cursor: pointer; white-space: nowrap;
 }
 .bulkbar__primary:hover:not(:disabled) { background: #472C8F; }

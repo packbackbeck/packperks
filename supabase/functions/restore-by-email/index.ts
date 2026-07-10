@@ -189,70 +189,42 @@ Deno.serve(async (req) => {
     const survivorId = restoredUser.id;
     const absorbedId = deviceUser.id;
 
-    // 4a. Sum cup_balances. If only one side has a row, the missing
-    //     side's contribution is zero. We upsert the survivor and
-    //     delete the absorbed row at the end.
-    const [{ data: survBal }, { data: absBal }] = await Promise.all([
-      supabase.from("cup_balances").select("balance, lifetime_cups").eq("user_id", survivorId).maybeSingle(),
-      supabase.from("cup_balances").select("balance, lifetime_cups").eq("user_id", absorbedId).maybeSingle(),
-    ]);
-    const mergedBalance  = (survBal?.balance       || 0) + (absBal?.balance       || 0);
-    const mergedLifetime = (survBal?.lifetime_cups || 0) + (absBal?.lifetime_cups || 0);
-
-    const { error: balErr } = await supabase
-      .from("cup_balances")
-      .upsert(
-        {
-          user_id: survivorId,
-          balance: mergedBalance,
-          lifetime_cups: mergedLifetime,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" },
-      );
-    if (balErr) return jsonResponse({ error: "merge_balance_failed", detail: balErr.message }, 500);
-
-    // 4b. Re-point per-user FK rows. Each table is updated independently
-    //     because we want partial success to leave the system in a
-    //     readable state — losing an activity_history row is much less
-    //     bad than failing the whole merge and confusing the user.
-    const repointTargets: Array<{ table: string; col: string }> = [
-      { table: "activity_history", col: "user_id" },
-      { table: "claims",           col: "user_id" },
-      { table: "cup_scans",        col: "user_id" },
-      { table: "cups",             col: "shared_by_user_id" },
-      { table: "cups",             col: "activated_by_user_id" },
-    ];
-    const repointErrors: Array<{ table: string; col: string; message: string }> = [];
-    for (const { table, col } of repointTargets) {
+    // A.12 — cross-org guard. If the restored (email) row and the current
+    // device row live in DIFFERENT orgs, we must NOT merge: that would move
+    // cups/claims across a tenant boundary. Instead, just make sure the
+    // restored row is linked to this auth identity and leave the device row
+    // (a different org's anonymous account) untouched.
+    if ((restoredUser.org_id ?? null) !== (deviceUser.org_id ?? null)) {
       const { error } = await supabase
-        .from(table)
-        .update({ [col]: survivorId })
-        .eq(col, absorbedId);
-      if (error) repointErrors.push({ table, col, message: error.message });
+        .from("users")
+        .update({
+          auth_user_id: authUser.id,
+          email: restoredUser.email || authEmail,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", survivorId);
+      if (error) return jsonResponse({ error: "update_failed", detail: error.message }, 500);
+      return jsonResponse({
+        status: "restored_no_merge_cross_org",
+        user_id: survivorId,
+        device_user_id: absorbedId,
+      });
     }
 
-    // 4c. Drop the absorbed cup_balances row so it can't drift.
-    await supabase.from("cup_balances").delete().eq("user_id", absorbedId);
+    // Same org → atomic merge (A.10): the RPC sums balances, repoints FKs,
+    // deletes the absorbed balance and tombstones the absorbed row inside one
+    // transaction, so a mid-way failure can't double-count or orphan claims.
+    const { data: mergeRes, error: mergeErr } = await supabase.rpc("merge_user_rows", {
+      p_survivor: survivorId,
+      p_absorbed: [absorbedId],
+      p_enforce_same_org: true,
+    });
+    if (mergeErr) return jsonResponse({ error: "merge_failed", detail: mergeErr.message }, 500);
+    const mergedBalance  = (mergeRes as { merged_balance?: number })?.merged_balance ?? 0;
+    const mergedLifetime = (mergeRes as { merged_lifetime?: number })?.merged_lifetime ?? 0;
 
-    // 4d. Mark the absorbed users row as merged. We don't hard-delete
-    //     so any orphaned FKs we missed (e.g. tables added later) can
-    //     still resolve to a row. Clear its device_id so the next
-    //     getOrCreateUser call from this browser resolves to the
-    //     survivor instead.
-    await supabase
-      .from("users")
-      .update({
-        device_id: null,
-        merged_into: survivorId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", absorbedId);
-
-    // 4e. Finally, repoint the survivor's device_id to the current
-    //     browser. That makes ordinary getOrCreateUser('device') reads
-    //     resolve straight to the survivor without going through this
-    //     edge function again.
+    // Repoint the survivor's device_id to the current browser so ordinary
+    // getOrCreateUser('device') reads resolve straight to it next time.
     const { error: survErr } = await supabase
       .from("users")
       .update({
@@ -270,7 +242,6 @@ Deno.serve(async (req) => {
       absorbed_user_id: absorbedId,
       merged_balance: mergedBalance,
       merged_lifetime: mergedLifetime,
-      repoint_errors: repointErrors,
     });
   }
 

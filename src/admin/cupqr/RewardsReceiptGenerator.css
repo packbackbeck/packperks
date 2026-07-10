@@ -10,7 +10,7 @@
   border: 1px solid #E4DFD6; background: #fff; color: #1D1D1D; font-weight: 600;
 }
 .rrg-btn--ghost:hover { background: #F7F4EF; }
-.rrg-btn--primary { background: #1A8737; border-color: #1A8737; color: #fff; }
+.rrg-btn--primary { background: var(--pb-green); border-color: var(--pb-green); color: #fff; }
 .rrg-btn--primary:hover { filter: brightness(1.05); }
 .rrg-btn--block { width: 100%; margin-top: 12px; padding: 11px; }
 .rrg-btn:disabled { opacity: 0.5; cursor: default; }
@@ -67,14 +67,14 @@
 .rrg-receipt__total--sub { font-weight: 400; font-size: 11px; color: #555; margin-top: 2px; }
 .rrg-receipt__badge {
   display: flex; align-items: center; gap: 10px; background: #E9F7EE;
-  border: 1px solid #1A8737; border-radius: 8px; padding: 10px 12px; margin-top: 4px;
+  border: 1px solid var(--pb-green); border-radius: 8px; padding: 10px 12px; margin-top: 4px;
 }
 .rrg-receipt__check {
-  width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; background: #1A8737; color: #fff;
+  width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; background: var(--pb-green); color: #fff;
   display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;
 }
 .rrg-receipt__badge-title { font-size: 10.5px; font-weight: 700; color: #14622A; font-family: var(--font-primary, system-ui); }
-.rrg-receipt__token { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #1A8737; }
+.rrg-receipt__token { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: var(--pb-green); }
 .rrg-receipt__foot { text-align: center; font-size: 9.5px; color: #9E9A93; margin-top: 12px; font-family: var(--font-primary, system-ui); }
 
 /* ── Log ── */

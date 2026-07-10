@@ -147,7 +147,7 @@
   font-weight: var(--fw-bold);
   color: var(--black);
 }
-.rsp__value--green { color: #1A8737; }
+.rsp__value--green { color: var(--pb-green); }
 
 /* ETA */
 .rsp__eta {
@@ -156,7 +156,7 @@
   gap: 6px;
   font-family: var(--font-primary);
   font-size: 10px;
-  color: #1A8737;
+  color: var(--pb-green);
   background: rgba(26,135,55,0.07);
   border-radius: var(--radius-sm);
   padding: 6px 10px;

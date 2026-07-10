@@ -37,13 +37,61 @@
 
 /* ─── Design Tokens ─── */
 :root {
-  /* Brand – Burger King palette (from Figma) */
-  --bk-orange: #FEA01E;
-  --bk-red: #E24400;
-  --bk-brown: #502314;
-  --bk-cream: #F4EBDC;
-  --bk-green: #1A8737;
-  --bk-green-light: #D4EDDA;
+  /* Brand palette. E.3/E.14.6: renamed from the old "Burger King palette" to
+     neutral PackBack (--pb-*) tokens, keeping the SAME colours. The old --bk-*
+     names remain as aliases so every existing usage keeps working while the
+     codebase migrates to --pb-* (the wide find-replace is a separate pass). */
+  --pb-orange: #FEA01E;   /* PackBack orange */
+  --pb-red: #E24400;
+  --pb-brown: #502314;
+  --pb-cream: #F4EBDC;
+  --pb-green: #1A8737;
+  --pb-green-light: #D4EDDA;
+  /* Back-compat aliases. No code references --bk-* anymore (migrated to --pb-*);
+     kept only as a safety net for any DB-stored brand config that still names
+     them. Safe to delete once configs are confirmed clean. */
+  --bk-orange: var(--pb-orange);
+  --bk-red: var(--pb-red);
+  --bk-brown: var(--pb-brown);
+  --bk-cream: var(--pb-cream);
+  --bk-green: var(--pb-green);
+  --bk-green-light: var(--pb-green-light);
+
+  /* E.4: the warm/coral orange that drifted in via gradients + headers. Kept as
+     a distinct named token (the user chose to keep BOTH oranges) rather than
+     merged into --pb-orange. Same value, now themeable in one place. */
+  --pb-orange-warm: #FD6F46;
+
+  /* E.5: green scale. --pb-green (#1A8737) is the canonical "success/money"
+     green; the lighter + darker steps give screens a token to reach for instead
+     of eyeballing a fresh hex. Drifted one-off greens are rounded onto these in
+     a later visual pass. */
+  --pb-green-100: #D4EDDA;   /* light success background (= --pb-green-light) */
+  --pb-green-500: #1A8737;   /* solid fill / text (= --pb-green) */
+  --pb-green-600: #12703F;   /* darker text on light-green cards */
+
+  /* E.6: purple = the BYO brand accent. --pb-purple-600 is the base, -700 the
+     darker gradient/hover shade, -500 the brighter Stores-headline variant
+     (kept as its own step so the current look is preserved). */
+  --pb-purple-500: #672BFF;
+  --pb-purple-600: #5333A5;
+  --pb-purple-700: #42298B;
+
+  /* E.1: one system CTA colour + one danger colour. Over-arching "system"
+     buttons (sign-in, continue, retry, error screens) read from --color-cta so
+     they're identical everywhere; vendor/reward CTAs keep the café's own
+     brand_color. Destructive actions (reject / leave money) use --color-danger,
+     never the CTA colour. */
+  --color-cta: var(--pb-purple-600);
+  --color-cta-hover: var(--pb-purple-700);
+  --color-cta-text: #FFFFFF;
+  --color-danger: #C0392B;
+  --color-danger-text: #FFFFFF;
+
+  /* E.11: per-action accent — the activity-row icon and its action button both
+     read from these, so they can't drift to different colours again. */
+  --action-share: var(--pb-purple-600);
+  --action-donate: var(--pb-green-500);
 
   /* Neutrals */
   --white: #FFFFFF;
@@ -70,6 +118,7 @@
 
   --fw-regular: 400;
   --fw-medium: 500;
+  --fw-semibold: 600;   /* E.14.1: was undefined → "semibold" text rendered at 400 */
   --fw-bold: 700;
 
   /* Spacing */
@@ -84,6 +133,7 @@
   --radius-sm: 10px;
   --radius-md: 13px;
   --radius-lg: 15px;
+  --radius-pill: 999px;   /* E.7: was undefined → "pill" shapes rendered square */
 
   /* Shadows (from Figma) */
   --shadow-screen: 0px 20px 40px rgba(212, 212, 212, 0.25);
@@ -94,6 +144,25 @@
   --duration-fast: 0.15s;
   --duration-normal: 0.3s;
   --duration-slow: 0.5s;
+}
+
+/* ─── Shared buttons (E.1) ───
+   .btn-primary is the one system CTA style; screens opt in instead of writing
+   their own colour. .btn-danger is for destructive actions. Both are additive —
+   existing per-screen button classes are migrated onto these in a visual pass. */
+.btn-primary {
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  border: none;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out-expo);
+}
+.btn-primary:hover { background: var(--color-cta-hover); }
+.btn-danger {
+  background: var(--color-danger);
+  color: var(--color-danger-text);
+  border: none;
+  cursor: pointer;
 }
 
 /* ─── Reset & Base ─── */
@@ -115,7 +184,7 @@ body {
   font-family: var(--font-primary);
   font-size: var(--fs-md);
   color: var(--black);
-  background-color: var(--bk-cream);
+  background-color: var(--pb-cream);
   line-height: 1.1;
   min-height: 100dvh;
   display: flex;
@@ -126,7 +195,7 @@ body {
   width: 100%;
   max-width: 375px;
   min-height: 100dvh;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   position: relative;
   overflow-x: hidden;
 }

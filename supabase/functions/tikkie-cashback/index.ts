@@ -244,6 +244,10 @@ Deno.serve(async (req) => {
   // ── create: mint a real cashback for an approved claim ──────────────────
   if (body.action === "create") {
     if (!body.claim_id) return json({ error: "missing_claim_id" }, 400);
+    // A.7: minting spends REAL money — restrict to owner/admin (managers excluded).
+    if (admin.role !== "owner" && admin.role !== "admin") {
+      return json({ error: "insufficient_role", detail: `role=${admin.role}` }, 403);
+    }
     const { data: claim, error: cErr } = await supabase.from("claims")
       .select("id, org_id, type, status, payout_amount, tikkie_cashback_id, tikkie_url, tikkie_status, notify_email, user_id, reward_id")
       .eq("id", body.claim_id).maybeSingle();
@@ -258,6 +262,16 @@ Deno.serve(async (req) => {
         url: claim.tikkie_url,
         tikkie_status: claim.tikkie_status,
       });
+    }
+
+    // A.4: only mint for an APPROVED claim of a payable type. The admin approve
+    // flow sets status='completed' before calling this, and pays out both
+    // 'cashback' and 'direct_refund' via Tikkie. Anything else must not spend.
+    if (claim.status !== "completed") {
+      return json({ error: "claim_not_approved", detail: `status=${claim.status}` }, 409);
+    }
+    if (claim.type !== "cashback" && claim.type !== "direct_refund") {
+      return json({ error: "bad_claim_type", detail: `type=${claim.type}` }, 400);
     }
 
     const amountInCents = Math.round(Number(claim.payout_amount) * 100);
@@ -279,10 +293,41 @@ Deno.serve(async (req) => {
     const recordError = async (msg: string) => {
       console.error(`[tikkie] create FAILED → claim=${claim.id}: ${msg}`);
       await supabase.from("claims").update({
+        // A.3: clear the 'minting' lock so the admin's "retry" can re-grab it.
+        // (Only reached on a pre-payment failure — after a successful POST we
+        // never reset, so a paid cashback can never be minted twice.)
+        tikkie_status: null,
         tikkie_last_error: msg.slice(0, 500),
         tikkie_last_error_at: new Date().toISOString(),
       }).eq("id", claim.id);
     };
+
+    // A.3: atomically CLAIM this mint before spending. Two concurrent create
+    // calls (double-click approve, retry, bulk-approve) would both read
+    // tikkie_cashback_id=null and both POST — paying the customer twice. This
+    // single UPDATE flips tikkie_status → 'minting'; Postgres serialises it on
+    // the row, so only ONE call flips it and proceeds to POST. The loser matches
+    // zero rows and returns the current state instead of paying again. A normal
+    // one-off mint (tikkie_status null) always wins, so the happy path is
+    // untouched; the sentinel is cleared on any pre-payment failure (recordError).
+    const { data: grabbed, error: grabErr } = await supabase.from("claims")
+      .update({ tikkie_status: "minting" })
+      .eq("id", claim.id)
+      .is("tikkie_cashback_id", null)
+      .or("tikkie_status.is.null,tikkie_status.neq.minting")
+      .select("id").maybeSingle();
+    if (grabErr) return json({ error: "db_error", detail: grabErr.message }, 500);
+    if (!grabbed) {
+      const { data: cur } = await supabase.from("claims")
+        .select("tikkie_cashback_id, tikkie_url, tikkie_status")
+        .eq("id", claim.id).maybeSingle();
+      return json({
+        status: "in_progress",
+        cashbackId: cur?.tikkie_cashback_id ?? null,
+        url: cur?.tikkie_url ?? null,
+        tikkie_status: cur?.tikkie_status ?? "minting",
+      });
+    }
 
     let resp: Response;
     try {

@@ -66,7 +66,7 @@
   width: 44px;
   height: 38px;
   padding: 0 8px;
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
   border: none;
   border-radius: var(--radius-sm);
@@ -102,13 +102,13 @@
  * primary action of the three tiles. Without an accent, three brown
  * squares all read as equally important. */
 .header__tile--add {
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   color: var(--white);
 }
 .header__tile--add:hover { filter: brightness(1.08); }
 
 .header__tile--user {
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   position: relative;
 }
 
@@ -125,12 +125,12 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  border: 2px solid var(--bk-cream);
+  border: 2px solid var(--pb-cream);
   box-sizing: border-box;
 }
 .header__tile-badge--pending { background: #E89E2C; }
 .header__tile-badge--ready {
-  background: #1A8737;
+  background: var(--pb-green);
   animation: header-badge-pulse 1.9s ease-in-out infinite;
 }
 @keyframes header-badge-pulse {

@@ -169,13 +169,14 @@ export const COPY_PRESETS = {
   },
 };
 
-/* Resolve a preset, defaulting to the deposit model for unknown/legacy
- * modes so nothing ever renders empty. */
+/* Resolve a preset. D.6: default to BYO — that's the product now; `deposit`
+ * stays reachable but only when a group/org explicitly chooses it, so an
+ * unspecified mode no longer greets customers with SmartBin wording. */
 export function getCopyPreset(mode) {
-  return COPY_PRESETS[mode] || COPY_PRESETS.deposit;
+  return COPY_PRESETS[mode] || COPY_PRESETS.byo;
 }
 
-/* Normalise an arbitrary value to a valid mode. */
+/* Normalise an arbitrary value to a valid mode (D.6: unknown → byo). */
 export function normalizeMode(mode) {
-  return COPY_MODES.includes(mode) ? mode : 'deposit';
+  return COPY_MODES.includes(mode) ? mode : 'byo';
 }

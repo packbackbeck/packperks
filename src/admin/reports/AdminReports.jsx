@@ -418,6 +418,13 @@ export default function AdminReports({ onNavigate }) {
         rows: filtered.length,
         columns: visibleColumns.map(c => c.key),
         contains_pii: PII_DATASETS.has(dataset),
+        // B10: record the SPECIFIC PII columns that left the system and how many
+        // rows, so a personal-data egress is queryable on its own (to match the
+        // per-look pii.reveal events) — not just inferred from a boolean flag.
+        pii_columns: visibleColumns
+          .filter(c => c.key === 'email' || c.key === 'user_email')
+          .map(c => c.key),
+        pii_rows: PII_DATASETS.has(dataset) ? filtered.length : 0,
       },
     });
   }

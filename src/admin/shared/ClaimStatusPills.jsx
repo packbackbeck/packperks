@@ -62,13 +62,30 @@ function deriveReview(claim) {
   return 'pending';
 }
 
+/* B3/B4: ONE rule for payout truth, so the payout pill and the detail panel's
+ * action gate can't disagree. A completed (approved) claim is 'sent' only when a
+ * real Tikkie payout link exists; a saved payout_status='failed' or a recorded
+ * mint error is 'failed' (retryable); otherwise it's still 'queued'. Direct
+ * refunds are paid via Tikkie just like cashback — no "paid at claim time"
+ * shortcut (that was a pre-Tikkie leftover). */
 function derivePayout(claim) {
-  // Direct refund is paid at claim time — show "Paid" not "n/a" so
-  // admins immediately see "money is out". Anything else uses the
-  // explicit payout_status column with a sensible fallback.
-  if (claim.type === 'direct_refund' && claim.status === 'completed') return 'sent';
-  if (claim.status === 'pending' || claim.status === 'failed')        return 'not_queued';
+  if (claim.status === 'pending' || claim.status === 'failed') return 'not_queued';
+  if (claim.payout_status === 'refunded') return 'refunded';
+  if (claim.tikkie_url && claim.tikkie_status !== 'failed') return 'sent';
+  if (claim.payout_status === 'failed' || claim.tikkie_last_error) return 'failed';
   return claim.payout_status || 'queued';
+}
+
+/* Shared payout predicates (B4) — imported by ClaimDetailPanel so its Approve/
+ * retry gate reads the exact same truth as this pill. */
+export function isClaimPaid(claim) {
+  const p = derivePayout(claim);
+  return p === 'sent' || p === 'refunded';
+}
+export function isPayoutActionable(claim) {
+  if (claim.status === 'pending') return true;                  // awaiting review
+  if (claim.status === 'completed') return !isClaimPaid(claim); // approved but not yet paid, or failed → retry
+  return false;                                                 // rejected: nothing to do
 }
 
 /* Single-kind helper exported so the Claims table can render the

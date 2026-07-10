@@ -36,7 +36,7 @@
 
 /* Markdown */
 .pp-md__h2 { font-size: 20px; font-weight: 800; color: var(--black, #1a1a1a); margin: 18px 0 8px; }
-.pp-md__h3 { font-size: 15.5px; font-weight: 800; color: var(--bk-brown, #502314); margin: 16px 0 6px; }
+.pp-md__h3 { font-size: 15.5px; font-weight: 800; color: var(--pb-brown, #502314); margin: 16px 0 6px; }
 .pp-md__p  { font-size: 13.5px; line-height: 1.55; color: var(--text-muted, #5A554F); margin: 0 0 9px; }
 .pp-md__row { font-size: 12.5px; line-height: 1.5; color: var(--text-muted, #6C6259); margin: 0 0 4px; }
 .pp-md__ul { margin: 0 0 10px; padding-left: 18px; }

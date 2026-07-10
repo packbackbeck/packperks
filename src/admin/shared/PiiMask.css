@@ -57,4 +57,4 @@
 }
 
 .pii-mask__icon { color: #9E9A93; flex-shrink: 0; }
-.pii-mask--chip:hover .pii-mask__icon { color: #5333A5; }
+.pii-mask--chip:hover .pii-mask__icon { color: var(--pb-purple-600); }

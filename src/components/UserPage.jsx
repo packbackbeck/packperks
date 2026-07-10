@@ -488,7 +488,7 @@ export default function UserPage({
           <span className="user-page__value-approx" aria-label="approximately">≈</span>
           <div className="user-page__value-option user-page__value-option--right">
             <span className="user-page__value-num user-page__value-num--euro">
-              €{(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate || 1.25)).toFixed(2)}
+              €{(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate ?? 1.25)).toFixed(2)}
             </span>
             <span className="user-page__value-label">in cashback</span>
           </div>
@@ -500,7 +500,7 @@ export default function UserPage({
         {onOpenShare && (
           <button className="user-page__action-btn" onClick={handleShare}>
             <svg width="15" height="13" viewBox="0 0 15 13" fill="none">
-              <path d="M7.5 12.5L1.5 6.5C0 5 0 2.5 1.5 1.5C3 0.5 5 0.5 6.5 2L7.5 3L8.5 2C10 0.5 12 0.5 13.5 1.5C15 2.5 15 5 13.5 6.5L7.5 12.5Z" fill="var(--bk-red)"/>
+              <path d="M7.5 12.5L1.5 6.5C0 5 0 2.5 1.5 1.5C3 0.5 5 0.5 6.5 2L7.5 3L8.5 2C10 0.5 12 0.5 13.5 1.5C15 2.5 15 5 13.5 6.5L7.5 12.5Z" fill="var(--pb-red)"/>
             </svg>
             {copy.shareButtonLabel || 'Share your Cup'}
           </button>
@@ -581,20 +581,31 @@ export default function UserPage({
         <div className="user-page__divider" />
         <div className="user-page__row">
           <span className="user-page__row-label">Email</span>
-          {emailSaved && email ? (
+          {/* C.8.1: show the saved email OR the sign-in-session email — an
+              auth-linked user with no saved profile.email used to see a bare
+              "—". A true visitor (no email at all) gets an orange "Save my
+              balance" prompt instead of "—". */}
+          {(email || authEmail) ? (
             emailRevealed ? (
-              <span className="user-page__row-value">{email}</span>
+              <span className="user-page__row-value">{email || authEmail}</span>
             ) : (
               <button
                 className="user-page__row-value user-page__masked-value"
                 onClick={() => setEmailRevealed(true)}
                 title="Tap to reveal"
               >
-                {maskEmail(email)}
+                {maskEmail(email || authEmail)}
               </button>
             )
           ) : (
-            <span className="user-page__row-value user-page__row-value--unknown">—</span>
+            <button
+              type="button"
+              className="user-page__row-value user-page__save-balance"
+              onClick={onOpenSignIn}
+              style={{ color: 'var(--pb-orange)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+            >
+              Save my balance
+            </button>
           )}
         </div>
 
@@ -893,7 +904,7 @@ function ImpactSummary({ cups }) {
             <line x1="14" y1="1" x2="14" y2="4" />
           </svg>
         </div>
-        <span className="user-page__impact-label">Cups returned</span>
+        <span className="user-page__impact-label">Cups collected</span>
         <span className="user-page__impact-val">{cups}</span>
       </div>
       <div className="user-page__divider" />
@@ -1029,7 +1040,7 @@ function ImpactDetailModal({ cups, profile, onClose }) {
         <div className="impact-modal__stats">
           <div className="impact-modal__stat">
             <div className="impact-modal__stat-val">{cups.toLocaleString()}</div>
-            <div className="impact-modal__stat-label">Cups returned</div>
+            <div className="impact-modal__stat-label">Cups collected</div>
           </div>
           <div className="impact-modal__stat-divider" />
           <div className="impact-modal__stat">
@@ -1051,7 +1062,7 @@ function ImpactDetailModal({ cups, profile, onClose }) {
             <div className="impact-modal__community-stats">
               <div className="impact-modal__community-stat">
                 <span className="impact-modal__community-val">{communityCups.toLocaleString()}</span>
-                <span className="impact-modal__community-sub">cups returned</span>
+                <span className="impact-modal__community-sub">cups collected</span>
               </div>
               <div className="impact-modal__community-stat">
                 <span className="impact-modal__community-val">
@@ -1097,7 +1108,7 @@ function ImpactDetailModal({ cups, profile, onClose }) {
           </div>
           <div className="impact-share-card__hero">
             <div className="impact-share-card__big">{cups.toLocaleString()}</div>
-            <div className="impact-share-card__big-label">cups returned</div>
+            <div className="impact-share-card__big-label">cups collected</div>
           </div>
           <div className="impact-share-card__rows">
             <div className="impact-share-card__row">

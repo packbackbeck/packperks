@@ -97,7 +97,7 @@
   background: white;
   outline: none;
 }
-.ps-field input:focus { border-color: #FD6F46; box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
+.ps-field input:focus { border-color: var(--pb-orange-warm); box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
 
 /* Color picker */
 .ps-color-row {
@@ -136,7 +136,7 @@
   transition: all 0.15s;
 }
 .ps-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.ps-btn--primary { background: #FD6F46; color: white; box-shadow: 0 6px 18px rgba(253, 111, 70, 0.22); }
+.ps-btn--primary { background: var(--pb-orange-warm); color: white; box-shadow: 0 6px 18px rgba(253, 111, 70, 0.22); }
 .ps-btn--primary:hover:not(:disabled) { background: #E55A30; }
 .ps-btn--ghost {
   background: white;

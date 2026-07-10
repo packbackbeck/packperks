@@ -68,7 +68,7 @@ export function mergeDesign(partial) {
 /* CSS-variable map: which design tokens override which existing root
  * variable in index.css. Keeping this here means the user-app components
  * never have to know about the design system — they keep using
- * var(--bk-*) and we just retarget those vars at the org's palette. */
+ * var(--pb-*) and we just retarget those vars at the org's palette. */
 export const COLOR_VAR_MAP = {
   primary:    '--bk-brown',
   accent:     '--bk-orange',

@@ -7,7 +7,7 @@
      (was --sp-6 / 30px horizontally). */
   padding: 60px var(--sp-4) var(--sp-6);
   min-height: 100dvh;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
 }
 
 .app__hero {
@@ -46,7 +46,7 @@
   padding: 14px 16px;
   background: var(--white, #FFFFFF);
   border: none;
-  border-radius: var(--radius-lg, 18px);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
   cursor: pointer;
   text-align: left;
@@ -67,7 +67,7 @@
   height: 40px;
   border-radius: 12px;
   background: #FFF3E9;
-  color: var(--bk-orange, #FD6F46);
+  color: var(--pb-orange, var(--pb-orange-warm));
 }
 .app__how-box-icon svg { width: 20px; height: 20px; }
 .app__how-box-text {
@@ -106,7 +106,7 @@
   border: none;
   border-radius: 999px;
   box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
-  color: var(--bk-brown, #502314);
+  color: var(--pb-brown, #502314);
   font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 700;
@@ -123,10 +123,10 @@
   gap: 3px;
   margin-top: 12px;
   padding: 12px 14px;
-  background: var(--bk-green-light, #D4EDDA);
+  background: var(--pb-green-light, #D4EDDA);
   border-radius: 12px;
 }
-.app__byo-crossorg strong { font-size: 13px; color: var(--bk-brown, #502314); }
+.app__byo-crossorg strong { font-size: 13px; color: var(--pb-brown, #502314); }
 .app__byo-crossorg span { font-size: 12.5px; color: var(--text-light); line-height: 1.45; }
 
 /* Info links row */

@@ -54,7 +54,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: #FFFFFF;
   display: grid;
   place-items: center;
@@ -84,7 +84,7 @@
   gap: 8px;
   width: 100%;
   padding: 13px 18px;
-  background: #5333A5;
+  background: var(--pb-purple-600);
   color: #FFFFFF;
   border: none;
   border-radius: 12px;
@@ -95,7 +95,7 @@
   cursor: pointer;
   transition: background 0.14s ease, transform 0.08s ease;
 }
-.app-err__retry:hover  { background: #42298B; }
+.app-err__retry:hover  { background: var(--pb-purple-700); }
 .app-err__retry:active { transform: translateY(1px); }
 
 .app-err__support {
@@ -104,7 +104,7 @@
   padding: 6px 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   text-decoration: none;
   border-radius: 6px;
   transition: color 0.14s ease, background 0.14s ease;

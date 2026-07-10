@@ -56,7 +56,7 @@
 .rds-image-wrap {
   width: 100%;
   height: 220px;
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -105,7 +105,7 @@
   font-family: var(--font-primary);
   font-weight: var(--fw-bold);
   font-size: var(--fs-xl);
-  color: var(--bk-brown);
+  color: var(--pb-brown);
   white-space: nowrap;
 }
 
@@ -129,20 +129,20 @@
 }
 
 .rds-chip--free {
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
 }
 
 .rds-chip--cups {
   background: #FFF3D6;
-  color: var(--bk-brown);
-  border: 1px solid #FEA01E;
+  color: var(--pb-brown);
+  border: 1px solid var(--pb-orange);
 }
 
 .rds-chip--plant {
   background: #DFF4E4;
-  color: #1A8737;
-  border: 1px solid #1A8737;
+  color: var(--pb-green);
+  border: 1px solid var(--pb-green);
 }
 
 /* ── Description ── */
@@ -180,7 +180,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
   font-family: var(--font-primary);
   font-weight: var(--fw-bold);
@@ -260,7 +260,7 @@
 }
 
 .rds-nutrition-row:nth-child(odd) {
-  background: var(--bk-cream);
+  background: var(--pb-cream);
 }
 
 .rds-nutrition-label {
@@ -320,7 +320,7 @@
 .rds-btn:active:not(:disabled) { transform: scale(0.98); }
 
 .rds-btn--primary {
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
 }
 
@@ -341,7 +341,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--bk-green, #1A8737);
+  background: var(--pb-green, var(--pb-green));
   color: var(--white);
 }
 

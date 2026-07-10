@@ -39,7 +39,7 @@ const STEPS = [
 ];
 
 export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
-  const brand = orgName || 'the restaurant';
+  const brand = orgName || 'the café';  // D.11.2: BYO venues are cafés, not restaurants
   const itemName = reward?.name || 'item';
   const videoRef = useRef(null);
   const fileRef = useRef(null);

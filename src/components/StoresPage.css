@@ -4,7 +4,7 @@
   min-height: 100dvh;
   /* Generous top spacing (larger than the store home) + clears the notch. */
   padding: calc(env(safe-area-inset-top, 0px) + 84px) 16px 40px;
-  background: var(--bk-cream, #F4EBDC);
+  background: var(--pb-cream, #F4EBDC);
   font-family: var(--font-primary);
   display: flex;
   flex-direction: column;
@@ -19,7 +19,7 @@
 .stores2__headline { margin: 0; font-family: var(--font-primary); font-size: 24px; font-weight: 800; color: var(--black, #1a1a1a); line-height: 1.15; animation: stores2Rise 0.66s cubic-bezier(0.16, 1, 0.3, 1) 0.04s both; }
 .stores2__intro { margin: 0; font-size: 15px; color: var(--text-light); line-height: 1.45; width: 100%; animation: stores2Rise 0.66s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both; }
 /* PackPerks purple accent word, with a highlight underline that sweeps in. */
-.stores2__headline-accent { color: #672BFF; position: relative; white-space: nowrap; }
+.stores2__headline-accent { color: var(--pb-purple-500); position: relative; white-space: nowrap; }
 .stores2__headline-accent::after {
   content: ''; position: absolute; left: -1px; right: -1px; bottom: 0.04em; height: 0.14em;
   background: rgba(103, 43, 255, 0.24); border-radius: 3px;
@@ -58,7 +58,7 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); color: var(--text-muted, #6C6259);
   transition: box-shadow 0.14s ease;
 }
-.stores2__search.is-filled { box-shadow: 0 0 0 1.5px var(--bk-green, #1A8737); color: #2A2724; }
+.stores2__search.is-filled { box-shadow: 0 0 0 1.5px var(--pb-green, var(--pb-green)); color: #2A2724; }
 .stores2__search-icon { flex-shrink: 0; opacity: 0.7; }
 .stores2__search-input {
   flex: 1; min-width: 0; border: none; background: none; outline: none;
@@ -153,11 +153,10 @@
    popup width so the count/progress reads the same as the list box. */
 .stores2__popcard--notyet .stores2__notyet-cta { margin-top: 10px; align-self: stretch; }
 .stores2__popcard--notyet .stores2__request-btn { width: 100%; }
-.stores2__popup-request {
-  display: block; width: 100%; margin-top: 8px; padding: 8px 10px; border: none; border-radius: 8px;
-  background: var(--bk-green, #1A8737); color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
-}
-.stores2__popup-request.is-done { background: rgba(0, 0, 0, 0.12); color: #6C6259; }
+/* E.12: removed the .stores2__popup-request colour/shape override (a green 8px
+   rectangle) so the map popup uses the SAME grey→black shared pill as the list
+   card — the code's own note above asks for them to match. The class stays on
+   the button (a JS hook reads it); only its styling override is gone. */
 
 /* ── Info card ───────────────────────────────────────────────────────── */
 .stores2__infocard {
@@ -304,7 +303,7 @@
 }
 .stores2__map-canvas .leaflet-control-zoom a {
   width: 34px; height: 34px; line-height: 34px;
-  color: var(--bk-brown, #502314); font-weight: 700; border: none;
+  color: var(--pb-brown, #502314); font-weight: 700; border: none;
 }
 .stores2__map-canvas .leaflet-control-zoom a:hover { background: #EFE9DE; color: #2A2724; }
 .stores2__map-canvas .leaflet-control-attribution { border-radius: 8px 0 0 0; font-size: 10px; }
@@ -379,7 +378,7 @@
 .stores2__impact-fade {
   position: fixed; left: 0; right: 0; bottom: 0; height: 136px; z-index: 490;
   pointer-events: none;
-  background: linear-gradient(to bottom, rgba(244, 235, 220, 0) 0%, var(--bk-cream, #F4EBDC) 72%);
+  background: linear-gradient(to bottom, rgba(244, 235, 220, 0) 0%, var(--pb-cream, #F4EBDC) 72%);
 }
 /* Reserves scroll room so the last card clears the fixed bar at the bottom. */
 .stores2__impact-spacer { height: 40px; flex-shrink: 0; }

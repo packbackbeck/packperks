@@ -54,7 +54,7 @@
   margin: 0 0 20px;
   font-size: 13px;
   line-height: 1.45;
-  color: #1A8737;
+  color: var(--pb-green);
   font-weight: 600;
 }
 

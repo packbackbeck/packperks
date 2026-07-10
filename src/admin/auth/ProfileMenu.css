@@ -105,7 +105,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   margin-top: 3px;
   align-self: flex-start;
 }
@@ -228,7 +228,7 @@
   outline: none;
   background: white;
 }
-.pm__field input:focus { border-color: #FD6F46; box-shadow: 0 0 0 3px rgba(253,111,70,0.15); }
+.pm__field input:focus { border-color: var(--pb-orange-warm); box-shadow: 0 0 0 3px rgba(253,111,70,0.15); }
 
 .pm__colors {
   display: grid;
@@ -246,7 +246,7 @@
 
 .pm__primary {
   height: 38px;
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: white;
   border: none;
   border-radius: 10px;

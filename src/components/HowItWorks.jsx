@@ -55,9 +55,9 @@ export const GUIDE_ICON_KEYS = Object.keys(GUIDE_ICONS);
 
 const DEFAULT_STEPS = [
   {
-    key: 'return',
-    title: 'Return your cups',
-    text: 'Bring your reusable cups back to any participating spot. Every cup you return adds to your balance.',
+    key: 'collect',
+    title: 'Collect your cups',
+    text: 'Bring your reusable cup to any participating spot and scan the counter QR. Every cup you collect adds to your balance.',
     image: '/how-it-works/step-1.png',
     bg: 'linear-gradient(165deg, #FDF1E6 0%, #F9DFCB 100%)',
     accent: '#E08A53',

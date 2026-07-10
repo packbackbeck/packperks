@@ -10,7 +10,7 @@
   z-index: 10;
   display: flex;
   flex-direction: column;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   font-family: var(--font-primary);
   color: var(--black);
 }
@@ -132,7 +132,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(26, 135, 55, 0.14);
-  color: #1A8737;
+  color: var(--pb-green);
 }
 .rj__safe-txt {
   font-size: 0.84rem;
@@ -149,7 +149,7 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.85rem 1.375rem calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
-  background: linear-gradient(to top, var(--bk-cream) 74%, rgba(244, 235, 220, 0));
+  background: linear-gradient(to top, var(--pb-cream) 74%, rgba(244, 235, 220, 0));
 }
 
 .rj__btn {

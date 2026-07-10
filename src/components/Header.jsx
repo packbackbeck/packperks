@@ -20,8 +20,15 @@ function OrgMark({ org }) {
   if (org?.logo_url) {
     return <img src={org.logo_url} alt={altText} className="header__logo-bk" style={logoStyle} />;
   }
-  if (!org || org.slug === 'burger-king' || org.slug === 'burgerking') {
+  // D.8: only a GENUINE Burger King org gets the bundled BK logo. Previously
+  // `!org` (the brief bootstrap window before the org resolves) also hit this
+  // branch, so EVERY brand flashed the Burger King logo on load.
+  if (org && (org.slug === 'burger-king' || org.slug === 'burgerking')) {
     return <img src={burgerKingLogo} alt={altText} className="header__logo-bk" style={logoStyle} />;
+  }
+  if (!org) {
+    // Neutral mark during startup — never a competitor's logo.
+    return <img src={packbackLogo} alt="PackBack" className="header__logo-bk" style={logoStyle} />;
   }
   const letter = (org?.name || '?').trim().charAt(0).toUpperCase() || '?';
   return (

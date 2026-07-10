@@ -19,15 +19,15 @@ body:has(.admin-app) {
 
 .admin-app {
   /* PackBack brand palette
-   *   --pb-purple    #5333A5  Primary brand (Publish, links, accents)
-   *   --pb-orange    #FD6F46  Action / CTA (Approve, badges, BK-aligned)
+   *   --pb-purple    var(--pb-purple-600)  Primary brand (Publish, links, accents)
+   *   --pb-orange    var(--pb-orange-warm)  Action / CTA (Approve, badges, BK-aligned)
    *   --pb-cream     #ECE5D8  Soft background, hover surfaces, dividers
    * Plus pragmatic derivatives (hover, soft, on-color) so components
    * don't have to compute their own tints. */
-  --pb-purple:        #5333A5;
-  --pb-purple-hover:  #42298B;
+  --pb-purple:        var(--pb-purple-600);
+  --pb-purple-hover:  var(--pb-purple-700);
   --pb-purple-soft:   rgba(83, 51, 165, 0.10);
-  --pb-orange:        #FD6F46;
+  --pb-orange:        var(--pb-orange-warm);
   --pb-orange-hover:  #E55A30;
   --pb-orange-soft:   rgba(253, 111, 70, 0.12);
   --pb-cream:         #ECE5D8;
@@ -54,9 +54,9 @@ body:has(.admin-app) {
   --topbar-h:    56px;
 
   min-height: 100vh;
-  background: var(--bk-bg);
+  background: var(--pb-bg);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: var(--bk-text);
+  color: var(--pb-text);
   -webkit-font-smoothing: antialiased;
 }
 

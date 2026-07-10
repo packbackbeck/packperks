@@ -42,7 +42,7 @@
   display: grid;
   place-items: center;
   background: rgba(253, 111, 70, 0.12);
-  color: var(--bk-orange, #FD6F46);
+  color: var(--pb-orange, var(--pb-orange-warm));
   margin-bottom: 14px;
 }
 .iab-sheet__title {
@@ -67,7 +67,7 @@
   font-size: 16px;
   font-weight: 800;
   color: #fff;
-  background: var(--bk-orange, #FD6F46);
+  background: var(--pb-orange, var(--pb-orange-warm));
   border: none;
   border-radius: 14px;
   padding: 15px 18px;

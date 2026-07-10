@@ -8,7 +8,7 @@
   min-height: 100dvh;
   /* Match the real home's top spacing (.app = 60px) + clear the notch. */
   padding: calc(env(safe-area-inset-top, 0px) + 60px) 16px 40px;
-  background: var(--bk-cream, #F4EBDC);
+  background: var(--pb-cream, #F4EBDC);
   font-family: var(--font-primary);
   display: flex;
   flex-direction: column;

@@ -6,12 +6,6 @@ function formatDate(d = new Date()) {
 function formatTime(d = new Date()) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
-function getUserName() {
-  try {
-    const p = JSON.parse(localStorage.getItem('packperks_user_profile') || '{}');
-    return p.displayName || 'PackPerks User';
-  } catch { return 'PackPerks User'; }
-}
 
 const Row = ({ label, value, bold, green }) => (
   <div className="rsp__row">
@@ -20,11 +14,13 @@ const Row = ({ label, value, bold, green }) => (
   </div>
 );
 
-export default function RefundSuccessPage({ cupCount, onDone }) {
+export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone }) {
   const now = new Date();
   const refundId = 'RF-' + Date.now().toString(36).toUpperCase().slice(-6);
-  const total = (cupCount * 1.00).toFixed(2);
-  const userName = getUserName();
+  // C.2: the amount is computed by App from the venue's configured refund rate
+  // and passed in — no hardcoded €1.00 per cup here anymore.
+  const total = Number(amount || 0).toFixed(2);
+  const perCup = cupCount > 0 ? (Number(amount || 0) / cupCount) : 0;
 
   return (
     <div className="rsp">
@@ -40,10 +36,10 @@ export default function RefundSuccessPage({ cupCount, onDone }) {
         </svg>
       </div>
 
-      {/* Text */}
+      {/* Text — C.3: refunds are collected via a Tikkie link, not a bank deposit. */}
       <div className="rsp__text">
-        <h1 className="rsp__title">Refund submitted!</h1>
-        <p className="rsp__subtitle">Your deposit is on the way 🏦</p>
+        <h1 className="rsp__title">Refund submitted</h1>
+        <p className="rsp__subtitle">We’ll send you a Tikkie link to collect it 💸</p>
       </div>
 
       {/* Receipt card */}
@@ -60,9 +56,9 @@ export default function RefundSuccessPage({ cupCount, onDone }) {
           <Row label="Refund ID"   value={refundId} />
           <Row label="Date"        value={formatDate(now)} />
           <Row label="Time"        value={formatTime(now)} />
-          <Row label="Name"        value={userName} />
+          {userEmail ? <Row label="Sent to" value={userEmail} /> : null}
           <Row label="Cups refunded" value={`${cupCount} cup${cupCount !== 1 ? 's' : ''}`} />
-          <Row label="Rate"        value="€1.00 per cup" />
+          <Row label="Rate"        value={`€${perCup.toFixed(2)} per cup`} />
         </div>
 
         <div className="rsp__dashed" />
@@ -73,14 +69,14 @@ export default function RefundSuccessPage({ cupCount, onDone }) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A8737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
           </svg>
-          Deposited within <strong>3 business days</strong>
+          Tikkie link arrives within <strong>7 days</strong>
         </div>
       </div>
 
       <button className="rsp__btn" onClick={onDone}>Back to home</button>
 
       <span className="rsp__note">
-        Your cup balance has been reset to zero.
+        We’ll review your refund and send a Tikkie link to collect your money — open it to get paid. Your cup balance has been reset to zero.
       </span>
     </div>
   );

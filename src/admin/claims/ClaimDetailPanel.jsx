@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getReceiptSignedUrl, hideClaimImage, unhideClaimImage } from '../lib/adminApi';
 import PiiMask from '../shared/PiiMask';
-import ClaimStatusPills from '../shared/ClaimStatusPills';
+import ClaimStatusPills, { isPayoutActionable } from '../shared/ClaimStatusPills';
 import PermissionGate from '../auth/PermissionGate';
 import { useAuth, hasPermission } from '../auth/AuthContext';
 import { logAction } from '../auth/actionLog';
@@ -262,11 +262,15 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
     );
   }
 
-  // The admin is the FINAL verdict on every claim. Actionable = still pending,
-  // OR the AI auto-marked it 'completed' but no Tikkie link has been sent yet
-  // (older behaviour) — in both cases a human hasn't approved the payout.
-  const canAct = claim.status === 'pending'
-    || (claim.status === 'completed' && !claim.tikkie_url);
+  // B4: use the SAME payout-truth rule as the status pill — a claim is
+  // actionable while pending, or approved-but-not-yet-paid (mint pending or
+  // failed → retry). Keeps the panel and the pill from ever disagreeing.
+  const canAct = isPayoutActionable(claim);
+
+  // B7: a cashback payout needs a VIEWABLE receipt. "No receipt at all" is worse
+  // than "still loading", so gate Approve on one positive rule that covers both.
+  const receiptViewable = claim.type !== 'cashback'
+    || (!!claim.receipt_photo_path && photoStatus === 'ready');
 
   return (
     <div className="rc-detail">
@@ -468,14 +472,16 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
            * For cashback claims with no photo loaded (loading or failed),
            * we hard-disable Approve — the admin needs evidence to sign off
            * on a payout. Reject stays available either way. */}
-          {claim.type === 'cashback' && claim.receipt_photo_path && photoStatus !== 'ready' && (
+          {claim.type === 'cashback' && !receiptViewable && (
             <p className="rc-detail__actions-warn">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
-              {photoStatus === 'failed'
-                ? 'Approve disabled — the receipt photo failed to load. Use Retry image above, or reject if it can\'t be recovered.'
-                : 'Approve will unlock once the receipt photo finishes loading.'}
+              {!claim.receipt_photo_path
+                ? 'Approve disabled — no receipt was attached to this cashback claim.'
+                : photoStatus === 'failed'
+                  ? 'Approve disabled — the receipt photo failed to load. Use Retry image above, or reject if it can\'t be recovered.'
+                  : 'Approve will unlock once the receipt photo finishes loading.'}
             </p>
           )}
           <p className="rc-detail__actions-hint">Verify the receipt matches the claim before approving.</p>
@@ -483,10 +489,7 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
             <PermissionGate action="claim.approve">
               <button
                 className="rc-detail__btn rc-detail__btn--approve"
-                disabled={
-                  updating ||
-                  (claim.type === 'cashback' && claim.receipt_photo_path && photoStatus !== 'ready')
-                }
+                disabled={updating || (claim.type === 'cashback' && !receiptViewable)}
                 onClick={() => setDecision('approve')}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>

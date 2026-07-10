@@ -4,14 +4,14 @@
 
 .cup-progress__track {
   position: relative;
-  background: var(--bk-red);
+  background: var(--pb-red);
   border-radius: 40px;
   min-height: 70px;
   transition: background var(--duration-slow) ease;
 }
 
 .cup-progress__track--complete {
-  background: var(--bk-green);
+  background: var(--pb-green);
 }
 
 /* Progress fill — single brand color shaded with a transparent-black
@@ -23,13 +23,13 @@
   left: 0;
   height: 100%;
   border-radius: 40px;
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   transition: width var(--duration-slow) var(--ease-out-expo), background var(--duration-slow) ease;
   z-index: 0;
 }
 
 .cup-progress__fill--complete {
-  background: var(--bk-green);
+  background: var(--pb-green);
 }
 
 /* Two-row "snake" progress fill — each segment is half the box height; the
@@ -46,7 +46,7 @@
   left: 0;
   height: 50%;
   min-width: 0;
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   border-radius: 30px;
   transition: width var(--duration-slow) var(--ease-out-expo), background var(--duration-slow) ease;
 }
@@ -54,7 +54,7 @@
  * flowing down into the bottom row rather than two separate pills. */
 .cup-progress__snake-seg--top { top: 0; border-bottom-left-radius: 0; }
 .cup-progress__snake-seg--bottom { bottom: 0; border-top-left-radius: 0; }
-.cup-progress__snake-seg--complete { background: var(--bk-green); }
+.cup-progress__snake-seg--complete { background: var(--pb-green); }
 
 /* Rows wrapper — one row normally, two stacked rows for >5-cup rewards. */
 .cup-progress__rows {
@@ -169,7 +169,7 @@
 .cup-progress__overflow {
   text-align: center;
   font-size: var(--fs-xs);
-  color: var(--bk-orange);
+  color: var(--pb-orange);
   font-weight: var(--fw-bold);
   margin-top: 4px;
 }

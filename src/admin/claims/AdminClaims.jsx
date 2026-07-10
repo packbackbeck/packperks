@@ -536,6 +536,9 @@ export default function AdminClaims({ onNavigate, draftState }) {
   // null when closed; { newStatus: 'completed' | 'failed' } when open.
 
   async function runBulkAction(newStatus, reason) {
+    // B1: bulk approve is removed — this path only ever runs a bulk REJECT now.
+    // Guard defensively so no code can approve many payouts in one shot.
+    if (newStatus === 'completed') return;
     setBulkUpdating(true);
     setActionError(null);
     const ids = [...selected].filter(id => {
@@ -756,19 +759,17 @@ export default function AdminClaims({ onNavigate, draftState }) {
       {selected.size > 0 && (
         <div className="ac-bulk-bar">
           <span className="ac-bulk-bar__count">{selected.size} selected</span>
+          {/* B1: bulk APPROVE removed — approving many payouts at once hid
+              per-claim Tikkie mint failures (a "done" claim whose money never
+              went out). Approvals now go one at a time through the review panel,
+              which shows the receipt and confirms. Bulk reject/delete stay —
+              they move no money. */}
           {selectedPending.length > 0 && (
-            <>
-              <button className="ac-bulk-btn ac-bulk-btn--complete"
-                disabled={bulkUpdating}
-                onClick={() => setBulkConfirm({ newStatus: 'completed' })}>
-                ✓ Approve {selectedPending.length}
-              </button>
-              <button className="ac-bulk-btn ac-bulk-btn--fail"
-                disabled={bulkUpdating}
-                onClick={() => setBulkConfirm({ newStatus: 'failed' })}>
-                ✕ Reject {selectedPending.length}
-              </button>
-            </>
+            <button className="ac-bulk-btn ac-bulk-btn--fail"
+              disabled={bulkUpdating}
+              onClick={() => setBulkConfirm({ newStatus: 'failed' })}>
+              ✕ Reject {selectedPending.length}
+            </button>
           )}
           {!deleteConfirm ? (
             <button className="ac-bulk-btn ac-bulk-btn--fail"
@@ -991,7 +992,8 @@ export default function AdminClaims({ onNavigate, draftState }) {
                                 className="ac-action-btn ac-action-btn--fail"
                                 disabled={updating === claim.id}
                                 onClick={() => handleStatusUpdate(claim.id, 'failed')}
-                                title="Fail"
+                                title="Reject"
+                                aria-label="Reject claim"
                               >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>

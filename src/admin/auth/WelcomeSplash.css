@@ -98,7 +98,7 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: white;
   padding: 4px 10px;
   border-radius: 999px;

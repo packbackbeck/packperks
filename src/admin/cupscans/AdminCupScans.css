@@ -131,7 +131,7 @@
 .cs-th--sortable { cursor: pointer; }
 .cs-th--sortable:hover { color: #4A4540; }
 .cs-sort-icon { margin-left: 4px; opacity: 0.4; }
-.cs-sort-icon--active { opacity: 1; color: #FD6F46; }
+.cs-sort-icon--active { opacity: 1; color: var(--pb-orange-warm); }
 
 .cs-row { border-bottom: 1px solid #F8F6F3; height: 52px; transition: background 0.1s; }
 .cs-row:hover { background: #FAFAF8; }
@@ -204,7 +204,7 @@
   border-radius: 20px;
   text-transform: capitalize;
 }
-.cs-type--camera   { background: rgba(124,92,215,0.12); color: #5333A5; }
+.cs-type--camera   { background: rgba(124,92,215,0.12); color: var(--pb-purple-600); }
 .cs-type--gallery  { background: rgba(167,139,250,0.14); color: #7C3AED; }
 .cs-type--deeplink { background: rgba(249,168,82,0.16);  color: #B85F00; }
 .cs-type--photo    { background: #F0EDE8; color: #7A7166; }
@@ -217,13 +217,13 @@
   padding: 0;
   font-family: ui-monospace, monospace;
   font-size: 12px;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   cursor: pointer;
   text-decoration: underline;
   text-decoration-color: transparent;
   transition: text-decoration-color 0.15s;
 }
-.cs-batch-link:hover { text-decoration-color: #FD6F46; }
+.cs-batch-link:hover { text-decoration-color: var(--pb-orange-warm); }
 
 /* Cups awarded */
 .cs-cups { font-weight: 700; color: #1A1A1A; cursor: help; }
@@ -301,7 +301,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #5333A5;
+  background: var(--pb-purple-600);
   color: #FFFFFF;
   display: grid;
   place-items: center;
@@ -323,6 +323,6 @@
   background: rgba(83, 51, 165, 0.04) !important;
 }
 .cs-row--active td:first-child {
-  box-shadow: inset 3px 0 0 #5333A5;
+  box-shadow: inset 3px 0 0 var(--pb-purple-600);
 }
 .cs-row:hover { background: #F5F2EE; }

@@ -110,7 +110,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   border-radius: var(--radius-md);
   padding: var(--sp-4);
 }
@@ -148,7 +148,7 @@
 
 .drs__compare-amount--reward {
   font-size: 44px;
-  color: #1A8737;
+  color: var(--pb-green);
 }
 
 .drs__compare-rate {
@@ -172,7 +172,7 @@
   padding: 10px 14px;
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
-  color: #1A8737;
+  color: var(--pb-green);
   line-height: 1.4;
   text-align: center;
 }
@@ -201,7 +201,7 @@
 .drs__btn:active { transform: scale(0.97); }
 
 .drs__btn--primary {
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   color: var(--white);
   border: none;
 }

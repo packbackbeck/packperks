@@ -5,7 +5,7 @@
   align-items: center;
   width: 100%;
   min-height: 100dvh;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   /* Big top gap so the notch / front camera never overlaps the content. */
   padding: calc(env(safe-area-inset-top, 0px) + 100px) var(--sp-5) calc(var(--sp-6) * 2);
   gap: var(--sp-5);
@@ -51,13 +51,13 @@
 }
 
 .receipt-page__step--done .receipt-page__step-icon {
-  background: #1A8737;
+  background: var(--pb-green);
   color: white;
 }
 
 .receipt-page__step--active .receipt-page__step-icon {
   background: #FFB535;
-  color: var(--bk-brown);
+  color: var(--pb-brown);
 }
 
 .receipt-page__step-label {
@@ -70,11 +70,11 @@
 }
 
 .receipt-page__step--done .receipt-page__step-label {
-  color: #1A8737;
+  color: var(--pb-green);
 }
 
 .receipt-page__step--active .receipt-page__step-label {
-  color: var(--bk-brown);
+  color: var(--pb-brown);
   font-weight: var(--fw-bold);
 }
 
@@ -90,7 +90,7 @@
 }
 
 .receipt-page__step--done .receipt-page__step-line {
-  background: #1A8737;
+  background: var(--pb-green);
 }
 
 /* ── Header ── */
@@ -132,9 +132,9 @@
   margin: 4px auto 8px;
   display: flex; align-items: center; justify-content: center; gap: 8px;
   height: 52px;
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white, #fff);
-  border: none; border-radius: var(--radius-sm, 14px);
+  border: none; border-radius: var(--radius-sm);
   font-family: var(--font-primary);
   font-size: var(--fs-md); font-weight: var(--fw-bold, 700);
   cursor: pointer;
@@ -187,7 +187,7 @@
 
 .receipt-page__req-icon {
   flex-shrink: 0;
-  color: #1A8737;
+  color: var(--pb-green);
   margin-top: 1px;
 }
 
@@ -293,7 +293,7 @@
   width: 68px;
   height: 68px;
   border-radius: 50%;
-  border: 3px solid var(--bk-brown);
+  border: 3px solid var(--pb-brown);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -303,7 +303,7 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   transition: background var(--duration-fast) ease;
 }
 .receipt-page__shutter:active .receipt-page__shutter-dot {
@@ -330,7 +330,7 @@
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
-  color: var(--bk-brown);
+  color: var(--pb-brown);
   background: rgba(255,255,255,0.8);
   border: none;
   border-radius: var(--radius-sm);
@@ -364,7 +364,7 @@
 
 .receipt-page__eta svg {
   flex-shrink: 0;
-  color: #1A8737;
+  color: var(--pb-green);
   margin-top: 1px;
 }
 

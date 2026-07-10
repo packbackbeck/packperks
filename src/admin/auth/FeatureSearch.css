@@ -120,7 +120,7 @@
 .fs-item__icon svg { width: 16px; height: 16px; }
 .fs-item--active .fs-item__icon {
   background: #FFE0CC;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
 }
 
 .fs-item__text {
@@ -150,7 +150,7 @@
 }
 .fs-item--active .fs-item__arrow {
   opacity: 1;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   transform: translateX(2px);
 }
 

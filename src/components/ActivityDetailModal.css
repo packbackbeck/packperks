@@ -66,7 +66,7 @@
   justify-content: center;
   margin-bottom: 12px;
 }
-.adm-icon--green { background: #D4EDDA; color: #1A8737; }
+.adm-icon--green { background: #D4EDDA; color: var(--pb-green); }
 .adm-icon--amber { background: #FFF3D6; color: #B8922A; }
 .adm-icon--red   { background: #FFE0D6; color: #E24400; }
 .adm-icon--blue  { background: #D6E8FF; color: #1E5BB8; }
@@ -124,7 +124,7 @@
   width: 100%;
   height: 48px;
   border-radius: 14px;
-  background: #1A8737;
+  background: var(--pb-green);
   color: #fff;
   font-family: inherit;
   font-size: 15px;

@@ -48,8 +48,8 @@
 }
 
 /* Tones */
-.rbm--ok .rbm__fill { background: #1A8737; }
-.rbm--ok .rbm__pill { color: #1A8737; background: rgba(26,135,55,0.10); }
+.rbm--ok .rbm__fill { background: var(--pb-green); }
+.rbm--ok .rbm__pill { color: var(--pb-green); background: rgba(26,135,55,0.10); }
 .rbm--warn .rbm__fill { background: #E8910C; }
 .rbm--warn .rbm__pill { color: #B26A00; background: rgba(232,145,12,0.14); }
 .rbm--blocked { border-color: #F0C3C3; background: #FDF5F5; }

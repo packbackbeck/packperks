@@ -66,7 +66,7 @@ export default function FeaturedReward({
           aria-label={`${cupsCollected} of ${reward.cupsNeeded} cups collected`}
         />
         <div className="featured-reward__content">
-          <div className="featured-reward__image-wrap" style={{ background: reward.bgColor || 'var(--bk-orange)' }}>
+          <div className="featured-reward__image-wrap" style={{ background: reward.bgColor || 'var(--pb-orange)' }}>
             <img
               src={reward.image}
               alt={reward.name}
@@ -170,7 +170,7 @@ export default function FeaturedReward({
             {nudgeVisible && !isUnlocked && (
               <>
                 <p className="featured-reward__nudge" role="alert">
-                  Return {cupsRemaining} more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
+                  Collect {cupsRemaining} more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
                 </p>
                 {/* Direct-action follow-up. Shows AFTER the user taps the
                     locked CTA, so it's not visual noise on first paint —

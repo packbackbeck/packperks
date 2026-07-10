@@ -126,8 +126,8 @@
 }
 
 /* ── Per-tone icon tints ────────────────────────────────────────── */
-.ql__card--blue   .ql__card-icon { background: rgba(37, 99, 235, 0.10);  color: #5333A5; }
-.ql__card--orange .ql__card-icon { background: rgba(253, 111, 70, 0.10);   color: #FD6F46; }
+.ql__card--blue   .ql__card-icon { background: rgba(37, 99, 235, 0.10);  color: var(--pb-purple-600); }
+.ql__card--orange .ql__card-icon { background: rgba(253, 111, 70, 0.10);   color: var(--pb-orange-warm); }
 .ql__card--purple .ql__card-icon { background: rgba(124, 58, 237, 0.10); color: #7C3AED; }
 .ql__card--red    .ql__card-icon { background: rgba(220, 38, 38, 0.10);  color: #DC2626; }
 .ql__card--teal   .ql__card-icon { background: rgba(13, 148, 136, 0.10); color: #0D9488; }

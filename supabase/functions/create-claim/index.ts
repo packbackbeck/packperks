@@ -1,9 +1,16 @@
 // ──────────────────────────────────────────────────────────────────────
 // PackPerks — create-claim Edge Function (audit item 2)
 //
-// ⚠️ DEPLOY-PENDING — authored offline. Deploy with `supabase functions deploy
-// create-claim`, then remove the client's direct `insert into claims` and the
-// anon claims-write RLS policies (see migration 029).
+// STATUS: DEPLOYED + hardened (A.5 dedupe). This is the server-authoritative
+// claim writer meant to REPLACE the client's direct `insert into claims`.
+// Verified (A.6) to mirror the current claim flow — same ownership check, same
+// cups=balance — but the payout amount is computed server-side from live config,
+// never trusted from the browser (fixes the client-controlled payout amount).
+//
+// NOT yet wired from the client: the browser still inserts `claims` directly.
+// Switching the client to call this + dropping the anon claims-write RLS is the
+// staged A.1/A.6 step. When that lands, add a server-side cups DEBIT here and a
+// matching RESTORE on reject (so a rejected claim returns the cups).
 //
 // Why: today the anonymous browser inserts `claims` directly, so a third party
 // could forge claims or set payout fields. This function becomes the ONLY
@@ -76,6 +83,14 @@ Deno.serve(async (req) => {
     .select("balance").eq("user_id", user_id).maybeSingle();
   const cups = bal?.balance ?? 0;
   if (cups <= 0) return json({ error: "no_cups" }, 400);
+
+  // A.5: one open claim at a time. Without this a user could submit N pending
+  // claims off the same balance — each for the full amount — and if more than
+  // one is approved the same cups pay out repeatedly. They must let the current
+  // claim resolve (approved or rejected) before starting another.
+  const { data: openClaim } = await supabase.from("claims")
+    .select("id").eq("user_id", user_id).eq("status", "pending").limit(1).maybeSingle();
+  if (openClaim) return json({ error: "claim_in_progress", claim_id: openClaim.id }, 409);
 
   const { data: claim, error } = await supabase.from("claims").insert({
     user_id, org_id, reward_id: reward_id ?? null, type,

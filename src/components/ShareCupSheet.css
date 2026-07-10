@@ -68,7 +68,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--sp-4);
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   border-radius: var(--radius-md);
   padding: var(--sp-3) var(--sp-4);
   margin-bottom: var(--sp-4);
@@ -198,7 +198,7 @@
 .scs__btn:active { transform: scale(0.97); }
 
 .scs__btn--primary {
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   color: var(--white);
   border: none;
 }
@@ -226,7 +226,7 @@
   border-color: #BDE5C6;
   color: #1A6B2A;
 }
-.scs__notice--success svg { color: #1A8737; }
+.scs__notice--success svg { color: var(--pb-green); }
 
 /* P-46: countdown pill under the share QR. Calm purple by default,
  * red when the time runs out — at which point the QR is dead and
@@ -238,7 +238,7 @@
   margin: 6px 0 0;
   padding: 4px 10px;
   background: rgba(83, 51, 165, 0.08);
-  color: #5333A5;
+  color: var(--pb-purple-600);
   border-radius: 999px;
   font-size: 11.5px;
   font-weight: 700;

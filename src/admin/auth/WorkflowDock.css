@@ -72,11 +72,11 @@
 /* ── Publish (highlighted primary) ───────────────────────────────── */
 .wd-publish {
   padding: 0 14px;
-  background: #5333A5; /* PackBack purple */
+  background: var(--pb-purple-600); /* PackBack purple */
   color: #FFFFFF;
   position: relative;
 }
-.wd-publish:hover { background: #42298B; }
+.wd-publish:hover { background: var(--pb-purple-700); }
 
 /* Tiny pending-pulse dot when there are auto-saved-but-not-yet-published
  * changes. Sits at the top-right corner of the Publish button. */
@@ -163,7 +163,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.wd-diff__kind--settings { background: rgba(83, 51, 165, 0.10);  color: #5333A5; }
+.wd-diff__kind--settings { background: rgba(83, 51, 165, 0.10);  color: var(--pb-purple-600); }
 .wd-diff__kind--added    { background: rgba(74, 222, 128, 0.14); color: #16A34A; }
 .wd-diff__kind--changed  { background: rgba(214, 149, 0, 0.14);  color: #7C5A00; }
 .wd-diff__kind--removed  { background: rgba(220, 38, 38, 0.10);  color: #C73E1D; }

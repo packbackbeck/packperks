@@ -106,7 +106,7 @@
 .tx-th--sortable { cursor: pointer; }
 .tx-th--sortable:hover { color: #4A4540; }
 .tx-sort-icon { margin-left: 4px; opacity: 0.4; }
-.tx-sort-icon--active { opacity: 1; color: #FD6F46; }
+.tx-sort-icon--active { opacity: 1; color: var(--pb-orange-warm); }
 
 .tx-row { border-bottom: 1px solid #F8F6F3; height: 56px; }
 .tx-row:hover { background: #FAFAF8; }
@@ -138,7 +138,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FF7A2E, #FD6F46);
+  background: linear-gradient(135deg, #FF7A2E, var(--pb-orange-warm));
   color: white;
   font-size: 11px;
   font-weight: 700;

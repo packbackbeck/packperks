@@ -116,15 +116,15 @@ Deno.serve(async (req) => {
     .from("cups").insert(rows).select("id");
   if (insErr) return json({ error: "db_error", detail: insErr.message }, 500);
 
-  const newBalance = (balanceRow.balance || 0) - count;
-  const { data: updated, error: updErr } = await supabase
-    .from("cup_balances")
-    .update({ balance: newBalance, updated_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .gte("balance", count)
-    .select("balance");
-
-  if (updErr || !updated?.length) {
+  // A.9: ATOMIC guarded decrement. The old code computed newBalance from the
+  // earlier read and wrote that absolute value, so two concurrent shares of N
+  // both passed `balance >= N` and wrote the same number — debiting once but
+  // minting cups twice. spend_cup_balance does `balance = balance - count WHERE
+  // balance >= count` in a single statement (returns -1 if insufficient).
+  const { data: spentBalance, error: spendErr } = await supabase
+    .rpc("spend_cup_balance", { p_user_id: userId, p_amount: count });
+  if (spendErr || spentBalance == null || spentBalance < 0) {
+    // Insufficient (another share beat this one) — roll back the cups we made.
     const ids = (inserted || []).map((r: { id: string }) => r.id);
     if (ids.length > 0) await supabase.from("cups").delete().in("id", ids);
     return json(
@@ -132,6 +132,7 @@ Deno.serve(async (req) => {
       409,
     );
   }
+  const newBalance = spentBalance;
 
   await supabase.from("activity_history").insert({
     user_id: userId,

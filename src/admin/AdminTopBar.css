@@ -59,7 +59,7 @@
 .admin-topbar__logo-bk {
   width: 32px;
   height: 32px;
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: #FFC52F;
   font-weight: 900;
   font-size: 13px;
@@ -190,7 +190,7 @@
 }
 
 .admin-topbar__btn--primary {
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: #FFFFFF;
 }
 .admin-topbar__btn--primary:hover {
@@ -234,7 +234,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   flex-shrink: 0;
 }
 
@@ -276,7 +276,7 @@
   transition: border-color 0.15s;
 }
 .admin-publish-modal__input:focus {
-  border-color: #FD6F46;
+  border-color: var(--pb-orange-warm);
 }
 .admin-publish-modal__input::placeholder {
   color: #555;
@@ -307,7 +307,7 @@
 
 .admin-publish-modal__confirm {
   padding: 9px 20px;
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   border: none;
   border-radius: 8px;
   color: #FFFFFF;

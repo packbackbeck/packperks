@@ -132,7 +132,7 @@
 }
 .org-input--url:focus {
   outline: none;
-  border-color: #FD6F46;
+  border-color: var(--pb-orange-warm);
 }
 
 .org-card__title {
@@ -203,7 +203,7 @@
   background: white;
   width: 100%;
 }
-.org-input:focus { border-color: #FD6F46; box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
+.org-input:focus { border-color: var(--pb-orange-warm); box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
 .org-input--mono { font-family: ui-monospace, monospace; font-size: 12px; }
 .org-color-input {
   width: 56px;
@@ -242,7 +242,7 @@
 .org-btn--ghost:hover:not(:disabled) { background: #F4EFE5; }
 
 .org-btn--primary {
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: white;
 }
 .org-btn--primary:hover:not(:disabled) { background: #E55A30; }
@@ -292,7 +292,7 @@
 .org-link {
   background: none;
   border: none;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -425,7 +425,7 @@
   transition: all 0.15s;
 }
 .org-role-card:hover:not(:disabled) { border-color: #C8C2B5; background: #FAFAF8; }
-.org-role-card--active { border-color: #FD6F46; background: #FFF8F1; }
+.org-role-card--active { border-color: var(--pb-orange-warm); background: #FFF8F1; }
 .org-role-card:disabled { opacity: 0.5; cursor: not-allowed; }
 .org-role-card__name { font-size: 13px; font-weight: 800; color: #1A1A1A; }
 .org-role-card__desc { font-size: 11px; color: #7A7166; line-height: 1.35; }
@@ -473,7 +473,7 @@
   height: 44px;
   border-radius: 12px;
   background: #FFF6EE;
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -523,7 +523,7 @@
   outline: none;
   background: white;
 }
-.invite-input:focus { border-color: #FD6F46; box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
+.invite-input:focus { border-color: var(--pb-orange-warm); box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.15); }
 
 /* Role cards */
 .invite-role-grid {
@@ -554,7 +554,7 @@
   transform: translateY(-1px);
 }
 .invite-role-card--active {
-  border-color: var(--role-color, #FD6F46);
+  border-color: var(--role-color, var(--pb-orange-warm));
   background: #FFF8F1;
   box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.10);
 }
@@ -618,7 +618,7 @@
   padding-bottom: 8px;
 }
 .invite-matrix__th--active {
-  color: #FD6F46 !important;
+  color: var(--pb-orange-warm) !important;
 }
 .invite-matrix__table tbody tr:last-child td { border-bottom: none; }
 .invite-matrix__feature {
@@ -677,7 +677,7 @@
 }
 .invite-method__tab--active {
   background: #FFFFFF;
-  color: #5333A5;
+  color: var(--pb-purple-600);
   box-shadow: 0 1px 3px rgba(83, 51, 165, 0.12);
 }
 .invite-method__tab:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -699,7 +699,7 @@
   margin-top: 3px;
   width: 16px;
   height: 16px;
-  accent-color: #5333A5;
+  accent-color: var(--pb-purple-600);
   cursor: pointer;
   flex-shrink: 0;
 }

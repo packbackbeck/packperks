@@ -122,7 +122,7 @@
   width: 100%;
   padding: var(--sp-3);
   margin-top: 16px;
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
   border-radius: var(--radius-sm);
   font-family: var(--font-primary);
@@ -138,12 +138,12 @@
 
 .modal-btn--outline {
   background: transparent;
-  color: var(--bk-brown);
-  border: 1px solid var(--bk-brown);
+  color: var(--pb-brown);
+  border: 1px solid var(--pb-brown);
 }
 
 .modal-btn--danger {
-  background: var(--bk-red);
+  background: var(--pb-red);
 }
 
 /* ── Direct Refund comparison card ── */
@@ -161,7 +161,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 14px 12px;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
 }
 
 .modal-compare__option--highlight {
@@ -192,7 +192,7 @@
 }
 
 .modal-compare__option--highlight .modal-compare__value {
-  color: #1A8737;
+  color: var(--pb-green);
 }
 
 .modal-compare__unit {
@@ -209,5 +209,5 @@
 }
 
 .modal-compare__option--highlight .modal-compare__desc {
-  color: #1A8737;
+  color: var(--pb-green);
 }

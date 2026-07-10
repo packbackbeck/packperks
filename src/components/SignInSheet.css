@@ -72,7 +72,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FD6F46, #FF8B6A);
+  background: linear-gradient(135deg, var(--pb-orange-warm), #FF8B6A);
   color: #FFFFFF;
   display: grid;
   place-items: center;
@@ -80,7 +80,7 @@
   box-shadow: 0 10px 24px rgba(253, 111, 70, 0.30);
 }
 .signin-art--sent {
-  background: linear-gradient(135deg, #5333A5, #7251C8);
+  background: linear-gradient(135deg, var(--pb-purple-600), #7251C8);
   box-shadow: 0 10px 24px rgba(83, 51, 165, 0.32);
 }
 .signin-art--ok {
@@ -144,7 +144,7 @@
 .signin-input:hover { background: #FFFFFF; }
 .signin-input:focus {
   background: #FFFFFF;
-  border-color: #5333A5;
+  border-color: var(--pb-purple-600);
   box-shadow: 0 0 0 3px rgba(83, 51, 165, 0.14);
 }
 
@@ -176,10 +176,10 @@
 .signin-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .signin-btn--primary {
-  background: #5333A5;
+  background: var(--pb-purple-600);
   color: #FFFFFF;
 }
-.signin-btn--primary:hover:not(:disabled) { background: #42298B; }
+.signin-btn--primary:hover:not(:disabled) { background: var(--pb-purple-700); }
 
 .signin-btn--ghost {
   background: #F8F4EC;

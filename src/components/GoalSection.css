@@ -58,9 +58,9 @@
 }
 
 .goal-section__filter-btn--active {
-  background: var(--bk-brown);
+  background: var(--pb-brown);
   color: var(--white);
-  border-color: var(--bk-brown);
+  border-color: var(--pb-brown);
 }
 
 .goal-section__filter-btn--sort {

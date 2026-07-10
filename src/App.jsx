@@ -26,6 +26,7 @@ import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
+import { getShotPreset } from './lib/shotPresets'; // DEV-only screen-audit harness
 import { track, EVENTS, setAnalyticsContext, getEntryContext, getInAppBrowserKind } from './utils/analytics';
 import {
   getOrCreateUser,
@@ -42,7 +43,6 @@ import {
   // below so each org's app skin renders without a hard refresh.
   // (Note: applyDesignColors lives in the admin tree but is pure DOM
   // mutation; safe to import from the user app.)
-  logCupScan,
   getAppConfig,
   uploadReceiptPhoto,
   verifyReceipt,
@@ -192,8 +192,11 @@ export default function App() {
   const [liveSettings, setLiveSettings] = useState({
     cashbackRatePerCup: 1.25,
     refundRatePerCup: 1.00,
-    heroHeadline: 'Collect Cups & Get Rewards',
-    heroSubtext: 'We pool your cup deposits into one cashback payout — worth more than a standard refund.',
+    // D.5: default to the BYO wording (this is the product now). Was the old
+    // Burger-King/deposit hero ("Collect Cups & Get Rewards" / "cup deposits…
+    // standard refund"), which showed for any ungrouped org + the pre-config flash.
+    heroHeadline: 'Bring your cup, earn cashback',
+    heroSubtext: 'Use your own reusable cup and collect rewards every time you refill.',
     featureCupSharing: false,
     featureDonations: true,
     featureDirectRefunds: true,
@@ -309,6 +312,7 @@ export default function App() {
 
   /* ── Navigation ── */
   const [page, setPage] = useState('home');
+  const [shot, setShot] = useState(null); // DEV-only screen-audit preset (?__shot=)
 
   // Behavioural analytics: log which screen the user is on whenever it
   // changes. Powers the "Last screen / drop-off" metric. Fire-and-forget.
@@ -330,6 +334,7 @@ export default function App() {
   const [hiwSeen, setHiwSeen] = usePersistedState('hiw_seen', false);
   const [directRefundOpen, setDirectRefundOpen] = useState(false);
   const [refundCupCount, setRefundCupCount] = useState(0);
+  const [refundAmount, setRefundAmount] = useState(0); // C.2: real € paid (rate × cups)
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [donateSheetOpen, setDonateSheetOpen] = useState(false);
   const [donatedCups, setDonatedCups] = useState(0);
@@ -407,6 +412,96 @@ export default function App() {
   useEffect(() => {
     async function init(attempt = 0) {
       try {
+        // DEV-ONLY screen-audit harness. ?__shot=<preset> renders one screen +
+        // state deterministically INSIDE the real BYO group (byonl) — it
+        // resolves the real org/group/config (authentic BYO copy, venues,
+        // rewards, Stores hub) then applies preset overrides. No user writes.
+        // Stripped from prod via import.meta.env.DEV.
+        if (import.meta.env.DEV) {
+          const shotName = new URLSearchParams(window.location.search).get('__shot');
+          const preset = shotName ? getShotPreset(shotName) : null;
+          if (preset) {
+            setShot(preset);
+            if (preset.hold) return; // keep the loading skeleton up
+
+            // Resolve the REAL org + group from the URL (/byonl or /byonl/<store>).
+            const segs = (window.location.pathname || '/').split('/').filter(Boolean);
+            const grp = segs[0] ? await getGroupBySlug(segs[0]) : null;
+            let org = null, hubRoute = false;
+            if (grp) {
+              if (segs[1]) org = (await getOrgBySlug(segs[1])) || grp.members[0];
+              else { hubRoute = true; org = grp.members[0]; }
+            } else if (segs[0]) {
+              org = await getOrgBySlug(segs[0]);
+            }
+            if (!org) org = await getDefaultOrg();
+            if (org) setActiveOrg(org);
+
+            const gctx = await getGroupContext(org?.id);
+            setGroupCtx(gctx);
+            if (gctx) byoGroupRef.current = gctx.mode === 'byo';
+
+            const config = await getAppConfig(org?.id);
+            const live = (config?.rewards || []).filter((r) => r.status === 'live');
+            if (live.length) setLiveRewards(live);
+            if (config?.settings) setLiveSettings((s) => ({ ...s, ...config.settings }));
+            if (preset.settings) setLiveSettings((s) => ({ ...s, ...preset.settings }));
+
+            if (gctx) {
+              try { setGroupStores(await getGroupStores(gctx.members.map((m) => m.id))); } catch { /* best-effort */ }
+              if (preset.memberBalances) {
+                const bals = {};
+                gctx.members.forEach((m, i) => { bals[m.id] = { balance: preset.memberBalances[i] ?? 0, lifetime: preset.memberBalances[i] ?? 0 }; });
+                setGroupBalances(bals);
+              }
+            }
+
+            // Featured reward + reward-linked demo objects from the venue's REAL rewards.
+            const rlist = live.length ? live : liveRewards;
+            const featured = rlist[preset.featIdx ?? 0] || rlist[0];
+            if (featured) setSelectedRewardId(featured.id);
+            const euro = (rw) => (typeof rw?.euros === 'number' ? rw.euros : (rw?.cupsNeeded || 0) * (config?.settings?.cashbackRatePerCup || 0.4));
+            const mkClaim = (kind, rw) => ({
+              id: `demo-${kind}`, type: 'cashback', reward_id: rw?.id, cups_redeemed: rw?.cupsNeeded || 8,
+              payout_amount: Number(euro(rw).toFixed(2)), created_at: '2026-07-06T10:00:00Z', notify_email: true, notify_push: false,
+              ...(kind === 'pending' ? { status: 'pending' }
+                : kind === 'ready' ? { status: 'completed', tikkie_url: 'https://tikkie.me/pay/demo/abc', tikkie_status: 'created' }
+                : { status: 'failed' }),
+            });
+            if (preset.claims === 'pending') setUserClaims([mkClaim('pending', featured)]);
+            else if (preset.claims === 'ready') setUserClaims([mkClaim('ready', featured)]);
+            else if (preset.claims === 'mix') setUserClaims([mkClaim('pending', featured), mkClaim('ready', rlist[1] || featured), mkClaim('rejected', rlist[3] || featured)]);
+            if (preset.detailIdx != null) setDetailReward(rlist[preset.detailIdx] || rlist[1] || featured);
+
+            if (preset.profile) setProfile(preset.profile);
+            if (preset.authEmail) setAuthEmail(preset.authEmail);
+            if (typeof preset.cupCount === 'number') setCupCount(preset.cupCount);
+            if (typeof preset.lifetimeCups === 'number') setLifetimeCups(preset.lifetimeCups);
+            if (preset.history) setHistory(preset.history);
+            if (preset.termsOpen) setTermsOpen(true);
+            if (preset.howItWorksOpen) setHowItWorksOpen(true);
+            if (preset.directRefundOpen) setDirectRefundOpen(true);
+            if (preset.donateSheetOpen) setDonateSheetOpen(true);
+            if (preset.byoResult) setByoResult(preset.byoResult);
+            if (preset.budgetPausedOpen) setBudgetPausedOpen(true);
+            if (preset.inAppClaim) setInAppClaim(preset.inAppClaim);
+            if (preset.showSignIn) setShowSignIn(true);
+            if (preset.accountCombined) setAccountCombined(true);
+            if (typeof preset.refundCupCount === 'number') setRefundCupCount(preset.refundCupCount);
+            if (typeof preset.donatedCups === 'number') setDonatedCups(preset.donatedCups);
+            if (typeof preset.lastCupsScanned === 'number') setLastCupsScanned(preset.lastCupsScanned);
+            if (preset.cupScanError) setCupScanError(preset.cupScanError);
+            if (preset.aiVerdict) setAiVerdict(preset.aiVerdict);
+            if (preset.aiRequiredItem) setAiRequiredItem(preset.aiRequiredItem);
+            if (preset.lastClaimId) setLastClaimId(preset.lastClaimId);
+            setUserId('shot-user');
+            if (preset.initError) { setInitError(preset.initError); setIsLoading(false); return; }
+            setPage(preset.page || (hubRoute ? 'stores' : 'home'));
+            setIsLoading(false);
+            return;
+          }
+        }
+
         // Preview mode short-circuit. We still need the per-org
         // config so the iframe paints with the right brand
         // (rewards + settings + design), but we skip the user-data
@@ -732,7 +827,7 @@ export default function App() {
    * The admin's App Design tab writes settings.design.colors per-org;
    * here we re-target the existing --bk-* tokens at whatever the
    * active org has chosen. Components don't need to know — they keep
-   * using var(--bk-orange) etc. and just get a different colour. */
+   * using var(--pb-orange) etc. and just get a different colour. */
   useEffect(() => {
     const merged = mergeDesign(liveSettings?.design);
     applyDesignColors(merged.colors);
@@ -825,7 +920,9 @@ export default function App() {
 
   /* ── Reward handlers ── */
   const handlePickReward = (id) => {
-    const reward = rewards.find((r) => r.id === id);
+    // C.8.6: log the reward from LIVE rewards, not the Burger King seed array
+    // (which would log an undefined/wrong name for any real org reward).
+    const reward = liveRewards.find((r) => r.id === id);
     track(EVENTS.REWARD_SELECTED, { reward_id: id, reward_name: reward?.name, cup_count: cupCount });
     setDidEngage(true); // actively picking a reward = a real user, not a visitor
     setSelectedRewardId(id);
@@ -904,11 +1001,18 @@ export default function App() {
 
   /* ── Direct refund ── */
   const handleDirectRefundConfirm = () => {
-    track(EVENTS.WITHDRAW_ALL_CUPS, { cups_withdrawn: cupCount, deposit_value: (cupCount * 1.00).toFixed(2) });
     const count = cupCount;
-    const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''} — €${(count * 1.00).toFixed(2)}`;
+    // C.2: use the venue's CONFIGURED refund rate for the analytics figure, the
+    // history label, AND the stored payout amount — not a hardcoded €1.00. The
+    // on-screen sheet already showed this rate, so the amount paid now matches
+    // what the customer saw (was a 2.5× overpay at a €0.40 BYO venue).
+    const refundRate = liveSettings.refundRatePerCup ?? 1.00;
+    const amount = Number((count * refundRate).toFixed(2));
+    track(EVENTS.WITHDRAW_ALL_CUPS, { cups_withdrawn: count, deposit_value: amount.toFixed(2) });
+    const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''} — €${amount.toFixed(2)}`;
     addHistory('cups_withdrawn', label);
     setRefundCupCount(count);
+    setRefundAmount(amount);
     setCupCount(0);
     setClaimed(false);
     setDirectRefundOpen(false);
@@ -917,7 +1021,7 @@ export default function App() {
     if (userId) {
       persist(
         updateCupBalance(userId, 0),
-        createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: count * 1.00, orgId: activeOrg?.id }),
+        createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: amount, orgId: activeOrg?.id }),
         addHistoryEntry(userId, 'cups_withdrawn', label)
       );
     }
@@ -1193,8 +1297,8 @@ export default function App() {
       const brand = activeOrg?.partner_brand_name || activeOrg?.name || 'the store';
       const label =
         (result.activatedCount || 1) === 1
-          ? `Cup returned at ${brand}`
-          : `${result.activatedCount} cups returned at ${brand}`;
+          ? `Cup collected at ${brand}`
+          : `${result.activatedCount} cups collected at ${brand}`;
       addHistory('cup_added', label);
       haptic('success');
       setPage('cup-scan-success');
@@ -1293,8 +1397,16 @@ export default function App() {
     const checkReason = (() => {
       const v = aiVerdict?.verdict;
       if (!v) return null;
-      const checks = ['check_is_receipt', 'check_is_authentic_burger_king', 'check_contains_required_item'];
-      for (const k of checks) {
+      // D.10: scan EVERY `check_*` node that failed with a reason, instead of a
+      // hardcoded Burger-King-specific list. The old list included
+      // `check_is_authentic_burger_king`, so on a non-BK org an authenticity
+      // rejection never surfaced its real reason. `check_is_receipt` is tried
+      // first (most fundamental), then any other failed check.
+      if (v.check_is_receipt?.passed === false && v.check_is_receipt?.reason) {
+        return v.check_is_receipt.reason;
+      }
+      for (const k of Object.keys(v)) {
+        if (!k.startsWith('check_')) continue;
         const node = v[k];
         if (node && node.passed === false && node.reason) return node.reason;
       }
@@ -1333,6 +1445,8 @@ export default function App() {
     return (
       <RefundSuccessPage
         cupCount={refundCupCount}
+        amount={refundAmount}
+        userEmail={profile?.email || authEmail}
         onDone={() => { setPage('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
       />
     );
@@ -1453,6 +1567,8 @@ export default function App() {
       onMarketingConsent={(consent) =>
         handleSaveProfile({ marketingConsent: consent, marketingConsentSource: 'signin_popup' })
       }
+      __devStatus={shot?.signInStatus || null}
+      __devEmail={shot?.signInEmail || null}
     />
   );
 

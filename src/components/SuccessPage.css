@@ -91,7 +91,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-4);
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   border-radius: var(--radius-lg);
   padding: var(--sp-3);
   width: 300px;
@@ -105,7 +105,7 @@
   height: 60px;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: var(--bk-orange);
+  background: var(--pb-orange);
   flex-shrink: 0;
 }
 
@@ -132,7 +132,7 @@
 .success-page__reward-value {
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
-  color: #1A8737;
+  color: var(--pb-green);
   font-weight: var(--fw-medium);
 }
 
@@ -152,7 +152,7 @@
 .success-page__eta p {
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
-  color: #1A8737;
+  color: var(--pb-green);
   line-height: 1.4;
   margin: 0;
 }
@@ -241,7 +241,7 @@
 .sp-receipt__cashback-amount {
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
-  color: #1A8737;
+  color: var(--pb-green);
   font-weight: var(--fw-medium);
 }
 
@@ -288,7 +288,7 @@
 }
 
 .sp-receipt__value--green {
-  color: #1A8737;
+  color: var(--pb-green);
 }
 
 /* ── Pending review variant ──────────────────────────────────────────────
@@ -369,7 +369,7 @@
   position: relative;
   transition: background 0.14s ease, border-color 0.14s ease;
 }
-.sp-notify__check.is-on { background: #1A8737; border-color: #1A8737; }
+.sp-notify__check.is-on { background: var(--pb-green); border-color: var(--pb-green); }
 .sp-notify__check.is-on::after {
   content: '';
   position: absolute;

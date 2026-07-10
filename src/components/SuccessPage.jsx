@@ -9,14 +9,9 @@ function formatDate(d = new Date()) {
 function formatTime(d = new Date()) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
-function getUserName() {
-  try { const p = JSON.parse(localStorage.getItem('packperks_user_profile') || '{}'); return p.displayName || 'PackPerks User'; }
-  catch { return 'PackPerks User'; }
-}
-function getUserEmail() {
-  try { const p = JSON.parse(localStorage.getItem('packperks_user_profile') || '{}'); return p.email || null; }
-  catch { return null; }
-}
+// D.10: removed the dead getUserName/getUserEmail readers — nothing writes the
+// `packperks_user_profile` localStorage key anymore, so they only ever returned
+// "PackPerks User"/null. The real name/email come from props (App passes them).
 
 const ReceiptRow = ({ label, value, bold, green }) => (
   <div className="sp-receipt__row">
@@ -32,8 +27,8 @@ const ReceiptRow = ({ label, value, bold, green }) => (
  * and/or a browser push notification); the choice is stored on the claim. */
 export default function SuccessPage({ reward, onDone, userName: userNameProp, userEmail: userEmailProp, claimId, onAddEmail }) {
   const now = new Date();
-  const userName = userNameProp || getUserName();
-  const userEmail = userEmailProp || getUserEmail();
+  const userName = userNameProp || 'there';
+  const userEmail = userEmailProp || null;
   const cashback = reward.euros?.toFixed(2) ?? (reward.cupsNeeded * 1.25).toFixed(2);
 
   const pushSupported = isPushSupported();
@@ -129,32 +124,8 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
           </span>
           <span className={`sp-notify__check${notifyEmail ? ' is-on' : ''}`} aria-hidden="true" />
         </button>
-
-        {pushSupported && (
-          <button
-            type="button"
-            className="sp-notify__opt"
-            onClick={togglePush}
-            disabled={pushPerm === 'denied'}
-          >
-            <span className="sp-notify__opt-icon" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
-              </svg>
-            </span>
-            <span className="sp-notify__opt-main">
-              <span className="sp-notify__opt-label">Notify me on this device</span>
-              <span className="sp-notify__opt-sub">
-                {pushPerm === 'denied'
-                  ? 'Notifications are blocked in your browser settings'
-                  : needsInstall
-                    ? 'On iPhone, add PackPerks to your Home Screen first'
-                    : 'A browser push notification'}
-              </span>
-            </span>
-            <span className={`sp-notify__check${notifyPush ? ' is-on' : ''}`} aria-hidden="true" />
-          </button>
-        )}
+        {/* C.4: the "notify on this device" (push) option was removed — there is
+            no push sender yet, so it delivered nothing. Email works (via Brevo). */}
       </div>
 
       <button className="success-page__btn" onClick={onDone}>

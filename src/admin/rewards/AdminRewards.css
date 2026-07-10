@@ -64,7 +64,7 @@
   align-items: center;
   gap: 7px;
   padding: 9px 18px;
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   border: none;
   border-radius: 8px;
   color: #FFFFFF;
@@ -125,7 +125,7 @@
   cursor: pointer;
   outline: none;
 }
-.rew-list__select:focus { border-color: #FD6F46; }
+.rew-list__select:focus { border-color: var(--pb-orange-warm); }
 
 .rew-list__label {
   font-size: 10px;
@@ -152,10 +152,10 @@
   text-transform: none;
   letter-spacing: 0;
 }
-.rew-list__template-btn:hover { color: #FD6F46; }
+.rew-list__template-btn:hover { color: var(--pb-orange-warm); }
 
 .rew-card__claims {
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
   font-weight: 700;
 }
 
@@ -202,7 +202,7 @@
 }
 
 .rew-card--active {
-  border-color: #FD6F46;
+  border-color: var(--pb-orange-warm);
   background: #FFF8F6;
 }
 
@@ -295,7 +295,7 @@
 }
 /* Insertion indicator on the drop target. */
 .rew-card-wrap--dragover .rew-card {
-  border-color: #FD6F46;
+  border-color: var(--pb-orange-warm);
   box-shadow: 0 0 0 2px rgba(253,111,70,0.18);
 }
 .rew-grip {
@@ -307,7 +307,7 @@
   color: #B6ADA2;
 }
 .rew-card-wrap--reorder:hover .rew-grip {
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
 }
 
 /* Rearrange toggle button (in the list controls) */
@@ -334,8 +334,8 @@
 }
 .rew-reorder-toggle--active {
   color: #FFFFFF;
-  background: #FD6F46;
-  border-color: #FD6F46;
+  background: var(--pb-orange-warm);
+  border-color: var(--pb-orange-warm);
 }
 .rew-reorder-toggle--active:hover {
   background: #ED5F38;

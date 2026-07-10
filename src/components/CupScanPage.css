@@ -31,7 +31,7 @@
   gap: var(--sp-4);
   position: fixed;
   inset: 0;
-  background: var(--bk-cream);
+  background: var(--pb-cream);
   z-index: 20;
   animation: fade-in var(--duration-normal) ease both;
 }
@@ -41,7 +41,7 @@
   height: 52px;
   border-radius: 50%;
   border: 4px solid rgba(26,135,55,0.15);
-  border-top-color: #1A8737;
+  border-top-color: var(--pb-green);
   animation: spin 0.9s linear infinite;
 }
 

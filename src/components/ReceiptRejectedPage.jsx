@@ -167,8 +167,8 @@ function SupportLink({ claimId, reason }) {
     ? `Help with receipt claim ${claimId}${reason ? ` (${reason})` : ''}`
     : 'Help with receipt claim';
   const body = claimId
-    ? `Hi PackBack team,\n\nI need help with my receipt claim.\n\nClaim ID: ${claimId}\nReason shown: ${reason || 'unknown'}\n\nWhat happened: \n\nThanks!`
-    : 'Hi PackBack team,\n\nI need help with my receipt claim.\n\nWhat happened: \n\nThanks!';
+    ? `Hi PackPerks team,\n\nI need help with my receipt claim.\n\nClaim ID: ${claimId}\nReason shown: ${reason || 'unknown'}\n\nWhat happened: \n\nThanks!`
+    : 'Hi PackPerks team,\n\nI need help with my receipt claim.\n\nWhat happened: \n\nThanks!';
   const href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   return (
     <a className="rj__help" href={href}>

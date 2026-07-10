@@ -39,7 +39,7 @@ import './SignInSheet.css';
  * form. This is the only place in the user app where signing out is
  * exposed — outside the sheet there's no reason for them to do it.
  */
-export default function SignInSheet({ open, onClose, onLinked, onVerified, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent }) {
+export default function SignInSheet({ open, onClose, onLinked, onVerified, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent, __devStatus = null, __devEmail = null }) {
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -48,10 +48,14 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
    *                 (OTP code entry + server-side merge)
    * Each mode has its own status machine (see `status` below). */
   const mergeFromSave = useRef(false); // true once we've routed Save → merge OTP
+  const verifyingRef = useRef(false);  // C.7: blocks a double-submit of the code
+  const statusRef = useRef('idle');    // C.7: live status, so a late catch can't clobber a success
   const [mergeOtherCount, setMergeOtherCount] = useState(0); // for the merge-offer prompt
   const [mode, setMode] = useState('save'); // 'save' | 'restore'
-  const [status, setStatus] = useState('idle'); // see comments per-mode below
-  const [email, setEmail] = useState('');
+  // __devStatus/__devEmail: DEV-only, used solely by the screen-audit harness
+  // (?__shot=…) to open the sheet directly in a given status for screenshots.
+  const [status, setStatus] = useState(import.meta.env.DEV && __devStatus ? __devStatus : 'idle');
+  const [email, setEmail] = useState(import.meta.env.DEV && __devEmail ? __devEmail : '');
   // Optional marketing-email opt-in (default OFF — a valid GDPR/PDPL opt-in is
   // unticked by default). Service email needs no consent, so there is no
   // required checkbox — only a notice line below the field.
@@ -60,7 +64,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   const [newEmail, setNewEmail] = useState(''); // for the change-email flow
   const [restoreResult, setRestoreResult] = useState(null); // { status, merged_balance? }
   const [error, setError] = useState(null);
-  const [currentEmail, setCurrentEmail] = useState(null);
+  const [currentEmail, setCurrentEmail] = useState(import.meta.env.DEV && __devEmail ? __devEmail : null);
   const inputRef = useRef(null);
   const codeRef  = useRef(null);
 
@@ -68,6 +72,8 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   // in so we render the right initial state.
   useEffect(() => {
     if (!open) return;
+    // DEV screen-audit: honour the forced __devStatus, don't reset on open.
+    if (import.meta.env.DEV && __devStatus) return;
     let cancelled = false;
     // No-verification mode: the email lives on the user row, there's no auth
     // session to read. Show the saved email (if any) without an OTP round-trip.
@@ -97,6 +103,9 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
     return () => t && clearTimeout(t);
   }, [open, status]);
 
+  // C.7: keep statusRef in sync so the verify handlers can read the live status.
+  useEffect(() => { statusRef.current = status; }, [status]);
+
   // Reset transient state when the sheet closes so the next open is clean.
   useEffect(() => {
     if (open) return;
@@ -104,6 +113,13 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
     setNewEmail('');
     setRestoreResult(null);
     setError(null);
+    // C.1: also reset `mode` — otherwise a reopen after the Restore flow lands
+    // in (mode='restore', status='idle'), which no render branch handles, and
+    // the popup goes blank/frozen (it's the gate for every cashback claim).
+    // mergeFromSave is reset too so a later plain restore isn't mis-routed to
+    // merge (this is also the close-side of C.8.2).
+    setMode('save');
+    mergeFromSave.current = false;
   }, [open]);
 
   // Lock body scroll while sheet is open (matches other sheets in app).
@@ -175,6 +191,11 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   async function handleVerifySaveCode(e) {
     e.preventDefault();
     if (otpCode.length !== 6) return;
+    // C.7 fix 1: a fast double-Enter would fire verify twice; the second replays
+    // an already-used code, fails, and its error wipes the success screen. This
+    // in-flight guard makes the second submit a no-op.
+    if (verifyingRef.current) return;
+    verifyingRef.current = true;
     setError(null);
     setStatus('verifying');
     try {
@@ -184,17 +205,22 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
       onLinked?.();
       onVerified?.(); // may auto-continue a claim that was waiting on an email
     } catch (err) {
-      const code = err?.detail?.error || err?.message;
-      const friendly =
-        code === 'invalid_code'
-          ? 'That code is 6 digits — check the email and try again.'
-          : /expired/i.test(code || '')
-            ? 'That code expired. Tap "Resend" below to get a fresh one.'
-            : /invalid/i.test(code || '')
-              ? "That code doesn't match. Double-check the email — 6 digits, no spaces."
-              : (code || 'Something went wrong verifying the code.');
-      setError(friendly);
-      setStatus('sent');
+      // C.7 fix 2: never let a late failure erase a success that already landed.
+      if (statusRef.current !== 'signedIn') {
+        const code = err?.detail?.error || err?.message;
+        const friendly =
+          code === 'invalid_code'
+            ? 'That code is 6 digits — check the email and try again.'
+            : /expired/i.test(code || '')
+              ? 'That code expired. Tap "Resend" below to get a fresh one.'
+              : /invalid/i.test(code || '')
+                ? "That code doesn't match. Double-check the email — 6 digits, no spaces."
+                : (code || 'Something went wrong verifying the code.');
+        setError(friendly);
+        setStatus('sent');
+      }
+    } finally {
+      verifyingRef.current = false;
     }
   }
 
@@ -272,6 +298,8 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   async function handleVerifyRestore(e) {
     e.preventDefault();
     if (otpCode.length !== 6) return;
+    if (verifyingRef.current) return;   // C.7 fix 1: block a double-submit
+    verifyingRef.current = true;
     setError(null);
     setStatus('restore_verifying');
     try {
@@ -289,19 +317,24 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
       // cup count / history with the merged state.
       onLinked?.();
     } catch (err) {
-      const code = err?.detail?.error || err?.message;
-      const friendly =
-        code === 'invalid_code'
-          ? 'That code is 6 digits — check the email and try again.'
-          : code === 'otp_expired' || code === 'token_has_expired' || /expired/i.test(code || '')
-            ? 'That code expired. Tap "Send a new code" below to get a fresh one.'
-            : code === 'invalid_token' || /invalid/i.test(code || '')
-              ? "That code doesn't match. Double-check the email — codes are 6 digits, no spaces."
-              : code === 'update_failed' || code === 'survivor_update_failed' || code === 'merge_balance_failed'
-                ? "Looks like you're already signed in to this account on this device — your cups should already be here. Pull to refresh to check."
-                : (code || 'Something went wrong verifying the code.');
-      setError(friendly);
-      setStatus('restore_code');
+      // C.7 fix 2: don't let a late failure erase a finished restore.
+      if (statusRef.current !== 'restore_done') {
+        const code = err?.detail?.error || err?.message;
+        const friendly =
+          code === 'invalid_code'
+            ? 'That code is 6 digits — check the email and try again.'
+            : code === 'otp_expired' || code === 'token_has_expired' || /expired/i.test(code || '')
+              ? 'That code expired. Tap "Send a new code" below to get a fresh one.'
+              : code === 'invalid_token' || /invalid/i.test(code || '')
+                ? "That code doesn't match. Double-check the email — codes are 6 digits, no spaces."
+                : code === 'update_failed' || code === 'survivor_update_failed' || code === 'merge_balance_failed'
+                  ? "Looks like you're already signed in to this account on this device — your cups should already be here. Pull to refresh to check."
+                  : (code || 'Something went wrong verifying the code.');
+        setError(friendly);
+        setStatus('restore_code');
+      }
+    } finally {
+      verifyingRef.current = false;
     }
   }
 
@@ -551,7 +584,10 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
         )}
 
         {/* Idle form (or error variant of it) — "save" mode only */}
-        {mode === 'save' && (status === 'idle' || status === 'sending' || status === 'error') && (
+        {/* C.1 fix 2: draw the idle/save form whenever status is idle/sending/
+            error REGARDLESS of mode, so a stray (mode='restore', status='idle')
+            can never leave the popup blank. Restore uses its own restore_* statuses. */}
+        {(status === 'idle' || status === 'sending' || status === 'error') && (
           <form className="signin-state" onSubmit={handleSubmit}>
             <div className="signin-art">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

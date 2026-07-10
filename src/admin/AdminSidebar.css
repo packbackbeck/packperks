@@ -77,7 +77,7 @@
 }
 
 .admin-sidebar__badge {
-  background: #FD6F46;
+  background: var(--pb-orange-warm);
   color: #FFFFFF;
   font-size: 10px;
   font-weight: 700;

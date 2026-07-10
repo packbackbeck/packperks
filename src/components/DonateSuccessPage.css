@@ -71,7 +71,7 @@
   font-size: 48px;
   font-weight: 700;
   line-height: 1.1;
-  color: #00F0FF;
+  color: var(--pb-green);  /* E.14.4: was off-palette neon cyan #00F0FF */
   margin: 0;
   letter-spacing: -1px;
   text-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);

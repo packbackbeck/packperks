@@ -102,7 +102,7 @@ export async function getAdminStats(orgIds) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * Feasibility-test Stats (Titaan sandbox validation).
+ * System Health Stats (D.11.2: was "Feasibility-test / Titaan sandbox" pilot jargon).
  *
  * Computes the 10 go/no-go metrics from the existing event log
  * (`cup_scans`, filtered to source='qr' so photo/OCR claim reviews
@@ -1636,8 +1636,12 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
     try {
       const mint = await invokeEdge('tikkie-cashback', { action: 'create', claim_id: claimId });
       if (mint?.error) {
-        // Approval stands; the payout link can be retried from the claim panel.
-        return { ...data, tikkie_error: mint };
+        // B3: persist payout_status='failed' so the payout badge (and any export)
+        // reads the honest truth instead of a stale 'queued'. A later successful
+        // retry sets 'sent', so the failed state can't stick. Approval still
+        // stands; the link is retryable from the claim panel.
+        await applyOrgFilter(supabase.from('claims').update({ payout_status: 'failed' }).eq('id', claimId));
+        return { ...data, payout_status: 'failed', tikkie_error: mint };
       }
       return {
         ...data,
@@ -1648,7 +1652,9 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
         payout_status: 'sent',
       };
     } catch (e) {
-      return { ...data, tikkie_error: { error: 'tikkie_invoke_failed', detail: e?.message || String(e) } };
+      // B3: same authoritative 'failed' save when the mint call itself throws.
+      await applyOrgFilter(supabase.from('claims').update({ payout_status: 'failed' }).eq('id', claimId));
+      return { ...data, payout_status: 'failed', tikkie_error: { error: 'tikkie_invoke_failed', detail: e?.message || String(e) } };
     }
   }
 
@@ -2725,7 +2731,7 @@ export async function getGroupStats(groupId) {
   if (orgIds.length === 0) return empty;
 
   const { data: users } = await supabase
-    .from('users').select('id, org_id').in('org_id', orgIds).is('merged_into', null);
+    .from('users').select('id, org_id, identity_id').in('org_id', orgIds).is('merged_into', null);
   const userIds = (users || []).map(u => u.id);
   const orgByUser = {};
   (users || []).forEach(u => { orgByUser[u.id] = u.org_id; });
@@ -2766,6 +2772,15 @@ export async function getGroupStats(groupId) {
     claims: t.claims + s.claims,
     payout: t.payout + s.payout,
   }), { stores: 0, users: 0, cups: 0, lifetime: 0, claims: 0, payout: 0 });
+
+  // B8: the group "Members" total must count DISTINCT people, not sum per-store
+  // rows — in BYO one identity spans several stores, so summing double-counts.
+  // Per-store `users` (footfall per venue) stays as-is; only the group total is
+  // de-duplicated by identity (falling back to the user id when there's no
+  // shared identity). cups/claims/payout stay additive — they're genuinely
+  // per-org. (`totals.usersRaw` keeps the old sum if any caller wants footfall.)
+  totals.usersRaw = totals.users;
+  totals.users = new Set((users || []).map(u => u.identity_id || u.id)).size;
 
   return { totals, perStore };
 }

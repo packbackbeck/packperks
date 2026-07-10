@@ -157,7 +157,7 @@
  * once released. Bright purple ring so it's unmistakable. */
 .ov-stat--drop-target,
 .ov-card--drop-target {
-  outline: 2px solid #5333A5;
+  outline: 2px solid var(--pb-purple-600);
   outline-offset: 2px;
   box-shadow: 0 4px 18px rgba(83, 51, 165, 0.20);
 }
@@ -904,7 +904,7 @@
 .ov-insight__leader-bar-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #FF7A2E, #FD6F46);
+  background: linear-gradient(90deg, #FF7A2E, var(--pb-orange-warm));
   border-radius: 999px;
 }
 .ov-insight__leader-val {
@@ -940,7 +940,7 @@
   transition: color 0.14s ease, background 0.14s ease;
 }
 .ov-stat__info:hover {
-  color: #5333A5;
+  color: var(--pb-purple-600);
   background: rgba(83, 51, 165, 0.08);
 }
 
@@ -986,7 +986,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #5333A5;
+  color: var(--pb-purple-600);
 }
 
 .ov-triage--risk .ov-triage__eyebrow { color: #C84A26; }
@@ -1112,7 +1112,7 @@
 }
 .ov-range-pop__field input:focus {
   background: #FFFFFF;
-  border-color: #5333A5;
+  border-color: var(--pb-purple-600);
   box-shadow: 0 0 0 3px rgba(83, 51, 165, 0.14);
 }
 
@@ -1146,10 +1146,10 @@
 }
 .ov-range-pop__btn--ghost:hover { background: #F8F4EC; }
 .ov-range-pop__btn--primary {
-  background: #5333A5;
+  background: var(--pb-purple-600);
   color: #FFFFFF;
 }
-.ov-range-pop__btn--primary:hover:not(:disabled) { background: #42298B; }
+.ov-range-pop__btn--primary:hover:not(:disabled) { background: var(--pb-purple-700); }
 .ov-range-pop__btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Reward budget monitor block */

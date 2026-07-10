@@ -22,14 +22,14 @@
   height: 64px;
   border-radius: 50%;
   background: #ECE5D8;
-  color: #5333A5;
+  color: var(--pb-purple-600);
   display: grid;
   place-items: center;
   margin-bottom: 4px;
 }
 .empty-state--action .empty-state__art {
   background: rgba(253, 111, 70, 0.12);
-  color: #FD6F46;
+  color: var(--pb-orange-warm);
 }
 
 .empty-state__title {
@@ -65,10 +65,10 @@
   transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
 }
 .empty-state__btn--primary {
-  background: #5333A5;
+  background: var(--pb-purple-600);
   color: #FFFFFF;
 }
-.empty-state__btn--primary:hover { background: #42298B; }
+.empty-state__btn--primary:hover { background: var(--pb-purple-700); }
 .empty-state__btn--ghost {
   background: #FFFFFF;
   border-color: #E5DECF;

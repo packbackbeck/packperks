@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PackPerks — BYO Customer App: Screen Map & Flow</title>
+<style>
+  :root{
+    --bg:#F4EBDC; --card:#fff; --ink:#1A1A1A; --muted:#6b6257; --line:#e3d9c8;
+    --green:#2f7d4f; --purple:#5b3df5; --shadow:0 2px 10px rgba(60,40,20,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:30px;font-weight:800;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--muted);max-width:820px;margin:0 0 4px}
+  .pill{display:inline-block;background:#e7f0e8;color:var(--green);
+    font-weight:700;font-size:12px;padding:3px 10px;border-radius:999px;margin-right:6px}
+  h2{font-size:20px;font-weight:800;margin:44px 0 4px;letter-spacing:-.01em}
+  h2 .n{color:var(--muted);font-weight:700;font-size:14px}
+  .stage-note{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .flow{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    box-shadow:var(--shadow);padding:12px;overflow-x:auto;margin-top:14px}
+  .flow svg{display:block;min-width:900px;width:100%;height:auto}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:14px 2px 0;font-size:13px;color:var(--muted)}
+  .key{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px;margin-top:16px}
+  figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:16px;
+    overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+  figure a{display:block;background:#efe6d6}
+  figure img{display:block;width:100%;height:auto;aspect-ratio:390/720;object-fit:cover;object-position:top}
+  figcaption{padding:11px 13px 13px}
+  .cap-n{display:inline-block;background:var(--purple);color:#fff;font-size:11px;font-weight:800;
+    padding:2px 8px;border-radius:6px;letter-spacing:.02em}
+  .cap-t{font-size:14.5px;font-weight:700;margin:6px 0 5px}
+  .cap-r{font-size:12.5px;color:var(--ink);margin:0 0 3px}
+  .cap-r b, .cap-p b{color:var(--muted);font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.04em}
+  .cap-p{font-size:12.5px;color:var(--muted);margin:0}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
+  code{background:#efe6d6;padding:1px 6px;border-radius:6px;font-size:12.5px}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#1c1712;--card:#26201a;--ink:#f3ece0;--muted:#a89a86;--line:#3a3128;
+      --shadow:0 2px 12px rgba(0,0,0,.35)}
+    .pill{background:#22321f}
+    figure a{background:#2f2820}
+    code{background:#332b22}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>PackPerks — BYO Customer App</h1>
+    <p class="sub"><span class="pill">BYO group · byonl</span> Every screen a customer can see, captured live from the real <b>Bring-Your-Own-Cup</b> group (venue <b>La Place</b>, plus the group hub across all venues). Screens are numbered by <b>flow step</b> — <b>3A</b> is step 3, variation A. The flow map shows what <b>triggers</b> each step and what must be <b>true</b> for it to appear; the gallery repeats that per screen. Click any shot to open it full-size. <em>(Donation &amp; direct-refund screens are omitted — both features are disabled for this venue.)</em></p>
+  </header>
+
+  <!-- ─────────── FLOW MAP ─────────── -->
+  <h2>The flow <span class="n">— trigger &amp; precondition for every step</span></h2>
+  <p class="stage-note">Solid = main path (top→bottom). Dashed = side branches / interrupts. Labels on the arrows are the <b>trigger</b> (tap / event / timing); the grey line in each box is the <b>precondition</b>.</p>
+  <div class="flow" role="img" aria-label="Detailed flowchart of the BYO customer journey with triggers and preconditions">
+    <svg viewBox="0 0 900 1210" xmlns="http://www.w3.org/2000/svg" font-family="inherit">
+      <defs>
+        <marker id="arw" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#8a7c6a"/></marker>
+        <style>
+          .box{stroke-width:1.5}
+          .b-entry{fill:#efe7d7;stroke:#d9cdb8}.b-hub{fill:#e9f1f6;stroke:#bcd3e2}
+          .b-home{fill:#e7f0e8;stroke:#bcdcc4}.b-side{fill:#fbf6ec;stroke:#e6dcc6}
+          .b-gate{fill:#efe9ff;stroke:#c8bcf5}.b-claim{fill:#fdefe0;stroke:#f2d3ad}
+          .b-acct{fill:#e9f1f6;stroke:#bcd3e2}.b-sys{fill:#f3eadf;stroke:#ddd0bd}
+          .t{fill:#1a1a1a;font-size:13.5px;font-weight:700}
+          .v{fill:#3a4a3f;font-size:11px;font-weight:700}
+          .pre{fill:#6b6257;font-size:10.5px;font-style:italic}
+          .lnk{stroke:#8a7c6a;stroke-width:1.7;fill:none}.dash{stroke-dasharray:5 4}
+          .trig{fill:#4b3fb0;font-size:10.5px;font-weight:700}
+          @media (prefers-color-scheme:dark){
+            .b-entry{fill:#2c261d;stroke:#4a3f31}.b-hub{fill:#1e2a31;stroke:#3a5566}
+            .b-home{fill:#1f2c20;stroke:#3c5a41}.b-side{fill:#2a251c;stroke:#463d2c}
+            .b-gate{fill:#241f38;stroke:#463a70}.b-claim{fill:#33271a;stroke:#5c4527}
+            .b-acct{fill:#1e2a31;stroke:#3a5566}.b-sys{fill:#2b241c;stroke:#453a2c}
+            .t{fill:#f3ece0}.v{fill:#bcd8c4}.pre{fill:#a89a86}.trig{fill:#b7a9ff}
+          }
+        </style>
+      </defs>
+
+      <!-- 1 Entry -->
+      <rect class="box b-entry" x="320" y="16" width="260" height="66" rx="14"/>
+      <text class="t" x="450" y="38" text-anchor="middle">1 · App opens</text>
+      <text class="v" x="450" y="55" text-anchor="middle">1A Loading  →  1B Cookie consent</text>
+      <text class="pre" x="450" y="72" text-anchor="middle">shown on a first-ever visit (no consent cookie)</text>
+      <line class="lnk" x1="450" y1="82" x2="450" y2="140" marker-end="url(#arw)"/>
+      <text class="trig" x="462" y="107">accept cookies, then open</text>
+      <text class="trig" x="462" y="121">/byonl (hub) or a venue link</text>
+
+      <!-- 2 Stores hub -->
+      <rect class="box b-hub" x="320" y="142" width="260" height="64" rx="14"/>
+      <text class="t" x="450" y="164" text-anchor="middle">2 · Stores hub</text>
+      <text class="v" x="450" y="181" text-anchor="middle">2A List   ·   2B Map</text>
+      <text class="pre" x="450" y="198" text-anchor="middle">only for an org that belongs to a group</text>
+      <line class="lnk" x1="450" y1="206" x2="450" y2="262" marker-end="url(#arw)"/>
+      <text class="trig" x="462" y="238">tap a venue card</text>
+
+      <!-- 3 Venue home -->
+      <rect class="box b-home" x="300" y="264" width="300" height="92" rx="14"/>
+      <text class="t" x="450" y="287" text-anchor="middle">3 · Venue home — “Bring your cup…”</text>
+      <text class="v" x="450" y="305" text-anchor="middle">3A empty(0) → 3B partial → 3C full → 3D member</text>
+      <text class="pre" x="450" y="323" text-anchor="middle">state follows this venue’s cup balance;</text>
+      <text class="pre" x="450" y="337" text-anchor="middle">3C unlocks “Get cashback” at cups ≥ reward goal</text>
+
+      <!-- 5 Scan (left) -->
+      <rect class="box b-side" x="24" y="256" width="210" height="108" rx="13"/>
+      <text class="t" x="129" y="278" text-anchor="middle">5 · Collect cups</text>
+      <text class="v" x="129" y="296" text-anchor="middle">5A scanner → 5B added</text>
+      <text class="v" x="129" y="311" text-anchor="middle">5C error · 5D daily limit</text>
+      <text class="pre" x="129" y="330" text-anchor="middle">scan the counter QR;</text>
+      <text class="pre" x="129" y="344" text-anchor="middle">cup lands on your balance</text>
+      <line class="lnk dash" x1="300" y1="300" x2="236" y2="300" marker-end="url(#arw)"/>
+      <line class="lnk dash" x1="236" y1="330" x2="300" y2="330" marker-end="url(#arw)"/>
+      <text class="trig" x="243" y="288">tap + Add cups</text>
+      <text class="trig" x="243" y="356">balance +1</text>
+
+      <!-- 4 Info (right) -->
+      <rect class="box b-side" x="666" y="256" width="210" height="108" rx="13"/>
+      <text class="t" x="771" y="278" text-anchor="middle">4 · Explore &amp; info</text>
+      <text class="v" x="771" y="296" text-anchor="middle">4A reward detail</text>
+      <text class="v" x="771" y="311" text-anchor="middle">4B terms · 4C how-it-works</text>
+      <text class="pre" x="771" y="330" text-anchor="middle">overlays over home;</text>
+      <text class="pre" x="771" y="344" text-anchor="middle">pick a goal / read rules</text>
+      <line class="lnk dash" x1="600" y1="310" x2="664" y2="310" marker-end="url(#arw)"/>
+      <text class="trig" x="606" y="300">tap a reward / link</text>
+
+      <line class="lnk" x1="450" y1="356" x2="450" y2="410" marker-end="url(#arw)"/>
+      <text class="trig" x="462" y="386">tap “Get €X cashback”</text>
+
+      <!-- 6 Sign-in gate -->
+      <rect class="box b-gate" x="310" y="412" width="280" height="88" rx="14"/>
+      <text class="t" x="450" y="434" text-anchor="middle">6 · Sign in / verify email</text>
+      <text class="v" x="450" y="452" text-anchor="middle">6A email → 6B code → 6C verified</text>
+      <text class="v" x="450" y="467" text-anchor="middle">6D change email · 6E merge accounts</text>
+      <text class="pre" x="450" y="485" text-anchor="middle">gate opens only when no verified email is on file</text>
+      <line class="lnk" x1="450" y1="500" x2="450" y2="552" marker-end="url(#arw)"/>
+      <text class="trig" x="462" y="529">enter the 6-digit code → auto-continue</text>
+
+      <!-- 7 Receipt -->
+      <rect class="box b-claim" x="310" y="554" width="280" height="82" rx="14"/>
+      <text class="t" x="450" y="576" text-anchor="middle">7 · Submit receipt</text>
+      <text class="v" x="450" y="594" text-anchor="middle">7A rules → 7B camera → 7C verifying</text>
+      <text class="pre" x="450" y="612" text-anchor="middle">needs full cups + a verified email;</text>
+      <text class="pre" x="450" y="626" text-anchor="middle">7C runs an automated pre-check</text>
+      <line class="lnk" x1="410" y1="636" x2="330" y2="690" marker-end="url(#arw)"/>
+      <text class="trig" x="250" y="662">AI accepts</text>
+      <line class="lnk" x1="500" y1="636" x2="600" y2="690" marker-end="url(#arw)"/>
+      <text class="trig" x="600" y="662">AI rejects</text>
+
+      <!-- 8 Verdict -->
+      <rect class="box b-claim" x="150" y="692" width="270" height="76" rx="14"/>
+      <text class="t" x="285" y="714" text-anchor="middle">8 · Approved → collect</text>
+      <text class="v" x="285" y="732" text-anchor="middle">8A Tikkie pending · 8B add email</text>
+      <text class="pre" x="285" y="750" text-anchor="middle">claim created; a person confirms → Tikkie in ≤7 days</text>
+
+      <rect class="box b-claim" x="560" y="692" width="230" height="76" rx="14"/>
+      <text class="t" x="675" y="714" text-anchor="middle">8C · Rejected</text>
+      <text class="v" x="675" y="732" text-anchor="middle">reason shown · try again</text>
+      <text class="pre" x="675" y="750" text-anchor="middle">receipt failed the pre-check</text>
+      <line class="lnk dash" x1="620" y1="692" x2="500" y2="628" marker-end="url(#arw)"/>
+      <text class="trig" x="516" y="676">retake</text>
+
+      <line class="lnk" x1="285" y1="768" x2="360" y2="856" marker-end="url(#arw)"/>
+      <text class="trig" x="200" y="812">collect via Tikkie,</text>
+      <text class="trig" x="200" y="826">then tap profile ▸</text>
+
+      <!-- 9 Account -->
+      <rect class="box b-acct" x="330" y="858" width="260" height="86" rx="14"/>
+      <text class="t" x="460" y="880" text-anchor="middle">9 · My account</text>
+      <text class="v" x="460" y="898" text-anchor="middle">9A member · 9B visitor · 9C combined</text>
+      <text class="pre" x="460" y="916" text-anchor="middle">tap the header profile tile from any screen;</text>
+      <text class="pre" x="460" y="930" text-anchor="middle">9C sums every venue when opened from the hub</text>
+
+      <!-- 10 System band -->
+      <rect class="box b-sys" x="60" y="978" width="780" height="70" rx="14"/>
+      <text class="t" x="450" y="1002" text-anchor="middle">10 · Interrupts &amp; system states  (can appear over any step)</text>
+      <text class="v" x="450" y="1021" text-anchor="middle">10A in-app-browser prompt   ·   10B budget paused   ·   10C error   ·   10D maintenance</text>
+      <text class="pre" x="450" y="1039" text-anchor="middle">triggered by environment/config: an in-app webview, a hit budget cap, a load failure, or maintenance mode</text>
+      <line class="lnk dash" x1="120" y1="944" x2="120" y2="976" marker-end="url(#arw)"/>
+      <line class="lnk dash" x1="780" y1="500" x2="820" y2="500"/>
+      <line class="lnk dash" x1="820" y1="500" x2="820" y2="976" marker-end="url(#arw)"/>
+
+      <text class="pre" x="450" y="1075" text-anchor="middle">A customer arriving via a direct venue link (/byonl/la-place) skips step 2 and lands straight on step 3.</text>
+    </svg>
+  </div>
+  <div class="legend">
+    <span class="key"><span class="swatch" style="background:#efe7d7"></span> Entry</span>
+    <span class="key"><span class="swatch" style="background:#e9f1f6"></span> Hub / account</span>
+    <span class="key"><span class="swatch" style="background:#e7f0e8"></span> Venue home</span>
+    <span class="key"><span class="swatch" style="background:#fbf6ec"></span> Side branch (scan / info)</span>
+    <span class="key"><span class="swatch" style="background:#efe9ff"></span> Email gate</span>
+    <span class="key"><span class="swatch" style="background:#fdefe0"></span> Claim / verdict</span>
+    <span class="key"><span class="swatch" style="background:#f3eadf"></span> System</span>
+  </div>
+
+  <!-- ─────────── GALLERY ─────────── -->
+  <h2>Step 1 <span class="n">· App opens</span></h2>
+  <div class="grid" id="s1"></div>
+  <h2>Step 2 <span class="n">· Discover venues (Stores hub)</span></h2>
+  <div class="grid" id="s2"></div>
+  <h2>Step 3 <span class="n">· Venue home, as cups grow</span></h2>
+  <div class="grid" id="s3"></div>
+  <h2>Step 4 <span class="n">· Explore a reward / info</span></h2>
+  <div class="grid" id="s4"></div>
+  <h2>Step 5 <span class="n">· Collect cups (counter QR)</span></h2>
+  <div class="grid" id="s5"></div>
+  <h2>Step 6 <span class="n">· Email gate / sign-in</span></h2>
+  <div class="grid" id="s6"></div>
+  <h2>Step 7 <span class="n">· Submit receipt</span></h2>
+  <div class="grid" id="s7"></div>
+  <h2>Step 8 <span class="n">· Verdict</span></h2>
+  <div class="grid" id="s8"></div>
+  <h2>Step 9 <span class="n">· Account / collect</span></h2>
+  <div class="grid" id="s9"></div>
+  <h2>Step 10 <span class="n">· Interrupts &amp; system states</span></h2>
+  <div class="grid" id="s10"></div>
+
+  <footer>
+    33 screens captured live from <code>/byonl</code> (BYO group, venue <code>la-place</code>) at 390×844 (retina). Regenerate after UI changes with
+    <code>node screen-audit/_capture.mjs</code> while the dev server runs; the screen list + numbering live in <code>_manifest.mjs</code>.
+    The audit harness is DEV-only and stripped from production builds.
+  </footer>
+</div>
+
+<script>
+  // [file, number, title, trigger, precondition]
+  const S = {
+    s1:[
+      ['01a-loading','1A','Loading','App opens (any URL).','Initial data is still being fetched.'],
+      ['01b-cookie-consent','1B','Cookie consent','App finishes first paint.','First-ever visit — no consent cookie stored yet.'],
+    ],
+    s2:[
+      ['02a-stores-list','2A','Stores hub — list','Open /byonl, or tap “See all stores” on a venue.','The org belongs to a group (multi-venue).'],
+      ['02b-stores-map','2B','Stores hub — map','Tap the “Map view” toggle on 2A.','Same list, plotted on a map.'],
+    ],
+    s3:[
+      ['03a-home-empty','3A','Home — no cups','Tap a venue card, or open /byonl/la-place.','0 cups collected at this venue; reward locked.'],
+      ['03b-home-partial','3B','Home — partway','Return after scanning a few cups.','0 < cups < the reward’s goal.'],
+      ['03c-home-full','3C','Home — reward unlocked','Cup balance reaches the reward’s target.','cups ≥ goal → “Get cashback” is enabled.'],
+      ['03d-home-member','3D','Home — returning member','Reopen the app while signed in.','Verified email + a claim in progress (badge on the profile tile).'],
+    ],
+    s4:[
+      ['04a-reward-detail','4A','Reward detail','Tap any reward card (featured or in the goal list).','Shows how-to-claim + “Choose this reward”.'],
+      ['04b-cashback-terms','4B','Cashback terms','Tap “Read the cashback terms”.','Accept/reject rules, one-use, human review.'],
+      ['04c-how-it-works','4C','How it works — step 1','Tap “How does it work?” / the explain link.','Story-style BYO walkthrough. Step 1 of 5: “Bring your own cup”.'],
+      ['04c2-guide-add-cup','4C·2','Guide — Get +1 cup','Story guide, step 2 of 5 (tap Next).','Scan the QR at the counter → one cup added at that venue.'],
+      ['04c3-guide-venues','4C·3','Guide — Collect across venues','Story guide, step 3 of 5.','Track progress everywhere; each store keeps its own balance.'],
+      ['04c4-guide-receipt','4C·4','Guide — Scan your receipt','Story guide, step 4 of 5.','Buy your reward, then scan the store receipt to verify.'],
+      ['04c5-guide-cashback','4C·5','Guide — Receive your cashback','Story guide, step 5 of 5.','Approved → we send a Tikkie link to collect the cashback.'],
+    ],
+    s5:[
+      ['05a-cup-scan','5A','Cup scanner','Tap “+” (Add cups) in the header.','Camera permission granted.'],
+      ['05b-cup-added','5B','Cup added','Scan a valid counter QR (or open a ?byo= link).','Success popup over home; balance goes up.'],
+      ['05c-scan-error','5C','Scan error','Scan an invalid / already-used QR.','e.g. these cups were already added.'],
+      ['05d-daily-limit','5D','Daily cup limit','Scan again after the day’s cap.','Held for review instead of auto-credited.'],
+    ],
+    s6:[
+      ['06a-email','6A','Enter email','Tap “Get cashback” with no email (gate), or add email from the profile.','No verified email on file.'],
+      ['06b-code-sent','6B','Code sent','Submit the email on 6A.','A 6-digit code was emailed via Brevo.'],
+      ['06c-verified','6C','Verified','Enter the correct 6-digit code.','Email confirmed — cups now backed up.'],
+      ['06d-change-email','6D','Change email','Tap “Change email” on 6C.','Sends a confirmation link to the new address.'],
+      ['06e-merge','6E','Merge accounts','Submit an email already used on another account.','Offers to merge the two balances.'],
+    ],
+    s7:[
+      ['07a-receipt-rules','7A','Receipt — rules','After the email is verified (auto), or “Get cashback” with an email set.','cups ≥ goal + verified email.'],
+      ['07b-receipt-camera','7B','Receipt — camera','Tap “Understood — take the photo”.','Capture the printed store receipt.'],
+      ['07c-verifying','7C','Verifying','After the photo is submitted.','Automated AI pre-check is running.'],
+    ],
+    s8:[
+      ['08a-approved','8A','Approved / pending','Receipt passes the AI pre-check.','Claim created; a person confirms → Tikkie link in ≤7 days.'],
+      ['08b-approved-add-email','8B','Approved — add email','Same as 8A, but no email on file.','Prompts to add an email so the Tikkie link can reach you.'],
+      ['08c-rejected','8C','Rejected','Receipt fails the AI pre-check.','Reason shown; option to retake.'],
+    ],
+    s9:[
+      ['09a-account-member','9A','Account — member','Tap the profile tile in the header.','Signed-in, with claims + history.'],
+      ['09b-account-visitor','9B','Account — visitor','Tap the profile tile while anonymous.','0 cups, no email — CTAs to save cups.'],
+      ['09c-account-combined','9C','Account — combined','Open the account from the Stores hub.','Sums cups + cashback across every venue in the group.'],
+    ],
+    s10:[
+      ['10a-inapp-prompt','10A','In-app browser prompt','Open a cup deep-link inside an in-app webview (Instagram/FB).','Offers to reopen in the real browser so the cup isn’t stranded.'],
+      ['10b-budget-paused','10B','Budget paused','Tap “Get cashback” when the venue’s budget cap is reached.','Claiming is paused; cups stay safe.'],
+      ['10c-error','10C','Error','A data-load failure on boot.','“Trouble loading your cups” fallback.'],
+      ['10d-maintenance','10D','Maintenance','App loads while maintenance mode is on.','Down-for-maintenance state.'],
+    ],
+  };
+  for(const [gid, items] of Object.entries(S)){
+    document.getElementById(gid).innerHTML = items.map(([f,n,t,trig,pre])=>`
+      <figure>
+        <a href="${f}.png" target="_blank" rel="noopener"><img loading="lazy" src="${f}.png" alt="${t}"></a>
+        <figcaption>
+          <span class="cap-n">${n}</span>
+          <div class="cap-t">${t}</div>
+          <p class="cap-r"><b>Trigger</b> · ${trig}</p>
+          <p class="cap-p"><b>Shown when</b> · ${pre}</p>
+        </figcaption>
+      </figure>`).join('');
+  }
+</script>
+</body>
+</html>

@@ -10,6 +10,8 @@ export const MANIFEST = [
   // ── Step 1 · App opens ──
   { name: '01a-loading',           shot: 'loading',        path: VENUE },
   { name: '01b-cookie-consent',    shot: 'home-empty',     path: VENUE, consent: false },
+  // Cookie banner → "Read our privacy & cookie policy" opens the full policy sheet.
+  { name: '01c-privacy-policy',    shot: 'home-empty',     path: VENUE, consent: false, clickText: 'Read our privacy', settle: 1400 },
 
   // ── Step 2 · Discover venues (Stores hub) ──
   { name: '02a-stores-list',       shot: 'stores-list',    path: HUB, full: true },

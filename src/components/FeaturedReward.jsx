@@ -1,13 +1,13 @@
-import { useState } from 'react';
 import './FeaturedReward.css';
 import zigzagImg from '../assets/images/zigzag.svg';
 import cashbackIcon from '../assets/images/cashback-icon.png';
 import { rewardImageStyle } from '../utils/imageTransform';
 
+const TIKKIE_URL = 'https://www.tikkie.me/particulier/statiegeld-terugkrijgen';
+
 export default function FeaturedReward({
   reward,
   isUnlocked,
-  cupsRemaining,
   cupsCollected,
   claimed,
   onClaim,
@@ -18,28 +18,25 @@ export default function FeaturedReward({
   onOpenTerms,
   onOpenRefund,
   onViewDetail,
-  onNudge,
-  onAddCup,
   onExplain,
+  orgName,
 }) {
-  const [nudgeVisible, setNudgeVisible] = useState(false);
   const isComplete = cupsCollected >= reward.cupsNeeded;
   const cashbackAmount = reward.euros?.toFixed(2) ?? (reward.cupsNeeded * 1.25).toFixed(2);
+  const store = orgName || 'the store';
 
   const handleClaim = () => {
     if (!isUnlocked) {
-      // Not enough cups yet: open the "how it works" stories so the user
-      // learns how to collect them. Still nudge the progress bar underneath.
+      // Not enough cups yet: open the story guide so the user learns how to
+      // collect them. The progress-bar nudge fires once the guide closes
+      // (handled by the parent), so the animation isn't hidden behind it.
       onExplain?.();
-      setNudgeVisible(true);
-      onNudge?.(cupsRemaining);
       return;
     }
     onClaimAttempt?.();
     // Rewards paused for this org (budget cap reached) — explain via popup,
     // never reveal the amount.
     if (budgetBlocked) { onBudgetBlocked?.(); return; }
-    setNudgeVisible(false);
     onClaim();
   };
 
@@ -132,11 +129,13 @@ export default function FeaturedReward({
           /* ── Claim form ── */
           <div className="featured-reward__claim">
             <div className="featured-reward__claim-info">
-              <h3 className="featured-reward__claim-title">Unlock your reward via cashback</h3>
               <p className="featured-reward__claim-desc">
                 {isUnlocked
-                  ? 'Scan your receipt and we\'ll send you a Tikkie link to collect your cashback. '
-                  : <>Collect cups to earn cashback. Keep your purchase receipt. You'll need it to claim.</>}
+                  ? <>Buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>
+                  : <>Once you unlock this, buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>}
+                <strong>Save your receipt</strong> — you'll need it. We'll send your cashback via{' '}
+                <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>.
+                {' '}
                 <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the cashback terms</button>
                 {onOpenRefund && (
                   <><span style={{ margin: '0 4px' }}>or</span>
@@ -144,12 +143,6 @@ export default function FeaturedReward({
                 )}
               </p>
             </div>
-
-            {isUnlocked && !budgetBlocked && (
-              <p className="featured-reward__payout-note">
-                Once your receipt is approved, we'll send you a <strong>Tikkie link</strong> to collect your cashback, usually within a few days.
-              </p>
-            )}
 
             <button
               className={`featured-reward__claim-btn ${(!isUnlocked || (isUnlocked && budgetBlocked)) ? 'featured-reward__claim-btn--locked' : ''}`}
@@ -166,32 +159,6 @@ export default function FeaturedReward({
                 </>
               )}
             </button>
-
-            {nudgeVisible && !isUnlocked && (
-              <>
-                <p className="featured-reward__nudge" role="alert">
-                  Collect {cupsRemaining} more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
-                </p>
-                {/* Direct-action follow-up. Shows AFTER the user taps the
-                    locked CTA, so it's not visual noise on first paint —
-                    it appears exactly when "what do I do next?" is the
-                    question on the user's mind. Highlighted (orange,
-                    pulsing) to draw the eye away from the disabled CTA. */}
-                {onAddCup && (
-                  <button
-                    type="button"
-                    className="featured-reward__add-cups-btn"
-                    onClick={onAddCup}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    Add more cups
-                  </button>
-                )}
-              </>
-            )}
           </div>
         )}
       </div>

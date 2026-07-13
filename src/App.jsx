@@ -363,6 +363,12 @@ export default function App() {
 
   /* ── Nudge (highlight remaining cups) ── */
   const [nudgeCount, setNudgeCount] = useState(0);
+  // Tapping the locked "Get cashback" opens the story guide and surfaces a
+  // "collect N more cups" block under the progress bar; the cup-circle
+  // animation is deferred until the guide is dismissed (pendingNudge) so it
+  // isn't wasted behind the full-screen guide.
+  const [nudgeActive, setNudgeActive] = useState(false);
+  const [pendingNudge, setPendingNudge] = useState(false);
 
   /* ── Modal state ── */
   const [termsOpen, setTermsOpen] = useState(false);
@@ -1400,6 +1406,22 @@ export default function App() {
     setTimeout(() => setNudgeCount(0), 3000);
   };
 
+  // Locked "Get cashback" tap: open the story guide + reveal the "collect more"
+  // block, and remember to run the cup nudge once the guide closes.
+  const handleLockedClaim = () => {
+    setNudgeActive(true);
+    setPendingNudge(true);
+    setHowItWorksOpen(true);
+  };
+  // Fired when the story guide is dismissed — run the deferred cup nudge.
+  const closeGuide = () => {
+    setHowItWorksOpen(false);
+    if (pendingNudge) {
+      setPendingNudge(false);
+      handleNudge(cupsRemaining);
+    }
+  };
+
   /* ── Loading / error screens ──
    * P-47: skeleton shimmer instead of the bare "🥤 Loading…" spinner.
    * Feels less like a wait and more like the page composing itself. */
@@ -1811,11 +1833,26 @@ export default function App() {
         nudgeCount={nudgeCount}
       />
 
+      {/* "Collect N more cups" — its own block right after the progress bar,
+          shown once the user taps the locked CTA (and gone once unlocked). */}
+      {nudgeActive && !isUnlocked && (
+        <div className="cup-nudge" role="status">
+          <p className="cup-nudge__text">
+            Collect <strong>{cupsRemaining}</strong> more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
+          </p>
+          <button type="button" className="cup-nudge__btn" onClick={handleAddCup}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add more cups
+          </button>
+        </div>
+      )}
+
       <FeaturedReward
         key={selectedRewardId}
         reward={selectedReward}
         isUnlocked={isUnlocked}
-        cupsRemaining={cupsRemaining}
         cupsCollected={cupCount}
         claimed={claimed}
         onClaim={handleClaim}
@@ -1826,9 +1863,8 @@ export default function App() {
         onOpenTerms={handleOpenTerms}
         onOpenRefund={showRefund ? handleOpenRefund : null}
         onViewDetail={() => handleViewDetail(selectedReward)}
-        onNudge={handleNudge}
-        onAddCup={handleAddCup}
-        onExplain={() => setHowItWorksOpen(true)}
+        onExplain={handleLockedClaim}
+        orgName={activeOrg?.partner_brand_name || activeOrg?.name}
       />
 
       <GoalSection
@@ -1852,7 +1888,7 @@ export default function App() {
         />
       )}
 
-      {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
+      {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={closeGuide} onComplete={() => setHiwSeen(true)} />}
 
       <BudgetPausedModal
         open={budgetPausedOpen}

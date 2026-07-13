@@ -38,7 +38,7 @@ const STATUS_OPTIONS = ['draft', 'scheduled', 'live', 'paused', 'expired', 'arch
 const REWARD_TABS = [
   { id: 'setup',     label: 'Setup',     desc: 'Status, price, visuals' },
   { id: 'promotion', label: 'Promotion', desc: 'Featured, discount, tags' },
-  { id: 'content',   label: 'Content',   desc: 'Nutrition + allergens' },
+  { id: 'content',   label: 'Content',   desc: 'Allergens' },
 ];
 
 /* <input type="datetime-local"> wants `YYYY-MM-DDTHH:mm` in the user's
@@ -136,31 +136,6 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
     setDirty(true);
   }
 
-  function updateNutrition(index, key, value) {
-    setForm(prev => ({
-      ...prev,
-      nutrition: (prev.nutrition || []).map((row, i) =>
-        i === index ? { ...row, [key]: value } : row
-      ),
-    }));
-    setDirty(true);
-  }
-
-  function addNutritionRow() {
-    setForm(prev => ({
-      ...prev,
-      nutrition: [...(prev.nutrition || []), { label: '', value: '' }],
-    }));
-    setDirty(true);
-  }
-
-  function removeNutritionRow(index) {
-    setForm(prev => ({
-      ...prev,
-      nutrition: (prev.nutrition || []).filter((_, i) => i !== index),
-    }));
-    setDirty(true);
-  }
 
   function toggleTag(tag) {
     setForm(prev => {
@@ -689,42 +664,6 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
 
        {activeTab === 'content' && (
         <>
-        {/* Nutrition */}
-        <section className="rep__section">
-          <div className="rep__section-title-row">
-            <div className="rep__section-title">Nutrition</div>
-            <button className="rep__add-row" onClick={addNutritionRow}>+ Add row</button>
-          </div>
-          <div className="rep__nutrition-table">
-            <div className="rep__nutrition-thead">
-              <span>Nutrient</span>
-              <span>Value</span>
-              <span />
-            </div>
-            {(form.nutrition || []).map((row, i) => (
-              <div key={i} className="rep__nutrition-row">
-                <input
-                  className="rep__input rep__input--sm"
-                  value={row.label}
-                  onChange={e => updateNutrition(i, 'label', e.target.value)}
-                  placeholder="Energy"
-                />
-                <input
-                  className="rep__input rep__input--sm"
-                  value={row.value}
-                  onChange={e => updateNutrition(i, 'value', e.target.value)}
-                  placeholder="498 kcal"
-                />
-                <button className="rep__rm-row" onClick={() => removeNutritionRow(i)}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* Allergy info */}
         <section className="rep__section rep__section--last">
           <div className="rep__section-title">Allergen Info</div>

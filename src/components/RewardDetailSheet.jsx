@@ -125,19 +125,6 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
             </div>
           </div>
 
-          {/* Nutrition table */}
-          <div className="rds-section">
-            <h3 className="rds-section-title">Nutritional info <span className="rds-section-note">(per serving)</span></h3>
-            <div className="rds-nutrition">
-              {reward.nutrition?.map((n) => (
-                <div key={n.label} className="rds-nutrition-row">
-                  <span className="rds-nutrition-label">{n.label}</span>
-                  <span className="rds-nutrition-value">{n.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Allergy info */}
           <div className="rds-allergy">
             <InfoIcon />

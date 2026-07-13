@@ -3,7 +3,9 @@ import './GoalSection.css';
 import RewardCard from './RewardCard';
 
 export default function GoalSection({ rewards, cupCount, onSelectReward, onViewDetail }) {
-  const [sortOrder, setSortOrder] = useState(null); // null | 'asc' | 'desc'
+  // Cheapest first by default (fewest cups = lowest price). Tap cycles
+  // asc → desc → unsorted → asc.
+  const [sortOrder, setSortOrder] = useState('asc'); // null | 'asc' | 'desc'
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 

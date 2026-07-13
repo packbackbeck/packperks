@@ -130,11 +130,9 @@ export const COPY_PRESETS = {
       // byo-N.png), so the BYO guide is fully self-contained rather than reusing
       // the deposit-model artwork.
       steps: [
-        { title: 'Bring your own cup',    body: 'Visit a participating café with your reusable cup, no deposit, no single-use packaging.', image: '/how-it-works/byo-1.png', bg: 'linear-gradient(165deg, #FBEDE4 0%, #F6D8C6 100%)', accent: '#E88E63', icon: 'cup' },
-        { title: 'Get +1 cup',            body: 'Scan the QR at the counter and one cup is added to your balance at that venue.', image: '/how-it-works/byo-2.png', bg: 'linear-gradient(165deg, #EAF6EC 0%, #D6ECD9 100%)', accent: '#5FA96E', icon: 'cup' },
-        { title: 'Collect across venues', body: 'Track your progress here and at every other participating store. Each keeps its own balance.', image: '/how-it-works/byo-3.png', bg: 'linear-gradient(165deg, #ECEDFB 0%, #DCE0F8 100%)', accent: '#7C86D6', icon: 'store' },
-        { title: 'Scan your receipt',     body: 'Once you’ve collected enough cups, buy your reward and scan the store receipt so we can verify your purchase.', image: '/how-it-works/byo-4.png', bg: 'linear-gradient(165deg, #FCF3D2 0%, #F8E7B0 100%)', accent: '#E5B23A', icon: 'receipt' },
-        { title: 'Receive your cashback', body: 'After your receipt is approved, we send you a Tikkie link to collect your cashback.', image: '/how-it-works/byo-5.png', bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)', accent: '#57C08D', icon: 'cash' },
+        { title: 'Bring your reusable cup', body: 'Bring your reusable cup and scan the QR code.', image: '/how-it-works/byo-1.png', bg: 'linear-gradient(165deg, #FBEDE4 0%, #F6D8C6 100%)', accent: '#E88E63', icon: 'cup' },
+        { title: 'Collect enough cups',     body: 'Collect enough cups to unlock a reward.', image: '/how-it-works/byo-2.png', bg: 'linear-gradient(165deg, #EAF6EC 0%, #D6ECD9 100%)', accent: '#5FA96E', icon: 'cup' },
+        { title: 'Buy it and get cashback', body: 'Buy the rewarded item and get full cashback.', image: '/how-it-works/byo-5.png', bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)', accent: '#57C08D', icon: 'cash' },
       ],
     },
     terms: {

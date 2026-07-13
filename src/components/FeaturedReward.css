@@ -214,18 +214,30 @@
 
 .featured-reward__claim-desc {
   font-family: var(--font-primary);
-  font-weight: var(--fw-regular);
+  font-weight: var(--fw-medium, 500);
   font-size: var(--fs-sm);
   /* Roomier leading so the inline "Read the voucher terms / Get the direct
      refund" links read as one flowing paragraph instead of cramped,
      detached-looking lines. */
   line-height: 1.5;
-  color: var(--text-muted);
+  /* Dark, high-contrast — this is the key instruction (photograph the
+     receipt), not fine print. */
+  color: var(--black, #1D1D1D);
 }
 
 .featured-reward__claim-desc strong {
-  color: var(--black);
+  color: var(--black, #1D1D1D);
+  font-weight: var(--fw-bold, 800);
 }
+
+/* "Tikkie" link — how the cashback arrives. */
+.featured-reward__tikkie-link {
+  color: var(--pb-purple-600, #5333A5);
+  font-weight: var(--fw-bold, 700);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.featured-reward__tikkie-link:hover { color: var(--pb-purple-700, #42298B); }
 
 .featured-reward__claim-label {
   font-family: var(--font-primary);

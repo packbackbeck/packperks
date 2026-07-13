@@ -133,6 +133,12 @@ export default function HowItWorks({ onClose, onComplete, steps: customSteps }) 
   const [auto, setAuto] = useState(true);
   const last = steps.length - 1;
 
+  // Preload every step image up front so fast navigation never lands on a
+  // half-loaded step still showing the previous picture.
+  useEffect(() => {
+    steps.forEach(s => { if (s.image) { const img = new Image(); img.src = s.image; } });
+  }, [steps]);
+
   function goNext() {
     setAuto(false);
     if (index >= last) { onClose(); return; }
@@ -220,7 +226,17 @@ export default function HowItWorks({ onClose, onComplete, steps: customSteps }) 
       <div className="hiw__content">
         <div className="hiw__art">
           <div className="hiw__art-fallback"><Icon /></div>
-          <img className="hiw__art-img" src={step.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          {/* Keyed by src so React swaps in a fresh element per step (the old
+              image can't linger), fading in on load — no stale-frame flash. */}
+          <img
+            key={step.image}
+            className="hiw__art-img"
+            src={step.image}
+            alt=""
+            style={{ opacity: 0, transition: 'opacity 0.18s ease' }}
+            onLoad={(e) => { e.currentTarget.style.opacity = 1; }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
         </div>
         <span className="hiw__chip" style={{ color: step.accent }}><Icon /></span>
         <h2 className="hiw__title">{step.title}</h2>

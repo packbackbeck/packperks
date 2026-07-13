@@ -111,9 +111,23 @@
 @keyframes stores2-spin { to { transform: rotate(360deg); } }
 
 /* Cashback-claims-in-progress showcase wrapper. Collapses when there are no
-   active claims (PendingClaims renders nothing). */
+   active claims (PendingClaims renders nothing). Spans the full content width
+   here (no fixed 330px / auto side margins), so the "ready" card fits the rail
+   and the rail scrolls horizontally between several claims. */
 .stores2__claims { width: 100%; }
 .stores2__claims:empty { display: none; }
+.stores2__claims .pc { width: 100%; max-width: 100%; margin: 0; }
+.stores2__claims .pc__head { margin-left: 0; margin-right: 0; }
+
+/* Search-focused: collapse Nearby + Map to icon-only so the field expands. */
+.stores2__nearbybtn, .stores2__mapbtn {
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease,
+              transform 0.08s ease, width 0.2s ease, padding 0.2s ease;
+}
+.stores2__filterbar.is-searching .stores2__nearby-label,
+.stores2__filterbar.is-searching .stores2__mapbtn-label { display: none; }
+.stores2__filterbar.is-searching .stores2__nearbybtn,
+.stores2__filterbar.is-searching .stores2__mapbtn { width: 42px; min-width: 42px; padding: 0; gap: 0; }
 
 /* Locate-me button on the map (bottom-right, above the attribution). */
 .stores2__locate {

@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import packperksLogo from '../assets/images/packperks-wordmark.svg';
-import { getGlobalImpact } from '../lib/api';
+import { getGlobalImpact, submitStoreRequest } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
 import { getNotYetStores } from '../lib/notYetStores';
@@ -770,7 +770,7 @@ export default function StoresPage({
           <input
             type="text"
             className="stores2__search-input"
-            placeholder="Search stores or areas…"
+            placeholder="Search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
@@ -795,8 +795,11 @@ export default function StoresPage({
           {locating && !nearby ? (
             <span className="stores2__nearby-spinner" aria-hidden="true" />
           ) : (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z" /><circle cx="12" cy="10" r="2.6" />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="7" />
+              <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+              <line x1="12" y1="1.6" x2="12" y2="4.4" /><line x1="12" y1="19.6" x2="12" y2="22.4" />
+              <line x1="1.6" y1="12" x2="4.4" y2="12" /><line x1="19.6" y1="12" x2="22.4" y2="12" />
             </svg>
           )}
           <span className="stores2__nearby-label">Nearby</span>
@@ -922,7 +925,11 @@ export default function StoresPage({
             </ul>
           )}
 
-          {noResults && <p className="stores2__noresults">No stores match “{query}”.</p>}
+          {noResults && <p className="stores2__noresults">No stores match “{query}” yet.</p>}
+
+          {/* Haven't found your store? A free-text request that lands on the
+              admin Future vendors page. Emphasised when a search found nothing. */}
+          <StoreRequestForm region={region} suggested={noResults ? query : ''} emphasized={noResults} />
 
           {/* Plastic-avoided impact — a fixed floating bar (list view only). The
               spacer reserves scroll clearance so the last card clears the bar. */}
@@ -931,5 +938,71 @@ export default function StoresPage({
         </>
       )}
     </div>
+  );
+}
+
+/* "Haven't found your store?" — one free-text field + Request. The request
+ * lands in `store_requests` (always, regardless of cookie consent) and shows on
+ * the admin Future vendors page. When a search finds nothing, this is
+ * emphasised and pre-filled with what the customer searched for. */
+function StoreRequestForm({ region = 'NL', suggested = '', emphasized = false }) {
+  const [name, setName] = useState('');
+  const [state, setState] = useState('idle');   // idle | sending | done
+
+  // Pre-fill with the failed search term the first time this becomes the
+  // no-results prompt — but never clobber something the customer typed.
+  useEffect(() => {
+    if (emphasized && suggested && name.trim() === '') setName(suggested);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emphasized, suggested]);
+
+  const submit = async (e) => {
+    e?.preventDefault();
+    const clean = name.trim();
+    if (!clean || state === 'sending') return;
+    setState('sending');
+    await submitStoreRequest(clean, { region });
+    setState('done');
+  };
+
+  if (state === 'done') {
+    return (
+      <section className={`stores2__reqform is-done${emphasized ? ' is-emph' : ''}`}>
+        <span className="stores2__reqform-check" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+        </span>
+        <div className="stores2__reqform-donetxt">
+          <strong>Thanks, request received</strong>
+          <span>We’ll look into bringing this spot to PackPerks.</span>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className={`stores2__reqform${emphasized ? ' is-emph' : ''}`}>
+      <div className="stores2__reqform-head">
+        <h3 className="stores2__reqform-title">Haven’t found your store?</h3>
+        <p className="stores2__reqform-sub">Tell us the café or shop you’d like to see, and we’ll look into it.</p>
+      </div>
+      <form className="stores2__reqform-row" onSubmit={submit}>
+        <input
+          type="text"
+          className="stores2__reqform-input"
+          placeholder="Store name and city"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={200}
+          aria-label="Store you’d like to see on PackPerks"
+        />
+        <button
+          type="submit"
+          className="stores2__reqform-btn"
+          disabled={!name.trim() || state === 'sending'}
+        >
+          {state === 'sending' ? 'Sending…' : 'Request'}
+        </button>
+      </form>
+    </section>
   );
 }

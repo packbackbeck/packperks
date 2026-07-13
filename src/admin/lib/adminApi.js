@@ -2683,6 +2683,30 @@ export async function saveNotYetVendors(groupId, vendors) {
   return value;
 }
 
+/* Free-text store requests customers typed in themselves ("Haven't found your
+ * store?"). Grouped by the (case-insensitive) name so repeats become a demand
+ * count, newest first. Returns [{ name, count, lastAt }]. */
+export async function getStoreRequests(region) {
+  let q = supabase
+    .from('store_requests')
+    .select('name, created_at, region')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+  if (region) q = q.eq('region', region);
+  const { data, error } = await q;
+  if (error) return [];
+  const byKey = new Map();
+  (data || []).forEach(r => {
+    const name = (r.name || '').trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    const cur = byKey.get(key);
+    if (cur) { cur.count += 1; if (r.created_at > cur.lastAt) cur.lastAt = r.created_at; }
+    else byKey.set(key, { name, count: 1, lastAt: r.created_at });
+  });
+  return [...byKey.values()].sort((a, b) => (b.count - a.count) || (b.lastAt > a.lastAt ? 1 : -1));
+}
+
 /* Count "Request it" taps per future vendor (from client_events), so admins can
  * see which coming-soon venue customers want most. Returns { name: count }. */
 export async function getFutureVendorStats(region) {

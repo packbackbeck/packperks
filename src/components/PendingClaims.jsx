@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { COLLECT_WINDOW_MS } from '../lib/collectedClaims';
 import { setClaimNotifyPrefs } from '../lib/api';
 import { requestPushPermission, isPushSupported } from '../lib/notify';
@@ -80,28 +80,39 @@ export default function PendingClaims({ claims = [], collectedMap = {}, onCollec
   );
 }
 
-const CheckMini = () => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M20 6L9 17l-5-5" />
-  </svg>
-);
+const REVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/* Compact 3-step tracker: Submitted → Team review → Ready. */
-function Steps({ ready }) {
-  const steps = [
-    { label: 'Submitted',   done: true,   active: false },
-    { label: 'Team review', done: ready,  active: !ready },
-    { label: 'Ready',       done: ready,  active: false },
-  ];
+/* How far along the review a claim is, purely from elapsed time: 0% the moment
+ * it's submitted (day 0), filling toward the 7-day promise (day 7 = 100%).
+ * Recomputed on every load, so it creeps forward each session. Held at 95% —
+ * the final stretch only completes once a human approves and the Tikkie link
+ * exists, at which point this bar is gone and the card shows Collect instead. */
+function reviewPct(claim) {
+  const start = claim.created_at ? new Date(claim.created_at).getTime() : Date.now();
+  const elapsed = Date.now() - start;
+  if (!Number.isFinite(elapsed)) return 5;
+  return Math.max(5, Math.min(95, (elapsed / REVIEW_WINDOW_MS) * 100));
+}
+
+/* Slim, live-feeling progress bar for an in-review claim. Animates up from 0 to
+ * the current value on mount, with a barber-pole stripe + pulsing dot so it
+ * reads as actively being worked on. */
+function ReviewProgress({ claim }) {
+  const target = reviewPct(claim);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setW(target));
+    return () => cancelAnimationFrame(id);
+  }, [target]);
   return (
-    <div className="pc-steps">
-      {steps.map((s, i) => (
-        <div key={i} className={`pc-step${s.done ? ' is-done' : ''}${s.active ? ' is-active' : ''}`}>
-          <span className="pc-step__dot">{s.done ? <CheckMini /> : i + 1}</span>
-          <span className="pc-step__label">{s.label}</span>
-          {i < steps.length - 1 && <span className="pc-step__bar" />}
-        </div>
-      ))}
+    <div className="pc-progress">
+      <div className="pc-progress__track">
+        <div className="pc-progress__fill" style={{ width: `${w}%` }} />
+      </div>
+      <div className="pc-progress__meta">
+        <span className="pc-progress__stage">Checking your receipt</span>
+        <span className="pc-progress__eta">Ready within 7 days</span>
+      </div>
     </div>
   );
 }
@@ -144,7 +155,7 @@ function ClaimCard({ claim, onCollect, collected }) {
         )}
       </div>
 
-      <Steps ready={ready} />
+      {!ready && <ReviewProgress claim={claim} />}
 
       {!ready && <NotifyOptions claim={claim} />}
     </article>

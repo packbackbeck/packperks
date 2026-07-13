@@ -6,6 +6,7 @@ import {
   saveNotYetThreshold,
   saveNotYetVendors,
   getFutureVendorStats,
+  getStoreRequests,
 } from '../lib/adminApi';
 import { getNotYetStores } from '../../lib/notYetStores';
 import './AdminFutureVendors.css';
@@ -25,6 +26,15 @@ function groupRegion(group) {
 function cityFromArea(area) {
   const parts = String(area || '').split(',').map(s => s.trim()).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : '';
+}
+function fmtWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 30) return `${days} days ago`;
+  return d.toLocaleDateString();
 }
 const BLANK = { name: '', area: '', lat: '', lng: '', color: '#E4572E', logo_url: '' };
 
@@ -130,7 +140,10 @@ function Manager({ group, busy, showNotYet, threshold, onToggle, onThreshold, on
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('requests');    // 'requests' | 'az'
 
+  const [requests, setRequests] = useState(null);
+
   useEffect(() => { getFutureVendorStats(region).then(setStats).catch(() => setStats({})); }, [region]);
+  useEffect(() => { getStoreRequests(region).then(setRequests).catch(() => setRequests([])); }, [region]);
 
   const reqOf = (name) => (stats && stats[name]) || 0;
   const totalReq = stats ? Object.values(stats).reduce((a, b) => a + b, 0) : 0;
@@ -257,6 +270,41 @@ function Manager({ group, busy, showNotYet, threshold, onToggle, onThreshold, on
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+
+      {/* ── Customer requests — free-text "Haven't found your store?" intake ── */}
+      <section className="afv__card">
+        <div className="afv__vhead afv__vhead--stack">
+          <h2 className="afv__card-title">
+            Customer requests
+            {requests?.length ? <span className="afv__count">{requests.length}</span> : null}
+          </h2>
+          <p className="afv__reqsub">Stores customers typed in themselves on the market page — not on your list yet.</p>
+        </div>
+        {requests == null ? (
+          <div className="afv__vempty">Loading…</div>
+        ) : requests.length === 0 ? (
+          <div className="afv__vempty">No customer requests yet.</div>
+        ) : (
+          <ul className="afv__reqlist">
+            {requests.map(r => (
+              <li key={r.name.toLowerCase()} className="afv__reqrow">
+                {r.count > 1 && <span className="afv__reqcount" title={`Requested ${r.count} times`}>{r.count}×</span>}
+                <div className="afv__reqinfo">
+                  <span className="afv__reqname">{r.name}</span>
+                  <span className="afv__reqmeta">Last requested {fmtWhen(r.lastAt)}</span>
+                </div>
+                <button
+                  className="afv__btn afv__btn--ghost afv__btn--sm"
+                  onClick={() => setEditing({ ...BLANK, name: r.name })}
+                  disabled={busy}
+                >
+                  Add as vendor
+                </button>
+              </li>
+            ))}
           </ul>
         )}
       </section>

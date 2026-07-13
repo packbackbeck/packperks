@@ -212,7 +212,57 @@
 .stores2__request-btn.is-done { cursor: default; }
 .stores2__request-count { font-size: 11px; font-weight: 700; color: var(--text-light, #8A8175); text-align: center; white-space: nowrap; }
 .stores2__request-count--soon { color: #12703F; }
-.stores2__noresults { margin: 18px 0; text-align: center; font-size: 14px; color: var(--text-light, #8A8175); }
+.stores2__noresults { margin: 18px 0 10px; text-align: center; font-size: 14px; color: var(--text-light, #8A8175); }
+
+/* "Haven't found your store?" — free-text request at the foot of the list, and
+   the primary prompt when a search finds nothing (.is-emph). */
+.stores2__reqform {
+  margin: 22px 0 8px;
+  padding: 18px;
+  background: var(--white, #fff);
+  border: 1px solid #ECE5D8;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+.stores2__reqform.is-emph {
+  border-color: rgba(26, 135, 55, 0.4);
+  box-shadow: 0 3px 16px rgba(26, 135, 55, 0.12);
+}
+.stores2__reqform-head { margin-bottom: 13px; }
+.stores2__reqform-title {
+  margin: 0; font-family: var(--font-primary);
+  font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: #2A2724;
+}
+.stores2__reqform-sub { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: #7A7269; }
+.stores2__reqform-row { display: flex; align-items: stretch; gap: 8px; }
+.stores2__reqform-input {
+  flex: 1; min-width: 0; height: 44px; padding: 0 14px;
+  border: 1.5px solid #E6DECF; border-radius: 12px; background: #FCFAF6;
+  font-family: inherit; font-size: 14px; color: #2A2724; outline: none;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.stores2__reqform-input::placeholder { color: #A9A196; }
+.stores2__reqform-input:focus { border-color: var(--pb-green, #1A8737); background: #fff; }
+.stores2__reqform-btn {
+  flex: none; height: 44px; padding: 0 20px; border: none; border-radius: 12px;
+  background: var(--pb-green, #1A8737); color: #fff; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 800; white-space: nowrap;
+  transition: filter 0.14s ease, transform 0.08s ease, opacity 0.14s ease;
+}
+.stores2__reqform-btn:hover { filter: brightness(0.96); }
+.stores2__reqform-btn:active { transform: scale(0.97); }
+.stores2__reqform-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Confirmation state — the form is replaced by a compact thank-you. */
+.stores2__reqform.is-done { display: flex; align-items: center; gap: 13px; }
+.stores2__reqform-check {
+  flex: none; width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #E3F3E8; color: var(--pb-green, #1A8737);
+}
+.stores2__reqform-donetxt { display: flex; flex-direction: column; gap: 2px; }
+.stores2__reqform-donetxt strong { font-size: 14.5px; font-weight: 800; color: #2A2724; }
+.stores2__reqform-donetxt span { font-size: 12.5px; color: #7A7269; }
 
 /* Not-yet map pin — the venue's colour + initial (or logo), slightly smaller
    and softer than the live pins so participating stores still read first. */

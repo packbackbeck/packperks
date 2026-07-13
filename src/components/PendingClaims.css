@@ -151,59 +151,69 @@
 }
 .pc-card__msg strong { color: #2A2724; font-weight: 800; }
 
-/* ── 3-step tracker (Submitted → Team review → Ready) ── */
-.pc-steps {
-  display: flex;
-  margin-top: 14px;
+/* ── Time-based review progress (in-review claims) ──
+   Fills from day 0 (submitted) toward day 7, held at 95% until the Tikkie link
+   exists — at which point the bar is replaced by the Collect action. */
+.pc-progress { margin-top: 15px; }
+.pc-progress__track {
+  height: 8px;
+  border-radius: 999px;
+  background: #EEE7DB;
+  overflow: hidden;
 }
-.pc-step {
+.pc-progress__fill {
   position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
+  height: 100%;
+  min-width: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--pb-green), #45A96F);
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.pc-step__dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  background: #F1EADD;
-  color: #B3A794;
-  position: relative;
-  z-index: 1;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-.pc-step.is-active .pc-step__dot {
-  background: #F0B44E;
-  color: #6B3F1F;
-  box-shadow: 0 0 0 4px rgba(240, 180, 78, 0.22);
-}
-.pc-step.is-done .pc-step__dot { background: var(--pb-green); color: #fff; }
-.pc-step__label {
-  font-size: 10px;
-  font-weight: 700;
-  color: #A0968A;
-  white-space: nowrap;
-}
-.pc-step.is-active .pc-step__label { color: #A85320; }
-.pc-step.is-done .pc-step__label { color: var(--pb-green); }
-/* Connector between adjacent step dots. */
-.pc-step__bar {
+/* Barber-pole stripe — subtle motion so it reads as actively processing. */
+.pc-progress__fill::after {
+  content: '';
   position: absolute;
-  top: 11px;
-  left: 60%;
-  width: 80%;
-  height: 2px;
-  background: #EBE3D6;
-  z-index: 0;
+  inset: 0;
+  background-image: linear-gradient(-45deg,
+    rgba(255, 255, 255, 0.22) 25%, transparent 25%, transparent 50%,
+    rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0.22) 75%, transparent 75%);
+  background-size: 18px 18px;
+  animation: pc-stripes 0.85s linear infinite;
 }
-.pc-step.is-done .pc-step__bar { background: var(--pb-green); }
+@keyframes pc-stripes { to { background-position: 18px 0; } }
+.pc-progress__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.pc-progress__stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #4E7A5C;
+}
+.pc-progress__stage::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pb-green);
+  animation: pc-pulse 1.6s ease-out infinite;
+}
+.pc-progress__eta { font-size: 11.5px; font-weight: 600; color: #A0968A; }
+@keyframes pc-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(26, 135, 55, 0.4); }
+  70%  { box-shadow: 0 0 0 5px rgba(26, 135, 55, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(26, 135, 55, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-progress__fill { transition: none; }
+  .pc-progress__fill::after,
+  .pc-progress__stage::before { animation: none; }
+}
 
 .pc-card__collect {
   margin-top: 12px;

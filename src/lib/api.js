@@ -1199,3 +1199,23 @@ export async function getReceiptSignedUrl(photoPath, ttlSec = 600) {
   }
   return data?.signedUrl ?? null
 }
+
+// A customer typed a store we don't list yet ("Haven't found your store?").
+// Recorded in its own table (not analytics), so it always lands regardless of
+// cookie consent and shows on the admin Future vendors page. `name` may include
+// a city, e.g. "Blend Coffee, Utrecht". Fails soft — a request never blocks UI.
+export async function submitStoreRequest(name, { region = null, orgId = null } = {}) {
+  const clean = String(name || '').trim().slice(0, 200)
+  if (!clean) return false
+  const { error } = await supabase.from('store_requests').insert({
+    name: clean,
+    region,
+    org_id: orgId,
+    device_id: getDeviceId(),
+  })
+  if (error) {
+    console.warn('store_requests insert failed:', error.message)
+    return false
+  }
+  return true
+}

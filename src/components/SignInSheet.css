@@ -67,26 +67,20 @@
   text-align: center;
 }
 
-/* Decorative icon block — purple ring, orange (or green/blue) fill */
+/* Icon block — a flat, soft-tinted rounded square with a brand-coloured glyph,
+   matching the app's other rounded icon chips. No gradients, no glow. */
 .signin-art {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--pb-orange-warm), #FF8B6A);
-  color: #FFFFFF;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: #F1ECFB;
+  color: var(--pb-purple-600, #5333A5);
   display: grid;
   place-items: center;
   margin-bottom: 16px;
-  box-shadow: 0 10px 24px rgba(253, 111, 70, 0.30);
 }
-.signin-art--sent {
-  background: linear-gradient(135deg, var(--pb-purple-600), #7251C8);
-  box-shadow: 0 10px 24px rgba(83, 51, 165, 0.32);
-}
-.signin-art--ok {
-  background: linear-gradient(135deg, #16A34A, #4ADE80);
-  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.30);
-}
+.signin-art--sent { background: #FBEEDA; color: var(--pb-orange, #E4572E); }
+.signin-art--ok   { background: #E3F3E8; color: var(--pb-green, #1A8737); }
 
 .signin-title {
   margin: 0 0 8px;
@@ -185,12 +179,27 @@
   background: #F8F4EC;
   color: #4A4540;
   border: 1px solid #E5DECF;
-  margin-top: 4px;
 }
 .signin-btn--ghost:hover:not(:disabled) {
   background: #ECE5D8;
   color: #2A2724;
 }
+/* Roomier gap between stacked buttons in the sheet. */
+.signin-btn + .signin-btn { margin-top: 12px; }
+
+/* Inline "Privacy Policy" link inside a consent row. */
+.signin-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--pb-purple-600, #5333A5);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.signin-link:hover { color: var(--pb-purple-700, #42298B); }
 
 .signin-fine {
   margin: 14px 0 0;

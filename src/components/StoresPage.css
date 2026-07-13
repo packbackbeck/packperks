@@ -3,7 +3,7 @@
 .stores2 {
   min-height: 100dvh;
   /* Generous top spacing (larger than the store home) + clears the notch. */
-  padding: calc(env(safe-area-inset-top, 0px) + 64px) 16px 40px;
+  padding: calc(env(safe-area-inset-top, 0px) + 32px) 16px 40px;
   background: var(--pb-cream, #F4EBDC);
   font-family: var(--font-primary);
   display: flex;

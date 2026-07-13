@@ -1674,6 +1674,7 @@ export default function App() {
          changed) must be confirmed with the 6-digit code we email. */
       requireVerification={true}
       savedEmail={profile?.email || authEmail || null}
+      privacyPolicy={liveSettings.privacyPolicyText}
       onMarketingConsent={(consent) =>
         handleSaveProfile({ marketingConsent: consent, marketingConsentSource: 'signin_popup' })
       }

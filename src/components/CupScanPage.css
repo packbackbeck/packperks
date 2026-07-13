@@ -2,7 +2,7 @@
 
 .cup-scan-page {
   /* Room for the back button + clearance for the iPhone Dynamic Island / notch. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 52px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 50px);
 }
 
 .cup-scan__back {

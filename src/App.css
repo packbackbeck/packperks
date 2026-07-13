@@ -5,7 +5,7 @@
   gap: var(--sp-5);
   /* Tighter side margins so cards sit closer to the screen edges
      (was --sp-6 / 30px horizontally). */
-  padding: 60px var(--sp-4) var(--sp-6);
+  padding: 30px var(--sp-4) var(--sp-6);
   min-height: 100dvh;
   background: var(--pb-cream);
 }

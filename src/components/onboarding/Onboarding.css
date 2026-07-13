@@ -23,7 +23,7 @@
   flex-direction: column;
   /* 64px top clears the notch / camera even where the browser doesn't report a
      safe-area inset; matching bottom breathing room above the home indicator. */
-  padding: max(env(safe-area-inset-top, 0px), 64px) 20px max(env(safe-area-inset-bottom, 0px), 30px);
+  padding: max(env(safe-area-inset-top, 0px), 32px) 20px max(env(safe-area-inset-bottom, 0px), 30px);
 }
 
 /* ── Top row: back · progress · close ── */

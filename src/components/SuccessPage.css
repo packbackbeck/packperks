@@ -299,7 +299,7 @@
 .success-page--pending {
   justify-content: flex-start;
   /* Big top gap so the notch / front camera clears the checkmark. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 76px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 38px);
   padding-bottom: var(--sp-6);
 }
 .success-page--pending .success-page__glow {

@@ -7,7 +7,7 @@
   min-height: 100dvh;
   background: var(--pb-cream);
   /* Big top gap so the notch / front camera never overlaps the content. */
-  padding: calc(env(safe-area-inset-top, 0px) + 100px) var(--sp-5) calc(var(--sp-6) * 2);
+  padding: calc(env(safe-area-inset-top, 0px) + 50px) var(--sp-5) calc(var(--sp-6) * 2);
   gap: var(--sp-5);
   animation: page-slide-in 0.28s var(--ease-out-expo) both;
   position: relative;

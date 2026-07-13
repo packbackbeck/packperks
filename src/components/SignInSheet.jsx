@@ -10,6 +10,7 @@ import {
   mergeByEmail,
   changeAuthEmail,
 } from '../lib/api';
+import PrivacyPolicyView from './PrivacyPolicyView';
 import './SignInSheet.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ import './SignInSheet.css';
  * form. This is the only place in the user app where signing out is
  * exposed — outside the sheet there's no reason for them to do it.
  */
-export default function SignInSheet({ open, onClose, onLinked, onVerified, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent, __devStatus = null, __devEmail = null }) {
+export default function SignInSheet({ open, onClose, onLinked, onVerified, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent, privacyPolicy = null, __devStatus = null, __devEmail = null }) {
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -56,10 +57,11 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   // (?__shot=…) to open the sheet directly in a given status for screenshots.
   const [status, setStatus] = useState(import.meta.env.DEV && __devStatus ? __devStatus : 'idle');
   const [email, setEmail] = useState(import.meta.env.DEV && __devEmail ? __devEmail : '');
-  // Optional marketing-email opt-in (default OFF — a valid GDPR/PDPL opt-in is
-  // unticked by default). Service email needs no consent, so there is no
-  // required checkbox — only a notice line below the field.
-  const [marketingConsent, setMarketingConsent] = useState(false);
+  // Two consent boxes on the email form: privacy-policy acknowledgement
+  // (required to continue) and a marketing opt-in (default on per product).
+  const [marketingConsent, setMarketingConsent] = useState(true);
+  const [privacyRead, setPrivacyRead] = useState(false);
+  const [showPolicy, setShowPolicy] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [newEmail, setNewEmail] = useState(''); // for the change-email flow
   const [restoreResult, setRestoreResult] = useState(null); // { status, merged_balance? }
@@ -446,16 +448,13 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
               balance and history will be right there.
             </p>
             <button className="signin-btn signin-btn--primary" onClick={onClose}>
-              Go back
+              Done
             </button>
             <button
               className="signin-btn signin-btn--ghost"
               onClick={() => { setNewEmail(''); setError(null); setStatus('change_email'); }}
             >
               Change email
-            </button>
-            <button className="signin-btn signin-btn--ghost" onClick={handleSignOut}>
-              Log out
             </button>
           </div>
         )}
@@ -569,10 +568,6 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
               {status === 'verifying' ? 'Verifying…' : 'Verify code'}
             </button>
 
-            <p className="signin-fine">
-              On a computer you can also just tap the sign-in link in the email.
-            </p>
-
             <button
               type="button"
               className="signin-btn signin-btn--ghost"
@@ -616,10 +611,19 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
               required
             />
 
-            <p className="signin-notice">
-              We use your email to sign you in, restore your cups, and send
-              reward status and important service messages.
-            </p>
+            <label className="signin-consent">
+              <input
+                type="checkbox"
+                className="signin-consent__box"
+                checked={privacyRead}
+                onChange={e => setPrivacyRead(e.target.checked)}
+                disabled={status === 'sending'}
+              />
+              <span className="signin-consent__text">
+                I have read the{' '}
+                <button type="button" className="signin-link" onClick={() => setShowPolicy(true)}>Privacy Policy</button>.
+              </span>
+            </label>
 
             <label className="signin-consent">
               <input
@@ -629,10 +633,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
                 onChange={e => setMarketingConsent(e.target.checked)}
                 disabled={status === 'sending'}
               />
-              <span className="signin-consent__text">
-                Send me PackPerks offers, reward reminders and participating-venue updates by email.
-                <span className="signin-consent__muted"> Optional. Unsubscribe anytime.</span>
-              </span>
+              <span className="signin-consent__text">Send me offers and reward updates.</span>
             </label>
 
             {error && <p className="signin-error">{error}</p>}
@@ -640,16 +641,10 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             <button
               type="submit"
               className="signin-btn signin-btn--primary"
-              disabled={status === 'sending' || !email.trim()}
+              disabled={status === 'sending' || !email.trim() || !privacyRead}
             >
-              {requireVerification
-                ? (status === 'sending' ? 'Sending…' : 'Send me a sign-in link')
-                : (status === 'sending' ? 'Saving…' : 'Save email')}
+              {status === 'sending' ? 'Sending…' : 'Email me a 6-digit code'}
             </button>
-
-            <p className="signin-fine">
-              You must be 16 or older to use PackPerks. See our Privacy Policy for how we handle your data.
-            </p>
 
             {/* Restore entry — sits at the bottom so the primary CTA
                 stays "Save", but lost-my-cups users can find their way
@@ -812,6 +807,8 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             </button>
           </div>
         )}
+
+        {showPolicy && <PrivacyPolicyView text={privacyPolicy} onClose={() => setShowPolicy(false)} />}
       </div>
     </div>
   );

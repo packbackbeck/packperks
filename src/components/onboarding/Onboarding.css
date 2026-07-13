@@ -21,7 +21,9 @@
   max-width: 460px;
   display: flex;
   flex-direction: column;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  /* 64px top clears the notch / camera even where the browser doesn't report a
+     safe-area inset; matching bottom breathing room above the home indicator. */
+  padding: max(env(safe-area-inset-top, 0px), 64px) 20px max(env(safe-area-inset-bottom, 0px), 30px);
 }
 
 /* ── Top row: back · progress · close ── */
@@ -81,8 +83,11 @@
 }
 
 /* ══ Screen 1 — value proposition ══ */
-.onb-value { justify-content: space-between; }
-.onb-hero { position: relative; flex: 1; min-height: 300px; display: flex; align-items: center; justify-content: center; }
+.onb-value { justify-content: flex-start; }
+.onb-hero { position: relative; flex: 0 0 auto; height: 40vh; min-height: 200px; max-height: 340px; display: flex; align-items: center; justify-content: center; }
+.onb-value .onb-screen__body { padding-top: 12px; }
+/* Anchor the CTA to the bottom so the copy above it isn't squished against it. */
+.onb-value .onb-screen__foot { margin-top: auto; padding-top: 26px; }
 .onb-hero__card {
   position: relative; z-index: 2; width: 220px;
   background: var(--white, #fff); border-radius: 22px; padding: 16px;
@@ -135,27 +140,40 @@
 @keyframes onbFloatB { 0%, 100% { transform: translateY(0) rotate(2deg); } 50% { transform: translateY(11px) rotate(-2deg); } }
 @keyframes onbFloatSpin { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-9px) rotate(6deg); } }
 
-/* ══ Screen 2 — how it works ══ */
-.onb-how__steps { list-style: none; margin: 22px 0 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 14px; }
-.onb-how__step { position: relative; display: flex; align-items: center; gap: 15px; }
-/* Vertical rail connecting the three step thumbs. */
-.onb-how__step:not(:last-child)::before {
-  content: ''; position: absolute; left: 33px; top: 74px; bottom: -14px; width: 2px;
-  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.16) 0 4px, transparent 4px 9px);
+/* ══ Screen 2 — how it works (playful zig-zag cards) ══ */
+.onb-how2 {
+  list-style: none; margin: 20px 0 0; padding: 2px 0; flex: 1;
+  display: flex; flex-direction: column; justify-content: center; gap: 15px;
 }
-.onb-how__thumb {
-  position: relative; flex: none; width: 66px; height: 66px; border-radius: 18px; overflow: hidden;
-  display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(70, 45, 20, 0.1);
+.onb-how2__card {
+  position: relative; display: flex; align-items: center; gap: 16px;
+  padding: 15px; border-radius: 22px;
+  background: var(--card-bg);
+  box-shadow: 0 12px 26px rgba(80, 55, 25, 0.1);
+  animation: onbCardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.onb-how__thumb img { width: 100%; height: 100%; object-fit: cover; }
-.onb-how__num {
-  position: absolute; top: -6px; left: -6px; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--pb-purple-600, #5333A5); color: #fff; font-size: 13px; font-weight: 800;
-  display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+.onb-how2__card:nth-child(2) { animation-delay: 0.09s; }
+.onb-how2__card:nth-child(3) { animation-delay: 0.18s; }
+.onb-how2__card.is-flip { flex-direction: row-reverse; }
+@keyframes onbCardIn { from { opacity: 0; transform: translateY(18px) scale(0.96); } to { opacity: 1; transform: none; } }
+
+.onb-how2__art {
+  position: relative; flex: none; width: 106px; height: 106px;
+  border-radius: 18px; overflow: hidden; background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 6px 14px rgba(70, 45, 20, 0.12);
 }
-.onb-how__txt { min-width: 0; }
-.onb-how__step-title { margin: 0; font-size: 16.5px; font-weight: 800; color: var(--black, #1D1D1D); }
-.onb-how__step-body { margin: 3px 0 0; font-size: 13.5px; line-height: 1.4; color: rgba(0, 0, 0, 0.6); }
+.onb-how2__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.onb-how2__num {
+  position: absolute; top: -9px; left: -9px; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--card-accent); color: #fff; font-size: 15px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24); border: 2.5px solid var(--pb-cream, #F4EBDC);
+}
+.onb-how2__card.is-flip .onb-how2__num { left: auto; right: -9px; }
+.onb-how2__txt { flex: 1; min-width: 0; }
+.onb-how2__card.is-flip .onb-how2__txt { text-align: right; }
+.onb-how2__title { margin: 0; font-size: 17.5px; font-weight: 800; color: #2A2417; letter-spacing: -0.01em; line-height: 1.15; }
+.onb-how2__body { margin: 5px 0 0; font-size: 13.5px; line-height: 1.42; color: rgba(45, 33, 12, 0.66); }
 
 /* ══ Screen 3 — personalisation ══ */
 .onb-q { border: none; margin: 22px 0 0; padding: 0; }
@@ -254,7 +272,7 @@
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .onb__screen,
-  .onb-hero__card, .onb-float,
+  .onb-hero__card, .onb-float, .onb-how2__card,
   .onb-stack__card, .onb-stack__check { animation: none !important; transition: opacity 0.2s ease; }
   .onb-float { transform: none !important; }
   .onb-stack__check { transition: opacity 0.2s ease; }

@@ -1,27 +1,29 @@
-/* Screen 2 — how it works. Three steps on one screen, reusing the existing BYO
- * how-it-works illustrations (public/how-it-works/byo-*.png) so the visual
- * language matches the rest of the app rather than inventing new icons. The
- * flow reads top → bottom, connected by a vertical rail. */
+/* Screen 2 — how it works. Three steps on one screen as playful, colour-tinted
+ * cards that alternate side (zig-zag) with large BYO illustrations, reusing the
+ * existing artwork + per-step palette rather than inventing new icons. */
 
 const STEPS = [
   {
     n: 1,
     image: '/how-it-works/byo-1.png',
-    bg: 'linear-gradient(165deg, #FBEDE4 0%, #F6D8C6 100%)',
+    bg: 'linear-gradient(155deg, #FCEEE4 0%, #F7D6C1 100%)',
+    accent: '#E07E4F',
     title: 'Bring your reusable cup',
     body: 'Bring your reusable cup and scan the QR code.',
   },
   {
     n: 2,
     image: '/how-it-works/byo-2.png',
-    bg: 'linear-gradient(165deg, #EAF6EC 0%, #D6ECD9 100%)',
+    bg: 'linear-gradient(155deg, #EAF6EC 0%, #CFEAD5 100%)',
+    accent: '#4FA167',
     title: 'Collect enough cups',
     body: 'Collect enough cups to unlock a reward.',
   },
   {
     n: 3,
     image: '/how-it-works/byo-5.png',
-    bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)',
+    bg: 'linear-gradient(155deg, #E7F6EF 0%, #CDEEDF 100%)',
+    accent: '#3FA97C',
     title: 'Buy it and get cashback',
     body: 'Buy the rewarded item and get full cashback.',
   },
@@ -34,16 +36,20 @@ export default function OnboardingHowItWorks({ onNext }) {
         <h1 className="onb-screen__title">How you earn it</h1>
       </div>
 
-      <ol className="onb-how__steps">
-        {STEPS.map((s) => (
-          <li key={s.n} className="onb-how__step">
-            <div className="onb-how__thumb" style={{ background: s.bg }}>
+      <ol className="onb-how2">
+        {STEPS.map((s, i) => (
+          <li
+            key={s.n}
+            className={`onb-how2__card${i % 2 === 1 ? ' is-flip' : ''}`}
+            style={{ '--card-bg': s.bg, '--card-accent': s.accent }}
+          >
+            <div className="onb-how2__art">
               <img src={s.image} alt="" aria-hidden="true" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              <span className="onb-how__num">{s.n}</span>
+              <span className="onb-how2__num">{s.n}</span>
             </div>
-            <div className="onb-how__txt">
-              <h2 className="onb-how__step-title">{s.title}</h2>
-              <p className="onb-how__step-body">{s.body}</p>
+            <div className="onb-how2__txt">
+              <h2 className="onb-how2__title">{s.title}</h2>
+              <p className="onb-how2__body">{s.body}</p>
             </div>
           </li>
         ))}

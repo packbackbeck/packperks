@@ -1,20 +1,14 @@
 <!--
-  PackPerks — "Magic Link" Supabase Auth email template.
+  PackPerks — sign-in CODE email (Supabase Auth "Magic Link" template).
 
-  Paste the BODY (the <!doctype html> block below) into:
+  Paste the <!doctype html> block below into:
     Supabase Dashboard → Authentication → Emails → "Magic Link" → Message body (HTML)
 
-  Sends BOTH a one-tap sign-in link ({{ .ConfirmationURL }}) AND a 6-digit
-  code ({{ .Token }}) in the same email, so:
-    • the user-app "save my cups / sign in" flow can tap the link, and
-    • the "restore by email / enter a code" flow can type the code.
-
   Suggested subject line (set in the dashboard, above the body):
-    Your PackPerks sign-in link & code
+    Your PackPerks verification code
 
-  IMPORTANT: for the link to land back in the app, add your app origins
-  under Authentication → URL Configuration → Redirect URLs
-  (e.g. http://localhost:5173 and your production domain).
+  Code-only: the app's sign-in + restore flows both use the 6-digit code
+  ({{ .Token }}). There is intentionally NO sign-in link in this email.
 -->
 <!doctype html>
 <html lang="en">
@@ -22,71 +16,38 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>Sign in to PackPerks</title>
+    <title>Your PackPerks verification code</title>
   </head>
-  <body style="margin:0; padding:0; background-color:#FBF4EE; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#1A1A1A; -webkit-font-smoothing:antialiased;">
-
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#FBF4EE;">
+  <body style="margin:0; padding:0; background:#F4EBDC; font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4EBDC; padding:28px 12px;">
       <tr>
-        <td align="center" style="padding:40px 16px;">
-
-          <!-- Card -->
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:460px; background:#FFFFFF; border-radius:24px; box-shadow:0 12px 40px rgba(20,16,12,0.10); border:1px solid rgba(0,0,0,0.04); overflow:hidden;">
+        <td align="center">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:460px; background:#FFFFFF; border-radius:22px; overflow:hidden; box-shadow:0 8px 30px rgba(60,42,20,0.10);">
 
             <!-- Brand header -->
             <tr>
-              <td align="center" style="padding:34px 32px 6px;">
-                <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em; color:#E24400;">PackPerks</div>
-                <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#A89E92; margin-top:8px;">Return &middot; Collect &middot; Reward</div>
+              <td style="background:#1A1512; padding:22px 28px;">
+                <span style="font-size:19px; font-weight:800; letter-spacing:-0.01em; color:#FFFFFF;">Pack<span style="color:#E8B34A;">Perks</span></span>
               </td>
             </tr>
 
-            <!-- Heading -->
+            <!-- Body -->
             <tr>
-              <td style="padding:22px 36px 0;">
-                <h1 style="margin:0 0 10px; font-size:23px; line-height:1.25; font-weight:800; color:#1A1A1A;">Sign in to PackPerks</h1>
-                <p style="margin:0; font-size:15px; line-height:1.55; color:#5C564E;">
-                  Tap the button below to sign in and save your cups across devices.
+              <td style="padding:30px 28px 6px;">
+                <h1 style="margin:0 0 10px; font-size:23px; line-height:1.25; font-weight:800; color:#1A1512;">Your verification code</h1>
+                <p style="margin:0; font-size:15px; line-height:1.55; color:#5A5348;">
+                  Enter this code in PackPerks to finish signing in and save your cups across devices.
                 </p>
               </td>
             </tr>
 
-            <!-- Primary CTA (the link) -->
+            <!-- Code (hero) -->
             <tr>
-              <td align="center" style="padding:24px 36px 8px;">
+              <td align="center" style="padding:22px 28px 6px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td align="center" bgcolor="#E24400" style="border-radius:14px;">
-                      <a href="{{ .ConfirmationURL }}"
-                         style="display:inline-block; padding:15px 38px; font-size:16px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:14px;">
-                        Sign in to PackPerks
-                      </a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-
-            <!-- "or" divider -->
-            <tr>
-              <td style="padding:18px 36px 6px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                  <tr>
-                    <td style="border-top:1px solid #F0EBE3; font-size:0; line-height:0;">&nbsp;</td>
-                    <td style="padding:0 12px; font-size:12px; font-weight:600; color:#A89E92; white-space:nowrap;">or enter this code</td>
-                    <td style="border-top:1px solid #F0EBE3; font-size:0; line-height:0;">&nbsp;</td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-
-            <!-- Code box (the OTP) -->
-            <tr>
-              <td align="center" style="padding:10px 36px 4px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td align="center" style="background:#FFF6EE; border:1px solid #FBDCC6; border-radius:16px; padding:18px 30px;">
-                      <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:34px; font-weight:800; letter-spacing:0.32em; color:#E24400; line-height:1;">{{ .Token }}</div>
+                    <td align="center" style="background:#FFF6EE; border:1px solid #F6D9C0; border-radius:16px; padding:20px 34px;">
+                      <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:36px; font-weight:800; letter-spacing:0.34em; color:#E24400; line-height:1;">{{ .Token }}</div>
                     </td>
                   </tr>
                 </table>
@@ -95,30 +56,26 @@
 
             <!-- Expiry / security note -->
             <tr>
-              <td style="padding:22px 36px 0;">
+              <td style="padding:20px 28px 4px;">
                 <p style="margin:0; font-size:13px; line-height:1.6; color:#7A7166;">
-                  This link and code expire in <strong style="color:#1A1A1A;">1 hour</strong>. If you didn&rsquo;t request this, you can safely ignore this email &mdash; no changes will be made to your account.
+                  This code expires in <strong style="color:#1A1512;">1 hour</strong>. If you didn&rsquo;t request it, you can safely ignore this email &mdash; no changes will be made to your account.
                 </p>
               </td>
             </tr>
 
             <!-- Footer -->
             <tr>
-              <td style="padding:26px 36px 32px;">
-                <div style="border-top:1px solid #F0EBE3; padding-top:18px;">
-                  <p style="margin:0; font-size:11px; line-height:1.6; color:#B3ABA0; text-align:center;">
-                    You received this email because someone asked to sign in to PackPerks with this address.<br />
-                    PackPerks &middot; Reusable-cup rewards
+              <td style="padding:22px 28px 26px;">
+                <div style="border-top:1px solid #EFE7D8; padding-top:16px;">
+                  <p style="margin:0; font-size:12px; line-height:1.55; color:#B4AC9E;">
+                    You received this because someone asked to sign in to PackPerks with this address. Questions? Reach us at <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a>.
                   </p>
                 </div>
               </td>
             </tr>
 
           </table>
-          <!-- /Card -->
-
-          <div style="font-size:11px; color:#C4BCB0; margin-top:18px;">&copy; PackPerks</div>
-
+          <p style="margin:16px 0 0; font-size:11px; color:#B4AC9E;">PackPerks &middot; Bring your cup, earn cashback</p>
         </td>
       </tr>
     </table>

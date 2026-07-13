@@ -136,7 +136,7 @@ export default function FeaturedReward({
               <p className="featured-reward__claim-desc">
                 {isUnlocked
                   ? 'Scan your receipt and we\'ll send you a Tikkie link to collect your cashback. '
-                  : <>Collect cups to earn cashback. Keep your purchase receipt — you'll need it to claim.</>}
+                  : <>Collect cups to earn cashback. Keep your purchase receipt. You'll need it to claim.</>}
                 <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the cashback terms</button>
                 {onOpenRefund && (
                   <><span style={{ margin: '0 4px' }}>or</span>
@@ -147,7 +147,7 @@ export default function FeaturedReward({
 
             {isUnlocked && !budgetBlocked && (
               <p className="featured-reward__payout-note">
-                Once your receipt is approved, we'll send you a <strong>Tikkie link</strong> to collect your cashback — usually within a few days.
+                Once your receipt is approved, we'll send you a <strong>Tikkie link</strong> to collect your cashback, usually within a few days.
               </p>
             )}
 

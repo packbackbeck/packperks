@@ -1059,7 +1059,7 @@ export default function App() {
     const refundRate = liveSettings.refundRatePerCup ?? 1.00;
     const amount = Number((count * refundRate).toFixed(2));
     track(EVENTS.WITHDRAW_ALL_CUPS, { cups_withdrawn: count, deposit_value: amount.toFixed(2) });
-    const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''} — €${amount.toFixed(2)}`;
+    const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''}, €${amount.toFixed(2)}`;
     addHistory('cups_withdrawn', label);
     setRefundCupCount(count);
     setRefundAmount(amount);
@@ -1220,7 +1220,7 @@ export default function App() {
         isSystemError: true,
         summary:
           err?.message ||
-          "We couldn't reach the verification service. Your cups have not been used — please try again in a moment.",
+          "We couldn't reach the verification service. Your cups have not been used. Please try again in a moment.",
       });
       haptic('error');
       setPage('rejected');
@@ -1837,13 +1837,13 @@ export default function App() {
           </>
         ) : (
           <>
-            <p><strong>How it works:</strong> Collect cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} venue — scan the QR each time to add a cup to your balance for that venue.</p>
+            <p><strong>How it works:</strong> Collect cups at any participating {activeOrg?.partner_brand_name || activeOrg?.name || 'partner'} venue. Scan the QR each time to add a cup to your balance for that venue.</p>
             <ul>
               <li>Collect enough cups to unlock a reward, then claim it as <strong>cashback</strong>.</li>
               <li>To claim, add and <strong>verify your email</strong> (we send a 6-digit code), then upload a clear photo of the <strong>printed store receipt</strong> for the reward item.</li>
               <li>We accept genuine printed store/till receipts that clearly show the reward item and are dated within the last 30 days.</li>
               <li>We <strong>can’t accept</strong> screenshots, photos of a screen, edited or AI-generated images, blurry or unreadable photos, receipts that don’t show the reward item, or receipts dated before you collected your cups. Each receipt can be used once.</li>
-              <li>An automated check pre-screens your photo, but a person makes the final call. Once approved, we send a <strong>Tikkie link</strong> to collect your cashback yourself — usually within a few days, no later than 7. We never ask for your bank details; collect it promptly as links expire.</li>
+              <li>An automated check pre-screens your photo, but a person makes the final call. Once approved, we send a <strong>Tikkie link</strong> to collect your cashback yourself, usually within a few days, no later than 7. We never ask for your bank details; collect it promptly as links expire.</li>
               <li>Prefer not to take cashback? You can <strong>donate</strong> your cups to a good cause instead.</li>
               <li>Cups are saved separately at each venue, and you can switch your reward goal any time before claiming.</li>
             </ul>

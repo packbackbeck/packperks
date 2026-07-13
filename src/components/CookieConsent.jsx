@@ -68,7 +68,7 @@ export default function CookieConsent({ onChoose, onCustomize, onPolicy }) {
               <h2 className="cc-title">A quick cookie choice</h2>
             </div>
             <p className="cc-text">
-              We use <strong>essential</strong> cookies to run PackPerks — to register your
+              We use <strong>essential</strong> cookies to run PackPerks: to register your
               account, remember your cup balance, and keep track of your reward claims.
               With your consent we also use <strong>analytics</strong> to understand how the
               app is used. No ads, no third-party trackers.
@@ -107,7 +107,7 @@ export default function CookieConsent({ onChoose, onCustomize, onPolicy }) {
               <ToggleRow
                 id="cc-technical"
                 title="Technical"
-                desc="Essential — keeps you signed in and remembers your cups and claims."
+                desc="Essential: keeps you signed in and remembers your cups and claims."
                 checked={technical}
                 onChange={setTechnical}
               />

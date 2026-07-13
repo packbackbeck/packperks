@@ -137,7 +137,7 @@ function ClaimCard({ claim, onCollect, collected }) {
 
       {ready ? (
         <>
-          <p className="pc-card__msg">Approved by our team — collect your <strong>{amount}</strong> cashback through the secure Tikkie link.</p>
+          <p className="pc-card__msg">Approved by our team. Collect your <strong>{amount}</strong> cashback through the secure Tikkie link.</p>
           <a
             className="pc-card__collect"
             href={claim.tikkie_url}
@@ -181,7 +181,7 @@ function NotifyOptions({ claim }) {
     setHint(null);
     if (!checked) { setPush(false); save(email, false); return; }
     if (!isPushSupported()) {
-      setHint('Push isn’t supported in this browser — email still works.');
+      setHint('Push isn’t supported in this browser. Email still works.');
       return;
     }
     // Ask the browser for permission on first opt-in.
@@ -192,8 +192,8 @@ function NotifyOptions({ claim }) {
     } else {
       setPush(false);
       setHint(perm === 'denied'
-        ? 'Notifications are blocked for this site — allow them in your browser settings.'
-        : 'Push permission wasn’t granted — email still works.');
+        ? 'Notifications are blocked for this site. Allow them in your browser settings.'
+        : 'Push permission wasn’t granted. Email still works.');
     }
   };
 

@@ -76,7 +76,7 @@ export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone 
       <button className="rsp__btn" onClick={onDone}>Back to home</button>
 
       <span className="rsp__note">
-        We’ll review your refund and send a Tikkie link to collect your money — open it to get paid. Your cup balance has been reset to zero.
+        We’ll review your refund and send a Tikkie link to collect your money. Open it to get paid. Your cup balance has been reset to zero.
       </span>
     </div>
   );

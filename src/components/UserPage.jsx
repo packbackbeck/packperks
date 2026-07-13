@@ -343,12 +343,12 @@ export default function UserPage({
     const body = `Please handle the request below for my PackPerks account.\n\nDisplay name: ${profile.displayName}\n${email ? 'Email: ' + email : 'Email: (none saved)'}\n${extra}`;
     window.location.href = `mailto:${DSAR_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
-  const handleExportData = () => dsar('PackPerks — export my data (access request)');
+  const handleExportData = () => dsar('PackPerks: export my data (access request)');
   const handleDeleteAccount = () => {
     if (!window.confirm('Delete your account and personal data? This clears your saved email now and requests full erasure. Your cups will be removed. This cannot be undone.')) return;
     // Best-effort immediate scrub of identifiable data on this account.
     saveProfile({ email: '' });
-    dsar('PackPerks — delete my account (erasure request)', 'I want my account and all associated personal data deleted.');
+    dsar('PackPerks: delete my account (erasure request)', 'I want my account and all associated personal data deleted.');
   };
 
   const handleRegenerate = () => {
@@ -447,7 +447,7 @@ export default function UserPage({
             Visitor
           </span>
           <h3 className="user-page__visitor-title">Get started</h3>
-          <p className="user-page__visitor-sub">Two ways to begin — scan your first cup, or save your email. Either one sets up your account and unlocks cashback.</p>
+          <p className="user-page__visitor-sub">Two ways to begin: scan your first cup, or save your email. Either one sets up your account and unlocks cashback.</p>
           <div className="user-page__visitor-ctas">
             <button type="button" className="user-page__visitor-cta" onClick={onAddCup}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -872,7 +872,7 @@ const COMPARISON_PHRASES = [
     if (g < 600)  return `about the weight of a paperback book of plastic saved`;
     if (g < 1500) return `about the weight of a bag of sugar of plastic saved`;
     if (g < 5000) return `about the weight of a brick of plastic saved`;
-    return `about ${(g / 1000).toFixed(1)} kg of plastic — a small backpack's worth`;
+    return `about ${(g / 1000).toFixed(1)} kg of plastic, a small backpack's worth`;
   },
 ];
 
@@ -997,7 +997,7 @@ function ImpactDetailModal({ cups, profile, onClose }) {
         await navigator.share({
           files: [file],
           title: 'My PackPerks impact',
-          text: `I've returned ${cups} cups with PackPerks — that's ${formatGrams(grams)} of plastic kept out of landfill.`,
+          text: `I've returned ${cups} cups with PackPerks. That's ${formatGrams(grams)} of plastic kept out of landfill.`,
         });
         setShared(true);
       } else {

@@ -39,7 +39,7 @@ export default function ReceiptRejectedPage({
         icon="⚠️"
         tone="warn"
         title="Something went wrong"
-        why="This was a problem on our side — not with your receipt."
+        why="This was a problem on our side, not with your receipt."
         nextStep="Give it a moment and try again. If it keeps failing, get in touch and we'll sort it out."
         primaryLabel="Try again"
         onTryAgain={onTryAgain}

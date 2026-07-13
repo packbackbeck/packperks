@@ -29,7 +29,7 @@ function buildCopy(brand) {
   already_claimed: {
     emoji: '🔁',
     title: 'Someone already used this QR',
-    body: "Every cup QR can only be claimed once — looks like another customer scanned this receipt first.",
+    body: "Every cup QR can only be claimed once. Looks like another customer scanned this receipt first.",
     hint: "If a friend shared this QR with you, ask them to share again, or scan the counter QR at the venue for a fresh cup.",
     primary: 'Scan a different QR',
   },
@@ -37,14 +37,14 @@ function buildCopy(brand) {
     emoji: '🔁',
     title: 'These cups were already claimed',
     body: "Each cup token can only be added to one customer's balance. The cups on this receipt have already been claimed.",
-    hint: "Check your activity — if this was an earlier scan of yours, the cups are already in your balance.",
+    hint: "Check your activity. If this was an earlier scan of yours, the cups are already in your balance.",
     primary: 'Try again',
   },
   batch_not_found: {
     emoji: '❌',
     title: "This QR isn't valid",
     body: `The server doesn't recognise this receipt. It might be misprinted, expired, or not from a participating ${brand}.`,
-    hint: "Try scanning a different receipt — make sure it's from a participating restaurant and the QR is fully in frame.",
+    hint: "Try scanning a different receipt. Make sure it's from a participating restaurant and the QR is fully in frame.",
     primary: 'Scan a different QR',
   },
   batch_expired: {
@@ -57,7 +57,7 @@ function buildCopy(brand) {
   batch_revoked: {
     emoji: '🚫',
     title: "This QR has been cancelled",
-    body: "An admin marked this batch as no longer valid — usually because the receipt was misprinted or reissued.",
+    body: "An admin marked this batch as no longer valid, usually because the receipt was misprinted or reissued.",
     hint: `Ask ${brand} staff for a replacement receipt. Your other cups are unaffected.`,
     primary: 'Back to home',
   },
@@ -71,7 +71,7 @@ function buildCopy(brand) {
   no_cups: {
     emoji: '❌',
     title: 'This QR is empty',
-    body: "The QR code didn't contain any cup tokens. That shouldn't normally happen — it might be a test QR.",
+    body: "The QR code didn't contain any cup tokens. That shouldn't normally happen. It might be a test QR.",
     hint: `Ask the staff at ${brand} for a fresh receipt with cup tokens.`,
     primary: 'Back to home',
   },
@@ -85,7 +85,7 @@ function buildCopy(brand) {
   db_error: {
     emoji: '⚠️',
     title: 'Something went wrong on our end',
-    body: "We couldn't process this scan right now — it's not your fault. Your balance is safe.",
+    body: "We couldn't process this scan right now. It's not your fault. Your balance is safe.",
     hint: 'Wait a moment and try the scan again. If it keeps failing, we want to hear about it.',
     primary: 'Try again',
   },

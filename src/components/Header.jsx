@@ -122,9 +122,9 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
           className="header__tile header__tile--user"
           onClick={() => { track(EVENTS.ACCOUNT_OPENED); onBadgeClick?.(); }}
           aria-label={claimStatus === 'ready'
-            ? 'Cashback ready to collect — open your profile'
+            ? 'Cashback ready to collect, open your profile'
             : claimStatus === 'pending'
-              ? 'Cashback claim in review — open your profile'
+              ? 'Cashback claim in review, open your profile'
               : 'Open your profile'}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

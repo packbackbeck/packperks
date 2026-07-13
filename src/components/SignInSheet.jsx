@@ -146,7 +146,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
     // OTP verify + merge flow so we never create another duplicate.
     if (!requireVerification) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-        setError("That email doesn't look quite right — try again.");
+        setError("That email doesn't look quite right, try again.");
         setStatus('error');
         return;
       }
@@ -176,7 +176,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
       setStatus('sent');
     } catch (err) {
       setError(err.message === 'invalid_email'
-        ? "That email doesn't look quite right — try again."
+        ? "That email doesn't look quite right, try again."
         : err.message || 'Something went wrong. Please try again.');
       setStatus('error');
     }
@@ -210,11 +210,11 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
         const code = err?.detail?.error || err?.message;
         const friendly =
           code === 'invalid_code'
-            ? 'That code is 6 digits — check the email and try again.'
+            ? 'That code is 6 digits, check the email and try again.'
             : /expired/i.test(code || '')
               ? 'That code expired. Tap "Resend" below to get a fresh one.'
               : /invalid/i.test(code || '')
-                ? "That code doesn't match. Double-check the email — 6 digits, no spaces."
+                ? "That code doesn't match. Double-check the email: 6 digits, no spaces."
                 : (code || 'Something went wrong verifying the code.');
         setError(friendly);
         setStatus('sent');
@@ -241,7 +241,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
       setStatus('change_sent');
     } catch (err) {
       setError(err.message === 'invalid_email'
-        ? "That email doesn't look quite right — try again."
+        ? "That email doesn't look quite right, try again."
         : (err.message || 'Could not start the email change. Please try again.'));
       setStatus('change_email');
     }
@@ -277,7 +277,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
     // Already signed in to this exact email? There's nothing to restore —
     // say so plainly instead of letting the merge return a vague error.
     if (currentEmail && currentEmail.trim().toLowerCase() === email.trim().toLowerCase()) {
-      setError("You're already signed in with this email on this device — your cups are already here.");
+      setError("You're already signed in with this email on this device. Your cups are already here.");
       setStatus('restore_email');
       return;
     }
@@ -288,7 +288,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
     } catch (err) {
       setError(
         err.message === 'invalid_email'
-          ? "That email doesn't look quite right — try again."
+          ? "That email doesn't look quite right, try again."
           : err.message || 'Something went wrong. Please try again.',
       );
       setStatus('restore_email');
@@ -322,13 +322,13 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
         const code = err?.detail?.error || err?.message;
         const friendly =
           code === 'invalid_code'
-            ? 'That code is 6 digits — check the email and try again.'
+            ? 'That code is 6 digits, check the email and try again.'
             : code === 'otp_expired' || code === 'token_has_expired' || /expired/i.test(code || '')
               ? 'That code expired. Tap "Send a new code" below to get a fresh one.'
               : code === 'invalid_token' || /invalid/i.test(code || '')
-                ? "That code doesn't match. Double-check the email — codes are 6 digits, no spaces."
+                ? "That code doesn't match. Double-check the email: codes are 6 digits, no spaces."
                 : code === 'update_failed' || code === 'survivor_update_failed' || code === 'merge_balance_failed'
-                  ? "Looks like you're already signed in to this account on this device — your cups should already be here. Pull to refresh to check."
+                  ? "Looks like you're already signed in to this account on this device. Your cups should already be here. Pull to refresh to check."
                   : (code || 'Something went wrong verifying the code.');
         setError(friendly);
         setStatus('restore_code');
@@ -389,7 +389,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             <h2 className="signin-title">This email already has cups</h2>
             <p className="signin-sub">
               <strong>{email}</strong> is already linked to {mergeOtherCount > 1 ? `${mergeOtherCount} other accounts` : 'another account'} on PackPerks.
-              <br />To use it here, we'll send a 6-digit code to verify it's you — then combine the cups into one account.
+              <br />To use it here, we'll send a 6-digit code to verify it's you, then combine the cups into one account.
             </p>
             {error && <p className="signin-error">{error}</p>}
             <button
@@ -442,7 +442,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             <h2 className="signin-title">You're all set</h2>
             <p className="signin-sub">
               Your cups are backed up to <strong>{currentEmail}</strong>.
-              You can sign in from any device with this email — your
+              You can sign in from any device with this email. Your
               balance and history will be right there.
             </p>
             <button className="signin-btn signin-btn--primary" onClick={onClose}>
@@ -472,8 +472,8 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             </div>
             <h2 className="signin-title">Change your email</h2>
             <p className="signin-sub">
-              Enter a new email for this account. We'll send a confirmation link to it —
-              your current email <strong>{currentEmail}</strong> stays active until you open it.
+              Enter a new email for this account. We'll send a confirmation link to it.
+              Your current email <strong>{currentEmail}</strong> stays active until you open it.
             </p>
 
             <label className="signin-label" htmlFor="change-email">New email</label>
@@ -597,8 +597,8 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             <h2 className="signin-title">Save your cups across devices</h2>
             <p className="signin-sub">
               {requireVerification
-                ? <>Link your balance to an email so you can pick up where you left off — even after switching phones or clearing your browser.</>
-                : <>Add an email to your balance so you can recover it later. No code needed — it's saved right away.</>}
+                ? <>Link your balance to an email so you can pick up where you left off, even after switching phones or clearing your browser.</>
+                : <>Add an email to your balance so you can recover it later. No code needed. It's saved right away.</>}
             </p>
 
             <label className="signin-label" htmlFor="signin-email">Email</label>
@@ -631,7 +631,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
               />
               <span className="signin-consent__text">
                 Send me PackPerks offers, reward reminders and participating-venue updates by email.
-                <span className="signin-consent__muted"> Optional — unsubscribe anytime.</span>
+                <span className="signin-consent__muted"> Optional. Unsubscribe anytime.</span>
               </span>
             </label>
 
@@ -664,7 +664,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
               className="signin-btn signin-btn--ghost"
               onClick={switchToRestore}
             >
-              I lost my cups — restore by email
+              I lost my cups. Restore by email
             </button>
           </form>
         )}
@@ -731,7 +731,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             <h2 className="signin-title">Enter your code</h2>
             <p className="signin-sub">
               We sent a 6-digit code to <strong>{email}</strong>. Type
-              it below — codes expire after a few minutes.
+              it below, codes expire after a few minutes.
             </p>
 
             <label className="signin-label" htmlFor="restore-code">6-digit code</label>
@@ -802,7 +802,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
               ) : restoreResult?.status === 'linked' ? (
                 <>This device is now backed up to <strong>{currentEmail}</strong>.</>
               ) : restoreResult?.status === 'no_prior_history' ? (
-                <>We didn't find an earlier balance under <strong>{currentEmail}</strong>, but you're now signed in — any cups you collect from now on will be saved to this email.</>
+                <>We didn't find an earlier balance under <strong>{currentEmail}</strong>, but you're now signed in. Any cups you collect from now on will be saved to this email.</>
               ) : (
                 <>You're all set.</>
               )}

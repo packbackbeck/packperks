@@ -90,7 +90,7 @@ export default function ReceiptVerifyingPage() {
 
       <h1 className="rv-page__title">Verifying your receipt</h1>
       <p className="rv-page__subtitle">
-        Hold tight — this usually takes a few seconds.
+        Hold tight, this usually takes a few seconds.
       </p>
 
       <div className="rv-ring-wrap" style={{ width: SIZE, height: SIZE }}>

@@ -27,13 +27,13 @@ export default function AppErrorScreen({ error }) {
   const isPaused          = /paused|inactive|project is paused/i.test(detail);
 
   let headline = "We're having trouble loading your cups";
-  let body = "Something on our end is taking longer than expected. Give it a moment and try again — your balance is safe.";
+  let body = "Something on our end is taking longer than expected. Give it a moment and try again. Your balance is safe.";
   if (isMissingTable) {
     headline = "We're getting things ready";
     body = "PackPerks is being set up for the first time on this device. Please check back in a few minutes.";
   } else if (isPaused) {
     headline = "PackPerks is taking a quick break";
-    body = "Our service is temporarily idle. It should be back online shortly — thanks for your patience.";
+    body = "Our service is temporarily idle. It should be back online shortly. Thanks for your patience.";
   } else if (isNetwork) {
     headline = "Can't reach the PackPerks service";
     body = "Looks like a network hiccup. Check your connection and tap retry below.";

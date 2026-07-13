@@ -47,7 +47,7 @@ export default function DonateSheet({ open, onClose, cupCount, orgName }) {
               <h2 className="ds__title">You don't have any cups yet</h2>
               <p className="ds__desc">
                 You need at least 1 cup in your balance before you can donate.
-                Return a reusable cup at any participating {brand} to get started —
+                Return a reusable cup at any participating {brand} to get started,
                 then come back here to donate.
               </p>
             </div>

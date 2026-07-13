@@ -75,7 +75,7 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
       <div className="success-page__text">
         <h1 className="success-page__title">Receipt submitted</h1>
         <p className="success-page__subtitle">
-          We'll review it and send you a <strong>Tikkie link</strong> to collect your €{cashback} cashback — within <strong>7 days</strong>.
+          We'll review it and send you a <strong>Tikkie link</strong> to collect your €{cashback} cashback, within <strong>7 days</strong>.
         </p>
       </div>
 

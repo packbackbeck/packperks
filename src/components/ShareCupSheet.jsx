@@ -78,7 +78,7 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId, orgName
   const expiryLabel = (() => {
     if (!shareResult?.expires_at) return null;
     const ms = new Date(shareResult.expires_at).getTime() - now;
-    if (ms <= 0) return 'Expired — ask sender to generate a fresh QR';
+    if (ms <= 0) return 'Expired. Ask sender to generate a fresh QR';
     const hours = Math.floor(ms / 3_600_000);
     const mins  = Math.floor((ms % 3_600_000) / 60_000);
     if (hours >= 1) return `Expires in ${hours}h ${mins}m`;
@@ -102,7 +102,7 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId, orgName
 
   async function handleShare() {
     if (!userId) {
-      setError('No user session — please reload the app.');
+      setError('No user session. Please reload the app.');
       return;
     }
     if (amount > cupCount) {
@@ -128,7 +128,7 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId, orgName
       if (code === 'insufficient_balance' || /insufficient/i.test(msg)) {
         setError(
           `You don't have enough cups to share ${amount}. ` +
-          `Your current balance is ${cupCount} — return more cups first.`
+          `Your current balance is ${cupCount}. Return more cups first.`
         );
       } else {
         setError(msg || 'Could not generate share QR. Please try again.');
@@ -186,7 +186,7 @@ export default function ShareCupSheet({ open, onClose, cupCount, userId, orgName
             <div className="scs__header">
               <h2 className="scs__title">Share your cup</h2>
               <p className="scs__desc">
-                A friend scans your QR — they receive your cups, you lose them from your balance.
+                A friend scans your QR. They receive your cups, you lose them from your balance.
               </p>
             </div>
 

@@ -156,7 +156,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
         <ul className="receipt-page__req-list">
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
-            <span>Your <strong>cup-return ticket</strong> (the QR receipt from the bin) — that one only adds cups</span>
+            <span>Your <strong>cup-return ticket</strong> (the QR receipt from the bin), that one only adds cups</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
@@ -171,7 +171,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
 
       {/* Understood → move to the camera screen */}
       <button className="receipt-page__understood" onClick={() => setStep('camera')}>
-        Understood — take the photo
+        Understood, take the photo
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
       </>
@@ -249,7 +249,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12 6 12 12 16 14"/>
         </svg>
-        <span>We'll review your receipt and send you a Tikkie link to collect your cashback — <strong>within 7 days maximum</strong>.</span>
+        <span>We'll review your receipt and send you a Tikkie link to collect your cashback, <strong>within 7 days maximum</strong>.</span>
       </div>
 
       {/* Privacy note — kept at the very bottom of the flow. */}

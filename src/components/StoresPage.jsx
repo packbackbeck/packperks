@@ -478,7 +478,7 @@ function StoresImpact({ personalCups }) {
   );
 }
 
-const DEFAULT_INTRO = 'Bring your own cup to any café below and scan the QR to collect cups — then turn them into real cashback. New here? Just pick a store to start.';
+const DEFAULT_INTRO = 'Bring your own cup to any café below and scan the QR to collect cups, then turn them into real cashback. New here? Just pick a store to start.';
 
 /* Pull the city from a free-form area string ("De Pijp, Amsterdam" → "Amsterdam"). */
 function cityFromArea(area) {

@@ -47,7 +47,7 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
   return (
     <article
       className="reward-card"
-      aria-label={`${reward.name} — ${isUnlocked ? 'Ready' : `${cupsRemaining} cups remaining`}`}
+      aria-label={`${reward.name}, ${isUnlocked ? 'Ready' : `${cupsRemaining} cups remaining`}`}
       onClick={() => { track(EVENTS.REWARD_CARD_OPENED, { reward_id: reward.id }); onViewDetail?.(reward); }}
       style={{ cursor: 'pointer' }}
     >

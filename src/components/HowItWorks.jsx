@@ -95,7 +95,7 @@ const DEFAULT_STEPS = [
   {
     key: 'cashback',
     title: 'Get your cashback',
-    text: 'Once it is verified, we send you a Tikkie link to collect your cashback — usually within a few days.',
+    text: 'Once it is verified, we send you a Tikkie link to collect your cashback, usually within a few days.',
     image: '/how-it-works/step-5.png',
     bg: 'linear-gradient(165deg, #ECF8F1 0%, #DAF1E6 100%)',
     accent: '#2EA785',

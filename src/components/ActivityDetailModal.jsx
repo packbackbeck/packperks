@@ -52,7 +52,7 @@ function liveStatusForClaim(item, userClaims) {
       if (tikkieUrl) {
         return bestMatch.tikkie_status === 'redeemed'
           ? { label: 'Collected', color: '#1A8737', tikkieUrl, expired }
-          : { label: 'Ready — collect via Tikkie', color: '#1A8737', tikkieUrl, expired };
+          : { label: 'Ready: collect via Tikkie', color: '#1A8737', tikkieUrl, expired };
       }
       return { label: 'In review by our team', color: '#B8922A' };
     case 'failed':
@@ -117,7 +117,7 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
   }
 
   async function handleShare() {
-    const text = `${meta.title} — ${item.label} (${item.time}) · Ref ${refId}`;
+    const text = `${meta.title}: ${item.label} (${item.time}) · Ref ${refId}`;
     if (navigator.share) {
       try { await navigator.share({ title: 'PackPerks Activity', text }); return; } catch {}
     }
@@ -166,7 +166,7 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
               Collect via Tikkie
             </a>
             {liveStatus.expired && (
-              <p className="adm-collect-note">If this link no longer opens, it may have expired — contact us and we’ll reissue it.</p>
+              <p className="adm-collect-note">If this link no longer opens, it may have expired. Contact us and we’ll reissue it.</p>
             )}
           </div>
         )}

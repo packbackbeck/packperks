@@ -64,7 +64,7 @@ export const COPY_PRESETS = {
     heroHeadline: 'Collect & Get Rewards',
     heroSubtext:  'Return your packaging and earn cashback.',
     // Intro line under the logo on the multi-venue Stores page.
-    storesIntro:  'Return your packaging, scan, and earn cashback — your cups are saved separately at each participating store.',
+    storesIntro:  'Return your packaging, scan, and earn cashback. Your cups are saved separately at each participating store.',
     designCopy: {
       badgeText:         'My Cups',
       shareButtonLabel:  'Share a cup',
@@ -85,21 +85,21 @@ export const COPY_PRESETS = {
       title: 'The fine print',
       intro: 'By collecting cups you agree to a few simple rules:',
       points: [
-        'Cups are added when you return your packaging and scan the receipt or QR you receive — one cup per returned item.',
+        'Cups are added when you return your packaging and scan the receipt or QR you receive, one cup per returned item.',
         'To keep things fair, extra scans beyond the daily limit are held for a quick review before they’re credited.',
-        'Each store keeps its own cup balance — cups you collect at one venue stay with that venue, and you can switch your reward goal any time before you claim.',
+        'Each store keeps its own cup balance. Cups you collect at one venue stay with that venue, and you can switch your reward goal any time before you claim.',
         'To claim a reward you first add and verify your email (we send you a 6-digit code), then upload a clear photo of the printed store receipt for the reward item.',
         'We accept genuine printed store/till receipts that clearly show the reward item and are dated within the last 30 days.',
         'We can’t accept screenshots, photos of a screen, edited or AI-generated images, blurry or unreadable photos, receipts that don’t show the reward item, or receipts dated before you collected your cups.',
-        'Each receipt can be used once — a receipt already used for a claim can’t be submitted again.',
-        'An automated check pre-screens your photo, but a PackPerks team member makes the final decision — approval usually takes a few days, and no later than 7.',
+        'Each receipt can be used once. A receipt already used for a claim can’t be submitted again.',
+        'An automated check pre-screens your photo, but a PackPerks team member makes the final decision. Approval usually takes a few days, and no later than 7.',
         'Once approved, your cups convert to cashback in euros: we send a secure Tikkie link for you to collect it yourself (we never ask for your bank details). Collect it promptly, as Tikkie links expire.',
-        'Please play fair — abuse, automated scanning, or duplicate/altered receipts may lead to a review and the removal of cups.',
+        'Please play fair. Abuse, automated scanning, or duplicate/altered receipts may lead to a review and the removal of cups.',
       ],
     },
     crossOrgNotice: {
       title: 'A separate balance here',
-      body:  'Each store keeps its own cup balance. This cup is added at this store — your cups at other stores stay where they are.',
+      body:  'Each store keeps its own cup balance. This cup is added at this store. Your cups at other stores stay where they are.',
     },
     dailyCapReview: {
       title: 'This one’s being checked',
@@ -107,7 +107,7 @@ export const COPY_PRESETS = {
     },
     scanSuccess: {
       title: 'Cup added',
-      body:  'Nice — that’s another cup toward your cashback.',
+      body:  'Nice, that’s another cup toward your cashback.',
     },
   },
 
@@ -115,7 +115,7 @@ export const COPY_PRESETS = {
     heroHeadline: 'Bring your cup, earn cashback',
     heroSubtext:  'Use your own reusable cup and collect rewards every time you refill.',
     // Intro line under the logo on the multi-venue Stores page.
-    storesIntro:  'Bring your own cup to any café below and scan the QR to collect cups — then turn them into real cashback. New here? Just pick a store to start.',
+    storesIntro:  'Bring your own cup to any café below and scan the QR to collect cups, then turn them into real cashback. New here? Just pick a store to start.',
     designCopy: {
       badgeText:         'My Cups',
       shareButtonLabel:  'Share a cup',
@@ -130,9 +130,9 @@ export const COPY_PRESETS = {
       // byo-N.png), so the BYO guide is fully self-contained rather than reusing
       // the deposit-model artwork.
       steps: [
-        { title: 'Bring your own cup',    body: 'Visit a participating café with your reusable cup — no deposit, no single-use packaging.', image: '/how-it-works/byo-1.png', bg: 'linear-gradient(165deg, #FBEDE4 0%, #F6D8C6 100%)', accent: '#E88E63', icon: 'cup' },
+        { title: 'Bring your own cup',    body: 'Visit a participating café with your reusable cup, no deposit, no single-use packaging.', image: '/how-it-works/byo-1.png', bg: 'linear-gradient(165deg, #FBEDE4 0%, #F6D8C6 100%)', accent: '#E88E63', icon: 'cup' },
         { title: 'Get +1 cup',            body: 'Scan the QR at the counter and one cup is added to your balance at that venue.', image: '/how-it-works/byo-2.png', bg: 'linear-gradient(165deg, #EAF6EC 0%, #D6ECD9 100%)', accent: '#5FA96E', icon: 'cup' },
-        { title: 'Collect across venues', body: 'Track your progress here and at every other participating store — each keeps its own balance.', image: '/how-it-works/byo-3.png', bg: 'linear-gradient(165deg, #ECEDFB 0%, #DCE0F8 100%)', accent: '#7C86D6', icon: 'store' },
+        { title: 'Collect across venues', body: 'Track your progress here and at every other participating store. Each keeps its own balance.', image: '/how-it-works/byo-3.png', bg: 'linear-gradient(165deg, #ECEDFB 0%, #DCE0F8 100%)', accent: '#7C86D6', icon: 'store' },
         { title: 'Scan your receipt',     body: 'Once you’ve collected enough cups, buy your reward and scan the store receipt so we can verify your purchase.', image: '/how-it-works/byo-4.png', bg: 'linear-gradient(165deg, #FCF3D2 0%, #F8E7B0 100%)', accent: '#E5B23A', icon: 'receipt' },
         { title: 'Receive your cashback', body: 'After your receipt is approved, we send you a Tikkie link to collect your cashback.', image: '/how-it-works/byo-5.png', bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)', accent: '#57C08D', icon: 'cash' },
       ],
@@ -156,7 +156,7 @@ export const COPY_PRESETS = {
     },
     crossOrgNotice: {
       title: 'A new store, a fresh balance',
-      body:  'You’re collecting at a different store in this group. This cup is added here — each store keeps its own balance, so your cups at other venues stay exactly where they are.',
+      body:  'You’re collecting at a different store in this group. This cup is added here. Each store keeps its own balance, so your cups at other venues stay exactly where they are.',
     },
     dailyCapReview: {
       title: 'You’ve reached today’s cup limit',
@@ -164,7 +164,7 @@ export const COPY_PRESETS = {
     },
     scanSuccess: {
       title: 'Cup added',
-      body:  'Nice one — that’s another cup toward your cashback.',
+      body:  'Nice one, that’s another cup toward your cashback.',
     },
   },
 };

@@ -37,9 +37,9 @@ export default function InAppBrowserSheet({ open, platform, redirecting, onOpenD
             </h2>
             <p className="iab-sheet__body">
               {isIos ? (
-                <>You opened this inside an app's built-in browser, so this cup won't carry over to your normal browser. To keep it, tap the <strong>•••</strong> (or share) button and choose <strong>“Open in Safari”</strong> — or collect it here for now.</>
+                <>You opened this inside an app's built-in browser, so this cup won't carry over to your normal browser. To keep it, tap the <strong>•••</strong> (or share) button and choose <strong>“Open in Safari”</strong>, or collect it here for now.</>
               ) : (
-                <>You opened this inside an app's built-in browser. Open it in your default browser so your cup is saved to your phone — not lost when this window closes.</>
+                <>You opened this inside an app's built-in browser. Open it in your default browser so your cup is saved to your phone, not lost when this window closes.</>
               )}
             </p>
             <button type="button" className="iab-sheet__cta" onClick={onOpenDefaultBrowser}>
@@ -60,7 +60,7 @@ export default function InAppBrowserSheet({ open, platform, redirecting, onOpenD
             </h2>
             <p className="iab-sheet__body">
               {isIos ? (
-                <>If Safari didn't open, tap the <strong>•••</strong> (or share) button and choose <strong>“Open in Safari”</strong> — or collect your cup right here.</>
+                <>If Safari didn't open, tap the <strong>•••</strong> (or share) button and choose <strong>“Open in Safari”</strong>, or collect your cup right here.</>
               ) : (
                 <>We asked your phone to open this in your default browser. Nothing happened? You can still collect your cup right here.</>
               )}

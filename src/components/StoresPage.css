@@ -119,31 +119,45 @@
 .stores2__claims .pc { width: 100%; max-width: 100%; margin: 0; }
 .stores2__claims .pc__head { margin-left: 0; margin-right: 0; }
 
-/* Search-focused: collapse Nearby + Map to icon-only so the field expands. */
+/* Search-focused: collapse Nearby + Map to icon-only so the field glides open.
+   The labels shrink + fade on one easing curve (clipped by the button's own
+   overflow), the button reflows to a square as its content narrows, and the
+   search field flows into the freed space — no width jump. */
 .stores2__nearbybtn, .stores2__mapbtn {
+  overflow: hidden;
   transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease,
-              transform 0.08s ease, width 0.2s ease, padding 0.2s ease;
+              transform 0.08s ease,
+              gap 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+              padding 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.stores2__nearby-label, .stores2__mapbtn-label {
+  display: inline-block; overflow: hidden; white-space: nowrap;
+  max-width: 74px; opacity: 1;
+  transition: max-width 0.34s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
 }
 .stores2__filterbar.is-searching .stores2__nearby-label,
-.stores2__filterbar.is-searching .stores2__mapbtn-label { display: none; }
+.stores2__filterbar.is-searching .stores2__mapbtn-label { max-width: 0; opacity: 0; }
 .stores2__filterbar.is-searching .stores2__nearbybtn,
-.stores2__filterbar.is-searching .stores2__mapbtn { width: 42px; min-width: 42px; padding: 0; gap: 0; }
+.stores2__filterbar.is-searching .stores2__mapbtn { padding: 0 13px; gap: 0; }
 
-/* Locate-me button on the map (bottom-right, above the attribution). */
+/* Locate-me button on the map (bottom-right, above the attribution). Coloured
+   blue to match the "you are here" dot, so it reads clearly as a location
+   control against the map tiles. */
 .stores2__locate {
   position: absolute; right: 12px; bottom: 26px; z-index: 1000;
-  width: 42px; height: 42px; border-radius: 12px; border: none;
+  width: 44px; height: 44px; border-radius: 12px; border: none;
   display: flex; align-items: center; justify-content: center;
-  background: var(--white, #fff); color: #2A2724; cursor: pointer;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
-  transition: background 0.14s ease, transform 0.08s ease;
+  background: #2E7DF6; color: #fff; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(46, 125, 246, 0.45);
+  transition: background 0.14s ease, transform 0.08s ease, box-shadow 0.14s ease;
 }
-.stores2__locate:hover { background: #F3EEE4; }
+.stores2__locate:hover { background: #1E6BE0; }
 .stores2__locate:active { transform: scale(0.94); }
+.stores2__locate.is-active { background: #1E6BE0; box-shadow: 0 4px 16px rgba(46, 125, 246, 0.6); }
 .stores2__locate:disabled { cursor: default; }
 .stores2__locate-spinner {
   width: 18px; height: 18px; border-radius: 50%;
-  border: 2.4px solid rgba(0, 0, 0, 0.16); border-top-color: #2A2724;
+  border: 2.4px solid rgba(255, 255, 255, 0.45); border-top-color: #fff;
   animation: stores2-spin 0.7s linear infinite;
 }
 

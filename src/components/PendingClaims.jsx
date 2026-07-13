@@ -123,40 +123,30 @@ function ClaimCard({ claim, onCollect, collected }) {
           <span className="pc-card__name">{name}</span>
           <span className="pc-card__amount">{amount} cashback</span>
         </div>
-        <span className={`pc-card__badge${ready ? ' is-ready' : ''}`}>
-          {ready ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
-          )}
-          {ready ? 'Ready' : 'In review'}
-        </span>
-      </div>
-
-      <Steps ready={ready} />
-
-      {ready ? (
-        <>
-          <p className="pc-card__msg">Approved by our team. Collect your <strong>{amount}</strong> cashback through the secure Tikkie link.</p>
+        {ready ? (
           <a
-            className="pc-card__collect"
+            className="pc-card__collect-link"
             href={claim.tikkie_url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => onCollect?.(claim)}
           >
-            {collected ? 'Reopen Tikkie link' : 'Collect via Tikkie'}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {collected ? 'Reopen link' : 'Collect via Tikkie'}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
             </svg>
           </a>
-        </>
-      ) : (
-        <>
-          <p className="pc-card__msg">A PackPerks team member checks every receipt by hand. Your Tikkie link to collect this cashback arrives within <strong>7 days</strong>.</p>
-          <NotifyOptions claim={claim} />
-        </>
-      )}
+        ) : (
+          <span className="pc-card__badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+            In review
+          </span>
+        )}
+      </div>
+
+      <Steps ready={ready} />
+
+      {!ready && <NotifyOptions claim={claim} />}
     </article>
   );
 }

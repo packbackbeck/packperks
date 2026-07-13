@@ -115,7 +115,7 @@ export const COPY_PRESETS = {
     heroHeadline: 'Bring your cup, earn cashback',
     heroSubtext:  'Use your own reusable cup and collect rewards every time you refill.',
     // Intro line under the logo on the multi-venue Stores page.
-    storesIntro:  'Bring your own cup to any café below and scan the QR to collect cups, then turn them into real cashback. New here? Just pick a store to start.',
+    storesIntro:  'PackPerks pays you back for reusing your cup. Collect cups at the cafés below and turn them into real cashback, no deposit, no catch.',
     designCopy: {
       badgeText:         'My Cups',
       shareButtonLabel:  'Share a cup',

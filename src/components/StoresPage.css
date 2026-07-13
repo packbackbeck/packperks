@@ -84,6 +84,74 @@
 .stores2__mapbtn:active { transform: scale(0.97); }
 .stores2__mapbtn svg { flex-shrink: 0; }
 
+/* "Nearby" sort toggle — between the search field and the Map switch. Off: a
+   light pill. On: brand green. One tap sorts by distance, a second turns off. */
+.stores2__nearbybtn {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 42px; padding: 0 13px; border: none; border-radius: 12px;
+  background: var(--white, #fff); color: #2A2724; cursor: pointer;
+  font-family: inherit; font-size: 13.5px; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.08s ease;
+}
+.stores2__nearbybtn:hover { background: #FBF7EF; }
+.stores2__nearbybtn:active { transform: scale(0.97); }
+.stores2__nearbybtn.is-active {
+  background: var(--pb-green, #1A8737); color: #fff;
+  box-shadow: 0 2px 10px rgba(26, 135, 55, 0.34);
+}
+.stores2__nearbybtn:disabled { opacity: 0.7; cursor: default; }
+.stores2__nearbybtn svg { flex-shrink: 0; }
+.stores2__nearby-spinner {
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.18); border-top-color: #2A2724;
+  animation: stores2-spin 0.7s linear infinite;
+}
+@keyframes stores2-spin { to { transform: rotate(360deg); } }
+
+/* Cashback-claims-in-progress showcase wrapper. Collapses when there are no
+   active claims (PendingClaims renders nothing). */
+.stores2__claims { width: 100%; }
+.stores2__claims:empty { display: none; }
+
+/* Locate-me button on the map (bottom-right, above the attribution). */
+.stores2__locate {
+  position: absolute; right: 12px; bottom: 26px; z-index: 1000;
+  width: 42px; height: 42px; border-radius: 12px; border: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--white, #fff); color: #2A2724; cursor: pointer;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
+  transition: background 0.14s ease, transform 0.08s ease;
+}
+.stores2__locate:hover { background: #F3EEE4; }
+.stores2__locate:active { transform: scale(0.94); }
+.stores2__locate:disabled { cursor: default; }
+.stores2__locate-spinner {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2.4px solid rgba(0, 0, 0, 0.16); border-top-color: #2A2724;
+  animation: stores2-spin 0.7s linear infinite;
+}
+
+/* "You are here" marker — a pulsing blue dot. */
+.stores2__userdot-icon { background: transparent; border: none; }
+.stores2__userdot {
+  position: relative; display: block;
+  width: 16px; height: 16px; margin: 4px auto; border-radius: 50%;
+  background: #2E7DF6; border: 3px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.stores2__userdot::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(46, 125, 246, 0.5);
+  animation: stores2-userpulse 1.8s ease-out infinite;
+}
+@keyframes stores2-userpulse {
+  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+}
+
 /* ── Coming-soon (not-yet) venues — same list as participating stores ───── */
 .stores2__card--notyet {
   cursor: default; background: rgba(0, 0, 0, 0.02);
@@ -285,7 +353,7 @@
 .stores2__thumb-slide { flex: 0 0 100%; width: 100%; height: 100%; object-fit: cover; }
 
 /* ── Map view (fills the screen height) ──────────────────────────────── */
-.stores2__map { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+.stores2__map { position: relative; display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
 .stores2__map-canvas {
   position: relative; width: 100%; flex: 1; min-height: 440px; border-radius: 22px;
   overflow: hidden; box-shadow: var(--shadow-screen, 0 6px 24px rgba(0, 0, 0, 0.08));

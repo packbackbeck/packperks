@@ -8,7 +8,27 @@ import { supabase } from '../lib/supabase';
 import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
 import { getNotYetStores } from '../lib/notYetStores';
 import { detectImageBg, useImageBg } from '../lib/imageBg';
+import PendingClaims from './PendingClaims';
+import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
 import './StoresPage.css';
+
+// Great-circle distance in km between two {lat,lng} points (Haversine). Used to
+// sort venues by how close they are to the customer when "Nearby" is on.
+function distanceKm(a, b) {
+  if (!a || !b || a.lat == null || b.lat == null || a.lng == null || b.lng == null) return Infinity;
+  const R = 6371, toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+// "You are here" marker for the map's locate button — a pulsing blue dot.
+const userDotIcon = L.divIcon({
+  className: 'stores2__userdot-icon',
+  html: '<span class="stores2__userdot"></span>',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
 
 const LockIcon = ({ size = 12 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -245,10 +265,12 @@ function notYetPopupHtml(s, count, threshold, done) {
 /* Real map via Leaflet + OpenStreetMap tiles (free, no API key). Plots a
  * marker at each store's actual coordinates; the marker popup shows the
  * store name, address and cups, with a button to open that store. */
-function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore, requested = new Set(), reqCounts = {}, notYetThreshold = 10 }) {
+function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore, requested = new Set(), reqCounts = {}, notYetThreshold = 10, userLoc = null, onLocate }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const [locating, setLocating] = useState(false);
   const fitSigRef = useRef(null); // only refit the map when the geography changes
   const onSelectRef = useRef(onSelectStore);
   onSelectRef.current = onSelectStore;
@@ -318,7 +340,7 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
       };
     });
     setTimeout(() => map.invalidateSize(), 80);
-    return () => { map.remove(); mapRef.current = null; layerRef.current = null; };
+    return () => { map.remove(); mapRef.current = null; layerRef.current = null; userMarkerRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -398,9 +420,62 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, highlightId, logoBgSig, notYetStateSig]);
 
+  // Add or move the "you are here" marker on the CURRENT map. hasLayer() guards
+  // against a stale marker left on a torn-down map (dev StrictMode remount).
+  const showUserMarker = (loc) => {
+    const map = mapRef.current;
+    if (!map || !loc || loc.lat == null) return;
+    if (userMarkerRef.current && map.hasLayer(userMarkerRef.current)) {
+      userMarkerRef.current.setLatLng([loc.lat, loc.lng]);
+    } else {
+      userMarkerRef.current = L.marker([loc.lat, loc.lng], { icon: userDotIcon, zIndexOffset: 1000, interactive: false, keyboard: false }).addTo(map);
+    }
+  };
+
+  // Keep the marker in sync with the shared user location (set by this button or
+  // by "Nearby"). Placed, not auto-centred.
+  useEffect(() => {
+    if (userLoc && userLoc.lat != null) showUserMarker(userLoc);
+    else if (userMarkerRef.current && mapRef.current?.hasLayer(userMarkerRef.current)) {
+      mapRef.current.removeLayer(userMarkerRef.current);
+      userMarkerRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userLoc]);
+
+  // Locate button: get the user's position (asking permission if needed), drop
+  // the marker, and recentre the map on it. Reuses a location already granted.
+  const handleLocate = async () => {
+    setLocating(true);
+    let loc = null;
+    try { loc = await onLocate?.(); } catch { /* denied / unavailable */ }
+    setLocating(false);
+    if (loc && loc.lat != null && mapRef.current) {
+      showUserMarker(loc);
+      mapRef.current.setView([loc.lat, loc.lng], 15, { animate: true });
+    }
+  };
+
   return (
     <div className="stores2__map">
       <div ref={containerRef} className="stores2__map-canvas" />
+      {onLocate && (
+        <button
+          type="button"
+          className={`stores2__locate${locating ? ' is-locating' : ''}`}
+          onClick={handleLocate}
+          disabled={locating}
+          aria-label="Find my location"
+        >
+          {locating ? (
+            <span className="stores2__locate-spinner" aria-hidden="true" />
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3.2" /><line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" />
+            </svg>
+          )}
+        </button>
+      )}
       {withCoords.length === 0 && notYetCoords.length === 0 && (
         <p className="stores2__map-hint">No store locations to show yet.</p>
       )}
@@ -478,7 +553,7 @@ function StoresImpact({ personalCups }) {
   );
 }
 
-const DEFAULT_INTRO = 'Bring your own cup to any café below and scan the QR to collect cups, then turn them into real cashback. New here? Just pick a store to start.';
+const DEFAULT_INTRO = 'PackPerks pays you back for reusing your cup. Collect cups at the cafés below and turn them into real cashback, no deposit, no catch.';
 
 /* Pull the city from a free-form area string ("De Pijp, Amsterdam" → "Amsterdam"). */
 function cityFromArea(area) {
@@ -495,6 +570,7 @@ export default function StoresPage({
   showNotYet = true,
   notYetStores = null,
   notYetThreshold = 10,
+  userClaims = [],
   onSelectStore,
   onOpenAccount,
   onOpenGuide,
@@ -503,6 +579,46 @@ export default function StoresPage({
 }) {
   const [view, setView] = useState('list');
   const [query, setQuery] = useState('');
+
+  // ── Cashback claims in progress (showcased at the top of the market) ──
+  // Enrich each claim with its reward's name/image by searching across every
+  // store in the group (claims can be from any venue). PendingClaims filters to
+  // the active ones (in review / ready to collect) itself.
+  const enrichedClaims = useMemo(() => (userClaims || []).map((c) => {
+    let reward = null;
+    for (const st of stores) {
+      const r = (st.rewards || []).find((rr) => rr.id === c.reward_id);
+      if (r) { reward = r; break; }
+    }
+    return { ...c, rewardName: reward?.name || c.reward_id || 'Cashback reward', rewardImage: reward?.image || null, rewardBg: reward?.bgColor || null };
+  }), [userClaims, stores]);
+  const [collectedClaims, setCollectedClaims] = useState(() => getCollectedMap());
+  const handleCollectClaim = (claim) => {
+    if (!claim?.id) return;
+    markClaimCollected(claim.id);
+    setCollectedClaims({ ...getCollectedMap() });
+  };
+
+  // ── "Nearby" sort: one tap sorts venues by distance to the customer (asks
+  // for location permission), a second tap turns it back off. ──
+  const [nearby, setNearby] = useState(false);
+  const [userLoc, setUserLoc] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const requestLocation = () => new Promise((resolve) => {
+    if (userLoc) { resolve(userLoc); return; }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) { resolve(null); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setLocating(false); const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; setUserLoc(loc); resolve(loc); },
+      () => { setLocating(false); resolve(null); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  });
+  const toggleNearby = async () => {
+    if (nearby) { setNearby(false); return; }
+    const loc = await requestLocation();
+    if (loc) setNearby(true);
+  };
   // Vendors this device has already requested — persisted so a page refresh
   // can't let the same person vote for the same venue again.
   const [requested, setRequested] = useState(() => {
@@ -534,11 +650,18 @@ export default function StoresPage({
   const cmpCupsThenName = (a, b) =>
     (b.balance || 0) - (a.balance || 0) || (a.name || '').localeCompare(b.name || '');
 
-  // Participating stores — filtered by search, then ordered cups-first / A→Z.
+  // Participating stores — filtered by search. Ordered by distance to the
+  // customer when "Nearby" is on (venues without coordinates fall to the end),
+  // otherwise cups-first / A→Z.
   const sortedStores = useMemo(() => {
-    return stores.filter(matchQ).sort(cmpCupsThenName);
+    const list = stores.filter(matchQ);
+    if (nearby && userLoc) {
+      return list.slice().sort((a, b) =>
+        (distanceKm(userLoc, a.location) - distanceKm(userLoc, b.location)) || cmpCupsThenName(a, b));
+    }
+    return list.sort(cmpCupsThenName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stores, q]);
+  }, [stores, q, nearby, userLoc]);
 
   // "Coming soon" venues — admin-edited list from the group config when present,
   // otherwise the curated region defaults. Each gets a stable brand colour.
@@ -616,8 +739,15 @@ export default function StoresPage({
       {/* Newcomer-focused headline + value prop — this is the entry page for
           first-time users, so it sells the reward, not just "browse stores". */}
       <div className="stores2__intro-block">
-        <h1 className="stores2__headline">Get <span className="stores2__headline-accent">cashback</span> for your reusable cup</h1>
+        <h1 className="stores2__headline">Earn real <span className="stores2__headline-accent">cashback</span> for reusing your cup</h1>
         <p className="stores2__intro">{intro || DEFAULT_INTRO}</p>
+      </div>
+
+      {/* Cashback claims in progress — showcased here so customers can track and
+          collect them from the market too, not only their profile. Renders
+          nothing when there are no active claims. */}
+      <div className="stores2__claims">
+        <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} onCollect={handleCollectClaim} />
       </div>
 
       {/* Search + view switch — filters both the list and the map at once.
@@ -640,6 +770,24 @@ export default function StoresPage({
             </button>
           )}
         </div>
+        <button
+          type="button"
+          className={`stores2__nearbybtn${nearby ? ' is-active' : ''}`}
+          onClick={toggleNearby}
+          disabled={locating && !nearby}
+          aria-pressed={nearby}
+          aria-label={nearby ? 'Turn off nearby sorting' : 'Sort venues by nearest to me'}
+          title={nearby ? 'Sorted by nearest — tap to turn off' : 'Sort by nearest to me'}
+        >
+          {locating && !nearby ? (
+            <span className="stores2__nearby-spinner" aria-hidden="true" />
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z" /><circle cx="12" cy="10" r="2.6" />
+            </svg>
+          )}
+          <span className="stores2__nearby-label">Nearby</span>
+        </button>
         <button
           type="button"
           className="stores2__mapbtn"
@@ -670,6 +818,8 @@ export default function StoresPage({
           requested={requested}
           reqCounts={reqCounts}
           notYetThreshold={notYetThreshold}
+          userLoc={userLoc}
+          onLocate={requestLocation}
         />
       ) : (
         <>

@@ -121,28 +121,6 @@
 }
 .pc-card__badge.is-ready { background: #E3F3E8; color: var(--pb-green); }
 
-/* Ready claim: the collect action sits where the status badge would be, so a
-   ready card reads as a single tap-to-collect row (no separate CTA/message). */
-.pc-card__collect-link {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 13px;
-  border-radius: 999px;
-  background: var(--pb-green);
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 800;
-  text-decoration: none;
-  white-space: nowrap;
-  box-shadow: 0 3px 10px rgba(47, 138, 74, 0.28);
-  transition: filter 0.14s ease, transform 0.08s ease;
-}
-.pc-card__collect-link:hover { filter: brightness(0.96); }
-.pc-card__collect-link:active { transform: scale(0.97); }
-.pc-card__collect-link svg { flex: none; }
-
 .pc-card__msg {
   margin: 13px 0 0;
   font-size: 13px;

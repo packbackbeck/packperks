@@ -2707,6 +2707,17 @@ export async function getStoreRequests(region) {
   return [...byKey.values()].sort((a, b) => (b.count - a.count) || (b.lastAt > a.lastAt ? 1 : -1));
 }
 
+/* Remove a customer store request (every row that shares the name, so the
+ * grouped entry disappears). Name-matched case-insensitively; `%`/`_` are
+ * escaped so a literal name never acts as a LIKE pattern. */
+export async function deleteStoreRequest(name) {
+  const clean = String(name || '').trim();
+  if (!clean) return;
+  const pattern = clean.replace(/([%_\\])/g, '\\$1');
+  const { error } = await supabase.from('store_requests').delete().ilike('name', pattern);
+  if (error) throw error;
+}
+
 /* Count "Request it" taps per future vendor (from client_events), so admins can
  * see which coming-soon venue customers want most. Returns { name: count }. */
 export async function getFutureVendorStats(region) {

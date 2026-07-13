@@ -7,6 +7,7 @@ import {
   saveNotYetVendors,
   getFutureVendorStats,
   getStoreRequests,
+  deleteStoreRequest,
 } from '../lib/adminApi';
 import { getNotYetStores } from '../../lib/notYetStores';
 import './AdminFutureVendors.css';
@@ -141,9 +142,19 @@ function Manager({ group, busy, showNotYet, threshold, onToggle, onThreshold, on
   const [sort, setSort] = useState('requests');    // 'requests' | 'az'
 
   const [requests, setRequests] = useState(null);
+  const [removing, setRemoving] = useState(null);
 
   useEffect(() => { getFutureVendorStats(region).then(setStats).catch(() => setStats({})); }, [region]);
   useEffect(() => { getStoreRequests(region).then(setRequests).catch(() => setRequests([])); }, [region]);
+
+  const removeRequest = async (name) => {
+    setRemoving(name.toLowerCase());
+    try {
+      await deleteStoreRequest(name);
+      setRequests(rs => (rs || []).filter(r => r.name.toLowerCase() !== name.toLowerCase()));
+    } catch { /* leave the row so the admin can retry */ }
+    finally { setRemoving(null); }
+  };
 
   const reqOf = (name) => (stats && stats[name]) || 0;
   const totalReq = stats ? Object.values(stats).reduce((a, b) => a + b, 0) : 0;
@@ -302,6 +313,15 @@ function Manager({ group, busy, showNotYet, threshold, onToggle, onThreshold, on
                   disabled={busy}
                 >
                   Add as vendor
+                </button>
+                <button
+                  className="afv__iconbtn afv__iconbtn--del"
+                  onClick={() => removeRequest(r.name)}
+                  disabled={removing === r.name.toLowerCase()}
+                  title="Delete request"
+                  aria-label={`Delete request for ${r.name}`}
+                >
+                  <IconTrash />
                 </button>
               </li>
             ))}

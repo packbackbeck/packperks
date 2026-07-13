@@ -948,11 +948,15 @@ export default function StoresPage({
 function StoreRequestForm({ region = 'NL', suggested = '', emphasized = false }) {
   const [name, setName] = useState('');
   const [state, setState] = useState('idle');   // idle | sending | done
+  const editedRef = useRef(false);
 
-  // Pre-fill with the failed search term the first time this becomes the
-  // no-results prompt — but never clobber something the customer typed.
+  // Mirror the failed search term into the field while the customer hasn't
+  // typed here directly. (An earlier "only when empty" version froze at the
+  // first few letters that stopped matching, so the field showed just those.)
+  // Reset once the search clears, so the next no-results search mirrors again.
   useEffect(() => {
-    if (emphasized && suggested && name.trim() === '') setName(suggested);
+    if (emphasized && !editedRef.current) setName(suggested);
+    if (!suggested) editedRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emphasized, suggested]);
 
@@ -991,7 +995,7 @@ function StoreRequestForm({ region = 'NL', suggested = '', emphasized = false })
           className="stores2__reqform-input"
           placeholder="Store name and city"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => { editedRef.current = true; setName(e.target.value); }}
           maxLength={200}
           aria-label="Store you’d like to see on PackPerks"
         />

@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import packperksLogo from '../assets/images/packperks-wordmark.svg';
 import { getGlobalImpact, submitStoreRequest } from '../lib/api';
+import { scoreStore } from '../lib/onboarding';
 import { supabase } from '../lib/supabase';
 import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
 import { getNotYetStores } from '../lib/notYetStores';
@@ -574,6 +575,7 @@ export default function StoresPage({
   notYetStores = null,
   notYetThreshold = 10,
   userClaims = [],
+  onboardingPrefs = null,
   onSelectStore,
   onOpenAccount,
   onOpenGuide,
@@ -655,19 +657,22 @@ export default function StoresPage({
   // Fixed order: most cups first, then alphabetical.
   const cmpCupsThenName = (a, b) =>
     (b.balance || 0) - (a.balance || 0) || (a.name || '').localeCompare(b.name || '');
+  // Onboarding match score (0 without prefs), applied before the cups/name
+  // order so cafés matching the customer's city + drinks float to the top.
+  const cmpByPrefs = (a, b) => (scoreStore(b, onboardingPrefs) - scoreStore(a, onboardingPrefs));
 
   // Participating stores — filtered by search. Ordered by distance to the
   // customer when "Nearby" is on (venues without coordinates fall to the end),
-  // otherwise cups-first / A→Z.
+  // otherwise onboarding match first, then cups-first / A→Z.
   const sortedStores = useMemo(() => {
     const list = stores.filter(matchQ);
     if (nearby && userLoc) {
       return list.slice().sort((a, b) =>
         (distanceKm(userLoc, a.location) - distanceKm(userLoc, b.location)) || cmpCupsThenName(a, b));
     }
-    return list.sort(cmpCupsThenName);
+    return list.slice().sort((a, b) => cmpByPrefs(a, b) || cmpCupsThenName(a, b));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stores, q, nearby, userLoc]);
+  }, [stores, q, nearby, userLoc, onboardingPrefs]);
 
   // "Coming soon" venues — admin-edited list from the group config when present,
   // otherwise the curated region defaults. Each gets a stable brand colour.
@@ -695,9 +700,9 @@ export default function StoresPage({
       return list.slice().sort((a, b) =>
         (distanceKm(userLoc, a.location) - distanceKm(userLoc, b.location)) || (a.name || '').localeCompare(b.name || ''));
     }
-    return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    return list.slice().sort((a, b) => cmpByPrefs(a, b) || (a.name || '').localeCompare(b.name || ''));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notYet, q, nearby, userLoc]);
+  }, [notYet, q, nearby, userLoc, onboardingPrefs]);
 
   // The lead "hero" (your top store) only fits the default, unsearched view.
   const showHero = !q;

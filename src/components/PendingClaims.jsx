@@ -59,7 +59,7 @@ export default function PendingClaims({ claims = [], collectedMap = {}, onCollec
         <span className="pc__title">Your cashback claims</span>
         <span className="pc__count">{active.length} in progress</span>
       </div>
-      <div className="pc__rail" ref={railRef} onScroll={onScroll}>
+      <div className={`pc__rail${active.length === 1 ? ' pc__rail--single' : ''}`} ref={railRef} onScroll={onScroll}>
         {active.map(c => <ClaimCard key={c.id} claim={c} onCollect={onCollect} collected={collectedMap[c.id] != null} />)}
       </div>
       {active.length > 1 && (

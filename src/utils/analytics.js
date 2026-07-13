@@ -51,6 +51,12 @@ const EVENTS = {
   NAME_REGENERATED:       'name_regenerated',
   REWARD_CARD_OPENED:     'reward_card_opened',
   STORE_REQUESTED:        'store_requested',   // "Request it" on a coming-soon venue
+  // ── Onboarding funnel ──
+  ONB_SCREEN_VIEWED:      'onboarding_screen_viewed',
+  ONB_CTA:                'onboarding_cta_clicked',
+  ONB_COUNTRY:            'onboarding_country_selected',
+  ONB_CITY:               'onboarding_city_selected',
+  ONB_COMPLETED:          'onboarding_completed',
   // ── In-app browser redirect (Android) ──
   INAPP_PROMPT_SHOWN:     'inapp_prompt_shown',
   OPEN_IN_DEFAULT_BROWSER:'open_in_default_browser',
@@ -85,6 +91,11 @@ const PERSISTED = new Set([
   EVENTS.NAME_REGENERATED,
   EVENTS.REWARD_CARD_OPENED,
   EVENTS.STORE_REQUESTED,
+  EVENTS.ONB_SCREEN_VIEWED,
+  EVENTS.ONB_CTA,
+  EVENTS.ONB_COUNTRY,
+  EVENTS.ONB_CITY,
+  EVENTS.ONB_COMPLETED,
 ]);
 
 /**

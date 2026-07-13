@@ -273,10 +273,23 @@ export default function UserPage({
   storeName,
   // Admin-editable privacy policy text (falls back to the bundled default).
   privacyPolicy,
+  // Secret: tapping the build stamp 3× re-opens the onboarding flow.
+  onReopenOnboarding,
 }) {
   // Refresh claim status when the user enters this page — admin approvals
   // that happened while the user wasn't looking get pulled in automatically.
   useEffect(() => { onRefreshClaims?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  // Secret re-open: three taps on the version within ~1.2s reopens onboarding.
+  const versionTaps = useRef({ n: 0, t: null });
+  const bumpVersion = () => {
+    if (!onReopenOnboarding) return;
+    const s = versionTaps.current;
+    s.n += 1;
+    clearTimeout(s.t);
+    s.t = setTimeout(() => { s.n = 0; }, 1200);
+    if (s.n >= 3) { s.n = 0; clearTimeout(s.t); onReopenOnboarding(); }
+  };
 
   // Enrich claims with a human-readable reward name so the modal can match
   // them against the activity_history label ("Claimed: Chicken Sandwich").
@@ -814,7 +827,7 @@ export default function UserPage({
           </button>
         )}
         {BUILD_STAMP && (
-          <p className="user-page__build" title="App version (build time)">
+          <p className="user-page__build" title="App version (build time)" onClick={bumpVersion}>
             Build {BUILD_STAMP}
           </p>
         )}

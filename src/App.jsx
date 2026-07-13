@@ -24,6 +24,8 @@ import AppErrorScreen from './components/AppErrorScreen';
 import SignInSheet from './components/SignInSheet';
 import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
+import Onboarding from './components/onboarding/Onboarding';
+import { getOnboarding, setOnboarding, isOnboardingDone } from './lib/onboarding';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
 import { getShotPreset } from './lib/shotPresets'; // DEV-only screen-audit harness
@@ -195,6 +197,10 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initError, setInitError] = useState(null);
 
+  /* ── Onboarding (first-time market visitors + a secret re-open) ── */
+  const [onboardingPrefs, setOnboardingPrefs] = useState(() => getOnboarding());
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   /* ── Email magic-link auth (optional account binding) ── */
   // `authEmail` is null when the user is in anonymous device-only mode
   // and set once they've verified an email via the magic-link flow.
@@ -337,6 +343,20 @@ export default function App() {
   useEffect(() => {
     track(EVENTS.SCREEN_VIEW, { screen: page });
   }, [page]);
+
+  // First-time market visitors get the onboarding flow. Skipped while the
+  // screenshot harness runs (so captures aren't blocked) and once completed
+  // (so it never nags returning users). Auto-triggers at most once per session
+  // (a skip doesn't re-nag mid-session, but a fresh load re-offers it until
+  // completed). Reopened manually via the profile's secret tap.
+  const onboardingAutoRef = useRef(false);
+  useEffect(() => {
+    if (shot || onboardingAutoRef.current) return;
+    if (page === 'stores' && !isOnboardingDone()) {
+      onboardingAutoRef.current = true;
+      setShowOnboarding(true);
+    }
+  }, [page, shot]);
 
   /* ── Detail sheet ── */
   const [detailReward, setDetailReward] = useState(null);
@@ -1387,6 +1407,22 @@ export default function App() {
     return <HomeSkeleton />;
   }
 
+  // Full-screen onboarding takes over when active (first visit or secret
+  // re-open). It saves the answers, which then reorder the market page.
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        onClose={() => setShowOnboarding(false)}
+        onComplete={(data) => {
+          setOnboarding(data);
+          setOnboardingPrefs(data);
+          setShowOnboarding(false);
+          if (page !== 'stores') setPage('stores');
+        }}
+      />
+    );
+  }
+
   if (initError) {
     return <AppErrorScreen error={initError} />;
   }
@@ -1536,6 +1572,7 @@ export default function App() {
           notYetStores={groupCtx?.groupConfig?.settings?.notYetVendors || null}
           notYetThreshold={groupCtx?.groupConfig?.settings?.notYetThreshold || 10}
           userClaims={userClaims}
+          onboardingPrefs={onboardingPrefs}
           onRequestStore={(s) => track('store_requested', { name: s?.name, area: s?.area, region: storesRegion })}
           onSelectStore={(store) => {
             // Open the store within the group: /<groupSlug>/<orgSlug>.
@@ -1660,6 +1697,7 @@ export default function App() {
           showImpact={showImpact}
           lifetimeCups={lifetimeCups}
           copy={effDesignCopy}
+          onReopenOnboarding={() => setShowOnboarding(true)}
           onRefreshClaims={async () => {
             // Re-pull claims when user lands on the activity tab — that's when
             // they'd notice an admin status change. Cheap enough to do eagerly.

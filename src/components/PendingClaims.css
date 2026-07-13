@@ -38,6 +38,9 @@
   scrollbar-width: none;
 }
 .pc__rail::-webkit-scrollbar { display: none; }
+/* A single claim never needs to scroll, so let its soft drop shadow spill
+   instead of being clipped by the scroll box. Several claims keep scrolling. */
+.pc__rail--single { overflow: visible; }
 
 .pc-card {
   scroll-snap-align: start;

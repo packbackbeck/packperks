@@ -8,6 +8,9 @@
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.28);
+  /* Blur the dimmed app behind the sheet so focus sits on the choice. */
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
   padding: 12px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   animation: cc-fade 0.2s ease both;
@@ -63,6 +66,53 @@
   padding: 8px;
 }
 .cc-btn--ghost:hover { color: var(--black, #2A2724); }
+
+/* ── Customize page: header with back, toggle rows, switches ── */
+.cc-head--sub { margin-bottom: 6px; }
+.cc-back {
+  flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--white, #fff); color: var(--black, #2A2724);
+  border: none; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: transform 0.12s ease;
+}
+.cc-back:active { transform: scale(0.94); }
+
+.cc-toggles {
+  display: flex; flex-direction: column;
+  background: var(--white, #fff);
+  border-radius: 16px;
+  padding: 4px 16px;
+  margin: 2px 0 16px;
+}
+.cc-toggle {
+  display: flex; align-items: center; gap: 14px;
+  padding: 15px 0;
+}
+.cc-toggle + .cc-toggle { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.cc-toggle__label { flex: 1; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+.cc-toggle__title { font-size: 15px; font-weight: 700; color: var(--black, #1a1a1a); }
+.cc-toggle__desc { font-size: 12.5px; line-height: 1.4; color: var(--text-light, #8A8175); }
+
+/* iOS-style switch — green (brand) when on, grey when off. */
+.cc-switch { flex-shrink: 0; position: relative; display: inline-flex; cursor: pointer; }
+.cc-switch__input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.cc-switch__track {
+  width: 48px; height: 29px; border-radius: 999px;
+  background: #D8D2C7;
+  transition: background 0.18s ease;
+  display: inline-flex; align-items: center;
+}
+.cc-switch__thumb {
+  width: 25px; height: 25px; margin: 0 2px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cc-switch__input:checked + .cc-switch__track { background: var(--pb-green, #1A8737); }
+.cc-switch__input:checked + .cc-switch__track .cc-switch__thumb { transform: translateX(19px); }
+.cc-switch__input:focus-visible + .cc-switch__track { box-shadow: 0 0 0 3px rgba(26, 135, 55, 0.35); }
 
 .cc-policy-link {
   display: block; margin: 12px auto 0; padding: 4px;

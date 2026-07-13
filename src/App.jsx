@@ -28,6 +28,7 @@ import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
 import { getShotPreset } from './lib/shotPresets'; // DEV-only screen-audit harness
 import { track, EVENTS, setAnalyticsContext, getEntryContext, getInAppBrowserKind } from './utils/analytics';
+import { getConsentPrefs } from './lib/consent';
 import {
   getOrCreateUser,
   generateInitialProfile,
@@ -881,6 +882,27 @@ export default function App() {
     catch { /* parent might not exist */ }
     return () => window.removeEventListener('message', onMessage);
   }, []);
+
+  /* Server-side consent sync: mirror the Marketing cookie choice onto the user's
+   * row (users.marketing_consent) so the choice is stored + honoured server-side.
+   * (Analytical consent already takes effect client-side — client_events are only
+   * written with analytical consent; see utils/analytics.js. Technical is the
+   * essential baseline.) Runs once the user row exists and again whenever the
+   * choice changes, writing only on an actual change so the timestamp isn't
+   * churned on every load. */
+  useEffect(() => {
+    if (!userId) return undefined;
+    const sync = (marketing) => {
+      if (marketing === profile?.marketingConsent) return;
+      updateUserProfile(userId, { marketingConsent: marketing }).catch(() => {});
+    };
+    const prefs = getConsentPrefs();
+    if (prefs) sync(prefs.marketing);
+    const onChange = (e) => sync(!!e.detail?.marketing);
+    window.addEventListener('packperks:consent-changed', onChange);
+    return () => window.removeEventListener('packperks:consent-changed', onChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, profile?.marketingConsent]);
 
   /* ── Auth-state listener (email magic link flow) ──
    * Fires when:

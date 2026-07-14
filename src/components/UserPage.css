@@ -973,6 +973,11 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  /* Boxed like the other section cards, not bare text. */
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-screen);
+  padding: var(--sp-4);
 }
 
 .user-page__history-signin-btn {
@@ -1365,6 +1370,14 @@
   border: 1.5px solid var(--pb-orange);
 }
 .user-page__visitor-cta--alt:hover { filter: none; background: #FFF6F1; }
+.user-page__visitor-or {
+  align-self: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #A89E92;
+  margin: 1px 0;
+}
 
 /* ── Email preferences: marketing-consent toggle ── */
 .user-page__pref {
@@ -1418,3 +1431,111 @@
 /* Manage-email row + marketing toggle as padded list rows (the base
  * .user-page__pref has no padding of its own — needs it inside a list). */
 .user-page__pref--row { padding: 13px var(--sp-4); }
+
+/* ── Profile card (compact 2-column: avatar | identity) ── */
+.user-page__profile-card { gap: 0; padding: 16px; }
+.user-page__edit-chip {
+  position: absolute; top: 12px; right: 12px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border: 1px solid #EBE3D5; border-radius: 999px;
+  background: #FBF7EF; color: #6C6259;
+  font-family: var(--font-primary); font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.user-page__edit-chip:hover { background: #F1E9DA; color: var(--black); }
+.user-page__profile-row { display: flex; align-items: center; gap: 14px; }
+.user-page__profile-avatar {
+  flex: none; width: 60px; height: 60px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.user-page__profile-avatar-emoji { font-size: 32px; line-height: 1; }
+.user-page__profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.user-page__profile-details {
+  min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-right: 52px;
+}
+.user-page__profile-name {
+  font-family: var(--font-primary); font-size: 17px; font-weight: 800; color: var(--black);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.user-page__profile-email {
+  font-size: 13px; color: #7A7269; font-family: inherit;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: none; border: none; padding: 0; text-align: left;
+}
+.user-page__profile-email--add { color: var(--pb-orange); font-weight: 700; cursor: pointer; }
+.user-page__profile-device {
+  font-size: 12px; color: #A89E92; margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Edit-profile modal ── */
+.upedit-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(20, 14, 38, 0.5); backdrop-filter: blur(4px);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: upedit-fade 0.2s ease-out;
+}
+@keyframes upedit-fade { from { opacity: 0; } to { opacity: 1; } }
+.upedit {
+  width: 100%; max-width: 440px; background: #fff;
+  border-radius: 22px 22px 0 0; padding: 20px 22px calc(env(safe-area-inset-bottom, 0px) + 22px);
+  box-shadow: 0 -8px 30px rgba(83, 51, 165, 0.16);
+  animation: upedit-slide 0.26s cubic-bezier(0.32, 1.12, 0.55, 1);
+  display: flex; flex-direction: column; gap: 16px;
+}
+@keyframes upedit-slide { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (min-width: 640px) {
+  .upedit-overlay { align-items: center; }
+  .upedit { border-radius: 22px; padding-bottom: 22px; }
+}
+.upedit__head { display: flex; align-items: center; justify-content: space-between; }
+.upedit__title { margin: 0; font-size: 18px; font-weight: 800; color: var(--black); }
+.upedit__close {
+  width: 30px; height: 30px; border: none; border-radius: 50%;
+  background: #F5F0E7; color: #6C6259; cursor: pointer; display: grid; place-items: center;
+}
+.upedit__close:hover { background: #ECE5D8; color: var(--black); }
+.upedit__avatar-block { display: flex; align-items: center; gap: 14px; }
+.upedit__avatar {
+  flex: none; width: 66px; height: 66px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.upedit__avatar-emoji { font-size: 34px; line-height: 1; }
+.upedit__avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.upedit__avatar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.upedit__ghost {
+  padding: 8px 13px; border: 1px solid #E5DECF; border-radius: 10px;
+  background: #FBF7EF; color: #4A4540; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.upedit__ghost:hover { background: #F1E9DA; }
+.upedit__ghost--muted { color: #9A9186; }
+.upedit__field { display: flex; flex-direction: column; gap: 6px; }
+.upedit__label { font-size: 12px; font-weight: 700; color: #8A8175; letter-spacing: 0.02em; }
+.upedit__name-row { display: flex; gap: 8px; }
+.upedit__input {
+  flex: 1; min-width: 0; height: 44px; padding: 0 13px;
+  border: 1.5px solid #E5DECF; border-radius: 12px; background: #FAFAF8;
+  font-family: inherit; font-size: 16px; color: var(--black); outline: none;
+}
+.upedit__input:focus { border-color: var(--pb-purple-600); background: #fff; box-shadow: 0 0 0 3px rgba(83, 51, 165, 0.12); }
+.upedit__shuffle {
+  flex: none; width: 44px; height: 44px; border: 1.5px solid #E5DECF; border-radius: 12px;
+  background: #FBF7EF; color: #6C6259; cursor: pointer; display: grid; place-items: center;
+}
+.upedit__shuffle:hover { background: #F1E9DA; color: var(--black); }
+.upedit__row-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+  height: 44px; padding: 0 13px; border: 1.5px solid #E5DECF; border-radius: 12px; background: #FAFAF8;
+  font-family: inherit; font-size: 14px; color: var(--black); cursor: pointer;
+}
+.upedit__row-btn:hover { background: #fff; border-color: #D8CFBB; }
+.upedit__row-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upedit__row-add { color: var(--pb-orange); font-weight: 700; }
+.upedit__row-btn svg { flex: none; color: #B3ABA0; }
+.upedit__toggle { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; color: #4A4540; }
+.upedit__meta { margin: 0; font-size: 12px; color: #A89E92; text-align: center; }
+.upedit__done {
+  height: 50px; border: none; border-radius: 14px; background: var(--pb-purple-600); color: #fff;
+  font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer; transition: filter 0.14s ease;
+}
+.upedit__done:hover { filter: brightness(1.06); }

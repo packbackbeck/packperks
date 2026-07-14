@@ -332,11 +332,14 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
         Object.assign(identity, idPatch)
       }
 
-      // Backfill THIS row so the store shows the same profile as the others.
+      // Reconcile THIS row to the identity (the source of truth) so every store
+      // shows the same name/animal. Forcing the value — not just filling blanks —
+      // heals a stale row that kept a different auto-generated name from an
+      // earlier visit (the cause of the "name differs on the dashboard" bug).
       const rowPatch = {}
-      if (!userRow.display_name && canonName)               rowPatch.display_name = canonName
-      if (userRow.animal_index == null && canonAnimal != null) rowPatch.animal_index = canonAnimal
-      if (!userRow.email && canonEmail)                     rowPatch.email = canonEmail
+      if (canonName && userRow.display_name !== canonName)          rowPatch.display_name = canonName
+      if (canonAnimal != null && userRow.animal_index !== canonAnimal) rowPatch.animal_index = canonAnimal
+      if (!userRow.email && canonEmail)                            rowPatch.email = canonEmail
       if (Object.keys(rowPatch).length) {
         await supabase.from('users').update(rowPatch).eq('id', userRow.id)
         Object.assign(userRow, rowPatch)

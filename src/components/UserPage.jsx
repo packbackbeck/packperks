@@ -13,6 +13,7 @@ import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
 
 const DSAR_EMAIL = 'info@packback.network';
+const AVATAR_KEY = 'packperks_profile_avatar';
 
 /* Build timestamp, stamped at compile time by vite (see vite.config.js).
  * Shown subtly at the bottom of the profile so we can confirm which
@@ -153,6 +154,36 @@ export default function UserPage({
   const animal = animalForProfile(profile);
   const browserInfo = useMemo(() => getBrowserInfo(), []);
 
+  // Optional uploaded profile photo (overrides the emoji avatar). Kept on this
+  // device (localStorage) so it needs no storage bucket; downscaled on upload.
+  const [avatarUrl, setAvatarUrl] = useState(() => { try { return localStorage.getItem(AVATAR_KEY) || null; } catch { return null; } });
+  const [editOpen, setEditOpen] = useState(false);
+
+  const handleUploadAvatar = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const s = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+        const url = canvas.toDataURL('image/jpeg', 0.82);
+        try { localStorage.setItem(AVATAR_KEY, url); } catch { /* quota */ }
+        setAvatarUrl(url);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  const handleRemoveAvatar = () => {
+    try { localStorage.removeItem(AVATAR_KEY); } catch { /* ignore */ }
+    setAvatarUrl(null);
+  };
+
   const saveProfile = (updated) => {
     onSaveProfile(updated);
   };
@@ -181,6 +212,7 @@ export default function UserPage({
     track(EVENTS.NAME_REGENERATED);
     const fresh = generateProfile();
     saveProfile({ displayName: fresh.displayName, animalIndex: fresh.animalIndex });
+    return fresh;
   };
 
   const handleEditName = () => {
@@ -215,52 +247,38 @@ export default function UserPage({
         <div className="user-page__header-spacer" />
       </header>
 
-      {/* ── Profile card ── */}
-      <div className="user-page__card">
+      {/* ── Profile card — avatar + identity in one row; Edit opens the
+            details modal (name, photo, email, prefs). ── */}
+      <div className="user-page__card user-page__profile-card">
+        <button
+          type="button"
+          className="user-page__edit-chip"
+          onClick={() => setEditOpen(true)}
+          aria-label="Edit profile"
+        >
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828L6 16.828 2 18l1.172-4L13.586 3.586z"/>
+          </svg>
+          Edit
+        </button>
 
-        {/* Corner buttons — regenerate & edit (hidden while editing name) */}
-        {!isEditingName && (
-          <div className="user-page__card-actions">
-            <button className="user-page__name-icon-btn" onClick={handleRegenerate} aria-label="Regenerate name and avatar" title="Randomise">
-              {/* Clockwise refresh icon */}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="23 4 23 10 17 10"/>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-              </svg>
-            </button>
-            <button className="user-page__name-icon-btn" onClick={handleEditName} aria-label="Edit name" title="Edit name">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828L6 16.828 2 18l1.172-4L13.586 3.586z"/>
-              </svg>
-            </button>
+        <div className="user-page__profile-row">
+          <div className="user-page__profile-avatar" style={avatarUrl ? undefined : { background: animal.bg }}>
+            {avatarUrl
+              ? <img src={avatarUrl} alt="" className="user-page__profile-avatar-img" />
+              : <span className="user-page__profile-avatar-emoji" role="img" aria-label={animal.name}>{animal.emoji}</span>}
           </div>
-        )}
-
-        <div className="user-page__avatar" style={{ background: animal.bg }}>
-          <span className="user-page__avatar-emoji" role="img" aria-label={animal.name}>{animal.emoji}</span>
-        </div>
-        <div className="user-page__profile-info">
-          {isEditingName ? (
-            <div className="user-page__name-edit-row">
-              <input
-                className="user-page__name-input"
-                value={editNameValue}
-                onChange={e => setEditNameValue(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setIsEditingName(false); }}
-                autoFocus
-                aria-label="Edit display name"
-              />
-              <button className="user-page__name-icon-btn user-page__name-icon-btn--save" onClick={handleSaveName} aria-label="Save name">
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 10L8 14L16 6"/>
-                </svg>
+          <div className="user-page__profile-details">
+            <span className="user-page__profile-name">{profile.displayName}</span>
+            {(email || authEmail) ? (
+              <span className="user-page__profile-email">{email || authEmail}</span>
+            ) : (
+              <button type="button" className="user-page__profile-email user-page__profile-email--add" onClick={onOpenSignIn}>
+                Add email to save balance
               </button>
-            </div>
-          ) : (
-            <div className="user-page__name-row">
-              <span className="user-page__name">{profile.displayName}</span>
-            </div>
-          )}
+            )}
+            <span className="user-page__profile-device">{[profile.phone, browserInfo].filter(Boolean).join(', ')}</span>
+          </div>
         </div>
       </div>
 
@@ -275,22 +293,23 @@ export default function UserPage({
             Visitor
           </span>
           <h3 className="user-page__visitor-title">Get started</h3>
-          <p className="user-page__visitor-sub">Two ways to begin: scan your first cup, or save your email. Either one sets up your account and unlocks cashback.</p>
+          <p className="user-page__visitor-sub">Two ways to begin</p>
           <div className="user-page__visitor-ctas">
-            <button type="button" className="user-page__visitor-cta" onClick={onAddCup}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add your first cup
-            </button>
             {onOpenSignIn && (
-              <button type="button" className="user-page__visitor-cta user-page__visitor-cta--alt" onClick={onOpenSignIn}>
+              <button type="button" className="user-page__visitor-cta" onClick={onOpenSignIn}>
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
                 </svg>
                 Add your email
               </button>
             )}
+            {onOpenSignIn && <span className="user-page__visitor-or">OR</span>}
+            <button type="button" className="user-page__visitor-cta user-page__visitor-cta--alt" onClick={onAddCup}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add your first cup
+            </button>
           </div>
         </div>
       )}
@@ -394,81 +413,8 @@ export default function UserPage({
       {/* Save-your-cups prompt now lives inline on the Email row below
           (the empty-email state is an "Add email" action) — no separate banner. */}
 
-      {/* ── Details + account ── phone / browser / email, plus the email
-          management action and the marketing-email toggle, all in one card. */}
-      <div className="user-page__card user-page__card--list">
-        <div className="user-page__row">
-          <span className="user-page__row-label">Phone</span>
-          <span className="user-page__row-value">{profile.phone}</span>
-        </div>
-        <div className="user-page__divider" />
-        <div className="user-page__row">
-          <span className="user-page__row-label">Browser</span>
-          <span className="user-page__row-value">{browserInfo}</span>
-        </div>
-        <div className="user-page__divider" />
-        <div className="user-page__row">
-          <span className="user-page__row-label">Email</span>
-          {/* C.8.1: show the saved email OR the sign-in-session email — an
-              auth-linked user with no saved profile.email used to see a bare
-              "—". A true visitor (no email at all) gets an orange "Save my
-              balance" prompt instead of "—". */}
-          {(email || authEmail) ? (
-            emailRevealed ? (
-              <span className="user-page__row-value">{email || authEmail}</span>
-            ) : (
-              <button
-                className="user-page__row-value user-page__masked-value"
-                onClick={() => setEmailRevealed(true)}
-                title="Tap to reveal"
-              >
-                {maskEmail(email || authEmail)}
-              </button>
-            )
-          ) : (
-            <button
-              type="button"
-              className="user-page__row-value user-page__save-balance"
-              onClick={onOpenSignIn}
-              style={{ color: 'var(--pb-orange)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
-            >
-              Save my balance
-            </button>
-          )}
-        </div>
-
-        {/* Email management — always routes through the verified sign-in sheet.
-            Adding OR changing an email always requires confirming the 6-digit
-            code we email; there is no unverified direct-save path. */}
-        <div className="user-page__divider" />
-        <button
-          type="button"
-          className="user-page__data-row"
-          onClick={onOpenSignIn}
-        >
-          <span>{(emailSaved || authEmail) ? 'Manage email' : 'Add your email'}</span>
-          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-
-        {/* Marketing emails — one toggle row (no description). */}
-        {(emailSaved || authEmail) && !isEditingEmail && (
-          <>
-            <div className="user-page__divider" />
-            <label className="user-page__pref user-page__pref--row">
-              <span className="user-page__pref-title">Marketing emails</span>
-              <input
-                type="checkbox"
-                className="user-page__switch"
-                checked={!!profile.marketingConsent}
-                onChange={e => onSaveProfile({ marketingConsent: e.target.checked, marketingConsentSource: 'app_profile' })}
-                aria-label="Marketing emails"
-              />
-            </label>
-          </>
-        )}
-      </div>
+      {/* Account details (name, photo, email, marketing) now live in the
+          profile-card Edit modal — rendered near the end of this component. */}
 
       {/* ── Lifetime impact card ──
        * Sits ABOVE the activity feed (sustainability angle is more
@@ -627,6 +573,25 @@ export default function UserPage({
 
       {policyOpen && <PrivacyPolicyView text={privacyPolicy} onClose={() => setPolicyOpen(false)} />}
 
+      {editOpen && (
+        <ProfileEditModal
+          profile={profile}
+          animal={animal}
+          avatarUrl={avatarUrl}
+          email={email || authEmail}
+          hasEmail={!!(email || authEmail)}
+          marketingConsent={profile.marketingConsent}
+          browserInfo={browserInfo}
+          onClose={() => setEditOpen(false)}
+          onSaveName={(name) => saveProfile({ displayName: name })}
+          onRegenerate={handleRegenerate}
+          onUploadAvatar={handleUploadAvatar}
+          onRemoveAvatar={handleRemoveAvatar}
+          onManageEmail={() => { setEditOpen(false); onOpenSignIn?.(); }}
+          onToggleMarketing={(checked) => onSaveProfile({ marketingConsent: checked, marketingConsentSource: 'app_profile' })}
+        />
+      )}
+
       {/* ── Footer ── */}
       {/* (ImpactCard helper component is declared at module scope below
            so the JSX above can render it inline.) */}
@@ -648,6 +613,99 @@ export default function UserPage({
         )}
       </footer>
     </div>
+  );
+}
+
+/* ── Edit-profile modal — name, photo, email + marketing, in one place.
+ * Minimal: an avatar with photo controls, an editable name with a shuffle,
+ * the email (routes to the verified sign-in sheet), and a marketing toggle. ── */
+function ProfileEditModal({
+  profile, animal, avatarUrl, email, hasEmail, marketingConsent, browserInfo,
+  onClose, onSaveName, onRegenerate, onUploadAvatar, onRemoveAvatar, onManageEmail, onToggleMarketing,
+}) {
+  const [name, setName] = useState(profile.displayName || '');
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+
+  const commitName = () => {
+    const t = name.trim();
+    if (t && t !== profile.displayName) onSaveName(t);
+  };
+  const regenerate = () => {
+    const fresh = onRegenerate?.();
+    if (fresh?.displayName) setName(fresh.displayName);
+  };
+
+  return createPortal(
+    <div className="upedit-overlay" onClick={onClose}>
+      <div className="upedit" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Edit profile">
+        <div className="upedit__head">
+          <h2 className="upedit__title">Edit profile</h2>
+          <button type="button" className="upedit__close" onClick={onClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div className="upedit__avatar-block">
+          <div className="upedit__avatar" style={avatarUrl ? undefined : { background: animal.bg }}>
+            {avatarUrl
+              ? <img src={avatarUrl} alt="" className="upedit__avatar-img" />
+              : <span className="upedit__avatar-emoji" role="img" aria-label={animal.name}>{animal.emoji}</span>}
+          </div>
+          <div className="upedit__avatar-actions">
+            <button type="button" className="upedit__ghost" onClick={() => fileRef.current?.click()}>
+              {avatarUrl ? 'Change photo' : 'Upload photo'}
+            </button>
+            {avatarUrl && <button type="button" className="upedit__ghost upedit__ghost--muted" onClick={onRemoveAvatar}>Remove</button>}
+            <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { onUploadAvatar?.(e.target.files?.[0]); e.target.value = ''; }} />
+          </div>
+        </div>
+
+        <div className="upedit__field">
+          <span className="upedit__label">Name</span>
+          <div className="upedit__name-row">
+            <input
+              className="upedit__input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+              aria-label="Display name"
+            />
+            <button type="button" className="upedit__shuffle" onClick={regenerate} aria-label="Randomise name" title="Randomise">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="upedit__field">
+          <span className="upedit__label">Email</span>
+          <button type="button" className="upedit__row-btn" onClick={onManageEmail}>
+            <span className={hasEmail ? 'upedit__row-val' : 'upedit__row-add'}>{hasEmail ? email : 'Add email to save your balance'}</span>
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+
+        {hasEmail && (
+          <label className="upedit__toggle">
+            <span>Marketing emails</span>
+            <input type="checkbox" className="user-page__switch" checked={!!marketingConsent} onChange={(e) => onToggleMarketing?.(e.target.checked)} aria-label="Marketing emails" />
+          </label>
+        )}
+
+        <p className="upedit__meta">{[profile.phone, browserInfo].filter(Boolean).join(' · ')}</p>
+
+        <button type="button" className="upedit__done" onClick={() => { commitName(); onClose(); }}>Done</button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

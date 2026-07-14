@@ -167,35 +167,36 @@ function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string
     : `Your cashback is approved and ready to collect.`;
   const font = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
-<body style="margin:0;padding:0;background:#F4EBDC;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4EBDC;padding:28px 12px;">
+<body style="margin:0;padding:0;background:#F4EBDC;font-family:${font};-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4EBDC;padding:34px 14px;">
     <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:460px;background:#FFFFFF;border-radius:22px;overflow:hidden;box-shadow:0 8px 30px rgba(60,42,20,0.10);">
-        <tr><td style="background:#1A1512;padding:22px 28px;">
-          <span style="font-family:${font};font-size:19px;font-weight:800;color:#FFFFFF;letter-spacing:-0.01em;">Pack<span style="color:#E8B34A;">Perks</span></span>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:464px;background:#FFFFFF;border-radius:26px;overflow:hidden;box-shadow:0 14px 40px rgba(70,48,20,0.12);">
+        <tr><td align="center" style="padding:38px 36px 0;">
+          <div style="font-size:25px;font-weight:800;letter-spacing:-0.01em;color:#EBA80C;">PackPerks</div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#C4B49A;margin-top:7px;">Reusable-cup rewards</div>
         </td></tr>
-        <tr><td style="padding:30px 28px 8px;">
-          <p style="margin:0 0 6px;font-family:${font};font-size:15px;color:#6B6154;">${hi}</p>
-          <h1 style="margin:0 0 10px;font-family:${font};font-size:23px;line-height:1.25;font-weight:800;color:#1A1512;">Your ${amount} cashback is ready 🎉</h1>
-          <p style="margin:0 0 22px;font-family:${font};font-size:15px;line-height:1.55;color:#5A5348;">${rewardLine} Tap below to collect it securely through <strong>Tikkie</strong>.</p>
+        <tr><td align="center" style="padding:26px 40px 0;">
+          <p style="margin:0 0 6px;font-size:15px;color:#6B6154;">${hi}</p>
+          <h1 style="margin:0 0 10px;font-size:23px;line-height:1.3;font-weight:800;color:#241E16;">Your ${amount} cashback is ready 🎉</h1>
+          <p style="margin:0;font-size:15px;line-height:1.55;color:#6B6154;">${rewardLine} Tap below to collect it securely through <strong style="color:#3A342C;">Tikkie</strong>.</p>
         </td></tr>
-        <tr><td align="center" style="padding:0 28px;">
+        <tr><td align="center" style="padding:26px 36px 4px;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-            <td style="border-radius:14px;background:#E24400;">
-              <a href="${esc(opts.url)}" target="_blank" style="display:inline-block;padding:15px 34px;font-family:${font};font-size:16px;font-weight:800;color:#FFFFFF;text-decoration:none;border-radius:14px;">Collect ${amount} via Tikkie</a>
+            <td style="border-radius:14px;background:#E24400;box-shadow:0 6px 16px rgba(226,68,0,0.28);">
+              <a href="${esc(opts.url)}" target="_blank" style="display:inline-block;padding:16px 36px;font-size:16px;font-weight:800;color:#FFFFFF;text-decoration:none;border-radius:14px;">Collect ${amount} via Tikkie</a>
             </td>
           </tr></table>
         </td></tr>
-        <tr><td style="padding:18px 28px 4px;">
-          <p style="margin:0;font-family:${font};font-size:12.5px;line-height:1.5;color:#9A9186;text-align:center;">The link opens in the Tikkie app. It's unique to you — please don't share it. Collect it soon, as cashback links expire.</p>
+        <tr><td align="center" style="padding:18px 40px 0;">
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:#9A9186;">The link opens in the Tikkie app and is unique to you, so please don&rsquo;t share it. Collect it soon, as cashback links expire.</p>
         </td></tr>
-        <tr><td style="padding:22px 28px 26px;">
-          <div style="border-top:1px solid #EFE7D8;padding-top:16px;">
-            <p style="margin:0;font-family:${font};font-size:12px;line-height:1.55;color:#B4AC9E;">You're receiving this because you asked us to email you about this cashback. Questions? Just reply or reach us at <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a>.</p>
+        <tr><td style="padding:28px 40px 34px;">
+          <div style="border-top:1px solid #F1EADD;padding-top:18px;">
+            <p style="margin:0;font-size:12px;line-height:1.55;color:#B4AC9E;text-align:center;">You&rsquo;re receiving this because you asked us to email you about this cashback.<br />Questions? <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a></p>
           </div>
         </td></tr>
       </table>
-      <p style="margin:16px 0 0;font-family:${font};font-size:11px;color:#B4AC9E;">PackPerks · Bring your cup, earn cashback</p>
+      <p style="margin:18px 0 0;font-size:11px;color:#BBB09E;">PackPerks &middot; Bring your cup, earn cashback</p>
     </td></tr>
   </table>
 </body></html>`;
@@ -385,7 +386,7 @@ Deno.serve(async (req) => {
           const text =
             `${u.display_name ? `Hi ${u.display_name},` : "Hi there,"}\n\n` +
             `Your €${amount.toFixed(2)} cashback is approved and ready to collect via Tikkie:\n${cb.url}\n\n` +
-            `The link is unique to you — please don't share it, and collect it soon as cashback links expire.\n\nPackPerks`;
+            `The link is unique to you, so please don't share it, and collect it soon as cashback links expire.\n\nPackPerks`;
           const r = await sendBrevoEmail(u.email, `Your €${amount.toFixed(2)} cashback is ready`, html, text);
           emailSent = r.ok;
           emailError = r.error;

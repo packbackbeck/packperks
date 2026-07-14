@@ -2,8 +2,8 @@
   PackPerks — "Receipt approved" customer email.
 
   Sent when a submitted receipt passes review and the cashback claim is
-  approved (before the Tikkie collection link goes out). On-brand, neutral,
-  system-to-system. Placeholders (fill server-side when wiring a send):
+  approved (before the Tikkie collection link goes out). Neutral, on-brand.
+  Placeholders (fill server-side when wiring a send):
     {{name}}    — customer's display name (or "there")
     {{amount}}  — e.g. "€3.20"
     {{reward}}  — e.g. "Verse muntthee"
@@ -18,44 +18,42 @@
     <title>Your receipt is approved</title>
   </head>
   <body style="margin:0; padding:0; background:#F4EBDC; font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4EBDC; padding:28px 12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4EBDC; padding:34px 14px;">
       <tr>
         <td align="center">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:460px; background:#FFFFFF; border-radius:22px; overflow:hidden; box-shadow:0 8px 30px rgba(60,42,20,0.10);">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:464px; background:#FFFFFF; border-radius:26px; overflow:hidden; box-shadow:0 14px 40px rgba(70,48,20,0.12);">
 
-            <!-- Brand header -->
+            <!-- Logo lockup -->
             <tr>
-              <td style="background:#1A1512; padding:22px 28px;">
-                <span style="font-size:19px; font-weight:800; letter-spacing:-0.01em; color:#FFFFFF;">Pack<span style="color:#E8B34A;">Perks</span></span>
+              <td align="center" style="padding:38px 36px 0;">
+                <div style="font-size:25px; font-weight:800; letter-spacing:-0.01em; color:#EBA80C;">PackPerks</div>
+                <div style="font-size:10.5px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#C4B49A; margin-top:7px;">Reusable-cup rewards</div>
               </td>
             </tr>
 
             <!-- Approved badge + heading -->
             <tr>
-              <td style="padding:30px 28px 6px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;">
+              <td align="center" style="padding:24px 40px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 14px;">
                   <tr>
-                    <td style="background:#E3F3E8; border-radius:999px; padding:6px 13px;">
+                    <td style="background:#E3F3E8; border-radius:999px; padding:6px 14px;">
                       <span style="font-size:12px; font-weight:800; letter-spacing:0.02em; color:#1A8737;">&#10003;&nbsp;Receipt approved</span>
                     </td>
                   </tr>
                 </table>
-                <p style="margin:0 0 6px; font-size:15px; color:#6B6154;">Hi {{name}},</p>
-                <h1 style="margin:0 0 10px; font-size:23px; line-height:1.25; font-weight:800; color:#1A1512;">Your receipt checks out</h1>
-                <p style="margin:0; font-size:15px; line-height:1.55; color:#5A5348;">
-                  We&rsquo;ve reviewed your receipt for <strong>{{reward}}</strong> from <strong>{{store}}</strong> and your <strong>{{amount}}</strong> cashback is approved.
-                </p>
+                <h1 style="margin:0 0 10px; font-size:23px; line-height:1.3; font-weight:800; color:#241E16;">Your receipt checks out</h1>
+                <p style="margin:0; font-size:15px; line-height:1.55; color:#6B6154;">Hi {{name}}, we&rsquo;ve reviewed your receipt for <strong style="color:#3A342C;">{{reward}}</strong> from <strong style="color:#3A342C;">{{store}}</strong> and your cashback is approved.</p>
               </td>
             </tr>
 
-            <!-- Amount summary -->
+            <!-- Amount -->
             <tr>
-              <td style="padding:20px 28px 4px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#FBF6EE; border:1px solid #EFE2CF; border-radius:16px;">
+              <td align="center" style="padding:24px 36px 4px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:320px; background:#EEF8F0; border:1px solid #CDE9D4; border-radius:18px;">
                   <tr>
-                    <td style="padding:16px 18px;">
-                      <div style="font-size:12px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:#A89E92;">Cashback approved</div>
-                      <div style="font-size:26px; font-weight:800; color:#1A8737; margin-top:2px;">{{amount}}</div>
+                    <td align="center" style="padding:18px 20px;">
+                      <div style="font-size:11.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#5C9A6E;">Cashback approved</div>
+                      <div style="font-size:30px; font-weight:800; color:#1A8737; margin-top:3px;">{{amount}}</div>
                     </td>
                   </tr>
                 </table>
@@ -64,26 +62,22 @@
 
             <!-- Next step -->
             <tr>
-              <td style="padding:18px 28px 4px;">
-                <p style="margin:0; font-size:14px; line-height:1.6; color:#5A5348;">
-                  Next, we&rsquo;ll email you a secure <strong>Tikkie</strong> link so you can collect your cashback yourself. No bank details needed &mdash; keep an eye on your inbox.
-                </p>
+              <td align="center" style="padding:18px 40px 0;">
+                <p style="margin:0; font-size:14px; line-height:1.6; color:#6B6154;">Next, we&rsquo;ll email you a secure <strong style="color:#3A342C;">Tikkie</strong> link so you can collect your cashback yourself. No bank details needed, so keep an eye on your inbox.</p>
               </td>
             </tr>
 
             <!-- Footer -->
             <tr>
-              <td style="padding:22px 28px 26px;">
-                <div style="border-top:1px solid #EFE7D8; padding-top:16px;">
-                  <p style="margin:0; font-size:12px; line-height:1.55; color:#B4AC9E;">
-                    You&rsquo;re receiving this because you submitted a receipt to claim a PackPerks reward. Questions? Reach us at <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a>.
-                  </p>
+              <td style="padding:28px 40px 34px;">
+                <div style="border-top:1px solid #F1EADD; padding-top:18px;">
+                  <p style="margin:0; font-size:12px; line-height:1.55; color:#B4AC9E; text-align:center;">You&rsquo;re receiving this because you submitted a receipt to claim a PackPerks reward.<br />Questions? <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a></p>
                 </div>
               </td>
             </tr>
 
           </table>
-          <p style="margin:16px 0 0; font-size:11px; color:#B4AC9E;">PackPerks &middot; Bring your cup, earn cashback</p>
+          <p style="margin:18px 0 0; font-size:11px; color:#BBB09E;">PackPerks &middot; Bring your cup, earn cashback</p>
         </td>
       </tr>
     </table>

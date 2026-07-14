@@ -45,8 +45,8 @@ export default function OnboardingHowItWorks({ onNext }) {
           >
             <div className="onb-how2__art">
               <img src={s.image} alt="" aria-hidden="true" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              <span className="onb-how2__num">{s.n}</span>
             </div>
+            <span className="onb-how2__num">{s.n}</span>
             <div className="onb-how2__txt">
               <h2 className="onb-how2__title">{s.title}</h2>
               <p className="onb-how2__body">{s.body}</p>

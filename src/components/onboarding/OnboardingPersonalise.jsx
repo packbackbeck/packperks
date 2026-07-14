@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { track, EVENTS } from '../../utils/analytics';
 import { DRINK_OPTIONS, MAX_DRINKS, COUNTRIES, CITIES } from '../../lib/onboarding';
 
@@ -9,6 +9,7 @@ import { DRINK_OPTIONS, MAX_DRINKS, COUNTRIES, CITIES } from '../../lib/onboardi
 export default function OnboardingPersonalise({ answers, onPatch, onSubmit }) {
   const { drinkPreferences, country, city } = answers;
   const [limitHint, setLimitHint] = useState(false);
+  const revealRef = useRef(null);
 
   const toggleDrink = (key) => {
     const selecting = !drinkPreferences.includes(key);
@@ -28,6 +29,8 @@ export default function OnboardingPersonalise({ answers, onPatch, onSubmit }) {
     if (key === country) return;
     onPatch({ country: key, city: null });   // country change clears the city
     track(EVENTS.ONB_COUNTRY, { country: key });
+    // Bring the freshly-revealed city list into view (after it starts opening).
+    setTimeout(() => revealRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 140);
   };
 
   const selectCity = (c) => {
@@ -92,7 +95,7 @@ export default function OnboardingPersonalise({ answers, onPatch, onSubmit }) {
         </fieldset>
 
         {/* Q3 — city, revealed once a country exists (smooth height + opacity) */}
-        <div className={`onb-reveal${country ? ' is-open' : ''}`}>
+        <div ref={revealRef} className={`onb-reveal${country ? ' is-open' : ''}`}>
           <div className="onb-reveal__inner">
             {country && (
               <fieldset className="onb-q">

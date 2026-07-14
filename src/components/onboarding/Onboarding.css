@@ -58,7 +58,7 @@
 }
 .onb-screen__sub { margin: 10px 0 0; font-size: 15.5px; line-height: 1.45; color: rgba(0, 0, 0, 0.62); }
 .onb-screen__foot { flex: none; padding-top: 16px; }
-.onb-screen__hint { margin: 10px 0 0; text-align: center; font-size: 12.5px; color: rgba(0, 0, 0, 0.5); }
+.onb-screen__hint { margin: 16px 0 0; text-align: center; font-size: 12.5px; color: rgba(0, 0, 0, 0.5); }
 
 /* ── Buttons ── */
 .onb-btn {
@@ -83,11 +83,12 @@
 }
 
 /* ══ Screen 1 — value proposition ══ */
-.onb-value { justify-content: flex-start; }
-.onb-hero { position: relative; flex: 0 0 auto; height: 40vh; min-height: 200px; max-height: 340px; display: flex; align-items: center; justify-content: center; }
-.onb-value .onb-screen__body { padding-top: 12px; }
-/* Anchor the CTA to the bottom so the copy above it isn't squished against it. */
-.onb-value .onb-screen__foot { margin-top: auto; padding-top: 26px; }
+/* Centre the hero + copy + CTA as one block so the CTA has a comfortable (not
+   cavernous) gap under the copy, with no dead space pinned to the bottom. */
+.onb-value { justify-content: center; }
+.onb-hero { position: relative; flex: 0 0 auto; height: 38vh; min-height: 190px; max-height: 320px; display: flex; align-items: center; justify-content: center; }
+.onb-value .onb-screen__body { padding-top: 14px; }
+.onb-value .onb-screen__foot { padding-top: 30px; }
 .onb-hero__card {
   position: relative; z-index: 2; width: 220px;
   background: var(--white, #fff); border-radius: 22px; padding: 16px;
@@ -163,13 +164,15 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 6px 14px rgba(70, 45, 20, 0.12);
 }
 .onb-how2__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Sits on the card (not inside the overflow-hidden art) so it's never clipped;
+   overlaps the art's outer corner. */
 .onb-how2__num {
-  position: absolute; top: -9px; left: -9px; width: 30px; height: 30px; border-radius: 50%;
+  position: absolute; top: 7px; left: 7px; width: 30px; height: 30px; border-radius: 50%;
   background: var(--card-accent); color: #fff; font-size: 15px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24); border: 2.5px solid var(--pb-cream, #F4EBDC);
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24); border: 2.5px solid #fff; z-index: 2;
 }
-.onb-how2__card.is-flip .onb-how2__num { left: auto; right: -9px; }
+.onb-how2__card.is-flip .onb-how2__num { left: auto; right: 7px; }
 .onb-how2__txt { flex: 1; min-width: 0; }
 .onb-how2__card.is-flip .onb-how2__txt { text-align: right; }
 .onb-how2__title { margin: 0; font-size: 17.5px; font-weight: 800; color: #2A2417; letter-spacing: -0.01em; line-height: 1.15; }

@@ -245,22 +245,18 @@
   text-align: left;
 }
 
+/* Plain checkbox + text — no box outline or fill. */
 .signin-consent {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   width: 100%;
   box-sizing: border-box;
-  padding: 11px 12px;
-  margin-bottom: 4px;
-  background: #FAFAF8;
-  border: 1px solid #E5DECF;
-  border-radius: 12px;
+  padding: 3px 2px;
+  margin-bottom: 2px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.14s ease, background 0.14s ease;
 }
-.signin-consent:hover { background: #FFFFFF; border-color: #D8CFBB; }
 .signin-consent__box {
   flex: none;
   width: 18px;

@@ -10,6 +10,7 @@ import PendingClaims from './PendingClaims';
 import { getGlobalImpact } from '../lib/api';
 import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
 import { clearConsent } from '../lib/consent';
+import { animalForProfile, generateProfile } from '../lib/animals';
 
 const DSAR_EMAIL = 'info@packback.network';
 
@@ -28,194 +29,6 @@ const BUILD_STAMP = (() => {
     return null;
   }
 })();
-
-/* ── Inline SVG animal avatars ── */
-const ANIMALS = [
-  {
-    name: 'Fox',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#FEA01E"/>
-        <ellipse cx="40" cy="48" rx="18" ry="14" fill="#F4EBDC"/>
-        <ellipse cx="40" cy="34" rx="16" ry="16" fill="#E24400"/>
-        <polygon points="24,22 18,6 32,18" fill="#E24400"/>
-        <polygon points="56,22 62,6 48,18" fill="#E24400"/>
-        <polygon points="25,21 20,9 31,18" fill="#FFB535"/>
-        <polygon points="55,21 60,9 49,18" fill="#FFB535"/>
-        <ellipse cx="33" cy="35" rx="3" ry="3.5" fill="white"/>
-        <ellipse cx="47" cy="35" rx="3" ry="3.5" fill="white"/>
-        <circle cx="33" cy="36" r="1.8" fill="#1D1D1D"/>
-        <circle cx="47" cy="36" r="1.8" fill="#1D1D1D"/>
-        <ellipse cx="40" cy="41" rx="5" ry="3" fill="#F4EBDC"/>
-        <ellipse cx="40" cy="42" rx="2.5" ry="1.5" fill="#E24400"/>
-      </svg>
-    ),
-  },
-  {
-    name: 'Panda',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#E9E9E9"/>
-        <circle cx="40" cy="38" r="18" fill="white"/>
-        <circle cx="22" cy="22" r="9" fill="#1D1D1D"/>
-        <circle cx="58" cy="22" r="9" fill="#1D1D1D"/>
-        <ellipse cx="32" cy="35" rx="6" ry="5" fill="#1D1D1D"/>
-        <ellipse cx="48" cy="35" rx="6" ry="5" fill="#1D1D1D"/>
-        <circle cx="32" cy="35" r="3" fill="white"/>
-        <circle cx="48" cy="35" r="3" fill="white"/>
-        <circle cx="32.8" cy="35.8" r="1.8" fill="#1D1D1D"/>
-        <circle cx="48.8" cy="35.8" r="1.8" fill="#1D1D1D"/>
-        <ellipse cx="40" cy="42" rx="4" ry="2.5" fill="#1D1D1D"/>
-        <ellipse cx="40" cy="47" rx="5" ry="3" fill="#E9E9E9"/>
-      </svg>
-    ),
-  },
-  {
-    name: 'Bear',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#C87A2E"/>
-        <circle cx="40" cy="38" r="18" fill="#A85C1A"/>
-        <circle cx="22" cy="20" r="9" fill="#A85C1A"/>
-        <circle cx="58" cy="20" r="9" fill="#A85C1A"/>
-        <circle cx="22" cy="20" r="5" fill="#C87A2E"/>
-        <circle cx="58" cy="20" r="5" fill="#C87A2E"/>
-        <ellipse cx="40" cy="43" rx="9" ry="7" fill="#C87A2E"/>
-        <circle cx="34" cy="35" r="3" fill="white"/>
-        <circle cx="46" cy="35" r="3" fill="white"/>
-        <circle cx="34.8" cy="35.8" r="1.8" fill="#1D1D1D"/>
-        <circle cx="46.8" cy="35.8" r="1.8" fill="#1D1D1D"/>
-        <ellipse cx="40" cy="42" rx="3.5" ry="2" fill="#1D1D1D"/>
-      </svg>
-    ),
-  },
-  {
-    name: 'Rabbit',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#F4EBDC"/>
-        <circle cx="40" cy="42" r="18" fill="white"/>
-        <ellipse cx="28" cy="18" rx="7" ry="14" fill="white"/>
-        <ellipse cx="52" cy="18" rx="7" ry="14" fill="white"/>
-        <ellipse cx="28" cy="18" rx="4" ry="11" fill="#FFB0C8"/>
-        <ellipse cx="52" cy="18" rx="4" ry="11" fill="#FFB0C8"/>
-        <circle cx="34" cy="39" r="3" fill="#FFB0C8"/>
-        <circle cx="46" cy="39" r="3" fill="#FFB0C8"/>
-        <circle cx="34" cy="39" r="1.5" fill="#1D1D1D"/>
-        <circle cx="46" cy="39" r="1.5" fill="#1D1D1D"/>
-        <ellipse cx="40" cy="44.5" rx="2.5" ry="1.5" fill="#FFB0C8"/>
-        <ellipse cx="40" cy="49" rx="5" ry="3" fill="#F4EBDC"/>
-      </svg>
-    ),
-  },
-  {
-    name: 'Cat',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#FEA01E"/>
-        <circle cx="40" cy="40" r="18" fill="#F5C040"/>
-        <polygon points="22,24 16,8 32,20" fill="#F5C040"/>
-        <polygon points="58,24 64,8 48,20" fill="#F5C040"/>
-        <polygon points="23,23 18,11 30,20" fill="#E24400"/>
-        <polygon points="57,23 62,11 50,20" fill="#E24400"/>
-        <ellipse cx="34" cy="37" rx="4" ry="4.5" fill="white"/>
-        <ellipse cx="46" cy="37" rx="4" ry="4.5" fill="white"/>
-        <ellipse cx="34" cy="38" rx="2" ry="3.5" fill="#1D1D1D"/>
-        <ellipse cx="46" cy="38" rx="2" ry="3.5" fill="#1D1D1D"/>
-        <polygon points="40,43 37.5,46 42.5,46" fill="#E24400"/>
-        <line x1="22" y1="44" x2="35" y2="45" stroke="white" strokeWidth="1" opacity="0.7"/>
-        <line x1="22" y1="47" x2="35" y2="47" stroke="white" strokeWidth="1" opacity="0.7"/>
-        <line x1="45" y1="45" x2="58" y2="44" stroke="white" strokeWidth="1" opacity="0.7"/>
-        <line x1="45" y1="47" x2="58" y2="47" stroke="white" strokeWidth="1" opacity="0.7"/>
-      </svg>
-    ),
-  },
-  {
-    name: 'Owl',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#502314"/>
-        <circle cx="40" cy="42" r="18" fill="#A85C1A"/>
-        <polygon points="29,24 25,10 35,22" fill="#502314"/>
-        <polygon points="51,24 55,10 45,22" fill="#502314"/>
-        <circle cx="33" cy="38" r="8" fill="#F5C040"/>
-        <circle cx="47" cy="38" r="8" fill="#F5C040"/>
-        <circle cx="33" cy="38" r="5" fill="#1D1D1D"/>
-        <circle cx="47" cy="38" r="5" fill="#1D1D1D"/>
-        <circle cx="35" cy="36" r="1.5" fill="white"/>
-        <circle cx="49" cy="36" r="1.5" fill="white"/>
-        <polygon points="40,43 37,48 43,48" fill="#FEA01E"/>
-        <ellipse cx="40" cy="52" rx="8" ry="6" fill="#F4EBDC"/>
-      </svg>
-    ),
-  },
-  {
-    name: 'Deer',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#FEA01E"/>
-        <circle cx="40" cy="40" r="18" fill="#C87A2E"/>
-        <line x1="28" y1="22" x2="22" y2="8" stroke="#502314" strokeWidth="3" strokeLinecap="round"/>
-        <line x1="22" y1="14" x2="16" y2="10" stroke="#502314" strokeWidth="2.5" strokeLinecap="round"/>
-        <line x1="22" y1="10" x2="18" y2="5" stroke="#502314" strokeWidth="2" strokeLinecap="round"/>
-        <line x1="52" y1="22" x2="58" y2="8" stroke="#502314" strokeWidth="3" strokeLinecap="round"/>
-        <line x1="58" y1="14" x2="64" y2="10" stroke="#502314" strokeWidth="2.5" strokeLinecap="round"/>
-        <line x1="58" y1="10" x2="62" y2="5" stroke="#502314" strokeWidth="2" strokeLinecap="round"/>
-        <ellipse cx="24" cy="26" rx="6" ry="8" fill="#C87A2E"/>
-        <ellipse cx="56" cy="26" rx="6" ry="8" fill="#C87A2E"/>
-        <ellipse cx="40" cy="44" rx="9" ry="7" fill="#F4EBDC"/>
-        <circle cx="34" cy="36" r="3" fill="white"/>
-        <circle cx="46" cy="36" r="3" fill="white"/>
-        <circle cx="34.8" cy="36.8" r="1.8" fill="#1D1D1D"/>
-        <circle cx="46.8" cy="36.8" r="1.8" fill="#1D1D1D"/>
-        <ellipse cx="40" cy="43" rx="3" ry="2" fill="#A85C1A"/>
-      </svg>
-    ),
-  },
-  {
-    name: 'Penguin',
-    svg: (
-      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="40" cy="40" r="40" fill="#1D1D1D"/>
-        <ellipse cx="40" cy="44" rx="14" ry="16" fill="white"/>
-        <circle cx="40" cy="30" r="14" fill="#1D1D1D"/>
-        <circle cx="35" cy="28" r="4" fill="white"/>
-        <circle cx="45" cy="28" r="4" fill="white"/>
-        <circle cx="35.8" cy="28.8" r="2.5" fill="#1D1D1D"/>
-        <circle cx="45.8" cy="28.8" r="2.5" fill="#1D1D1D"/>
-        <circle cx="36.5" cy="27.5" r="1" fill="white"/>
-        <circle cx="46.5" cy="27.5" r="1" fill="white"/>
-        <polygon points="40,34 37,38 43,38" fill="#FEA01E"/>
-        <circle cx="30" cy="33" r="4" fill="#FEA01E" opacity="0.5"/>
-        <circle cx="50" cy="33" r="4" fill="#FEA01E" opacity="0.5"/>
-      </svg>
-    ),
-  },
-];
-
-/* ── Silly rhyming names: adjective rhymes with animal ── */
-const SILLY_NAMES = {
-  Fox:     ['Ferris Fox',    'Felix Fox',    'Francis Fox',   'Foxy Fong'],
-  Panda:   ['Amanda Panda',  'Sandy Panda',  'Wanda Panda',   'Panda Banda'],
-  Bear:    ['Barry Bear',    'Perry Bear',   'Larry Bear',    'Gary Bear'],
-  Rabbit:  ['Habit Rabbit',  'Grabbit Rabbit','Abbott Rabbit', 'Rabbit Mabbitt'],
-  Cat:     ['Chadwick Cat',  'Pat the Cat',  'Natty Cat',     'Catrick Pat'],
-  Owl:     ['Rowland Owl',   'Powell Owl',   'Fowler Owl',    'Howlin Owl'],
-  Deer:    ['Cheerful Deer', 'Sheer Deer',   'Pierre Deer',   'Deer O\'Leary'],
-  Penguin: ['Finn Penguin',  'Quinn Penguin','Guin Penguin',  'Ringo Penguin'],
-};
-
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function generateProfile() {
-  const animalIndex = Math.floor(Math.random() * ANIMALS.length);
-  const animal = ANIMALS[animalIndex];
-  const nameOptions = SILLY_NAMES[animal.name] || [`Randy ${animal.name}`];
-  const displayName = pickRandom(nameOptions);
-  return { displayName, phone: 'iPhone 15 Pro', email: '', animalIndex };
-}
 
 function getBrowserInfo() {
   const ua = navigator.userAgent;
@@ -337,7 +150,7 @@ export default function UserPage({
 
   // Share sheet: lifted to App.jsx — call prop to open it
 
-  const animal = ANIMALS[profile.animalIndex % ANIMALS.length];
+  const animal = animalForProfile(profile);
   const browserInfo = useMemo(() => getBrowserInfo(), []);
 
   const saveProfile = (updated) => {
@@ -423,7 +236,9 @@ export default function UserPage({
           </div>
         )}
 
-        <div className="user-page__avatar">{animal.svg}</div>
+        <div className="user-page__avatar" style={{ background: animal.bg }}>
+          <span className="user-page__avatar-emoji" role="img" aria-label={animal.name}>{animal.emoji}</span>
+        </div>
         <div className="user-page__profile-info">
           {isEditingName ? (
             <div className="user-page__name-edit-row">

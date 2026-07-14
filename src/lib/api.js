@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { generateProfile } from './animals'
 
 // ── Device identity ────────────────────────────────────────────────────────
 // The only thing that stays in localStorage: a stable device fingerprint.
@@ -29,34 +30,11 @@ function getDeviceId() {
 }
 
 // ── Profile generation (for brand-new users) ───────────────────────────────
-// Existing animals keep their original index positions (animal_index is stored
-// on the user row); new animals are appended, and each animal's rhyming-name
-// pool is expanded for much more variety.
-const ANIMAL_NAMES = ['Fox', 'Panda', 'Bear', 'Rabbit', 'Cat', 'Owl', 'Deer', 'Penguin', 'Otter', 'Duck', 'Frog', 'Koala', 'Moose', 'Hedgehog', 'Seal', 'Turtle']
-const SILLY_NAMES = {
-  Fox:      ['Ferris Fox',    'Felix Fox',     'Francis Fox',   'Foster Fox',    'Roxy Fox',       'Knox Fox'],
-  Panda:    ['Amanda Panda',  'Sandy Panda',   'Wanda Panda',   'Miranda Panda', 'Brandy Panda',   'Chandra Panda'],
-  Bear:     ['Barry Bear',    'Perry Bear',    'Larry Bear',    'Harry Bear',    'Sherry Bear',    'Teddy Bear'],
-  Rabbit:   ['Habit Rabbit',  'Grabbit Rabbit','Abbott Rabbit', 'Bunny Rabbit',  'Hopper Rabbit',  'Cadbury Rabbit'],
-  Cat:      ['Chadwick Cat',  'Pat the Cat',   'Natty Cat',     'Tabby Cat',     'Cleo Cat',       'Whiskers Cat'],
-  Owl:      ['Rowland Owl',   'Powell Owl',    'Fowler Owl',    'Hooty Owl',     'Ollie Owl',      'Athena Owl'],
-  Deer:     ['Cheerful Deer', 'Sheer Deer',    'Pierre Deer',   'Dara Deer',     'Bambi Deer',     'Fawn Deer'],
-  Penguin:  ['Finn Penguin',  'Quinn Penguin', 'Guin Penguin',  'Pingu Penguin', 'Waddle Penguin', 'Gwen Penguin'],
-  Otter:    ['Otto Otter',    'Trotter Otter', 'Rudder Otter',  'Ripple Otter'],
-  Duck:     ['Chuck Duck',    'Buck Duck',     'Puddles Duck',  'Daffy Duck'],
-  Frog:     ['Froggy Frog',   'Kermit Frog',   'Ribbit Frog',   'Hopscotch Frog'],
-  Koala:    ['Kayla Koala',   'Kylie Koala',   'Cuddles Koala', 'Blue Koala'],
-  Moose:    ['Bruce Moose',   'Marcus Moose',  'Maple Moose',   'Bull Moose'],
-  Hedgehog: ['Sonic Hedgehog','Spike Hedgehog','Prickle Hedgehog','Quill Hedgehog'],
-  Seal:     ['Sheila Seal',   'Neal Seal',     'Pebble Seal',   'Sammy Seal'],
-  Turtle:   ['Myrtle Turtle', 'Shelly Turtle', 'Franklin Turtle','Squirt Turtle'],
-}
-
+// A random adjective + animal (e.g. "Bouncy Axolotl"), with a matching emoji
+// avatar. Lists + avatars live in ./animals so the app and this module stay in
+// sync (animal_index points into ANIMALS there).
 export function generateInitialProfile() {
-  const animalIndex = Math.floor(Math.random() * ANIMAL_NAMES.length)
-  const names = SILLY_NAMES[ANIMAL_NAMES[animalIndex]]
-  const displayName = names[Math.floor(Math.random() * names.length)]
-  return { animalIndex, displayName }
+  return generateProfile()
 }
 
 // ── Timestamp formatter ────────────────────────────────────────────────────

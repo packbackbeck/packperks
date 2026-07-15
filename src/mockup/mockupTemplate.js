@@ -65,6 +65,50 @@ export function cloneConfig(c) {
   };
 }
 
+/* ── Built-in starter mockups ──────────────────────────────────────────
+ * Ready-made, version-controlled example configs the team can load from the
+ * Library modal without any DB row. Unlike DEFAULT_CONFIG (a blank BYO start),
+ * each starter is a complete, on-brand dummy vendor.
+ *
+ * Stanfordo is a cup-DEPOSIT trattoria (NOT bring-your-own): the customer
+ * returns their cup after a visit and turns collected cups into cashback, so
+ * the hero copy mirrors the 'deposit' preset in copyPresets.js (return
+ * packaging → earn cashback), never any "bring your own cup" wording.
+ */
+export const STARTER_MOCKUPS = [
+  {
+    id: 'starter-stanfordo',
+    name: 'Stanfordo — trattoria (deposit)',
+    config: {
+      orgName: 'Stanfordo',
+      partnerBrandName: '',
+      logoUrl: '',
+      logoWidth: '',
+      brandColor: '#B8402F',
+      palette: {
+        background: '#F6EEE1',
+        primary:    '#5A2A22',
+        accent:     '#C6472F',
+        accentDeep: '#8F2E1E',
+        surface:    '#FFFFFF',
+        text:       '#211915',
+        textMuted:  '#6C6259',
+        success:    '#3E7D4F',
+      },
+      heroHeadline: 'Return your cup, get cashback',
+      heroSubtext: 'Enjoy your meal at Stanfordo, return your cup at the counter, and turn collected cups into real cashback.',
+      cupsCollected: 5,
+      sections: { showPackbackLogo: true, showBrandLogo: true },
+      rewards: [
+        { name: 'Pizza Margherita',    image: 'https://www.themealdb.com/images/media/meals/x0lk931587671540.jpg', cupsNeeded: 8,  euros: '', bgColor: '#C6472F', tags: 'CLASSICO' },
+        { name: 'Spaghetti Carbonara', image: 'https://www.themealdb.com/images/media/meals/llcbn01574260722.jpg', cupsNeeded: 6,  euros: '', bgColor: '#E0A12B', tags: '' },
+        { name: 'Lasagne al Forno',    image: 'https://www.themealdb.com/images/media/meals/wtsvxx1511296896.jpg', cupsNeeded: 10, euros: '', bgColor: '#3E7D4F', tags: "CHEF'S PICK" },
+      ],
+      selectedIndex: 0,
+    },
+  },
+];
+
 // ── CSV template ───────────────────────────────────────────────────────
 // Flat, human-friendly columns. One header row + one worked example row.
 export const CSV_COLUMNS = [

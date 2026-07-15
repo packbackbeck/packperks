@@ -234,6 +234,11 @@ body:has(.mockup-app) { background: #ECEBF1; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; line-height: 1.45; color: #33313D; resize: vertical;
 }
 
+.mockup-lib__section {
+  margin: 16px 0 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #9A96A6;
+}
+.mockup-lib__section:first-of-type { margin-top: 6px; }
 .mockup-lib { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .mockup-lib__row { display: flex; align-items: center; gap: 8px; border: 1px solid #E6E4EE; border-radius: 11px; padding: 8px 10px; }
 .mockup-lib__row.is-current { border-color: var(--pb-purple-500); background: rgba(103, 43, 255, 0.04); }

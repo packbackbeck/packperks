@@ -5,7 +5,7 @@ import MockupEditor from './MockupEditor';
 import MockupPreview from './MockupPreview';
 import PhoneFrame from './PhoneFrame';
 import {
-  DEFAULT_CONFIG, cloneConfig, downloadTemplate, parseCsv, csvRowToConfig, AI_RESEARCH_PROMPT,
+  DEFAULT_CONFIG, STARTER_MOCKUPS, cloneConfig, downloadTemplate, parseCsv, csvRowToConfig, AI_RESEARCH_PROMPT,
 } from './mockupTemplate';
 import { getSession, listMockups, createMockup, updateMockup, deleteMockup } from './mockupStore';
 import './MockupMaster.css';
@@ -171,6 +171,14 @@ export default function MockupMaster() {
     setConfig(cloneConfig(m.config)); setCurrentId(m.id); setName(m.name); setLibraryOpen(false);
   }
 
+  // Load a built-in starter into the editor as a fresh, unsaved draft (no
+  // currentId), so hitting Save creates a new library row rather than
+  // overwriting the shared preset.
+  function handleLoadStarter(s) {
+    setConfig(cloneConfig(s.config)); setCurrentId(null); setName(s.name); setLibraryOpen(false);
+    flash(`Loaded starter: ${s.config?.orgName || s.name}.`);
+  }
+
   function handleNew() {
     setConfig(cloneConfig(DEFAULT_CONFIG)); setCurrentId(null); setName('');
   }
@@ -308,6 +316,28 @@ export default function MockupMaster() {
               <h2>Shared library</h2>
               <button className="mockup-btn mockup-btn--sm" onClick={() => setLibraryOpen(false)}>Close</button>
             </div>
+
+            {/* Built-in starters — always available (no sign-in needed). */}
+            <div className="mockup-lib__section">Starters</div>
+            <ul className="mockup-lib">
+              {STARTER_MOCKUPS.map(s => (
+                <li key={s.id} className="mockup-lib__row">
+                  <button className="mockup-lib__load" onClick={() => handleLoadStarter(s)}>
+                    <span className="mockup-lib__thumb">
+                      <span className="mockup-lib__thumb-fallback" style={{ background: s.config?.brandColor || '#672BFF' }}>
+                        {(s.config?.orgName || 'M').charAt(0).toUpperCase()}
+                      </span>
+                    </span>
+                    <span className="mockup-lib__meta-col">
+                      <span className="mockup-lib__name">{s.name}</span>
+                      <span className="mockup-lib__meta">{s.config?.orgName || 'Starter'}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mockup-lib__section">Saved mockups</div>
             {session === undefined ? (
               <p className="mockup-muted">Checking sign-in…</p>
             ) : !session ? (

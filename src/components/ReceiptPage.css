@@ -370,21 +370,82 @@
 
 .receipt-page__eta strong { color: #14532D; }
 
-/* ── Exit / Cancel button ── */
+/* ── Exit / Cancel button — sits above the stepper, left-aligned to the
+   330px content column (in normal flow, not floating over the content). ── */
 .receipt-page__exit {
-  position: absolute;
-  top: calc(env(safe-area-inset-top, 10px) + 60px);
-  left: var(--sp-4);
+  width: 330px;
   display: flex;
   align-items: center;
   gap: 5px;
   background: none;
   border: none;
+  padding: 0;
   font-family: var(--font-primary);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   color: var(--text-muted);
   cursor: pointer;
-  z-index: 10;
 }
 .receipt-page__exit:hover { color: var(--black); }
+
+/* ── "Which photos do we accept?" link + rules popup ── */
+.receipt-page__rules-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 330px;
+  justify-content: center;
+  padding: 12px 14px;
+  background: var(--white);
+  border: 1px solid #EAE2D4;
+  border-radius: 12px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: #6C6259;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.receipt-page__rules-link:hover { background: #FBF7EF; color: var(--black); }
+.receipt-page__rules-link svg { flex-shrink: 0; color: var(--pb-orange); }
+
+.receipt-rules-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(20, 14, 8, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: rrm-fade 0.2s ease-out;
+}
+@keyframes rrm-fade { from { opacity: 0; } to { opacity: 1; } }
+.receipt-rules-modal__card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--pb-cream, #F4EBDC);
+  border-radius: 22px 22px 0 0;
+  padding: 18px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  box-shadow: 0 -8px 30px rgba(60, 42, 20, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 88vh;
+  overflow-y: auto;
+  animation: rrm-slide 0.26s cubic-bezier(0.32, 1.12, 0.55, 1);
+}
+@keyframes rrm-slide { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (min-width: 640px) {
+  .receipt-rules-modal { align-items: center; }
+  .receipt-rules-modal__card { border-radius: 22px; }
+}
+.receipt-rules-modal__head { display: flex; align-items: center; justify-content: space-between; }
+.receipt-rules-modal__title { margin: 0; font-family: var(--font-primary); font-size: 17px; font-weight: 800; color: var(--black); }
+.receipt-rules-modal__close {
+  width: 30px; height: 30px; border: none; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06); color: #6C6259; cursor: pointer; display: grid; place-items: center;
+}
+.receipt-rules-modal__close:hover { background: rgba(0, 0, 0, 0.1); color: var(--black); }
+/* The requirement blocks inside the popup span its full width. */
+.receipt-rules-modal__card .receipt-page__requirements { width: 100%; }

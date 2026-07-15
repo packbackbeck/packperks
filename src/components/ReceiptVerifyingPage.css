@@ -59,8 +59,9 @@
 }
 
 .rv-ring__fg {
-  /* The transition is what actually animates the fill. */
-  transition: stroke-dashoffset 4.5s cubic-bezier(0.05, 0.7, 0.1, 0.95);
+  /* The transition is what actually animates the fill (a bit longer so it
+     doesn't reach the end and just sit there while the result loads). */
+  transition: stroke-dashoffset 6.5s cubic-bezier(0.05, 0.7, 0.1, 0.95);
 }
 
 .rv-ring__center {

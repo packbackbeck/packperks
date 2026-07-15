@@ -42,7 +42,7 @@ export const SHOT_PRESETS = {
   'verifying':       { page: 'verifying', cupCount: 12, profile: memberProfile },
   'success':         { page: 'success', cupCount: 0, profile: memberProfile, authEmail: memberProfile.email, lastClaimId: 'demo-pending' },
   'success-noemail': { page: 'success', cupCount: 0, profile: visitorProfile, lastClaimId: 'demo-pending' },
-  'rejected':        { page: 'rejected', cupCount: 12, profile: memberProfile, aiVerdict: { failureChecks: ['check_is_receipt'], skippedChecks: [], isSystemError: false, summary: 'This looks like a screenshot rather than a printed store receipt. Please upload a clear photo of the paper receipt.' }, aiRequiredItem: 'Verse sinaasappelsap', lastClaimId: 'demo-rejected' },
+  'rejected':        { page: 'rejected', cupCount: 12, profile: memberProfile, aiVerdict: { failureChecks: ['is_receipt', 'contains_required_item'], skippedChecks: [], isSystemError: false, summary: 'This looks like a screenshot rather than a printed store receipt. Please upload a clear photo of the paper receipt.' }, aiRequiredItem: 'Verse sinaasappelsap', lastClaimId: 'demo-rejected' },
 
   // ── Cup scanner (BYO counter QR) ──
   'cup-scan':        { page: 'cup-scan', profile: memberProfile },

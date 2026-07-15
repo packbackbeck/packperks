@@ -38,6 +38,52 @@ const STEPS = [
   { icon: <CashStepIcon />, label: 'Get cashback', done: false },
 ];
 
+const RULES_SEEN_KEY = 'packperks_receipt_rules_seen';
+
+/* The receipt requirements — shown on the first-time rules screen AND in the
+ * "Which photos do we accept?" popup, so both read identically. */
+function ReceiptRules({ itemName }) {
+  return (
+    <>
+      <div className="receipt-page__requirements">
+        <p className="receipt-page__req-label">Your receipt must be:</p>
+        <ul className="receipt-page__req-list">
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
+            <span>The <strong>printed store receipt</strong> from your purchase, not the cup-return ticket</span>
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
+            <span>Clearly listing the <strong>{itemName}</strong> you're claiming</span>
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
+            <span><strong>Dated after</strong> your cup return</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="receipt-page__requirements">
+        <p className="receipt-page__req-label">Not accepted</p>
+        <ul className="receipt-page__req-list">
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            <span>Your <strong>cup-return ticket</strong> (the QR receipt from the bin), that one only adds cups</span>
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            <span>A <strong>bank app</strong> or online-order receipt, or any screenshot</span>
+          </li>
+          <li className="receipt-page__req-item">
+            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            <span>A <strong>photo of the checkout screen</strong> at a self-service till</span>
+          </li>
+        </ul>
+      </div>
+    </>
+  );
+}
+
 export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
   const brand = orgName || 'the café';  // D.11.2: BYO venues are cafés, not restaurants
   const itemName = reward?.name || 'item';
@@ -47,7 +93,20 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
   const [cameraActive, setCameraActive] = useState(false);
   const streamRef = useRef(null);
   // Two screens: 'rules' (what the receipt must be) → 'camera' (take the shot).
-  const [step, setStep] = useState('rules');
+  // The rules screen is only shown the FIRST time someone claims cashback;
+  // after that they land straight on the camera and can re-open the rules via
+  // the "Which photos do we accept?" button.
+  const [step, setStep] = useState(() => {
+    try { return localStorage.getItem(RULES_SEEN_KEY) ? 'camera' : 'rules'; }
+    catch { return 'rules'; }
+  });
+  // "Which photos do we accept?" popup on the camera screen.
+  const [rulesPopup, setRulesPopup] = useState(false);
+
+  const goToCamera = () => {
+    try { localStorage.setItem(RULES_SEEN_KEY, '1'); } catch { /* private mode */ }
+    setStep('camera');
+  };
 
   /* Scroll to top so the stepper + header are visible first — on each screen. */
   useEffect(() => {
@@ -128,49 +187,10 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
       </div>
 
       {/* ── Receipt requirements ── */}
-      <div className="receipt-page__requirements">
-        <p className="receipt-page__req-label">Your receipt must be:</p>
-        <ul className="receipt-page__req-list">
-          <li className="receipt-page__req-item">
-            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span>The <strong>printed store receipt</strong> from your purchase, not the cup-return ticket</span>
-          </li>
-          <li className="receipt-page__req-item">
-            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span>Clearly listing the <strong>{itemName}</strong> you're claiming</span>
-          </li>
-          <li className="receipt-page__req-item">
-            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span><strong>Fully readable</strong>, with no blur, glare, or cropped edges</span>
-          </li>
-          <li className="receipt-page__req-item">
-            <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span><strong>Dated after</strong> your cup return</span>
-          </li>
-        </ul>
-      </div>
-
-      {/* ── What does NOT count (clears up the most common questions) ── */}
-      <div className="receipt-page__requirements">
-        <p className="receipt-page__req-label">Not accepted</p>
-        <ul className="receipt-page__req-list">
-          <li className="receipt-page__req-item">
-            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
-            <span>Your <strong>cup-return ticket</strong> (the QR receipt from the bin), that one only adds cups</span>
-          </li>
-          <li className="receipt-page__req-item">
-            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
-            <span>A <strong>bank app</strong> or online-order receipt, or any screenshot</span>
-          </li>
-          <li className="receipt-page__req-item">
-            <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
-            <span>A <strong>photo of the checkout screen</strong> at a self-service till</span>
-          </li>
-        </ul>
-      </div>
+      <ReceiptRules itemName={itemName} />
 
       {/* Understood → move to the camera screen */}
-      <button className="receipt-page__understood" onClick={() => setStep('camera')}>
+      <button className="receipt-page__understood" onClick={goToCamera}>
         Understood, take the photo
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
@@ -243,14 +263,13 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
         <input ref={fileRef} type="file" accept="image/*" className="receipt-page__file-input" onChange={handleFileChange} />
       </div>
 
-      {/* ── Delivery timing ── */}
-      <div className="receipt-page__eta">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
+      {/* ── Which photos do we accept? → re-opens the rules ── */}
+      <button type="button" className="receipt-page__rules-link" onClick={() => setRulesPopup(true)}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
         </svg>
-        <span>We'll review your receipt and send you a Tikkie link to collect your cashback, <strong>within 7 days maximum</strong>.</span>
-      </div>
+        Which photos do we accept?
+      </button>
 
       {/* Privacy note — kept at the very bottom of the flow. */}
       <p className="receipt-page__privacy-note">
@@ -258,6 +277,21 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
         AI provider in the US, not used to train models) and deleted after review.
       </p>
       </>
+      )}
+
+      {/* ── Rules popup (same content as the first-time rules screen) ── */}
+      {rulesPopup && (
+        <div className="receipt-rules-modal" onClick={() => setRulesPopup(false)}>
+          <div className="receipt-rules-modal__card" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Which photos do we accept?">
+            <div className="receipt-rules-modal__head">
+              <h2 className="receipt-rules-modal__title">Which photos do we accept?</h2>
+              <button type="button" className="receipt-rules-modal__close" onClick={() => setRulesPopup(false)} aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <ReceiptRules itemName={itemName} />
+          </div>
+        </div>
       )}
 
     </div>

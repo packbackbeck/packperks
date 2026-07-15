@@ -84,6 +84,7 @@
   font-family: var(--font-primary);
   font-size: var(--fs-md);
   color: var(--text-light);
+  line-height: 1.6;
 }
 
 /* Reward card */
@@ -190,7 +191,8 @@
 
 /* ── Receipt card ── */
 .sp-receipt {
-  width: 300px;
+  width: 100%;
+  max-width: 340px;
   background: var(--white);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
@@ -303,7 +305,7 @@
   padding-bottom: var(--sp-6);
 }
 .success-page--pending .success-page__glow {
-  background: radial-gradient(circle, rgba(232,158,44,0.18) 0%, rgba(232,158,44,0) 70%);
+  background: radial-gradient(circle, rgba(26,135,55,0.16) 0%, rgba(26,135,55,0) 70%);
 }
 .success-page--pending .success-page__text  { margin-bottom: var(--sp-5); }
 .success-page--pending .sp-receipt          { margin-bottom: var(--sp-4); }

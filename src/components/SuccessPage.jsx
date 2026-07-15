@@ -65,8 +65,8 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
 
       <div className="success-page__check-wrap">
         <svg className="success-page__check-svg" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="40" r="38" fill="#E89E2C" opacity="0.15" />
-          <circle cx="40" cy="40" r="30" fill="#E89E2C" />
+          <circle cx="40" cy="40" r="38" fill="#1A8737" opacity="0.15" />
+          <circle cx="40" cy="40" r="30" fill="#1A8737" />
           <circle cx="40" cy="40" r="18" stroke="white" strokeWidth="3.5" fill="none" />
           <path d="M40 28 L40 40 L48 46" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

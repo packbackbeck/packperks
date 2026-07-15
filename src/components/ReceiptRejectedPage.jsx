@@ -1,160 +1,126 @@
-import { getFailureCopy, getFailureLabel, ALL_FAILURE_CODES } from '../admin/lib/aiVerdictLabels';
+import { ALL_FAILURE_CODES } from '../admin/lib/aiVerdictLabels';
 import './ReceiptRejectedPage.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * ReceiptRejectedPage — user-facing screen shown after the verify-receipt
- * edge fn returns `status: 'failed'`.
- *
- * Information hierarchy (top → bottom):
- *   1. Main verdict     — a soft badge + short, direct headline.
- *   2. Why              — the reason, plus small chips for the failed checks.
- *   3. Your cups safe    — a calm green reassurance strip.
- *   4. What to do next   — the single concrete action.
- *   5. CTA               — primary "try again", a WHITE "Back to home", help.
- *
- * The edge function never deducts cups on failure (App.jsx
- * handleReceiptSubmit only deducts when status !== 'failed'), which is what
- * the cups-safe strip promises.
+ * ReceiptRejectedPage — the single "not accepted" outcome of the receipt
+ * check (the other outcome is the green success screen). Instead of exposing
+ * the AI's reasoning, we show a plain pass/fail checklist of what a valid
+ * receipt needs. The check never deducts cups on failure, which is what the
+ * "cups are safe" block promises.
  * ───────────────────────────────────────────────────────────────────── */
 
 const SUPPORT_EMAIL = 'info@packback.network';
 
 export default function ReceiptRejectedPage({
   failureChecks = [],
-  skippedChecks = [],
-  reason,
   requiredItem,
   isSystemError = false,
   claimId,
-  partnerBrand,
   onTryAgain,
   onClose,
 }) {
-  const cleanedReason = stripInternalPrefix(reason);
-
-  // ── Variant A: hard system error (network down, non-2xx, etc). ──
+  // Technical failure on our side — a short retry, no receipt checklist.
   if (isSystemError) {
     return (
-      <Shell
-        icon="⚠️"
+      <RejectShell
         tone="warn"
         title="Something went wrong"
-        why="This was a problem on our side, not with your receipt."
-        nextStep="Give it a moment and try again. If it keeps failing, get in touch and we'll sort it out."
+        message="This was a problem on our side, not with your receipt. Give it a moment and try again."
         primaryLabel="Try again"
-        onTryAgain={onTryAgain}
-        onClose={onClose}
-        claimId={claimId}
-        supportReason="system_error"
+        onTryAgain={onTryAgain} onClose={onClose} claimId={claimId} supportReason="system_error"
       />
     );
   }
 
   const primaryCode = failureChecks.find(c => ALL_FAILURE_CODES.includes(c)) || failureChecks[0];
-  const copy = getFailureCopy(primaryCode, { partnerBrand });
 
-  // ── Variant B: image hidden by content moderation. Neutral only. ──
+  // Moderation hid the image — stay neutral, no checklist.
   if (primaryCode === 'inappropriate_image') {
     return (
-      <Shell
-        icon={copy.icon}
-        tone="warn"
-        title={copy.title}
-        why={copy.hint}
-        nextStep={copy.nextStep}
+      <RejectShell
+        tone="reject"
+        title="We couldn't accept this photo"
+        message="Re-take a clear photo of the printed receipt itself, then try again."
         primaryLabel="Upload a different photo"
-        onTryAgain={onTryAgain}
-        onClose={onClose}
-        claimId={claimId}
-        supportReason="inappropriate_image"
+        onTryAgain={onTryAgain} onClose={onClose} claimId={claimId} supportReason="inappropriate_image"
       />
     );
   }
 
-  // ── Variant C: AI evaluated and rejected (the normal case) ──
-  // The failed checks become compact chips under the reason. (is_receipt is
-  // omitted — when it fails the headline already says it's not a receipt.)
-  const failedChips = failureChecks
-    .filter(c => c !== 'is_receipt' && !skippedChecks.includes(c) && ALL_FAILURE_CODES.includes(c))
-    .map(c => getFailureLabel(c, { partnerBrand }));
+  // Normal rejection — a pass/fail checklist of the receipt requirements.
+  const item = requiredItem || 'the reward item';
+  const CHECKLIST = [
+    { codes: ['is_receipt', 'is_authentic_burger_king'], label: 'A real printed store receipt' },
+    { codes: ['contains_required_item'], label: `Lists ${item}` },
+    { codes: ['is_newer_than_cup_return'], label: 'Dated after your cup return' },
+    { codes: ['duplicate_receipt'], label: 'Not claimed before' },
+  ];
+  const checks = CHECKLIST.map(c => ({ label: c.label, passed: !c.codes.some(code => failureChecks.includes(code)) }));
 
   return (
-    <Shell
-      icon={copy.icon}
+    <RejectShell
       tone="reject"
-      title={copy.title}
-      why={cleanedReason || copy.hint}
-      chips={failedChips}
-      nextStep={copy.nextStep}
+      title="This isn't a valid receipt"
+      checks={checks}
       primaryLabel="Try a different receipt"
-      onTryAgain={onTryAgain}
-      onClose={onClose}
-      claimId={claimId}
-      supportReason={primaryCode}
+      onTryAgain={onTryAgain} onClose={onClose} claimId={claimId} supportReason={primaryCode}
     />
   );
 }
 
-/* ── Shared page shell — renders the fixed 5-step hierarchy. ── */
-function Shell({ icon, tone, title, why, chips = [], nextStep, primaryLabel, onTryAgain, onClose, claimId, supportReason }) {
+/* ── Shared shell: badge + (checklist or message) + cups-safe + actions. ── */
+function RejectShell({ tone, title, checks, message, primaryLabel, onTryAgain, onClose, claimId, supportReason }) {
   return (
     <div className="rj">
       <div className="rj__scroll">
-        {/* 1. Main verdict */}
         <div className="rj__hero">
-          <div className={`rj__badge rj__badge--${tone}`}>
-            <span role="img" aria-hidden="true">{icon}</span>
+          <div className={`rj__badge rj__badge--${tone}`} aria-hidden="true">
+            {tone === 'warn' ? (
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            ) : (
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round">
+                <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+              </svg>
+            )}
           </div>
           <h1 className="rj__title">{title}</h1>
         </div>
 
-        {/* 2. Why */}
-        {(why || chips.length > 0) && (
-          <section className="rj__card">
-            <span className="rj__eyebrow">Why</span>
-            {why && <p className="rj__lead">{why}</p>}
-            {chips.length > 0 && (
-              <div className="rj__chips">
-                {chips.map(label => (
-                  <span key={label} className="rj__chip">
-                    <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
-                      <line x1="5" y1="5" x2="15" y2="15" /><line x1="15" y1="5" x2="5" y2="15" />
-                    </svg>
-                    {label}
-                  </span>
-                ))}
-              </div>
-            )}
-          </section>
+        {checks && checks.length > 0 && (
+          <ul className="rj__checklist">
+            {checks.map(c => (
+              <li key={c.label} className={`rj__check rj__check--${c.passed ? 'yes' : 'no'}`}>
+                <span className="rj__check-mark" aria-hidden="true">
+                  {c.passed ? (
+                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10L8 14L16 6" /></svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="5" x2="15" y2="15" /><line x1="15" y1="5" x2="5" y2="15" /></svg>
+                  )}
+                </span>
+                <span className="rj__check-label">{c.label}</span>
+              </li>
+            ))}
+          </ul>
         )}
 
-        {/* 3. Your cups are safe */}
+        {message && <p className="rj__message">{message}</p>}
+
         <div className="rj__safe">
-          <span className="rj__safe-ic">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <span className="rj__safe-ic" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" />
             </svg>
           </span>
           <span className="rj__safe-txt"><strong>Your cups are safe.</strong> Nothing was spent on this claim.</span>
         </div>
-
-        {/* 4. What to do next */}
-        {nextStep && (
-          <section className="rj__card">
-            <span className="rj__eyebrow">What to do next</span>
-            <p className="rj__lead">{nextStep}</p>
-          </section>
-        )}
       </div>
 
-      {/* 5. CTA */}
       <div className="rj__actions">
-        <button type="button" className="rj__btn rj__btn--primary" onClick={onTryAgain}>
-          {primaryLabel}
-        </button>
-        <button type="button" className="rj__btn rj__btn--white" onClick={onClose}>
-          Back to home
-        </button>
+        <button type="button" className="rj__btn rj__btn--primary" onClick={onTryAgain}>{primaryLabel}</button>
+        <button type="button" className="rj__btn rj__btn--white" onClick={onClose}>Back to home</button>
         <SupportLink claimId={claimId} reason={supportReason} />
       </div>
     </div>
@@ -175,11 +141,4 @@ function SupportLink({ claimId, reason }) {
       Still stuck? Get help
     </a>
   );
-}
-
-/* The server summary looks like "Failed: is_receipt, ...". The "Failed: <keys>."
- * prefix is admin-only debug — strip it so end-users don't see it. */
-function stripInternalPrefix(raw) {
-  if (!raw) return null;
-  return raw.replace(/^Failed:[^.]*\.\s*/, '').trim() || null;
 }

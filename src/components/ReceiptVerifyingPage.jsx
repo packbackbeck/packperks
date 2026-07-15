@@ -57,9 +57,9 @@ const SIZE = 184;
 const STROKE = 10;
 const R = (SIZE - STROKE) / 2;
 const CIRC = 2 * Math.PI * R;
-// Target final dashoffset = 4% of the circumference (leaves a sliver unfilled
+// Target final dashoffset = 3% of the circumference (leaves a sliver unfilled
 // so the ring never visually reaches 100% before the actual result lands).
-const FINAL_OFFSET = CIRC * 0.04;
+const FINAL_OFFSET = CIRC * 0.03;
 
 export default function ReceiptVerifyingPage() {
   const [stepIdx, setStepIdx] = useState(0);
@@ -86,8 +86,6 @@ export default function ReceiptVerifyingPage() {
 
   return (
     <div className="rv-page">
-      <div className="rv-page__glow" />
-
       <h1 className="rv-page__title">Verifying your receipt</h1>
       <p className="rv-page__subtitle">
         Hold tight, this usually takes a few seconds.

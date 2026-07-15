@@ -163,8 +163,8 @@ function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string
   const amount = `€${(opts.amount || 0).toFixed(2)}`;
   const hi = opts.name ? `Hi ${esc(opts.name)},` : "Hi there,";
   const rewardLine = opts.reward
-    ? `Your <strong>${esc(opts.reward)}</strong> cashback is approved and ready to collect.`
-    : `Your cashback is approved and ready to collect.`;
+    ? `We&rsquo;ve reviewed your receipt and approved it. Your <strong style="color:#3A342C;">${esc(opts.reward)}</strong> cashback is ready to collect.`
+    : `We&rsquo;ve reviewed your receipt and approved it. Your cashback is ready to collect.`;
   const font = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   const safeUrl = esc(opts.url);
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>

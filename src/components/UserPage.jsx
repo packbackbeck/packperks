@@ -109,7 +109,7 @@ export default function UserPage({
   // them against the activity_history label ("Claimed: Chicken Sandwich").
   const enrichedClaims = userClaims.map(c => {
     const reward = rewards.find(r => r.id === c.reward_id);
-    return { ...c, rewardName: reward?.name || c.reward_id, rewardImage: reward?.image || null, rewardBg: reward?.bgColor || null };
+    return { ...c, rewardName: reward?.name || 'Cashback reward', rewardImage: reward?.image || null, rewardBg: reward?.bgColor || null };
   });
   // Claims whose Tikkie CTA has been tapped once — hidden from the pending
   // block (but kept in Activity). Persisted in localStorage.
@@ -402,7 +402,6 @@ export default function UserPage({
           </span>
           <span className="user-page__howto-text">
             <span className="user-page__howto-title">How does it work?</span>
-            <span className="user-page__howto-sub">A quick walkthrough of cups, rewards and cashback</span>
           </span>
           <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="9 6 15 12 9 18" />

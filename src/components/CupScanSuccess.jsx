@@ -14,7 +14,7 @@ const AUTO_DISMISS_MS = 5000;
 // Matches the exit-transition duration in CupScanSuccess.css.
 const FADE_MS = 400;
 
-export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome }) {
+export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome, hasEmail = true, onSaveEmail }) {
   const now = new Date();
   const scanId = 'CUP-' + Date.now().toString(36).toUpperCase().slice(-5);
 
@@ -32,6 +32,7 @@ export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome 
 
   const goReward = useCallback(() => leaveTo(onHome), [leaveTo, onHome]);
   const goAddMore = useCallback(() => leaveTo(onAddMore), [leaveTo, onAddMore]);
+  const goSaveEmail = useCallback(() => leaveTo(onSaveEmail), [leaveTo, onSaveEmail]);
 
   // Auto-dismiss → smoothly transition to the home screen after 5s.
   useEffect(() => {
@@ -135,6 +136,17 @@ export default function CupScanSuccess({ cupsAdded, newTotal, onAddMore, onHome 
           </svg>
           Add more cups
         </button>
+        {/* Third CTA — only for visitors who haven't saved an email yet. */}
+        {!hasEmail && onSaveEmail && (
+          <button className="css-page__btn css-page__btn--outline" onClick={goSaveEmail}>
+            {/* envelope icon */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Add email to save balance
+          </button>
+        )}
       </div>
       </div>
     </div>,

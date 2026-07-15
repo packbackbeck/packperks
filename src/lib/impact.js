@@ -27,7 +27,7 @@ const COMPARISON_PHRASES = [
     if (g < 600)  return 'about the weight of a paperback book of plastic saved';
     if (g < 1500) return 'about the weight of a bag of sugar of plastic saved';
     if (g < 5000) return 'about the weight of a brick of plastic saved';
-    return `about ${(g / 1000).toFixed(1)} kg of plastic — a small backpack's worth`;
+    return `about ${(g / 1000).toFixed(1)} kg of plastic, a small backpack's worth`;
   },
 ];
 

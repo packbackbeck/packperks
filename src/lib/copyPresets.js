@@ -35,12 +35,12 @@ export const MODE_META = {
   deposit: {
     key:   'deposit',
     label: 'Deposit & return',
-    blurb: 'The original model — customers return packaging and earn cashback. Deposit/return language.',
+    blurb: 'The original model: customers return packaging and earn cashback. Deposit/return language.',
   },
   byo: {
     key:   'byo',
     label: 'Bring your own cup',
-    blurb: 'No deposit, no bin — customers bring a reusable cup and scan a counter QR. Bring-your-own language.',
+    blurb: 'No deposit, no bin: customers bring a reusable cup and scan a counter QR. Bring-your-own language.',
   },
 };
 

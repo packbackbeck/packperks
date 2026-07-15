@@ -118,7 +118,7 @@ export function render({ name, reward, amount, url, cups, expiryDays = 7, orgNam
                 ${amountLine} is ready to collect
               </h1>
               <p style="margin:0 0 24px 0; font-family:${BRAND.font}; font-size:15px; line-height:1.5; color:${BRAND.muted};">
-                We checked your receipt and approved it. Tap the button below to collect your cashback through Tikkie — it lands straight in your bank account.
+                We checked your receipt and approved it. Tap the button below to collect your cashback through Tikkie. It lands straight in your bank account.
               </p>
 
               <!-- Summary card -->

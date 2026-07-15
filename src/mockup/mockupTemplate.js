@@ -180,7 +180,7 @@ export const AI_RESEARCH_PROMPT = `You are preparing a PackPerks pitch mockup fo
 
 BUSINESS TO RESEARCH: <<paste the business name, and its city and/or website>>
 
-Research this business (brand colours, signature menu items, tone of voice). Then produce the values for a mockup of THIS brand's store screen. If something is unknown, make a realistic, on-brand guess — never leave a field blank.
+Research this business (brand colours, signature menu items, tone of voice). Then produce the values for a mockup of THIS brand's store screen. If something is unknown, make a realistic, on-brand guess. Never leave a field blank.
 
 Rules:
 - brandColor and every palette*/bgColor value must be a 6-digit hex colour (e.g. #E4572E).

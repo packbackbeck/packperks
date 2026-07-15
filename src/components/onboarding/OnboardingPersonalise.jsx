@@ -73,7 +73,7 @@ export default function OnboardingPersonalise({ answers, onPatch, onSubmit }) {
             })}
           </div>
           <span className={`onb-q__limit${limitHint ? ' is-shown' : ''}`} role="status" aria-live="polite">
-            That’s 3 already — tap one to swap.
+            That’s 3 already, tap one to swap.
           </span>
         </fieldset>
 

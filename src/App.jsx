@@ -1694,6 +1694,13 @@ export default function App() {
       return s + (b?.balance || 0) * rate;
     }, 0);
     const acctCombined = accountCombined && !!groupCtx;
+    // Enrich pending-claim cards with the reward's name + image. A claim can be
+    // for any store in the group (combined view), so pool this org's rewards
+    // with every group store's rewards, not just the current org's.
+    const claimRewards = [
+      ...liveRewards,
+      ...Object.values(groupStores).flatMap(s => s?.rewards || []),
+    ];
     return (
       <div className="app">
         <UserPage
@@ -1707,7 +1714,7 @@ export default function App() {
           storeName={acctCombined ? null : (activeOrg?.partner_brand_name || activeOrg?.name)}
           privacyPolicy={liveSettings.privacyPolicyText}
           userClaims={userClaims}
-          rewards={liveRewards}
+          rewards={claimRewards}
           authEmail={authEmail}
           onOpenSignIn={() => setShowSignIn(true)}
           onAddCup={handleAddCup}
@@ -1801,6 +1808,8 @@ export default function App() {
           newTotal={cupCount}
           onAddMore={handleCupScanAgain}
           onHome={handleCupScanHome}
+          hasEmail={!!(profile?.email || authEmail)}
+          onSaveEmail={() => { handleCupScanHome(); setShowSignIn(true); }}
         />
       )}
 

@@ -1451,7 +1451,7 @@
 .user-page__profile-avatar-emoji { font-size: 32px; line-height: 1; }
 .user-page__profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
 .user-page__profile-details {
-  min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-right: 52px;
+  min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-right: 52px;
 }
 .user-page__profile-name {
   font-family: var(--font-primary); font-size: 17px; font-weight: 800; color: var(--black);

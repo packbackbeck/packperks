@@ -77,7 +77,7 @@ export default function MockupEditor({ config, onChange }) {
           <input className="mk-input" value={config.orgName} onChange={e => set({ orgName: e.target.value })} placeholder="e.g. Sunrise Coffee" />
         </label>
         <label className="mk-field">
-          <span className="mk-field__label">Brand label <em>(optional — “PackBack × ___”)</em></span>
+          <span className="mk-field__label">Brand label <em>(optional, “PackBack × ___”)</em></span>
           <input className="mk-input" value={config.partnerBrandName} onChange={e => set({ partnerBrandName: e.target.value })} placeholder="Defaults to store name" />
         </label>
         <ImageField label="Logo" value={config.logoUrl} onChange={v => set({ logoUrl: v })} />

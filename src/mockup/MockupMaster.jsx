@@ -230,7 +230,7 @@ export default function MockupMaster() {
     } catch (e) {
       flash(e.message === 'timeout'
         ? 'Export timed out. Try uploading images instead of pasting external URLs.'
-        : 'Export failed — an external image likely blocked it. Upload images instead of pasting URLs.');
+        : 'Export failed. An external image likely blocked it. Upload images instead of pasting URLs.');
       console.warn('png export failed', e);
     } finally { setBusy(false); }
   }
@@ -242,7 +242,7 @@ export default function MockupMaster() {
           <span className="mockup-topbar__logo">◧</span>
           <div>
             <h1 className="mockup-topbar__title">MockupMaster</h1>
-            <span className="mockup-topbar__sub">Pitch mockups — no org required</span>
+            <span className="mockup-topbar__sub">Pitch mockups, no org required</span>
           </div>
         </div>
 

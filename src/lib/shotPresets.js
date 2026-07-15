@@ -25,7 +25,7 @@ export const SHOT_PRESETS = {
   'terms':          { page: 'home', cupCount: 12, profile: memberProfile, termsOpen: true },
   'how-it-works':   { page: 'home', cupCount: 0,  profile: visitorProfile, howItWorksOpen: true },
   'byo-popup':      { page: 'home', cupCount: 2,  profile: memberProfile, byoResult: { title: 'You’ve reached today’s cup limit', body: 'You’ve hit today’s cup limit at this venue. We’ll review this scan and, if it’s valid, add the cup to your balance.' } },
-  'budget-paused':  { page: 'home', cupCount: 12, profile: memberProfile, budgetPausedOpen: true, settings: { budgetPausedTitle: 'Rewards are paused', budgetPausedBody: 'This month’s reward budget is fully committed. Your cups are safe — check back soon.' } },
+  'budget-paused':  { page: 'home', cupCount: 12, profile: memberProfile, budgetPausedOpen: true, settings: { budgetPausedTitle: 'Rewards are paused', budgetPausedBody: 'This month’s reward budget is fully committed. Your cups are safe, check back soon.' } },
   'inapp-prompt':   { page: 'home', cupCount: 0,  profile: visitorProfile, inAppClaim: { platform: 'instagram', parsed: {} } },
   'cup-scan-success': { page: 'cup-scan-success', cupCount: 6, lastCupsScanned: 1, profile: memberProfile },
 

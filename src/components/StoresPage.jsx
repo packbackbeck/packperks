@@ -795,7 +795,7 @@ export default function StoresPage({
           disabled={locating && !nearby}
           aria-pressed={nearby}
           aria-label={nearby ? 'Turn off nearby sorting' : 'Sort venues by nearest to me'}
-          title={nearby ? 'Sorted by nearest — tap to turn off' : 'Sort by nearest to me'}
+          title={nearby ? 'Sorted by nearest, tap to turn off' : 'Sort by nearest to me'}
         >
           {locating && !nearby ? (
             <span className="stores2__nearby-spinner" aria-hidden="true" />

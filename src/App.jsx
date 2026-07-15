@@ -39,6 +39,7 @@ import {
   getHistory,
   addHistoryEntry,
   createClaim,
+  setClaimNotifyPrefs,
   addDonationClaim,
   updateUserProfile,
   getUserStats,
@@ -200,6 +201,19 @@ export default function App() {
   /* ── Onboarding (first-time market visitors + a secret re-open) ── */
   const [onboardingPrefs, setOnboardingPrefs] = useState(() => getOnboarding());
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  /* Account-level "email me when a reward is approved" preference. Stored in
+   * localStorage (device-centric, like avatar / onboarding), default on.
+   * Replaces the old per-claim opt-in: set once here or in Edit profile, and
+   * every new claim inherits it via notify_email at creation time. */
+  const [notifyOnApproval, setNotifyOnApproval] = useState(() => {
+    try { const v = localStorage.getItem('packperks_notify_on_approval'); return v === null ? true : v === '1'; }
+    catch { return true; }
+  });
+  const handleToggleNotify = (checked) => {
+    setNotifyOnApproval(checked);
+    try { localStorage.setItem('packperks_notify_on_approval', checked ? '1' : '0'); } catch { /* ignore */ }
+  };
 
   /* ── Email magic-link auth (optional account binding) ── */
   // `authEmail` is null when the user is in anonymous device-only mode
@@ -1095,9 +1109,12 @@ export default function App() {
     setPage('refund-success');
 
     if (userId) {
+      const refundClaim = createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: amount, orgId: activeOrg?.id });
+      // Same account-level notify preference as the cashback flow.
+      if (notifyOnApproval) refundClaim.then(cid => setClaimNotifyPrefs(cid, { email: true })).catch(() => {});
       persist(
         updateCupBalance(userId, 0),
-        createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: amount, orgId: activeOrg?.id }),
+        refundClaim,
         addHistoryEntry(userId, 'cups_withdrawn', label)
       );
     }
@@ -1183,6 +1200,11 @@ export default function App() {
       // Keep the claim ID around so the rejection page can surface it
       // (and pass it to the support mailto link).
       setLastClaimId(claimId);
+
+      // Inherit the account-level "email me when approved" preference (set once
+      // in Edit profile) instead of asking on this claim. notify_email drives
+      // the approval email; if it's off we simply leave the claim's default.
+      if (notifyOnApproval) setClaimNotifyPrefs(claimId, { email: true }).catch(() => {});
 
       // 2. Upload photo to storage, attach path to the claim
       await uploadReceiptPhoto(claimId, compressed);
@@ -1716,6 +1738,8 @@ export default function App() {
           userClaims={userClaims}
           rewards={claimRewards}
           authEmail={authEmail}
+          notifyOnApproval={notifyOnApproval}
+          onToggleNotify={handleToggleNotify}
           onOpenSignIn={() => setShowSignIn(true)}
           onAddCup={handleAddCup}
           isVisitor={isVisitor}

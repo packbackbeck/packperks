@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './ReceiptPage.css';
 
 /* ── Step icons (inline SVG) ── */
@@ -279,8 +280,11 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
       </>
       )}
 
-      {/* ── Rules popup (same content as the first-time rules screen) ── */}
-      {rulesPopup && (
+      {/* ── Rules popup (same content as the first-time rules screen) ──
+          Portaled to <body> so it escapes .receipt-page's retained page-slide-in
+          transform (which would otherwise make this fixed overlay's containing
+          block the 375px page column instead of the full viewport). */}
+      {rulesPopup && createPortal(
         <div className="receipt-rules-modal" onClick={() => setRulesPopup(false)}>
           <div className="receipt-rules-modal__card" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Which photos do we accept?">
             <div className="receipt-rules-modal__head">
@@ -291,7 +295,8 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
             </div>
             <ReceiptRules itemName={itemName} />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
     </div>

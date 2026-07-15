@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { COLLECT_WINDOW_MS } from '../lib/collectedClaims';
-import { setClaimNotifyPrefs } from '../lib/api';
-import { requestPushPermission, isPushSupported } from '../lib/notify';
 import './PendingClaims.css';
 
 const money = (n) => `€${(Number(n) || 0).toFixed(2)}`;
@@ -160,66 +158,27 @@ function ClaimCard({ claim, onCollect, collected }) {
       ) : (
         <>
           <ReviewProgress claim={claim} />
-          <NotifyOptions claim={claim} />
+          <ClaimNotifyNote claim={claim} />
         </>
       )}
     </article>
   );
 }
 
-/* Two small opt-in checkboxes on an in-review claim: get told the moment the
- * Tikkie link is ready, by email and/or browser push (push asks the browser
- * for permission on first tick). Persisted per claim via set_claim_notify. */
-function NotifyOptions({ claim }) {
-  const [email, setEmail] = useState(!!claim.notify_email);
-  const [push, setPush]   = useState(!!claim.notify_push);
-  const [hint, setHint]   = useState(null);
-
-  const save = (e, p) => setClaimNotifyPrefs(claim.id, { email: e, push: p }).catch(() => {});
-
-  const toggleEmail = (checked) => {
-    setEmail(checked);
-    setHint(null);
-    save(checked, push);
-  };
-
-  const togglePush = async (checked) => {
-    setHint(null);
-    if (!checked) { setPush(false); save(email, false); return; }
-    if (!isPushSupported()) {
-      setHint('Push isn’t supported in this browser. Email still works.');
-      return;
-    }
-    // Ask the browser for permission on first opt-in.
-    const perm = await requestPushPermission();
-    if (perm === 'granted') {
-      setPush(true);
-      save(email, true);
-    } else {
-      setPush(false);
-      setHint(perm === 'denied'
-        ? 'Notifications are blocked for this site. Allow them in your browser settings.'
-        : 'Push permission wasn’t granted. Email still works.');
-    }
-  };
-
+/* Static reassurance on an in-review claim. We no longer ask per claim whether
+ * to notify: that opt-in now lives once in the profile ("Notify me when a
+ * reward is approved"), and each new claim inherits it via notify_email at
+ * creation. So the card just confirms the outcome instead of prompting.
+ * When the preference is off, we say nothing (no nagging). */
+function ClaimNotifyNote({ claim }) {
+  if (!claim.notify_email) return null;
   return (
-    <div className="pc-notify">
-      <span className="pc-notify__label">Notify me when it’s ready:</span>
-      <div className="pc-notify__opts">
-        <label className="pc-notify__opt">
-          <input
-            type="checkbox"
-            className="pc-notify__box"
-            checked={email}
-            onChange={e => toggleEmail(e.target.checked)}
-          />
-          <span>via email</span>
-        </label>
-        {/* C.4: the "via push notification" option was removed — no push sender
-            exists yet, so it delivered nothing. Email works (via Brevo). */}
-      </div>
-      {hint && <span className="pc-notify__hint">{hint}</span>}
+    <div className="pc-notify pc-notify--static">
+      <svg className="pc-notify__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </svg>
+      <span className="pc-notify__label">We’ll email you when it’s ready.</span>
     </div>
   );
 }

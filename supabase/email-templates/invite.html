@@ -12,7 +12,10 @@
     You've been invited to the PackPerks admin
 
   IMPORTANT: add your admin origin under Authentication → URL Configuration →
-  Redirect URLs (e.g. your production /admin domain) so the link lands correctly.
+  Redirect URLs so the link lands correctly.
+
+  Shares the unified PackPerks email system (cream canvas, DM Sans, yellow
+  wordmark, tinted icon badge). Transactional invite → no unsubscribe.
 
   Variable: {{ .ConfirmationURL }} = accept-invite link.
 -->
@@ -24,75 +27,68 @@
     <meta name="color-scheme" content="light" />
     <title>You're invited to PackPerks</title>
   </head>
-  <body style="margin:0; padding:0; background-color:#FBF4EE; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#1A1A1A; -webkit-font-smoothing:antialiased;">
-
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#FBF4EE;">
+  <body style="margin:0; padding:0; background:#F4EBDC; font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4EBDC; padding:34px 14px;">
       <tr>
-        <td align="center" style="padding:40px 16px;">
+        <td align="center">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:480px; background:#FFFFFF; border-radius:24px; overflow:hidden; box-shadow:0 14px 40px rgba(70,48,20,0.12);">
 
-          <!-- Card -->
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:460px; background:#FFFFFF; border-radius:24px; box-shadow:0 12px 40px rgba(20,16,12,0.10); border:1px solid rgba(0,0,0,0.04); overflow:hidden;">
-
-            <!-- Brand header -->
+            <!-- Header: wordmark -->
             <tr>
-              <td align="center" style="padding:34px 32px 6px;">
-                <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em; color:#E24400;">PackPerks</div>
-                <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#A89E92; margin-top:8px;">Admin dashboard</div>
+              <td align="center" style="padding:36px 36px 0;">
+                <div style="font-size:24px; font-weight:800; letter-spacing:-0.01em; color:#EBA80C; line-height:1;">PackPerks</div>
+                <div style="font-size:10.5px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#B7A98D; margin-top:9px;">Admin dashboard</div>
+              </td>
+            </tr>
+
+            <!-- Hero icon badge: add a teammate -->
+            <tr>
+              <td align="center" style="padding:26px 36px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                  <td width="64" height="64" align="center" valign="middle" style="width:64px; height:64px; background:#FDEEE4; border-radius:18px;">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E24400" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;"><path d="M15 20v-1.6a4 4 0 0 0-4-4H6.5a4 4 0 0 0-4 4V20"/><circle cx="8.75" cy="8" r="3.6"/><path d="M18.5 8.5v5"/><path d="M21 11h-5"/></svg>
+                  </td>
+                </tr></table>
               </td>
             </tr>
 
             <!-- Heading -->
             <tr>
-              <td style="padding:22px 36px 0;">
-                <h1 style="margin:0 0 10px; font-size:23px; line-height:1.25; font-weight:800; color:#1A1A1A;">You've been invited</h1>
-                <p style="margin:0; font-size:15px; line-height:1.55; color:#5C564E;">
-                  A PackPerks admin has invited you to join their team. Tap below to accept the invite and set up your account.
-                </p>
+              <td align="center" style="padding:20px 40px 0;">
+                <h1 style="margin:0 0 10px; font-size:23px; line-height:1.3; font-weight:800; color:#241E16;">You&rsquo;ve been invited</h1>
+                <p style="margin:0; font-size:15px; line-height:1.55; color:#6B6154;">A PackPerks admin has invited you to join their team. Tap below to accept the invite and set up your account.</p>
               </td>
             </tr>
 
             <!-- Primary CTA -->
             <tr>
-              <td align="center" style="padding:24px 36px 8px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td align="center" bgcolor="#E24400" style="border-radius:14px;">
-                      <a href="{{ .ConfirmationURL }}"
-                         style="display:inline-block; padding:15px 38px; font-size:16px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:14px;">
-                        Accept invitation
-                      </a>
-                    </td>
-                  </tr>
-                </table>
+              <td align="center" style="padding:26px 36px 4px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                  <td align="center" bgcolor="#E24400" style="border-radius:14px; box-shadow:0 6px 16px rgba(226,68,0,0.28);">
+                    <a href="{{ .ConfirmationURL }}" style="display:inline-block; padding:16px 38px; font-size:16px; font-weight:800; color:#FFFFFF; text-decoration:none; border-radius:14px;">Accept invitation</a>
+                  </td>
+                </tr></table>
               </td>
             </tr>
 
             <!-- Security note -->
             <tr>
-              <td style="padding:22px 36px 0;">
-                <p style="margin:0; font-size:13px; line-height:1.6; color:#7A7166;">
-                  If you weren&rsquo;t expecting this, you can safely ignore this email; no account will be created.
-                </p>
+              <td align="center" style="padding:20px 40px 0;">
+                <p style="margin:0; font-size:13px; line-height:1.6; color:#8A8175;">If you weren&rsquo;t expecting this, you can safely ignore this email; no account will be created.</p>
               </td>
             </tr>
 
             <!-- Footer -->
             <tr>
-              <td style="padding:26px 36px 32px;">
-                <div style="border-top:1px solid #F0EBE3; padding-top:18px;">
-                  <p style="margin:0; font-size:11px; line-height:1.6; color:#B3ABA0; text-align:center;">
-                    PackPerks &middot; Reusable-cup rewards<br />
-                    Questions? <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a>
-                  </p>
+              <td style="padding:28px 40px 34px;">
+                <div style="border-top:1px solid #F1EADD; padding-top:18px;">
+                  <p style="margin:0; font-size:12px; line-height:1.55; color:#B4AC9E; text-align:center;">You received this because a PackPerks admin invited this address to their team.<br />Questions? <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a></p>
                 </div>
               </td>
             </tr>
 
           </table>
-          <!-- /Card -->
-
-          <div style="font-size:11px; color:#C4BCB0; margin-top:18px;">&copy; PackPerks</div>
-
+          <p style="margin:18px 0 0; font-size:11px; color:#BBB09E;">PackPerks &middot; Bring your cup, earn cashback</p>
         </td>
       </tr>
     </table>

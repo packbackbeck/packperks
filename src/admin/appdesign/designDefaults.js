@@ -68,16 +68,22 @@ export function mergeDesign(partial) {
 /* CSS-variable map: which design tokens override which existing root
  * variable in index.css. Keeping this here means the user-app components
  * never have to know about the design system — they keep using
- * var(--pb-*) and we just retarget those vars at the org's palette. */
+ * var(--pb-*) and we just retarget those vars at the org's palette.
+ *
+ * These MUST be the canonical --pb-* tokens the components actually read.
+ * The legacy --bk-* names are now mere aliases (--bk-orange: var(--pb-orange)
+ * in index.css), so overriding --bk-* had no effect once every customer
+ * component migrated to --pb-* — which silently dropped per-org branding.
+ * Overriding --pb-* cascades to the --bk-* aliases too, so both are covered. */
 export const COLOR_VAR_MAP = {
-  primary:    '--bk-brown',
-  accent:     '--bk-orange',
-  accentDeep: '--bk-red',
-  background: '--bk-cream',
+  primary:    '--pb-brown',
+  accent:     '--pb-orange',
+  accentDeep: '--pb-red',
+  background: '--pb-cream',
   surface:    '--white',
   text:       '--black',
   textMuted:  '--text-muted',
-  success:    '--bk-green',
+  success:    '--pb-green',
 };
 
 /* Apply a design.colors object to the document root so the user app

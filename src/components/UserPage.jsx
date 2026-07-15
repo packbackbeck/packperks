@@ -11,6 +11,10 @@ import { getGlobalImpact } from '../lib/api';
 import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
 import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
+import { usePwaInstall } from '../lib/pwa';
+import { requestPushPermission, getPermissionState } from '../lib/notify';
+
+const PUSH_PREF_KEY = 'packperks_push_rewards';
 
 const DSAR_EMAIL = 'info@packback.network';
 const AVATAR_KEY = 'packperks_profile_avatar';
@@ -60,6 +64,8 @@ export default function UserPage({
   userClaims = [],
   rewards = [],
   authEmail = null,
+  notifyOnApproval = true,
+  onToggleNotify,
   onOpenSignIn,
   onAddCup,
   isVisitor = false,
@@ -118,6 +124,33 @@ export default function UserPage({
     if (!claim?.id) return;
     markClaimCollected(claim.id);
     setCollectedClaims({ ...getCollectedMap() });
+  };
+
+  // ── PWA install + reward push-notification preference ──
+  // The "Add to home screen" button disappears once the app is installed; a
+  // "push notifications" toggle then appears in Edit profile (push only works
+  // from the installed app, so it's meaningless before install).
+  const pwa = usePwaInstall();
+  const [iosInstallHint, setIosInstallHint] = useState(false);
+  const [pushRewards, setPushRewards] = useState(() => {
+    try { return localStorage.getItem(PUSH_PREF_KEY) === '1' && getPermissionState() === 'granted'; }
+    catch { return false; }
+  });
+  const handleAddToHome = async () => {
+    const outcome = await pwa.promptInstall();
+    // iOS Safari / Firefox have no programmatic prompt → reveal manual steps.
+    if (outcome === 'unavailable') setIosInstallHint(v => !v);
+  };
+  const handleTogglePush = async (checked) => {
+    if (!checked) {
+      setPushRewards(false);
+      try { localStorage.setItem(PUSH_PREF_KEY, '0'); } catch { /* ignore */ }
+      return;
+    }
+    const perm = await requestPushPermission();
+    const on = perm === 'granted';
+    setPushRewards(on);
+    try { localStorage.setItem(PUSH_PREF_KEY, on ? '1' : '0'); } catch { /* ignore */ }
   };
 
   const [email, setEmail] = useState(profile.email || '');
@@ -390,23 +423,54 @@ export default function UserPage({
 
       <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} onCollect={handleCollectClaim} />
 
-      {/* ── How it works ── opens the full-screen Stories-style guide ── */}
-      {onOpenHowItWorks && (
-        <button type="button" className="user-page__howto" onClick={() => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); }}>
-          <span className="user-page__howto-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M9.3 9.2a2.8 2.8 0 0 1 5.3 1c0 1.9-2.6 2.2-2.6 3.6" />
-              <line x1="12" y1="17.4" x2="12.01" y2="17.4" />
-            </svg>
-          </span>
-          <span className="user-page__howto-text">
-            <span className="user-page__howto-title">How does it work?</span>
-          </span>
-          <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="9 6 15 12 9 18" />
-          </svg>
-        </button>
+      {/* ── Info + install section: "How does it work?" plus an "Add to home
+           screen" button that installs the app like a native one. The install
+           button disappears once the app is installed. No section title. ── */}
+      {(onOpenHowItWorks || !pwa.installed) && (
+        <div className="user-page__howto-group">
+          {onOpenHowItWorks && (
+            <button type="button" className="user-page__howto" onClick={() => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); }}>
+              <span className="user-page__howto-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M9.3 9.2a2.8 2.8 0 0 1 5.3 1c0 1.9-2.6 2.2-2.6 3.6" />
+                  <line x1="12" y1="17.4" x2="12.01" y2="17.4" />
+                </svg>
+              </span>
+              <span className="user-page__howto-text">
+                <span className="user-page__howto-title">How does it work?</span>
+              </span>
+              <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="9 6 15 12 9 18" />
+              </svg>
+            </button>
+          )}
+
+          {!pwa.installed && (
+            <button type="button" className="user-page__howto user-page__howto--install" onClick={handleAddToHome} aria-expanded={iosInstallHint}>
+              <span className="user-page__howto-icon user-page__howto-icon--install">
+                {/* phone + downward arrow → "install to your phone" */}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+                  <path d="M12 7.5v6" />
+                  <path d="M9.4 11l2.6 2.6L14.6 11" />
+                  <line x1="10.5" y1="18.5" x2="13.5" y2="18.5" />
+                </svg>
+              </span>
+              <span className="user-page__howto-text">
+                <span className="user-page__howto-title">Add to home screen to save</span>
+                {iosInstallHint && (
+                  <span className="user-page__howto-sub">
+                    In your browser menu, tap <strong>Share</strong> then <strong>Add to Home Screen</strong>.
+                  </span>
+                )}
+              </span>
+              <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="9 6 15 12 9 18" />
+              </svg>
+            </button>
+          )}
+        </div>
       )}
 
       {/* Save-your-cups prompt now lives inline on the Email row below
@@ -580,6 +644,11 @@ export default function UserPage({
           email={email || authEmail}
           hasEmail={!!(email || authEmail)}
           marketingConsent={profile.marketingConsent}
+          notifyOnApproval={notifyOnApproval}
+          onToggleNotify={onToggleNotify}
+          pwaInstalled={pwa.installed}
+          pushRewards={pushRewards}
+          onTogglePush={handleTogglePush}
           browserInfo={browserInfo}
           onClose={() => setEditOpen(false)}
           onSaveName={(name) => saveProfile({ displayName: name })}
@@ -619,8 +688,9 @@ export default function UserPage({
  * Minimal: an avatar with photo controls, an editable name with a shuffle,
  * the email (routes to the verified sign-in sheet), and a marketing toggle. ── */
 function ProfileEditModal({
-  profile, animal, avatarUrl, email, hasEmail, marketingConsent, browserInfo,
-  onClose, onSaveName, onRegenerate, onUploadAvatar, onRemoveAvatar, onManageEmail, onToggleMarketing,
+  profile, animal, avatarUrl, email, hasEmail, marketingConsent, notifyOnApproval,
+  pwaInstalled, pushRewards, onTogglePush, browserInfo,
+  onClose, onSaveName, onRegenerate, onUploadAvatar, onRemoveAvatar, onManageEmail, onToggleMarketing, onToggleNotify,
 }) {
   const [name, setName] = useState(profile.displayName || '');
   const fileRef = useRef(null);
@@ -691,6 +761,22 @@ function ProfileEditModal({
             <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </div>
+
+        {hasEmail && (
+          <label className="upedit__toggle">
+            <span>Reward approval emails</span>
+            <input type="checkbox" className="user-page__switch" checked={!!notifyOnApproval} onChange={(e) => onToggleNotify?.(e.target.checked)} aria-label="Email me when a reward is approved" />
+          </label>
+        )}
+
+        {/* Push notifications only work from the installed app, so this toggle
+            appears only once PackPerks is added to the home screen. */}
+        {pwaInstalled && (
+          <label className="upedit__toggle">
+            <span>Reward push notifications</span>
+            <input type="checkbox" className="user-page__switch" checked={!!pushRewards} onChange={(e) => onTogglePush?.(e.target.checked)} aria-label="Notify me about rewards via push notification" />
+          </label>
+        )}
 
         {hasEmail && (
           <label className="upedit__toggle">

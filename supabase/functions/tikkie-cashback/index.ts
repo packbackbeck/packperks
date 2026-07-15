@@ -166,24 +166,40 @@ function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string
     ? `Your <strong>${esc(opts.reward)}</strong> cashback is approved and ready to collect.`
     : `Your cashback is approved and ready to collect.`;
   const font = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  const safeUrl = esc(opts.url);
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
 <body style="margin:0;padding:0;background:#F4EBDC;font-family:${font};-webkit-font-smoothing:antialiased;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4EBDC;padding:34px 14px;">
     <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:464px;background:#FFFFFF;border-radius:26px;overflow:hidden;box-shadow:0 14px 40px rgba(70,48,20,0.12);">
-        <tr><td align="center" style="padding:38px 36px 0;">
-          <div style="font-size:25px;font-weight:800;letter-spacing:-0.01em;color:#EBA80C;">PackPerks</div>
-          <div style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#C4B49A;margin-top:7px;">Reusable-cup rewards</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFFFF;border-radius:24px;overflow:hidden;box-shadow:0 14px 40px rgba(70,48,20,0.12);">
+        <tr><td align="center" style="padding:36px 36px 0;">
+          <div style="font-size:24px;font-weight:800;letter-spacing:-0.01em;color:#EBA80C;line-height:1;">PackPerks</div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#B7A98D;margin-top:9px;">Reusable-cup rewards</div>
         </td></tr>
-        <tr><td align="center" style="padding:26px 40px 0;">
+        <tr><td align="center" style="padding:26px 36px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td width="64" height="64" align="center" valign="middle" style="width:64px;height:64px;background:#FDEEE4;border-radius:18px;">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E24400" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M12 8H7.5a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8z"/><path d="M12 8h4.5a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8z"/></svg>
+            </td>
+          </tr></table>
+        </td></tr>
+        <tr><td align="center" style="padding:20px 40px 0;">
           <p style="margin:0 0 6px;font-size:15px;color:#6B6154;">${hi}</p>
-          <h1 style="margin:0 0 10px;font-size:23px;line-height:1.3;font-weight:800;color:#241E16;">Your ${amount} cashback is ready 🎉</h1>
+          <h1 style="margin:0 0 10px;font-size:23px;line-height:1.3;font-weight:800;color:#241E16;">Your ${amount} cashback is ready</h1>
           <p style="margin:0;font-size:15px;line-height:1.55;color:#6B6154;">${rewardLine} Tap below to collect it securely through <strong style="color:#3A342C;">Tikkie</strong>.</p>
         </td></tr>
-        <tr><td align="center" style="padding:26px 36px 4px;">
+        <tr><td align="center" style="padding:22px 36px 4px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:320px;background:#EEF8F0;border:1px solid #CDE9D4;border-radius:18px;"><tr>
+            <td align="center" style="padding:16px 20px;">
+              <div style="font-size:11.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5C9A6E;">Ready to collect</div>
+              <div style="font-size:30px;font-weight:800;color:#1A8737;margin-top:3px;">${amount}</div>
+            </td>
+          </tr></table>
+        </td></tr>
+        <tr><td align="center" style="padding:20px 36px 4px;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
             <td style="border-radius:14px;background:#E24400;box-shadow:0 6px 16px rgba(226,68,0,0.28);">
-              <a href="${esc(opts.url)}" target="_blank" style="display:inline-block;padding:16px 36px;font-size:16px;font-weight:800;color:#FFFFFF;text-decoration:none;border-radius:14px;">Collect ${amount} via Tikkie</a>
+              <a href="${safeUrl}" target="_blank" style="display:inline-block;padding:16px 36px;font-size:16px;font-weight:800;color:#FFFFFF;text-decoration:none;border-radius:14px;">Collect ${amount} via Tikkie</a>
             </td>
           </tr></table>
         </td></tr>
@@ -192,7 +208,8 @@ function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string
         </td></tr>
         <tr><td style="padding:28px 40px 34px;">
           <div style="border-top:1px solid #F1EADD;padding-top:18px;">
-            <p style="margin:0;font-size:12px;line-height:1.55;color:#B4AC9E;text-align:center;">You&rsquo;re receiving this because you asked us to email you about this cashback.<br />Questions? <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a></p>
+            <p style="margin:0 0 8px;font-size:12px;line-height:1.55;color:#B4AC9E;text-align:center;">You&rsquo;re receiving this because you asked us to email you about this cashback.<br />Questions? <a href="mailto:info@packback.network" style="color:#9A9186;">info@packback.network</a></p>
+            <p style="margin:0;font-size:11.5px;line-height:1.55;color:#B4AC9E;text-align:center;">Don&rsquo;t want reward emails? Turn them off in the app under <strong style="color:#9A9186;">Edit profile &rarr; Reward approval emails</strong>, or <a href="mailto:info@packback.network?subject=Unsubscribe%20from%20reward%20emails" style="color:#9A9186;text-decoration:underline;">unsubscribe</a>.</p>
           </div>
         </td></tr>
       </table>

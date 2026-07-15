@@ -131,7 +131,7 @@ export const COPY_PRESETS = {
       // the deposit-model artwork.
       steps: [
         { title: 'Bring your reusable cup', body: 'Order your drink in your own reusable cup at any participating café, then scan the QR code on the counter. Each scan adds one cup to your balance at that venue.', image: '/how-it-works/byo-1.png', bg: 'linear-gradient(165deg, #FBEDE4 0%, #F6D8C6 100%)', accent: '#E88E63', icon: 'cup' },
-        { title: 'Collect enough cups',     body: 'Keep collecting until you reach a reward’s cup goal. Each café keeps its own balance, and you can switch your reward goal any time before you claim.', image: '/how-it-works/byo-2.png', bg: 'linear-gradient(165deg, #EAF6EC 0%, #D6ECD9 100%)', accent: '#5FA96E', icon: 'cup' },
+        { title: 'Collect enough cups',     body: 'Keep collecting until you reach a reward’s cup goal. Each café keeps its own balance, and you can switch your reward goal any time before you claim.', image: '/how-it-works/byo-2.png', bg: 'linear-gradient(165deg, #FCF2D6 0%, #F8E7B9 100%)', accent: '#E0A12B', icon: 'cup' },
         { title: 'Buy it and get cashback', body: 'Once it is unlocked, buy the rewarded item and take a photo of the printed receipt. After a quick check we send your full cashback via a secure Tikkie link, no bank details needed.', image: '/how-it-works/byo-5.png', bg: 'linear-gradient(165deg, #EAF7EF 0%, #D8F0E4 100%)', accent: '#57C08D', icon: 'cash' },
       ],
     },

@@ -1355,6 +1355,21 @@
   color: var(--text-light);
 }
 
+/* Info + install group: two stacked cards, no heading. */
+.user-page__howto-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+/* Keep the install button's label + its optional hint left-aligned and tidy. */
+.user-page__howto--install { align-items: flex-start; }
+.user-page__howto--install .user-page__howto-arrow { align-self: center; }
+.user-page__howto-icon--install {
+  background: var(--pb-green-100, #D4EDDA);
+  color: var(--pb-green, #1A8737);
+}
+
 /* ── Visitor: two conversion CTAs (scan a cup OR save an email) ── */
 .user-page__visitor-ctas {
   display: flex;

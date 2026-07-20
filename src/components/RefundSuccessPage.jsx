@@ -1,4 +1,5 @@
 import './RefundSuccessPage.css';
+import { useMoney } from '../lib/RegionContext';
 
 function formatDate(d = new Date()) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -15,11 +16,12 @@ const Row = ({ label, value, bold, green }) => (
 );
 
 export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone }) {
+  const money = useMoney();
   const now = new Date();
   const refundId = 'RF-' + Date.now().toString(36).toUpperCase().slice(-6);
   // C.2: the amount is computed by App from the venue's configured refund rate
-  // and passed in — no hardcoded €1.00 per cup here anymore.
-  const total = Number(amount || 0).toFixed(2);
+  // and passed in — no hardcoded 1.00 per cup here anymore.
+  const total = Number(amount || 0);
   const perCup = cupCount > 0 ? (Number(amount || 0) / cupCount) : 0;
 
   return (
@@ -46,7 +48,7 @@ export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone 
       <div className="rsp__card">
         {/* Amount hero */}
         <div className="rsp__amount-row">
-          <span className="rsp__amount">€{total}</span>
+          <span className="rsp__amount">{money(total)}</span>
           <span className="rsp__amount-label">direct refund</span>
         </div>
 
@@ -58,12 +60,12 @@ export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone 
           <Row label="Time"        value={formatTime(now)} />
           {userEmail ? <Row label="Sent to" value={userEmail} /> : null}
           <Row label="Cups refunded" value={`${cupCount} cup${cupCount !== 1 ? 's' : ''}`} />
-          <Row label="Rate"        value={`€${perCup.toFixed(2)} per cup`} />
+          <Row label="Rate"        value={`${money(perCup)} per cup`} />
         </div>
 
         <div className="rsp__dashed" />
 
-        <Row label="Total refund" value={`€${total}`} bold green />
+        <Row label="Total refund" value={money(total)} bold green />
 
         <div className="rsp__eta">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A8737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

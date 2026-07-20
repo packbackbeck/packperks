@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { COLLECT_WINDOW_MS } from '../lib/collectedClaims';
+import { useMoney, useRegion } from '../lib/RegionContext';
 import './PendingClaims.css';
-
-const money = (n) => `€${(Number(n) || 0).toFixed(2)}`;
 
 /* A claim is only "ready" once an admin has approved it AND minted the Tikkie
  * link. The AI receipt check is just a pre-screen — the final verdict is a
@@ -116,6 +115,8 @@ function ReviewProgress({ claim }) {
 }
 
 function ClaimCard({ claim, onCollect, collected }) {
+  const money = useMoney();
+  const { symbol } = useRegion();
   const ready = isReady(claim);
   const amount = money(claim.payout_amount);
   const name = claim.rewardName || 'Cashback reward';
@@ -126,7 +127,7 @@ function ClaimCard({ claim, onCollect, collected }) {
         <div className="pc-card__thumb" style={claim.rewardBg ? { background: claim.rewardBg } : undefined}>
           {claim.rewardImage
             ? <img src={claim.rewardImage} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-            : <span className="pc-card__thumb-euro">€</span>}
+            : <span className="pc-card__thumb-euro">{symbol}</span>}
         </div>
         <div className="pc-card__meta">
           <span className="pc-card__name">{name}</span>
@@ -156,29 +157,8 @@ function ClaimCard({ claim, onCollect, collected }) {
           </svg>
         </a>
       ) : (
-        <>
-          <ReviewProgress claim={claim} />
-          <ClaimNotifyNote claim={claim} />
-        </>
+        <ReviewProgress claim={claim} />
       )}
     </article>
-  );
-}
-
-/* Static reassurance on an in-review claim. We no longer ask per claim whether
- * to notify: that opt-in now lives once in the profile ("Notify me when a
- * reward is approved"), and each new claim inherits it via notify_email at
- * creation. So the card just confirms the outcome instead of prompting.
- * When the preference is off, we say nothing (no nagging). */
-function ClaimNotifyNote({ claim }) {
-  if (!claim.notify_email) return null;
-  return (
-    <div className="pc-notify pc-notify--static">
-      <svg className="pc-notify__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-        <polyline points="22,6 12,13 2,6"/>
-      </svg>
-      <span className="pc-notify__label">We’ll email you when it’s ready.</span>
-    </div>
   );
 }

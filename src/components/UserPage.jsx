@@ -13,6 +13,7 @@ import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
 import { usePwaInstall } from '../lib/pwa';
 import { requestPushPermission, getPermissionState } from '../lib/notify';
+import { useMoney } from '../lib/RegionContext';
 
 const PUSH_PREF_KEY = 'packperks_push_rewards';
 
@@ -100,6 +101,8 @@ export default function UserPage({
   // that happened while the user wasn't looking get pulled in automatically.
   useEffect(() => { onRefreshClaims?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  const money = useMoney();
+
   // Secret re-open: three taps on the version within ~1.2s reopens onboarding.
   const versionTaps = useRef({ n: 0, t: null });
   const bumpVersion = () => {
@@ -137,9 +140,24 @@ export default function UserPage({
     catch { return false; }
   });
   const handleAddToHome = async () => {
+    // 1) Chrome / Edge / Android: fire the real one-tap install prompt.
     const outcome = await pwa.promptInstall();
-    // iOS Safari / Firefox have no programmatic prompt → reveal manual steps.
-    if (outcome === 'unavailable') setIosInstallHint(v => !v);
+    if (outcome !== 'unavailable') return;
+    // 2) iOS Safari (and others with no install API): open the OS share sheet,
+    //    where the user can pick "Add to Home Screen". Apple exposes no JS
+    //    install API, so this is the closest we can trigger programmatically.
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'PackPerks',
+          text: 'Save your cups by adding PackPerks to your home screen.',
+          url: window.location.origin,
+        });
+        return;
+      } catch { /* user dismissed / not permitted → fall through to steps */ }
+    }
+    // 3) No prompt and no share (Firefox / in-app browsers): show manual steps.
+    setIosInstallHint(v => !v);
   };
   const handleTogglePush = async (checked) => {
     if (!checked) {
@@ -368,7 +386,7 @@ export default function UserPage({
           <span className="user-page__value-approx" aria-label="approximately">≈</span>
           <div className="user-page__value-option user-page__value-option--right">
             <span className="user-page__value-num user-page__value-num--euro">
-              €{(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate ?? 1.25)).toFixed(2)}
+              {money(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate ?? 1.25))}
             </span>
             <span className="user-page__value-label">in cashback</span>
           </div>

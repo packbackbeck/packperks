@@ -9,8 +9,10 @@ import {
   saveGroupCopy,
   resetGroupCopy,
   getGroupStats,
+  setGroupMultiRegion,
 } from '../lib/adminApi';
 import { MODE_META, getCopyPreset, COPY_MODES } from '../../lib/copyPresets';
+import { regionForCountry } from '../../lib/regions';
 
 /* Merge a group's saved copy overrides (config.settings.copy) over its mode
  * preset → the full effective bundle. Mirrors the customer app's
@@ -374,6 +376,17 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
     run(() => setOrgGroupActive(org.id, !org.group_active));
   }
 
+  function handleMultiRegion(groupId, on) {
+    run(() => setGroupMultiRegion(groupId, on));
+  }
+
+  // org id → country, for showing which regions a group's members span.
+  const countryByOrg = useMemo(() => {
+    const m = {};
+    (orgs || []).forEach(o => { m[o.id] = o.country; });
+    return m;
+  }, [orgs]);
+
   function handleRename(groupId) {
     const name = renameVal.trim();
     if (!name) return;
@@ -522,6 +535,37 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
                       ) : showPrev ? (
                         <ModePreview copy={effectiveCopy(group)} />
                       ) : null}
+                    </div>
+
+                    {/* Multi-region: flag a group whose vendors span regions */}
+                    <div className="og-section">
+                      <div className="og-section__head">
+                        <span className="og-section__title">Regions</span>
+                        <label className="og-toggle" title="Enable if this group's vendors span more than one region (different currencies + payout providers)">
+                          <input
+                            type="checkbox"
+                            checked={!!group.config?.settings?.multiRegion}
+                            onChange={e => handleMultiRegion(group.id, e.target.checked)}
+                            disabled={busy}
+                          />
+                          <span className="og-toggle__track"><span className="og-toggle__thumb" /></span>
+                          <span className="og-toggle__label">{group.config?.settings?.multiRegion ? 'Multi-region' : 'Single region'}</span>
+                        </label>
+                      </div>
+                      {(() => {
+                        const keys = [...new Set(members
+                          .filter(m => !m.deleted_at)
+                          .map(m => regionForCountry(countryByOrg[m.id])?.key)
+                          .filter(Boolean))];
+                        return (
+                          <p className="og-hint">
+                            {keys.length === 0
+                              ? 'No regions yet — set each vendor’s country under Organisations → Regions.'
+                              : <>Vendors here span: {keys.map(k => <code key={k} className="og-member__slug" style={{ marginRight: 6 }}>{k}</code>)}
+                                 {keys.length > 1 && !group.config?.settings?.multiRegion && <strong> · turn on Multi-region.</strong>}</>}
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     {/* Members */}

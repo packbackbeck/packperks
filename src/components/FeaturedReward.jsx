@@ -2,6 +2,7 @@ import './FeaturedReward.css';
 import zigzagImg from '../assets/images/zigzag.svg';
 import cashbackIcon from '../assets/images/cashback-icon.png';
 import { rewardImageStyle } from '../utils/imageTransform';
+import { useMoney } from '../lib/RegionContext';
 
 const TIKKIE_URL = 'https://www.tikkie.me/particulier/statiegeld-terugkrijgen';
 
@@ -21,8 +22,9 @@ export default function FeaturedReward({
   onExplain,
   orgName,
 }) {
+  const money = useMoney();
   const isComplete = cupsCollected >= reward.cupsNeeded;
-  const cashbackAmount = reward.euros?.toFixed(2) ?? (reward.cupsNeeded * 1.25).toFixed(2);
+  const cashbackAmount = reward.euros ?? (reward.cupsNeeded * 1.25);
   const store = orgName || 'the store';
 
   const handleClaim = () => {
@@ -92,7 +94,7 @@ export default function FeaturedReward({
                 <span key={tag} className="featured-reward__tag">{tag}</span>
               ))}
               <span className="featured-reward__tag featured-reward__tag--cups">
-                €{cashbackAmount} for
+                {money(cashbackAmount)} for
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
                   <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
@@ -148,14 +150,14 @@ export default function FeaturedReward({
               className={`featured-reward__claim-btn ${(!isUnlocked || (isUnlocked && budgetBlocked)) ? 'featured-reward__claim-btn--locked' : ''}`}
               type="button"
               onClick={handleClaim}
-              aria-label={isUnlocked && budgetBlocked ? 'Rewards paused, try again later' : `Get €${cashbackAmount} cashback`}
+              aria-label={isUnlocked && budgetBlocked ? 'Rewards paused, try again later' : `Get ${money(cashbackAmount)} cashback`}
             >
               {isUnlocked && budgetBlocked ? (
                 'Rewards paused'
               ) : (
                 <>
                   <img src={cashbackIcon} alt="" className="featured-reward__claim-btn-icon" aria-hidden="true" />
-                  Get €{cashbackAmount} cashback
+                  Get {money(cashbackAmount)} cashback
                 </>
               )}
             </button>

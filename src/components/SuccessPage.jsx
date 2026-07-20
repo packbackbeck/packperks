@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './SuccessPage.css';
 import { setClaimNotifyPrefs } from '../lib/api';
 import { requestPushPermission, isPushSupported, iosNeedsInstall, getPermissionState } from '../lib/notify';
+import { useMoney } from '../lib/RegionContext';
 
 function formatDate(d = new Date()) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -29,7 +30,8 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
   const now = new Date();
   const userName = userNameProp || 'there';
   const userEmail = userEmailProp || null;
-  const cashback = reward.euros?.toFixed(2) ?? (reward.cupsNeeded * 1.25).toFixed(2);
+  const money = useMoney();
+  const cashback = money(reward.euros ?? reward.cupsNeeded * 1.25);
 
   const pushSupported = isPushSupported();
   const needsInstall = iosNeedsInstall();
@@ -75,7 +77,7 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
       <div className="success-page__text">
         <h1 className="success-page__title">Receipt submitted</h1>
         <p className="success-page__subtitle">
-          We'll review it and send you a <strong>Tikkie link</strong> to collect your €{cashback} cashback, within <strong>7 days</strong>.
+          We'll review it and send you a <strong>Tikkie link</strong> to collect your {cashback} cashback, within <strong>7 days</strong>.
         </p>
       </div>
 
@@ -94,7 +96,7 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
           </div>
           <div className="sp-receipt__header-info">
             <span className="sp-receipt__reward-name">{reward.name}</span>
-            <span className="sp-receipt__cashback-amount">€{cashback} cashback</span>
+            <span className="sp-receipt__cashback-amount">{cashback} cashback</span>
           </div>
         </div>
 

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listAllOrganizations, listOrgGroups, softDeleteOrganization, restoreOrganization, duplicateOrganization } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import OrgGroupsPanel from './OrgGroupsPanel';
+import RegionsPanel from './RegionsPanel';
+import { regionForCountry } from '../../lib/regions';
 import './AdminOrganizations.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -218,6 +220,18 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                           {org.partner_brand_name && org.partner_brand_name !== org.name && (
                             <div className="ao-org-partner">{org.partner_brand_name}</div>
                           )}
+                          {(() => {
+                            const rg = regionForCountry(org.country);
+                            return (
+                              <span
+                                className="ao-group-chip"
+                                style={{ background: '#EEF3FA', color: '#3D5A80' }}
+                                title={rg ? `Region: ${rg.label} (${rg.currency})` : 'No region — set the org country'}
+                              >
+                                {rg ? `${rg.flag} ${rg.key}` : 'No region'}
+                              </span>
+                            );
+                          })()}
                           {org.group_id && groupById[org.group_id] && (
                             <span
                               className={`ao-group-chip ao-group-chip--${groupById[org.group_id].mode}`}
@@ -292,6 +306,8 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
           </table>
         </div>
       )}
+
+      {!loading && <RegionsPanel orgs={orgs} onChanged={load} />}
 
       {!loading && <OrgGroupsPanel orgs={orgs} groups={groups} onChanged={load} />}
 

@@ -1,5 +1,6 @@
 import './RewardDetailSheet.css';
 import { rewardImageStyle } from '../utils/imageTransform';
+import { useMoney } from '../lib/RegionContext';
 
 const CupIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -27,6 +28,7 @@ const InfoIcon = () => (
 );
 
 export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked }) {
+  const money = useMoney();
   if (!reward) return null;
 
   const isUnlocked = cupCount >= reward.cupsNeeded;
@@ -70,7 +72,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
           {/* Name + price row */}
           <div className="rds-title-row">
             <h2 className="rds-name">{reward.name}</h2>
-            <span className="rds-euros">€{reward.euros?.toFixed(2)}</span>
+            <span className="rds-euros">{money(reward.euros)}</span>
           </div>
 
           {/* Chips: dynamic tags + cups cost */}
@@ -115,7 +117,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               <li className="rds-step">
                 <span className="rds-step__num">4</span>
                 <span className="rds-step__text">
-                  Once verified, we'll send you a <strong>Tikkie link</strong> to collect your <strong>€{reward.euros?.toFixed(2)} cashback</strong>, usually within a few days.
+                  Once verified, we'll send you a <strong>Tikkie link</strong> to collect your <strong>{money(reward.euros)} cashback</strong>, usually within a few days.
                 </span>
               </li>
             </ol>

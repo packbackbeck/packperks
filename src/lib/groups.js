@@ -25,7 +25,7 @@ export async function getGroupBySlug(slug) {
     if (!group) return null
     const { data: members } = await supabase
       .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, group_active, deleted_at')
+      .select('id, name, slug, brand_color, logo_url, country, group_active, deleted_at')
       .eq('group_id', group.id).is('deleted_at', null)
     return {
       group,
@@ -54,7 +54,7 @@ export async function getGroupContext(orgId) {
       supabase.from('org_groups').select('id, name, slug').eq('id', groupId).maybeSingle(),
       supabase.from('app_config').select('value').eq('key', `published:group:${groupId}`).maybeSingle(),
       supabase.from('organizations')
-        .select('id, name, slug, brand_color, logo_url, group_active, deleted_at')
+        .select('id, name, slug, brand_color, logo_url, country, group_active, deleted_at')
         .eq('group_id', groupId).is('deleted_at', null),
     ])
 
@@ -172,12 +172,12 @@ export async function getGroupStores(orgIds) {
       // Per-org cashback rate (€ per cup). Rates differ per org, not per group,
       // so a combined balance must be valued store-by-store, not with one rate.
       out[orgId].cashbackRate = Number(c.value?.settings?.cashbackRatePerCup) || null
-      // All live rewards that have an image — for the auto-cycling thumbnail.
-      // Featured first so the slideshow opens on it.
+      // All live rewards (featured first). Carry id + bgColor + cupsNeeded so an
+      // in-progress claim on the market can be matched by reward_id and show the
+      // reward's picture + name (the auto-cycling thumbnail filters to images).
       out[orgId].rewards = [...rewards]
         .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0))
-        .map(r => ({ name: r.name, image: r.image || '' }))
-        .filter(r => r.image)
+        .map(r => ({ id: r.id, name: r.name, image: r.image || '', bgColor: r.bgColor || null, cupsNeeded: r.cupsNeeded }))
     })
 
     ;(locs || []).forEach(l => {

@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import './GoalSection.css';
 import RewardCard from './RewardCard';
+import { useRegion } from '../lib/RegionContext';
 
 export default function GoalSection({ rewards, cupCount, onSelectReward, onViewDetail }) {
+  const { symbol } = useRegion();
   // Cheapest first by default (fewest cups = lowest price). Tap cycles
   // asc → desc → unsorted → asc.
   const [sortOrder, setSortOrder] = useState('asc'); // null | 'asc' | 'desc'
@@ -46,7 +48,7 @@ export default function GoalSection({ rewards, cupCount, onSelectReward, onViewD
             aria-label="Sort by price"
             onClick={handleSortClick}
           >
-            <span style={{ fontWeight: 600 }}>€</span>
+            <span style={{ fontWeight: 600 }}>{symbol}</span>
             <svg 
               width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
               strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"

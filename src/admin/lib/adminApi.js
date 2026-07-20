@@ -2,6 +2,22 @@ import { supabase } from '../../lib/supabase';
 import { applyOrgFilter, getActiveOrgId } from '../context/orgState';
 import { fmtDuration } from './behaviourFormat';
 import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
+import { providerForCountry } from '../../lib/payments';
+
+/* Multi-regional payout routing: resolve which payment provider (and edge
+ * function) pays out a claim, from its org's country/region. NL → Tikkie (live);
+ * a region with no adapter yet (e.g. UAE) returns edgeFunction:null so the
+ * approve flow surfaces "provider not configured" instead of minting in EUR. */
+async function payoutProviderForOrg(orgId) {
+  let country = null;
+  if (orgId) {
+    try {
+      const { data: org } = await supabase.from('organizations').select('country').eq('id', orgId).maybeSingle();
+      country = org?.country ?? null;
+    } catch { /* fall back to default region below */ }
+  }
+  return providerForCountry(country);
+}
 
 /* ─────────────────────────────────────────────────────────────────────
  * Multi-org note (Phase 2): every query in this file that touches a
@@ -1633,8 +1649,16 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
   // and writes the real tikkie_url/id/status/expiry back onto the claim. It is
   // idempotent (returns the existing link if one was already minted).
   if (payViaTikkie && !alreadyMinted) {
+    // Region-routed payout. NL → tikkie-cashback (unchanged); a region without a
+    // wired provider yet → mark failed with a clear reason (approval still stands,
+    // the payout is retryable once the provider exists).
+    const provider = await payoutProviderForOrg(data.org_id);
+    if (!provider.edgeFunction) {
+      await applyOrgFilter(supabase.from('claims').update({ payout_status: 'failed' }).eq('id', claimId));
+      return { ...data, payout_status: 'failed', tikkie_error: { error: 'payout_provider_not_configured', region: provider.region, provider: provider.key } };
+    }
     try {
-      const mint = await invokeEdge('tikkie-cashback', { action: 'create', claim_id: claimId });
+      const mint = await invokeEdge(provider.edgeFunction, { action: 'create', claim_id: claimId });
       if (mint?.error) {
         // B3: persist payout_status='failed' so the payout badge (and any export)
         // reads the honest truth instead of a stale 'queued'. A later successful
@@ -1668,10 +1692,15 @@ export async function refreshTikkieStatus(claimId) {
   return invokeEdge('tikkie-cashback', { action: 'status', claim_id: claimId });
 }
 
-/* Re-mint a Tikkie cashback link for an already-approved claim whose earlier
- * mint failed (e.g. the campaign was momentarily out of funds). Idempotent. */
+/* Re-mint a payout link for an already-approved claim whose earlier mint failed
+ * (e.g. the campaign was momentarily out of funds). Region-routed + idempotent. */
 export async function mintTikkieLink(claimId) {
-  return invokeEdge('tikkie-cashback', { action: 'create', claim_id: claimId });
+  const { data: c } = await supabase.from('claims').select('org_id').eq('id', claimId).maybeSingle();
+  const provider = await payoutProviderForOrg(c?.org_id);
+  if (!provider.edgeFunction) {
+    return { error: 'payout_provider_not_configured', region: provider.region, provider: provider.key };
+  }
+  return invokeEdge(provider.edgeFunction, { action: 'create', claim_id: claimId });
 }
 
 /* Cashback campaign funds/status for the admin dashboard. Returns
@@ -2529,6 +2558,50 @@ export async function listOrgGroups() {
       .filter(o => o.group_id === g.id)
       .sort((a, b) => (a.name || '').localeCompare(b.name || '')),
   }));
+}
+
+/* ── Regions (multi-regional) ──────────────────────────────────────────
+ * The region registry (currency, symbol, locale, map centre, payout provider)
+ * is admin-editable and stored GLOBALLY in app_config under 'published:regions'.
+ * The 'published:' prefix reuses the same read RLS the customer app already has
+ * for group config, so customers can load it and merge it over the code seed.
+ */
+const REGIONS_CFG_KEY = 'published:regions';
+
+export async function getRegionsConfig() {
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', REGIONS_CFG_KEY).maybeSingle();
+  return data?.value?.regions || {};
+}
+
+export async function saveRegionsConfig(regions) {
+  const value = { regions: regions || {}, updated_at: new Date().toISOString() };
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key: REGIONS_CFG_KEY, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value.regions;
+}
+
+/* Assign an org to a region by setting its country — region derives from it. */
+export async function setOrgRegion(orgId, country) {
+  const { error } = await supabase
+    .from('organizations').update({ country: country || null }).eq('id', orgId);
+  if (error) throw error;
+}
+
+/* Flag a group as spanning multiple regions (stored on the group config). */
+export async function setGroupMultiRegion(groupId, on) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value ? JSON.parse(JSON.stringify(existing.value)) : { settings: {} };
+  value.settings = value.settings || {};
+  value.settings.multiRegion = !!on;
+  const { error } = await supabase
+    .from('app_config').upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
 }
 
 /* Create a group. Seeds the default copy from the chosen mode so a BYO

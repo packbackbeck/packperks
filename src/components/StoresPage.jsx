@@ -8,6 +8,7 @@ import { scoreStore } from '../lib/onboarding';
 import { supabase } from '../lib/supabase';
 import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
 import { getNotYetStores } from '../lib/notYetStores';
+import { getRegion } from '../lib/regions';
 import { detectImageBg, useImageBg } from '../lib/imageBg';
 import PendingClaims from './PendingClaims';
 import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
@@ -266,13 +267,18 @@ function notYetPopupHtml(s, count, threshold, done) {
 /* Real map via Leaflet + OpenStreetMap tiles (free, no API key). Plots a
  * marker at each store's actual coordinates; the marker popup shows the
  * store name, address and cups, with a button to open that store. */
-function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore, requested = new Set(), reqCounts = {}, notYetThreshold = 10, userLoc = null, onLocate }) {
+function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore, requested = new Set(), reqCounts = {}, notYetThreshold = 10, userLoc = null, onLocate, focus = null }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const userMarkerRef = useRef(null);
   const [locating, setLocating] = useState(false);
   const fitSigRef = useRef(null); // only refit the map when the geography changes
+  // The customer's onboarding region { lat, lng, zoom }. The map opens focused
+  // here (rather than fitting every marker), so a NL user lands on NL — but
+  // every region's venues are still plotted and reachable by panning.
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
   const onSelectRef = useRef(onSelectStore);
   onSelectRef.current = onSelectStore;
   const onRequestRef = useRef(onRequestStore);
@@ -321,7 +327,8 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     }).addTo(map);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
-    map.setView([52.13, 5.29], 7); // Netherlands, until markers fit
+    const f0 = focusRef.current;
+    map.setView(f0 ? [f0.lat, f0.lng] : [52.13, 5.29], f0 ? f0.zoom : 7); // open on the customer's region
     map.on('popupopen', (e) => {
       const root = e.popup.getElement();
       const btn = root?.querySelector('.stores2__popup-btn');
@@ -414,7 +421,12 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     // vote/state-only rebuild, or the map would jump every time someone votes.
     if (sig !== fitSigRef.current) {
       fitSigRef.current = sig;
-      if (pts.length === 1) map.setView(pts[0], 15);
+      const f = focusRef.current;
+      if (f) {
+        // Multi-regional: stay zoomed on the customer's region (other regions'
+        // pins remain on the map, a pan away), instead of fitting the world.
+        map.setView([f.lat, f.lng], f.zoom);
+      } else if (pts.length === 1) map.setView(pts[0], 15);
       else if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
     }
     setTimeout(() => map.invalidateSize(), 80);
@@ -660,19 +672,24 @@ export default function StoresPage({
   // Onboarding match score (0 without prefs), applied before the cups/name
   // order so cafés matching the customer's city + drinks float to the top.
   const cmpByPrefs = (a, b) => (scoreStore(b, onboardingPrefs) - scoreStore(a, onboardingPrefs));
+  // Region-first: the customer's onboarding region (the `region` prop) floats
+  // to the top; other regions' venues still list below. (No-op while every
+  // vendor shares one region.)
+  const cmpByRegion = (a, b) =>
+    ((a.region === region ? 0 : 1) - (b.region === region ? 0 : 1));
 
   // Participating stores — filtered by search. Ordered by distance to the
   // customer when "Nearby" is on (venues without coordinates fall to the end),
-  // otherwise onboarding match first, then cups-first / A→Z.
+  // otherwise the customer's region → onboarding match → cups-first / A→Z.
   const sortedStores = useMemo(() => {
     const list = stores.filter(matchQ);
     if (nearby && userLoc) {
       return list.slice().sort((a, b) =>
         (distanceKm(userLoc, a.location) - distanceKm(userLoc, b.location)) || cmpCupsThenName(a, b));
     }
-    return list.slice().sort((a, b) => cmpByPrefs(a, b) || cmpCupsThenName(a, b));
+    return list.slice().sort((a, b) => cmpByRegion(a, b) || cmpByPrefs(a, b) || cmpCupsThenName(a, b));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stores, q, nearby, userLoc, onboardingPrefs]);
+  }, [stores, q, nearby, userLoc, onboardingPrefs, region]);
 
   // "Coming soon" venues — admin-edited list from the group config when present,
   // otherwise the curated region defaults. Each gets a stable brand colour.
@@ -683,12 +700,13 @@ export default function StoresPage({
       // E.14.9: derive the id from a STABLE name-slug, not the list index —
       // otherwise reordering the list reassigned the saved "Requested" state
       // (persisted by id in localStorage) to whichever venue now sits in that slot.
-      id: v.id || `notyet-${region}-${(v.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`,
+      id: v.id || `notyet-${v.region || region}-${(v.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`,
       name: v.name,
       area: v.area,
       location: { lat: v.lat, lng: v.lng },
       color: v.color || colorForName(v.name),
       logo_url: v.logo_url || null,
+      region: v.region || region,   // which region this coming-soon venue belongs to
       notYet: true,
       balance: 0,
     }));
@@ -700,9 +718,10 @@ export default function StoresPage({
       return list.slice().sort((a, b) =>
         (distanceKm(userLoc, a.location) - distanceKm(userLoc, b.location)) || (a.name || '').localeCompare(b.name || ''));
     }
-    return list.slice().sort((a, b) => cmpByPrefs(a, b) || (a.name || '').localeCompare(b.name || ''));
+    // Customer's chosen region first, then other regions; prefs + A→Z within.
+    return list.slice().sort((a, b) => cmpByRegion(a, b) || cmpByPrefs(a, b) || (a.name || '').localeCompare(b.name || ''));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notYet, q, nearby, userLoc, onboardingPrefs]);
+  }, [notYet, q, nearby, userLoc, onboardingPrefs, region]);
 
   // The lead "hero" (your top store) only fits the default, unsearched view.
   const showHero = !q;
@@ -841,6 +860,7 @@ export default function StoresPage({
           notYetThreshold={notYetThreshold}
           userLoc={userLoc}
           onLocate={requestLocation}
+          focus={getRegion(region).map}
         />
       ) : (
         <>

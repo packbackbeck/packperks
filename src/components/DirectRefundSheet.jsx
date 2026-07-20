@@ -1,11 +1,13 @@
 import './DirectRefundSheet.css';
+import { useMoney } from '../lib/RegionContext';
 
 export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm, refundRate = 1.00, cashbackRate = 1.25 }) {
+  const money = useMoney();
   if (!open) return null;
 
-  const directTotal = (cupCount * refundRate).toFixed(2);
-  const rewardTotal = (cupCount * cashbackRate).toFixed(2);
-  const difference  = (cupCount * (cashbackRate - refundRate)).toFixed(2);
+  const directTotal = cupCount * refundRate;
+  const rewardTotal = cupCount * cashbackRate;
+  const difference  = cupCount * (cashbackRate - refundRate);
   // E.13.2: compute the bonus from the venue's LIVE rates instead of a hardcoded
   // "25%" (only true at the old 1.25/1.00 defaults). If the reward isn't actually
   // worth more (e.g. equal rates), we don't claim a bonus.
@@ -45,20 +47,20 @@ export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm, 
           <div className="drs__compare">
             <div className="drs__compare-option">
               <span className="drs__compare-label">Direct refund</span>
-              <span className="drs__compare-amount drs__compare-amount--base">€{directTotal}</span>
-              <span className="drs__compare-rate">€{refundRate.toFixed(2)} per cup</span>
+              <span className="drs__compare-amount drs__compare-amount--base">{money(directTotal)}</span>
+              <span className="drs__compare-rate">{money(refundRate)} per cup</span>
             </div>
             <div className="drs__compare-vs">vs</div>
             <div className="drs__compare-option drs__compare-option--highlight">
               <span className="drs__compare-label">Reward cashback</span>
-              <span className="drs__compare-amount drs__compare-amount--reward">€{rewardTotal}</span>
-              <span className="drs__compare-rate">€{cashbackRate.toFixed(2)} per cup</span>
+              <span className="drs__compare-amount drs__compare-amount--reward">{money(rewardTotal)}</span>
+              <span className="drs__compare-rate">{money(cashbackRate)} per cup</span>
             </div>
           </div>
 
           {/* Difference pill */}
           <div className="drs__diff-pill">
-            You'd miss out on <strong>€{difference}</strong> by choosing the direct refund
+            You'd miss out on <strong>{money(difference)}</strong> by choosing the direct refund
           </div>
 
           {/* CTAs */}

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import { applyDesignColors, mergeDesign } from './admin/appdesign/designDefaults';
+import { regionForCountry, regionForOnboardingCountry, getAllRegions, formatMoney, DEFAULT_REGION } from './lib/regions';
+import { NOT_YET_STORES } from './lib/notYetStores';
+import { useRegion } from './lib/RegionContext';
 import CupProgress from './components/CupProgress';
 import FeaturedReward from './components/FeaturedReward';
 import GoalSection from './components/GoalSection';
@@ -903,6 +906,18 @@ export default function App() {
     return () => applyDesignColors(null); // reset on unmount
   }, [liveSettings?.design]);
 
+  /* ── Active region (multi-regional) ──
+   * The active org's country decides the region → currency, payout provider
+   * and map focus. Push it into RegionContext so every money component renders
+   * the right currency. `focusRegion` is the customer's own preference from
+   * onboarding (country), used to order + zoom the Stores hub even before they
+   * pick a venue; it falls back to the active org's region, then the default. */
+  const { setRegion } = useRegion();
+  const activeRegion = regionForCountry(activeOrg?.country)?.key || DEFAULT_REGION;
+  const focusRegion =
+    regionForOnboardingCountry(onboardingPrefs?.country)?.key || activeRegion;
+  useEffect(() => { setRegion(activeRegion); }, [activeRegion, setRegion]);
+
   /* ── Preview-mode override (admin App Design tab) ──
    * When the user app runs inside the admin's App Design iframe, the
    * parent posts the current DRAFT design over postMessage on every
@@ -1099,7 +1114,7 @@ export default function App() {
     const refundRate = liveSettings.refundRatePerCup ?? 1.00;
     const amount = Number((count * refundRate).toFixed(2));
     track(EVENTS.WITHDRAW_ALL_CUPS, { cups_withdrawn: count, deposit_value: amount.toFixed(2) });
-    const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''}, €${amount.toFixed(2)}`;
+    const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''}, ${formatMoney(amount, activeRegion)}`;
     addHistory('cups_withdrawn', label);
     setRefundCupCount(count);
     setRefundAmount(amount);
@@ -1591,6 +1606,8 @@ export default function App() {
       slug: m.slug,
       brand_color: m.brand_color,
       logo_url: m.logo_url,
+      // Region tag per vendor (multi-regional): drives ordering + map focus.
+      region: regionForCountry(m.country)?.key || DEFAULT_REGION,
       balance: m.id === activeOrg?.id ? cupCount : (groupBalances[m.id]?.balance || 0),
       featured: groupStores[m.id]?.featured || null,
       rewards: groupStores[m.id]?.rewards || [],
@@ -1600,10 +1617,23 @@ export default function App() {
     // Total cups this person has collected across the group (lifetime), for
     // the plastic-avoided impact panel.
     const personalCups = Object.values(groupBalances).reduce((sum, b) => sum + (b?.lifetime || 0), 0);
-    // Region drives the curated "coming soon" venue list; admins can hide those
-    // via the group setting (default on).
-    const storesRegion = /uae|dubai|emirat|abu\s*dhabi/i.test(`${groupCtx?.group?.slug || ''} ${groupCtx?.group?.name || ''}`) ? 'UAE' : 'NL';
+    // The customer's preferred region (from onboarding) orders the hub and
+    // focuses the map; every region's venues still render + stay on the map.
+    const storesRegion = focusRegion;
     const showNotYetStores = groupCtx?.groupConfig?.settings?.showNotYetStores !== false;
+    // Coming-soon ("future vendor") venues across ALL regions, each tagged with
+    // its region. The group override wins per region (region-keyed { NL:[…],
+    // AE:[…] } OR a legacy flat array treated as NL); regions with no override
+    // use the built-in curated list. The Stores page then puts the customer's
+    // chosen region first and zooms the map to it, while every region's pins
+    // stay on the map (zoom out to see the others).
+    const nvOverride = groupCtx?.groupConfig?.settings?.notYetVendors;
+    const regionNotYet = getAllRegions().flatMap((rg) => {
+      const list = Array.isArray(nvOverride)
+        ? (rg.key === 'NL' ? nvOverride : NOT_YET_STORES[rg.key])
+        : (nvOverride?.[rg.key] || NOT_YET_STORES[rg.key]);
+      return (list || []).map((v) => ({ ...v, region: v.region || rg.key }));
+    });
     return (
       <>
         <StoresPage
@@ -1613,7 +1643,7 @@ export default function App() {
           personalCups={personalCups}
           region={storesRegion}
           showNotYet={showNotYetStores}
-          notYetStores={groupCtx?.groupConfig?.settings?.notYetVendors || null}
+          notYetStores={regionNotYet}
           notYetThreshold={groupCtx?.groupConfig?.settings?.notYetThreshold || 10}
           userClaims={userClaims}
           onboardingPrefs={onboardingPrefs}

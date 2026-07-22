@@ -116,7 +116,7 @@ function ReviewProgress({ claim }) {
 
 function ClaimCard({ claim, onCollect, collected }) {
   const money = useMoney();
-  const { symbol } = useRegion();
+  const { symbol, collectLabel } = useRegion();
   const ready = isReady(claim);
   const amount = money(claim.payout_amount);
   const name = claim.rewardName || 'Cashback reward';
@@ -142,8 +142,9 @@ function ClaimCard({ claim, onCollect, collected }) {
       </div>
 
       {ready ? (
-        /* Once the Tikkie link exists, the review progress is done — its block
-           becomes the full-width Collect action. */
+        /* Once the payout link exists, the review progress is done — its block
+           becomes the full-width Collect action. Label is region-aware so the
+           UAE flow doesn't say "Tikkie". */
         <a
           className="pc-card__collect"
           href={claim.tikkie_url}
@@ -151,7 +152,7 @@ function ClaimCard({ claim, onCollect, collected }) {
           rel="noopener noreferrer"
           onClick={() => onCollect?.(claim)}
         >
-          {collected ? 'Reopen Tikkie link' : 'Collect via Tikkie'}
+          {collected ? 'Reopen payout link' : (collectLabel || 'Collect your cashback')}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>

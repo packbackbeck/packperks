@@ -71,19 +71,23 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
 
   const sections = design?.sections || {};
   const showPackback = sections.showPackbackLogo !== false;
-  const showBrand = sections.showBrandLogo !== false;
+  // Only pair a partner mark when there's a GENUINE distinct partner org.
+  // Before an org resolves (null), OrgMark falls back to the PackBack logo,
+  // which rendered "PackBack × PackBack" on the null/bootstrap screen — show a
+  // single PackBack mark instead.
+  const hasPartner = sections.showBrandLogo !== false && !!org;
   const brandLabel = org?.partner_brand_name || org?.name || 'the restaurant';
-  const showLockup = showPackback || showBrand;
+  const showLockup = showPackback || hasPartner;
 
   return (
     <header className="header" role="banner">
       {showLockup && (
-        <div className="header__brands" aria-label={`PackBack × ${brandLabel}`}>
+        <div className="header__brands" aria-label={hasPartner ? `PackBack × ${brandLabel}` : 'PackBack'}>
           {showPackback && (
             <img src={packbackLogo} alt="PackBack" className="header__logo-packback" />
           )}
-          {showPackback && showBrand && <span className="header__x">x</span>}
-          {showBrand && <OrgMark org={org} />}
+          {showPackback && hasPartner && <span className="header__x">x</span>}
+          {hasPartner && <OrgMark org={org} />}
         </div>
       )}
 

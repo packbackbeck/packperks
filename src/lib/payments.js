@@ -20,10 +20,18 @@ export const PAYMENT_PROVIDERS = {
   },
   uae: {
     key: 'uae',
-    label: 'UAE payout (adapter pending)',
-    edgeFunction: null,              // ← wire the UAE adapter here when chosen
+    label: 'UAE payout',
+    // Generic UAE adapter. The edge function exists and routes to whichever
+    // concrete provider is configured via the UAE_PAYOUT_PROVIDER secret; until
+    // one is chosen + credentialed it returns "not configured" (live: false), so
+    // approving an AE claim never mints in the wrong currency.
+    edgeFunction: 'uae-payout',
     live: false,
     currencies: ['AED'],
+    // Both payout shapes the adapter supports, so any UAE provider fits:
+    //   • link  — a hosted collect link the customer opens (reuses tikkie_url).
+    //   • proxy — instant push to the customer's mobile/email/QR identifier.
+    models: ['link', 'proxy'],
   },
   none: {
     key: 'none',

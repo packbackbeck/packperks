@@ -1,6 +1,6 @@
 import './RewardDetailSheet.css';
 import { rewardImageStyle } from '../utils/imageTransform';
-import { useMoney } from '../lib/RegionContext';
+import { useMoney, useRegion } from '../lib/RegionContext';
 
 const CupIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -29,6 +29,7 @@ const InfoIcon = () => (
 
 export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked }) {
   const money = useMoney();
+  const { payoutNoun } = useRegion();
   if (!reward) return null;
 
   const isUnlocked = cupCount >= reward.cupsNeeded;
@@ -82,7 +83,10 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                 ? <span key={tag} className="rds-chip rds-chip--plant"><LeafIcon /> Plant-based</span>
                 : <span key={tag} className="rds-chip rds-chip--free">{tag}</span>
             ))}
-            <span className="rds-chip rds-chip--cups">
+            <span
+              className="rds-chip rds-chip--cups"
+              style={reward.bgColor ? { background: reward.bgColor, color: '#fff', borderColor: 'transparent' } : undefined}
+            >
               <CupIcon /> {reward.cupsNeeded} cups
             </span>
           </div>
@@ -111,13 +115,13 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               <li className="rds-step">
                 <span className="rds-step__num">3</span>
                 <span className="rds-step__text">
-                  Upload a <strong>photo of your receipt</strong> to verify your purchase. We'll send your cashback via a Tikkie link.
+                  Upload a <strong>photo of your receipt</strong> to verify your purchase. We'll send your cashback via a {payoutNoun}.
                 </span>
               </li>
               <li className="rds-step">
                 <span className="rds-step__num">4</span>
                 <span className="rds-step__text">
-                  Once verified, we'll send you a <strong>Tikkie link</strong> to collect your <strong>{money(reward.euros)} cashback</strong>, usually within a few days.
+                  Once verified, we'll send you a <strong>{payoutNoun}</strong> to collect your <strong>{money(reward.euros)} cashback</strong>, usually within a few days.
                 </span>
               </li>
             </ol>
@@ -146,12 +150,19 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                   ? 'Rewards paused'
                   : 'Get cashback'}
             </button>
+          ) : isUnlocked ? (
+            /* Not the current goal, but the user already has enough cups for it —
+             * let them claim it directly instead of only "choosing" it. */
+            <button
+              className={`rds-btn rds-btn--primary ${budgetBlocked ? 'rds-btn--locked' : ''}`}
+              onClick={budgetBlocked ? onBudgetBlocked : () => { onPick(reward.id); onClose(); onClaim?.(); }}
+            >
+              {budgetBlocked ? 'Rewards paused' : 'Claim cashback'}
+            </button>
           ) : (
-            <>
-              <button className="rds-btn rds-btn--primary" onClick={() => { onPick(reward.id); onClose(); }}>
-                Choose this reward
-              </button>
-            </>
+            <button className="rds-btn rds-btn--primary" onClick={() => { onPick(reward.id); onClose(); }}>
+              Choose this reward
+            </button>
           )}
           <button className="rds-btn rds-btn--outline" onClick={onClose}>
             Back

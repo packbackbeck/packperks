@@ -1,0 +1,122 @@
+/* ── Maintenance screen ── */
+.mnt {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #FFF8F4;
+  z-index: 20;
+}
+.mnt__card {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+.mnt__glyph {
+  width: 66px;
+  height: 66px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: #FCEBDD;
+  color: #C7891F;
+}
+.mnt__title {
+  margin: 0 0 8px;
+  font-family: var(--font-primary, inherit);
+  font-size: 22px;
+  font-weight: 800;
+  color: #1A1A1A;
+}
+.mnt__sub {
+  margin: 0 0 24px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: #7A7166;
+}
+
+.mnt__form { text-align: left; }
+.mnt__label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #4A4540;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.mnt__row { display: flex; gap: 8px; }
+.mnt__input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 14px;
+  border: 1.5px solid #E6DECE;
+  border-radius: 13px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  color: #1A1A1A;
+  transition: border-color 0.14s ease;
+}
+.mnt__input:focus { outline: none; border-color: var(--pb-green, #1A8737); }
+.mnt__btn {
+  flex: 0 0 auto;
+  height: 46px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 13px;
+  background: var(--pb-green, #1A8737);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 0.14s ease, opacity 0.14s ease;
+}
+.mnt__btn:hover:not(:disabled) { filter: brightness(1.06); }
+.mnt__btn:disabled { opacity: 0.45; cursor: default; }
+.mnt__hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #A89E92;
+  text-align: center;
+}
+
+.mnt__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #EEF7F0;
+  border: 1px solid #CDE9D6;
+}
+.mnt__done-ic {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--pb-green, #1A8737);
+  color: #fff;
+}
+.mnt__done-txt { display: flex; flex-direction: column; gap: 3px; }
+.mnt__done-txt strong { font-size: 15px; color: #14602F; font-weight: 800; }
+.mnt__done-txt span { font-size: 13px; color: #4A4540; line-height: 1.4; }
+.mnt__done-edit {
+  margin-top: 4px;
+  background: none;
+  border: none;
+  color: #6B6154;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}

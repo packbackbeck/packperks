@@ -56,6 +56,7 @@ export const SHOT_PRESETS = {
   // ── Stores hub (the BYO multi-venue screen) ──
   'stores-list':     { page: 'stores', profile: memberProfile, memberBalances: [7, 4] },
   'stores-map':      { page: 'stores', profile: memberProfile, memberBalances: [7, 4] }, // script toggles to Map
+  'stores-claim':    { page: 'stores', profile: memberProfile, authEmail: memberProfile.email, memberBalances: [7, 4], claims: 'pending' }, // hub + pending-claim box
 
   // ── App-level states ──
   'loading':         { hold: true },

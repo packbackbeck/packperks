@@ -114,11 +114,16 @@
 .cc-switch__input:checked + .cc-switch__track .cc-switch__thumb { transform: translateX(19px); }
 .cc-switch__input:focus-visible + .cc-switch__track { box-shadow: 0 0 0 3px rgba(26, 135, 55, 0.35); }
 
+.cc-policy-note {
+  margin: 12px auto 0; max-width: 300px;
+  font-family: inherit; font-size: 12.5px; line-height: 1.45;
+  color: var(--text-light, #8A8175); text-align: center;
+}
 .cc-policy-link {
-  display: block; margin: 12px auto 0; padding: 4px;
+  display: inline; padding: 0;
   background: none; border: none; cursor: pointer;
-  font-family: inherit; font-size: 12.5px; font-weight: 600;
-  color: var(--text-light, #8A8175); text-decoration: underline;
+  font-family: inherit; font-size: inherit; font-weight: 700;
+  color: var(--pb-green, #1A8737); text-decoration: underline;
 }
 .cc-policy-link:hover { color: var(--black, #2A2724); }
 

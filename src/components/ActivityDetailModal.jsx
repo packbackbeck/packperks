@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useRegion } from '../lib/RegionContext';
 import './ActivityDetailModal.css';
 
 const TYPE_META = {
@@ -52,7 +53,7 @@ function liveStatusForClaim(item, userClaims) {
       if (tikkieUrl) {
         return bestMatch.tikkie_status === 'redeemed'
           ? { label: 'Collected', color: '#1A8737', tikkieUrl, expired }
-          : { label: 'Ready: collect via Tikkie', color: '#1A8737', tikkieUrl, expired };
+          : { label: 'Ready to collect', color: '#1A8737', tikkieUrl, expired };
       }
       return { label: 'In review by our team', color: '#B8922A' };
     case 'failed':
@@ -80,6 +81,7 @@ function ToneIcon({ icon }) {
 
 export default function ActivityDetailModal({ item, profile, userClaims, onClose }) {
   const cardRef = useRef(null);
+  const { collectLabel } = useRegion();
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose?.(); }
@@ -163,7 +165,7 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
               </svg>
-              Collect via Tikkie
+              {collectLabel || 'Collect your cashback'}
             </a>
             {liveStatus.expired && (
               <p className="adm-collect-note">If this link no longer opens, it may have expired. Contact us and we’ll reissue it.</p>

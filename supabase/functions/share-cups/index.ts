@@ -9,9 +9,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL      = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-// Set ALLOWED_ORIGIN in Supabase Edge Function secrets for production
-// (e.g. "https://packperks.app"). Unset → wildcard for local dev.
-const ALLOWED_ORIGIN    = Deno.env.get("ALLOWED_ORIGIN") ?? null;
+// Allowed origins for CORS. PackPerks runs on multiple domains (the Vercel URL,
+// perks.packback.app, perks.packback.network), so set ALLOWED_ORIGINS to a
+// comma-separated list in the Edge Function secrets, e.g.
+//   "https://perks.packback.network,https://perks.packback.app"
+// (legacy single ALLOWED_ORIGIN still honoured). Unset → wildcard for local dev.
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? Deno.env.get("ALLOWED_ORIGIN") ?? "")
+  .split(",").map((s) => s.trim()).filter(Boolean);
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -22,8 +26,8 @@ const SHARE_EXPIRY_HOURS = 24;
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  const allow  = ALLOWED_ORIGIN
-    ? (origin === ALLOWED_ORIGIN ? origin : null)
+  const allow  = ALLOWED_ORIGINS.length
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : null)
     : "*";
   const h: Record<string, string> = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

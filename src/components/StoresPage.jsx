@@ -6,7 +6,7 @@ import packperksLogo from '../assets/images/packperks-wordmark.svg';
 import { getGlobalImpact, submitStoreRequest } from '../lib/api';
 import { scoreStore } from '../lib/onboarding';
 import { supabase } from '../lib/supabase';
-import { GRAMS_PER_CUP, pickComparison, formatGrams } from '../lib/impact';
+import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, pickComparison, formatCo2 } from '../lib/impact';
 import { getNotYetStores } from '../lib/notYetStores';
 import { getRegion } from '../lib/regions';
 import { detectImageBg, useImageBg } from '../lib/imageBg';
@@ -509,8 +509,12 @@ function StoresImpact({ personalCups }) {
     getGlobalImpact().then(r => { if (alive) setCommunityCups(r?.totalLifetimeCups || 0); }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const personalG = (personalCups || 0) * GRAMS_PER_CUP;
-  const communityG = (communityCups || 0) * GRAMS_PER_CUP;
+  // Impact is shown as CO₂e avoided (72 g / cup). The collective figure is the
+  // whole Packback network's returned cups (base) PLUS every cup returned
+  // through PackPerks, so it's meaningful from day one.
+  const personalCo2 = (personalCups || 0) * CO2_GRAMS_PER_CUP;
+  const communityTotalCups = NETWORK_BASE_CUPS + (communityCups || 0);
+  const communityCo2 = communityTotalCups * CO2_GRAMS_PER_CUP;
   // Personal square → a leaf (your own footprint). Community square → a
   // group/people glyph (everyone on PackPerks together).
   const LeafIcon = () => (
@@ -539,19 +543,19 @@ function StoresImpact({ personalCups }) {
             <div className="stores2__impact-squares">
               <div className="stores2__impact-sq">
                 <span className="stores2__impact-icon"><LeafIcon /></span>
-                <span className="stores2__impact-val">{formatGrams(personalG)}</span>
-                <span className="stores2__impact-cap">you’ve avoided</span>
+                <span className="stores2__impact-val">{formatCo2(personalCo2)}</span>
+                <span className="stores2__impact-cap">CO₂ you’ve avoided</span>
               </div>
               <div className="stores2__impact-sq stores2__impact-sq--community">
                 <span className="stores2__impact-icon"><GroupIcon /></span>
-                <span className="stores2__impact-val">{communityCups == null ? '…' : formatGrams(communityG)}</span>
-                <span className="stores2__impact-cap">by all PackPerks users together</span>
+                <span className="stores2__impact-val">{formatCo2(communityCo2)}</span>
+                <span className="stores2__impact-cap">CO₂ across the whole Packback network</span>
               </div>
             </div>
             <p className="stores2__impact-compare">
               {personalCups > 0
                 ? <>That’s {pickComparison(personalCups)}.</>
-                : 'Bring your cup and scan to start saving plastic.'}
+                : 'Bring your cup and scan to start cutting CO₂.'}
             </p>
           </div>
         </div>
@@ -561,7 +565,7 @@ function StoresImpact({ personalCups }) {
           open the icon + number hide (the panel repeats them) — chevron stays. */}
       <button type="button" className="stores2__impact-bar" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={open ? 'Hide impact detail' : 'Show impact detail'}>
         <span className="stores2__impact-bar-icon"><GroupIcon /></span>
-        <span className="stores2__impact-bar-text"><strong>{communityCups == null ? '…' : formatGrams(communityG)}</strong> plastic avoided together</span>
+        <span className="stores2__impact-bar-text"><strong>{formatCo2(communityCo2)}</strong> CO₂ avoided together</span>
         <svg className="stores2__impact-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
       </button>
     </div>

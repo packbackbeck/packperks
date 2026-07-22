@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import QRCodeLib from 'qrcode';
 import { shareCups } from '../lib/api';
+import { APP_URL as CANONICAL_URL } from '../lib/appUrl';
 import './ShareCupSheet.css';
 
 // Same URL the smart-bin QR points at. The receiver's camera opens this
 // → App.jsx detects the ?cups= param → activates the cups for them.
 // When running on localhost, point at the local origin so the demo loop
 // works without re-deploying to Vercel for every share.
-const PROD_URL = 'https://perks.packback.app/';
+const PROD_URL = CANONICAL_URL;   // canonical domain (VITE_APP_URL, default .network)
 const APP_URL = (() => {
   if (typeof window === 'undefined') return PROD_URL;
   const origin = window.location.origin;

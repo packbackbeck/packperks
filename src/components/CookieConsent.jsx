@@ -85,9 +85,10 @@ export default function CookieConsent({ onChoose, onCustomize, onPolicy }) {
               </button>
             </div>
             {onPolicy && (
-              <button type="button" className="cc-policy-link" onClick={onPolicy}>
-                Read our privacy &amp; cookie policy
-              </button>
+              <p className="cc-policy-note">
+                By choosing an option above, you accept our{' '}
+                <button type="button" className="cc-policy-link" onClick={onPolicy}>privacy &amp; cookie policy</button>.
+              </p>
             )}
           </>
         ) : (
@@ -136,9 +137,10 @@ export default function CookieConsent({ onChoose, onCustomize, onPolicy }) {
               </button>
             </div>
             {onPolicy && (
-              <button type="button" className="cc-policy-link" onClick={onPolicy}>
-                Read our privacy &amp; cookie policy
-              </button>
+              <p className="cc-policy-note">
+                Saving your choice means you accept our{' '}
+                <button type="button" className="cc-policy-link" onClick={onPolicy}>privacy &amp; cookie policy</button>.
+              </p>
             )}
           </>
         )}

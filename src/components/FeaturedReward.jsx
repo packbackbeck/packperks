@@ -2,7 +2,7 @@ import './FeaturedReward.css';
 import zigzagImg from '../assets/images/zigzag.svg';
 import cashbackIcon from '../assets/images/cashback-icon.png';
 import { rewardImageStyle } from '../utils/imageTransform';
-import { useMoney } from '../lib/RegionContext';
+import { useMoney, useRegion } from '../lib/RegionContext';
 
 const TIKKIE_URL = 'https://www.tikkie.me/particulier/statiegeld-terugkrijgen';
 
@@ -23,6 +23,10 @@ export default function FeaturedReward({
   orgName,
 }) {
   const money = useMoney();
+  const { payoutNoun } = useRegion();
+  // Only NL's Tikkie payout has a public explainer page to deep-link to; other
+  // regions render the payout noun as plain text.
+  const isTikkie = payoutNoun === 'Tikkie link';
   const isComplete = cupsCollected >= reward.cupsNeeded;
   const cashbackAmount = reward.euros ?? (reward.cupsNeeded * 1.25);
   const store = orgName || 'the store';
@@ -121,7 +125,7 @@ export default function FeaturedReward({
             <h3 className="featured-reward__success-title">Reward claimed!</h3>
             <p className="featured-reward__success-desc">
               Your <strong>{reward.name}</strong> cashback is on its way.
-              We'll send you a Tikkie link to collect it once your receipt is approved.
+              We'll send you a {payoutNoun} to collect it once your receipt is approved.
             </p>
             <button className="featured-reward__success-btn" onClick={onResetClaim}>
               Claim another reward
@@ -136,7 +140,9 @@ export default function FeaturedReward({
                   ? <>Buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>
                   : <>Once you unlock this, buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>}
                 <strong>Save your receipt</strong>. You'll need it. We'll send your cashback via{' '}
-                <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>.
+                {isTikkie
+                  ? <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>
+                  : <span className="featured-reward__tikkie-link">a {payoutNoun}</span>}.
                 {' '}
                 <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the cashback terms</button>
                 {onOpenRefund && (

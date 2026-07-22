@@ -299,19 +299,23 @@
  * vertically centred) with a roomier rhythm so the screen doesn't feel
  * cramped when the receipt card + notify options stack up. */
 .success-page--pending {
+  /* Vertically centre the whole block. Auto margins on the first/last children
+   * (below) do the centring, so it stays flex-start and simply top-aligns
+   * (never clips) when the content is taller than the viewport. */
   justify-content: flex-start;
-  /* Big top gap so the notch / front camera clears the checkmark. */
   padding-top: calc(env(safe-area-inset-top, 0px) + 38px);
   padding-bottom: var(--sp-6);
 }
+.success-page--pending .success-page__check-wrap { margin-top: auto; }
 .success-page--pending .success-page__glow {
   background: radial-gradient(circle, rgba(26,135,55,0.16) 0%, rgba(26,135,55,0) 70%);
 }
 .success-page--pending .success-page__text  { margin-bottom: var(--sp-5); }
 .success-page--pending .sp-receipt          { margin-bottom: var(--sp-4); }
 .success-page--pending .sp-notify           { margin: var(--sp-4) 0 0; }
-/* The key fix — a clear breathing gap above the "Back to home" button. */
-.success-page--pending .success-page__btn   { margin-top: var(--sp-5); margin-bottom: var(--sp-6); }
+/* A clear breathing gap above the "Back to home" button; margin-bottom:auto
+ * balances the check-wrap's margin-top:auto so the block sits centred. */
+.success-page--pending .success-page__btn   { margin-top: var(--sp-5); margin-bottom: auto; }
 
 /* ── Notify-me options (Tikkie link ready) ── */
 .sp-notify {

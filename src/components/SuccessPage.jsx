@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import './SuccessPage.css';
 import { setClaimNotifyPrefs } from '../lib/api';
 import { requestPushPermission, isPushSupported, iosNeedsInstall, getPermissionState } from '../lib/notify';
-import { useMoney } from '../lib/RegionContext';
+import { useMoney, useRegion } from '../lib/RegionContext';
 
 function formatDate(d = new Date()) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -31,6 +31,7 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
   const userName = userNameProp || 'there';
   const userEmail = userEmailProp || null;
   const money = useMoney();
+  const { payoutNoun } = useRegion();
   const cashback = money(reward.euros ?? reward.cupsNeeded * 1.25);
 
   const pushSupported = isPushSupported();
@@ -77,7 +78,7 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
       <div className="success-page__text">
         <h1 className="success-page__title">Receipt submitted</h1>
         <p className="success-page__subtitle">
-          We'll review it and send you a <strong>Tikkie link</strong> to collect your {cashback} cashback, within <strong>7 days</strong>.
+          We'll review it and send you a <strong>{payoutNoun}</strong> to collect your {cashback} cashback, within <strong>7 days</strong>.
         </p>
       </div>
 

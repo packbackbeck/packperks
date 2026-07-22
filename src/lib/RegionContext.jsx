@@ -24,6 +24,8 @@ function valueFor(region, setRegion, rev) {
     region: r.key,
     currency: r.currency,
     symbol: r.symbol,
+    collectLabel: r.collectLabel, // provider-neutral "collect your cashback" CTA
+    payoutNoun: r.payoutNoun,     // inline copy noun ("Tikkie link" / "payment link")
     money: (n) => formatMoney(n, r.key),
     setRegion,
     _rev: rev, // bumps when the overlay loads so consumers re-read the registry

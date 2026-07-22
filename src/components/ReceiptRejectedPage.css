@@ -10,13 +10,17 @@
   z-index: 10;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   background: var(--pb-cream);
   font-family: var(--font-primary);
   color: var(--black);
 }
 
 .rj__scroll {
-  flex: 1 1 auto;
+  /* Was flex:1 (grew to fill, leaving a big gap above the pinned actions).
+   * Now it only takes its content height and the whole group is centered by
+   * .rj, so the "cups are safe" card sits close to the CTA. */
+  flex: 0 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
@@ -124,8 +128,13 @@
 }
 .rj__check--yes .rj__check-mark { background: var(--pb-green, #1A8737); }
 .rj__check--no  .rj__check-mark { background: #E24400; }
+/* Pending — the check was never reached (queue stopped at an earlier failure).
+ * An empty, hollow circle reads as "not evaluated" rather than a pass/fail. */
+.rj__check--pending .rj__check-mark { background: transparent; border: 2px solid #DAD2C4; }
+.rj__check--pending { opacity: 0.72; }
 .rj__check-label { font-size: 0.92rem; font-weight: 600; color: #4A453E; }
 .rj__check--no .rj__check-label { color: #1D1D1D; font-weight: 700; }
+.rj__check--pending .rj__check-label { color: #9A9186; font-weight: 600; }
 
 /* Short message (system error / moderation), centred. */
 .rj__message {

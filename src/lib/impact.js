@@ -8,6 +8,23 @@
 
 export const GRAMS_PER_CUP = 5;
 
+/* CO₂e avoided per reused cup — 72 g (the same PackBack estimate used on the
+ * donation success screen). Used for the collective "avoided together" number. */
+export const CO2_GRAMS_PER_CUP = 72;
+
+/* Cups already returned across the whole Packback network. Used as the BASE for
+ * the collective impact so the number is meaningful from day one; every cup
+ * returned through PackPerks is added on top. */
+export const NETWORK_BASE_CUPS = 8_530_020;
+
+/* Format a CO₂ mass in grams as g / kg / tonnes, whichever reads cleanest. */
+export function formatCo2(grams) {
+  const g = Math.max(0, Number(grams) || 0);
+  if (g >= 1_000_000) return `${(g / 1_000_000).toFixed(g >= 10_000_000 ? 0 : 1)} t`;
+  if (g >= 1_000) return `${Math.round(g / 1000).toLocaleString()} kg`;
+  return `${Math.round(g)} g`;
+}
+
 /* Everyday comparisons — tangible objects, not abstractions. A given cup
  * count maps to a stable phrase (via `cups % len`) that shifts as the
  * person collects more. */

@@ -2583,6 +2583,40 @@ export async function saveRegionsConfig(regions) {
   return value.regions;
 }
 
+/* ── Automated reports ─────────────────────────────────────────────────
+ * Config for a scheduled report email (e.g. the weekly per-store valid-claims
+ * summary that feeds vendor direct-debit batching). Stored globally in
+ * app_config under 'automated_reports'. This is the CONFIG only — a scheduled
+ * job (cron + edge function) reads it and sends the mail; the UI here is where
+ * an admin turns it on and sets the recipient/cadence. */
+const AUTOMATED_REPORTS_KEY = 'automated_reports';
+export const AUTOMATED_REPORTS_DEFAULT = {
+  enabled: false,
+  frequency: 'weekly',        // 'daily' | 'weekly' | 'monthly'
+  dayOfWeek: 'monday',        // used when frequency === 'weekly'
+  recipient: 'beke@packback.network',
+  dataset: 'claims',          // which report to run
+  status: 'completed',        // claims filter — 'completed' = valid/paid claims
+  scope: 'per_store',         // 'per_store' | 'all'
+  format: 'csv',              // 'csv' | 'xlsx' | 'pdf'
+};
+
+export async function getAutomatedReports() {
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', AUTOMATED_REPORTS_KEY).maybeSingle();
+  return { ...AUTOMATED_REPORTS_DEFAULT, ...(data?.value || {}) };
+}
+
+export async function saveAutomatedReports(config) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const value = { ...AUTOMATED_REPORTS_DEFAULT, ...(config || {}), updated_at: new Date().toISOString(), updated_by: user?.id ?? null };
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key: AUTOMATED_REPORTS_KEY, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
 /* Assign an org to a region by setting its country — region derives from it. */
 export async function setOrgRegion(orgId, country) {
   const { error } = await supabase

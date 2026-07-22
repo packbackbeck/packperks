@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import { applyDesignColors, mergeDesign } from './admin/appdesign/designDefaults';
-import { regionForCountry, regionForOnboardingCountry, getAllRegions, formatMoney, DEFAULT_REGION } from './lib/regions';
+import { regionForCountry, regionForOnboardingCountry, getRegion, getAllRegions, formatMoney, DEFAULT_REGION } from './lib/regions';
 import { NOT_YET_STORES } from './lib/notYetStores';
 import { useRegion } from './lib/RegionContext';
 import CupProgress from './components/CupProgress';
@@ -28,6 +28,7 @@ import SignInSheet from './components/SignInSheet';
 import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
 import Onboarding from './components/onboarding/Onboarding';
+import MaintenancePage from './components/MaintenancePage';
 import { getOnboarding, setOnboarding, isOnboardingDone } from './lib/onboarding';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
@@ -912,11 +913,31 @@ export default function App() {
    * the right currency. `focusRegion` is the customer's own preference from
    * onboarding (country), used to order + zoom the Stores hub even before they
    * pick a venue; it falls back to the active org's region, then the default. */
-  const { setRegion } = useRegion();
-  const activeRegion = regionForCountry(activeOrg?.country)?.key || DEFAULT_REGION;
-  const focusRegion =
-    regionForOnboardingCountry(onboardingPrefs?.country)?.key || activeRegion;
+  const { setRegion, payoutNoun } = useRegion();
+  // Account-level region — the customer's chosen "home" region. It drives the
+  // display currency, the payout method, the applied data policy, and the
+  // Stores hub focus/ordering. Stored on the device (like onboarding) and
+  // editable in Edit profile. Defaults from onboarding country, then the active
+  // venue's region, then the platform default.
+  const [accountRegion, setAccountRegion] = useState(() => {
+    try {
+      const saved = localStorage.getItem('packperks_region');
+      if (saved) return getRegion(saved).key;
+    } catch { /* ignore */ }
+    return null; // resolved below once onboarding / active org are known
+  });
+  const activeRegion =
+    accountRegion
+    || regionForOnboardingCountry(onboardingPrefs?.country)?.key
+    || regionForCountry(activeOrg?.country)?.key
+    || DEFAULT_REGION;
+  const focusRegion = activeRegion;
   useEffect(() => { setRegion(activeRegion); }, [activeRegion, setRegion]);
+  const handleChangeRegion = (regionKey) => {
+    const r = getRegion(regionKey);
+    setAccountRegion(r.key);
+    try { localStorage.setItem('packperks_region', r.key); } catch { /* ignore */ }
+  };
 
   /* ── Preview-mode override (admin App Design tab) ──
    * When the user app runs inside the admin's App Design iframe, the
@@ -1488,15 +1509,7 @@ export default function App() {
 
   /* ── Maintenance mode ── */
   if (liveSettings.maintenanceMode) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center', background: '#FFF8F4' }}>
-        <div>
-          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔧</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.5rem', color: '#1A1A1A' }}>Down for Maintenance</div>
-          <div style={{ color: '#7A7166', fontSize: '0.875rem' }}>We'll be back shortly. Thanks for your patience.</div>
-        </div>
-      </div>
-    );
+    return <MaintenancePage />;
   }
 
   /* ── Pages ── */
@@ -1739,12 +1752,22 @@ export default function App() {
     // Combined (from-Stores) account view: sum balances + merge activity
     // across every store in the group.
     const combinedBalance = Object.values(groupBalances).reduce((s, b) => s + (b?.balance || 0), 0);
-    // Value the combined balance store-by-store: each org has its OWN €/cup
-    // rate, so we can't just multiply the total cups by a single rate.
-    const combinedCashback = Object.entries(groupBalances).reduce((s, [orgId, b]) => {
+    // Value the combined balance store-by-store: each org has its OWN per-cup
+    // rate AND its own region/currency (derived from organizations.country).
+    // Summing a € value and an AED value into one number would be silently
+    // wrong, so bucket the cashback per region and let UserPage format each
+    // currency. In the common single-region group this is just one bucket.
+    const memberById = {};
+    (groupCtx?.members || []).forEach((m) => { memberById[m.id] = m; });
+    const cashbackByRegionMap = Object.entries(groupBalances).reduce((acc, [orgId, b]) => {
       const rate = groupStores[orgId]?.cashbackRate ?? (liveSettings.cashbackRatePerCup || 1.25);
-      return s + (b?.balance || 0) * rate;
-    }, 0);
+      const rKey = regionForCountry(memberById[orgId]?.country)?.key || activeRegion;
+      acc[rKey] = (acc[rKey] || 0) + (b?.balance || 0) * rate;
+      return acc;
+    }, {});
+    const cashbackByRegion = Object.entries(cashbackByRegionMap)
+      .map(([region, amount]) => ({ region, amount }));
+    const combinedCashback = cashbackByRegion.reduce((s, x) => s + x.amount, 0);
     const acctCombined = accountCombined && !!groupCtx;
     // Enrich pending-claim cards with the reward's name + image. A claim can be
     // for any store in the group (combined view), so pool this org's rewards
@@ -1761,6 +1784,7 @@ export default function App() {
           cupCount={acctCombined ? combinedBalance : cupCount}
           cashbackRate={liveSettings.cashbackRatePerCup}
           cashbackTotal={acctCombined ? combinedCashback : undefined}
+          cashbackByRegion={acctCombined ? cashbackByRegion : undefined}
           history={acctCombined ? combinedHistory : history}
           combined={acctCombined}
           storeName={acctCombined ? null : (activeOrg?.partner_brand_name || activeOrg?.name)}
@@ -1770,6 +1794,9 @@ export default function App() {
           authEmail={authEmail}
           notifyOnApproval={notifyOnApproval}
           onToggleNotify={handleToggleNotify}
+          region={activeRegion}
+          availableRegions={getAllRegions().filter(r => r.enabled)}
+          onChangeRegion={handleChangeRegion}
           onOpenSignIn={() => setShowSignIn(true)}
           onAddCup={handleAddCup}
           isVisitor={isVisitor}
@@ -1982,7 +2009,7 @@ export default function App() {
               <li>To claim, add and <strong>verify your email</strong> (we send a 6-digit code), then upload a clear photo of the <strong>printed store receipt</strong> for the reward item.</li>
               <li>We accept genuine printed store/till receipts that clearly show the reward item and are dated within the last 30 days.</li>
               <li>We <strong>can’t accept</strong> screenshots, photos of a screen, edited or AI-generated images, blurry or unreadable photos, receipts that don’t show the reward item, or receipts dated before you collected your cups. Each receipt can be used once.</li>
-              <li>An automated check pre-screens your photo, but a person makes the final call. Once approved, we send a <strong>Tikkie link</strong> to collect your cashback yourself, usually within a few days, no later than 7. We never ask for your bank details; collect it promptly as links expire.</li>
+              <li>An automated check pre-screens your photo, but a person makes the final call. Once approved, we send a <strong>{payoutNoun}</strong> to collect your cashback yourself, usually within a few days, no later than 7. We never ask for your bank details; collect it promptly as links expire.</li>
               <li>Prefer not to take cashback? You can <strong>donate</strong> your cups to a good cause instead.</li>
               <li>Cups are saved separately at each venue, and you can switch your reward goal any time before claiming.</li>
             </ul>

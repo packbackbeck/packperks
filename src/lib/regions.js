@@ -23,6 +23,8 @@ export const DEFAULT_REGIONS = {
     countries: ['NL', 'NLD'],           // organizations.country values
     onboardingKeys: ['netherlands'],    // onboarding.js COUNTRIES keys
     map: { lat: 52.13, lng: 5.29, zoom: 7 },
+    collectLabel: 'Collect via Tikkie', // customer "collect your cashback" CTA
+    payoutNoun: 'Tikkie link',          // inline copy: "we'll send you a …"
     enabled: true,
   },
   AE: {
@@ -32,10 +34,12 @@ export const DEFAULT_REGIONS = {
     currency: 'AED',
     symbol: 'د.إ',
     currencyLocale: 'en-AE',
-    provider: 'uae',                    // adapter not wired yet — see payments.js
+    provider: 'uae',                    // generic UAE adapter — see payments.js
     countries: ['AE', 'ARE'],
     onboardingKeys: ['uae'],
     map: { lat: 24.2, lng: 54.4, zoom: 7 },
+    collectLabel: 'Collect your cashback', // provider-neutral (no NL "Tikkie")
+    payoutNoun: 'payment link',            // provider-neutral inline copy
     enabled: true,
   },
 };
@@ -66,6 +70,8 @@ export function normalizeRegion(key, r = {}) {
       lng: Number(m.lng ?? 5.29),
       zoom: Number(m.zoom ?? 7),
     },
+    collectLabel: r.collectLabel ?? seed.collectLabel ?? 'Collect your cashback',
+    payoutNoun: r.payoutNoun ?? seed.payoutNoun ?? 'payment link',
     enabled: r.enabled !== false,
   };
 }
@@ -92,11 +98,16 @@ export function getRegion(key) {
   return regionForCountry(up) || REGISTRY[DEFAULT_REGION];
 }
 
-/** organizations.country → region (or null). */
+/** organizations.country → region (or null).
+ *  Matches ISO codes (the `countries` list) AND the region's full label, since
+ *  real data carries both "NL" and "Netherlands" in organizations.country. */
 export function regionForCountry(country) {
   if (!country) return null;
   const c = String(country).trim().toUpperCase();
-  return Object.values(REGISTRY).find((r) => r.countries.map(String).map(s => s.toUpperCase()).includes(c)) || null;
+  return Object.values(REGISTRY).find((r) =>
+    r.countries.map((s) => String(s).toUpperCase()).includes(c) ||
+    String(r.label).toUpperCase() === c,
+  ) || null;
 }
 
 /** onboarding.js country key ("uae") → region (or null). */

@@ -14,6 +14,8 @@ import { animalForProfile, generateProfile } from '../lib/animals';
 import { usePwaInstall } from '../lib/pwa';
 import { requestPushPermission, getPermissionState } from '../lib/notify';
 import { useMoney } from '../lib/RegionContext';
+import { getRegion, formatMoney } from '../lib/regions';
+import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, formatCo2 } from '../lib/impact';
 
 const PUSH_PREF_KEY = 'packperks_push_rewards';
 
@@ -67,6 +69,9 @@ export default function UserPage({
   authEmail = null,
   notifyOnApproval = true,
   onToggleNotify,
+  region = 'NL',
+  availableRegions = [],
+  onChangeRegion,
   onOpenSignIn,
   onAddCup,
   isVisitor = false,
@@ -90,6 +95,10 @@ export default function UserPage({
   // Pre-summed € total for a combined balance, valued per store (orgs can have
   // different €/cup rates). When provided, it overrides cupCount × cashbackRate.
   cashbackTotal,
+  // Combined cashback split per region: [{ region, amount }]. When the group
+  // spans more than one currency we render a subtotal per currency instead of
+  // one (meaningless) mixed-currency number.
+  cashbackByRegion,
   // The active store's name — used for the per-store balance caption.
   storeName,
   // Admin-editable privacy policy text (falls back to the bundled default).
@@ -385,9 +394,19 @@ export default function UserPage({
           </div>
           <span className="user-page__value-approx" aria-label="approximately">≈</span>
           <div className="user-page__value-option user-page__value-option--right">
-            <span className="user-page__value-num user-page__value-num--euro">
-              {money(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate ?? 1.25))}
-            </span>
+            {Array.isArray(cashbackByRegion) && cashbackByRegion.length > 1 ? (
+              // Group spans multiple currencies — never add € and AED together.
+              // Show a subtotal per currency, stacked.
+              <span className="user-page__value-num user-page__value-num--euro user-page__value-num--multi">
+                {cashbackByRegion.map((c) => (
+                  <span key={c.region} className="user-page__value-cur">{formatMoney(c.amount, c.region)}</span>
+                ))}
+              </span>
+            ) : (
+              <span className="user-page__value-num user-page__value-num--euro">
+                {money(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate ?? 1.25))}
+              </span>
+            )}
             <span className="user-page__value-label">in cashback</span>
           </div>
         </div>
@@ -664,6 +683,9 @@ export default function UserPage({
           marketingConsent={profile.marketingConsent}
           notifyOnApproval={notifyOnApproval}
           onToggleNotify={onToggleNotify}
+          region={region}
+          availableRegions={availableRegions}
+          onChangeRegion={onChangeRegion}
           pwaInstalled={pwa.installed}
           pushRewards={pushRewards}
           onTogglePush={handleTogglePush}
@@ -707,11 +729,14 @@ export default function UserPage({
  * the email (routes to the verified sign-in sheet), and a marketing toggle. ── */
 function ProfileEditModal({
   profile, animal, avatarUrl, email, hasEmail, marketingConsent, notifyOnApproval,
+  region = 'NL', availableRegions = [], onChangeRegion,
   pwaInstalled, pushRewards, onTogglePush, browserInfo,
   onClose, onSaveName, onRegenerate, onUploadAvatar, onRemoveAvatar, onManageEmail, onToggleMarketing, onToggleNotify,
 }) {
   const [name, setName] = useState(profile.displayName || '');
+  const [pendingRegion, setPendingRegion] = useState(null); // region key awaiting "are you sure?"
   const fileRef = useRef(null);
+  const current = getRegion(region);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -780,6 +805,29 @@ function ProfileEditModal({
           </button>
         </div>
 
+        {/* Region — the customer's home region. Drives currency, payout method,
+            the café list/map focus, and which data policy applies. */}
+        {availableRegions.length > 1 && (
+          <div className="upedit__field">
+            <span className="upedit__label">Region</span>
+            <div className="upedit__region-row">
+              {availableRegions.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  className={`upedit__region-opt${r.key === region ? ' is-on' : ''}`}
+                  onClick={() => { if (r.key !== region) setPendingRegion(r.key); }}
+                  aria-pressed={r.key === region}
+                >
+                  <span className="upedit__region-flag" aria-hidden="true">{r.flag}</span>
+                  <span className="upedit__region-name">{r.label}</span>
+                  <span className="upedit__region-cur">{r.symbol} {r.currency}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {hasEmail && (
           <label className="upedit__toggle">
             <span>Reward approval emails</span>
@@ -807,6 +855,30 @@ function ProfileEditModal({
 
         <button type="button" className="upedit__done" onClick={() => { commitName(); onClose(); }}>Done</button>
       </div>
+
+      {/* "Are you sure?" — spell out what switching region changes. */}
+      {pendingRegion && (() => {
+        const next = getRegion(pendingRegion);
+        return (
+          <div className="upedit-confirm-overlay" onClick={(e) => { e.stopPropagation(); setPendingRegion(null); }}>
+            <div className="upedit-confirm" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true" aria-label="Confirm region change">
+              <h3 className="upedit-confirm__title">Switch to {next.flag} {next.label}?</h3>
+              <p className="upedit-confirm__sub">Changing your region updates how the app works for you:</p>
+              <ul className="upedit-confirm__list">
+                <li>Prices show in <strong>{next.currency}</strong> — e.g. {formatMoney(4.8, next.key)}.</li>
+                <li>Cashback is paid using the <strong>{next.label}</strong> payout method.</li>
+                <li>The café list and map focus on <strong>{next.label}</strong> first (other regions stay visible).</li>
+                <li><strong>{next.label}</strong> data-protection terms apply.</li>
+              </ul>
+              <p className="upedit-confirm__note">Cups you&rsquo;ve already collected stay exactly as they are.</p>
+              <div className="upedit-confirm__actions">
+                <button type="button" className="upedit__ghost" onClick={() => setPendingRegion(null)}>Cancel</button>
+                <button type="button" className="upedit-confirm__go" onClick={() => { onChangeRegion?.(pendingRegion); setPendingRegion(null); }}>Switch region</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>,
     document.body,
   );
@@ -880,7 +952,7 @@ function formatGrams(g) {
  * profile page. Three rows. Tap target is the wrapping button in
  * UserPage. ─── */
 function ImpactSummary({ cups }) {
-  const grams = cups * GRAMS_PER_CUP;
+  const co2 = cups * CO2_GRAMS_PER_CUP;
   return (
     <div className="user-page__impact-summary">
       <div className="user-page__impact-row">
@@ -904,8 +976,8 @@ function ImpactSummary({ cups }) {
             <path d="M2 21c0-3 1.85-5.36 5.08-6" />
           </svg>
         </div>
-        <span className="user-page__impact-label">Plastic avoided</span>
-        <span className="user-page__impact-val">~{formatGrams(grams)}</span>
+        <span className="user-page__impact-label">CO₂ avoided</span>
+        <span className="user-page__impact-val">~{formatCo2(co2)}</span>
       </div>
       <div className="user-page__divider" />
       <div className="user-page__impact-row user-page__impact-row--cta">
@@ -958,10 +1030,12 @@ function ImpactDetailModal({ cups, profile, onClose }) {
     };
   }, [onClose]);
 
-  const grams         = cups * GRAMS_PER_CUP;
+  const co2           = cups * CO2_GRAMS_PER_CUP;
   const comparison    = pickComparison(cups);
-  const communityCups = community?.totalLifetimeCups || 0;
-  const communityKg   = (communityCups * GRAMS_PER_CUP) / 1000;
+  // Collective total = the whole Packback network's returned cups (base) plus
+  // every cup returned through PackPerks, expressed as CO₂e avoided.
+  const communityTotalCups = NETWORK_BASE_CUPS + (community?.totalLifetimeCups || 0);
+  const communityCo2  = communityTotalCups * CO2_GRAMS_PER_CUP;
 
   async function handleShare() {
     if (!shareCardRef.current) return;
@@ -986,7 +1060,7 @@ function ImpactDetailModal({ cups, profile, onClose }) {
         await navigator.share({
           files: [file],
           title: 'My PackPerks impact',
-          text: `I've returned ${cups} cups with PackPerks. That's ${formatGrams(grams)} of plastic kept out of landfill.`,
+          text: `I've returned ${cups} cups with PackPerks. That's ~${formatCo2(co2)} of CO₂ avoided.`,
         });
         setShared(true);
       } else {
@@ -1033,8 +1107,8 @@ function ImpactDetailModal({ cups, profile, onClose }) {
           </div>
           <div className="impact-modal__stat-divider" />
           <div className="impact-modal__stat">
-            <div className="impact-modal__stat-val">~{formatGrams(grams)}</div>
-            <div className="impact-modal__stat-label">Plastic avoided</div>
+            <div className="impact-modal__stat-val">~{formatCo2(co2)}</div>
+            <div className="impact-modal__stat-label">CO₂ avoided</div>
           </div>
         </div>
 
@@ -1050,14 +1124,12 @@ function ImpactDetailModal({ cups, profile, onClose }) {
           ) : (
             <div className="impact-modal__community-stats">
               <div className="impact-modal__community-stat">
-                <span className="impact-modal__community-val">{communityCups.toLocaleString()}</span>
-                <span className="impact-modal__community-sub">cups collected</span>
+                <span className="impact-modal__community-val">{communityTotalCups.toLocaleString()}</span>
+                <span className="impact-modal__community-sub">cups returned</span>
               </div>
               <div className="impact-modal__community-stat">
-                <span className="impact-modal__community-val">
-                  {communityKg >= 1 ? `${communityKg.toFixed(1)} kg` : `${(communityKg * 1000).toFixed(0)} g`}
-                </span>
-                <span className="impact-modal__community-sub">plastic avoided</span>
+                <span className="impact-modal__community-val">{formatCo2(communityCo2)}</span>
+                <span className="impact-modal__community-sub">CO₂ avoided</span>
               </div>
               {community.returningUsers > 0 && (
                 <div className="impact-modal__community-stat">
@@ -1101,17 +1173,17 @@ function ImpactDetailModal({ cups, profile, onClose }) {
           </div>
           <div className="impact-share-card__rows">
             <div className="impact-share-card__row">
-              <span className="impact-share-card__row-label">Plastic kept out of landfill</span>
-              <span className="impact-share-card__row-val">~{formatGrams(grams)}</span>
+              <span className="impact-share-card__row-label">CO₂ avoided</span>
+              <span className="impact-share-card__row-val">~{formatCo2(co2)}</span>
             </div>
             <div className="impact-share-card__row">
               <span className="impact-share-card__row-label">Equivalent</span>
               <span className="impact-share-card__row-val impact-share-card__row-val--small">{comparison}</span>
             </div>
-            {community && communityCups > 0 && (
+            {community && (
               <div className="impact-share-card__row impact-share-card__row--community">
-                <span className="impact-share-card__row-label">PackPerks community</span>
-                <span className="impact-share-card__row-val">{communityCups.toLocaleString()} cups together</span>
+                <span className="impact-share-card__row-label">Packback network</span>
+                <span className="impact-share-card__row-val">{communityTotalCups.toLocaleString()} cups returned</span>
               </div>
             )}
           </div>

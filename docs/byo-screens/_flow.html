@@ -1,0 +1,216 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --cream:#F5ECDD; --ink:#1D1D1D; --muted:#8B8577; --purple:#6C4CE0; --green:#1A8737; --line:#C9BCA3; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--cream);
+    background-image: radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    padding: 40px 44px 56px;
+    width: 1560px;
+  }
+  .head { margin-bottom: 30px; }
+  .head h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+  .head p { color: var(--muted); font-size: 14.5px; margin-top: 6px; }
+  .head .meta { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .head .meta b { color: var(--green); }
+
+  .lane { margin-bottom: 30px; background: rgba(255,255,255,0.42); border:1px solid #E7DCC7; border-radius: 20px; padding: 18px 22px 24px; }
+  .lane-title { display:inline-flex; align-items:center; gap:9px; font-size: 14px; font-weight: 800; color:#fff; background: var(--purple); padding: 7px 14px; border-radius: 999px; margin-bottom: 20px; }
+  .lane-title .n { background: rgba(255,255,255,0.28); border-radius: 999px; width:20px;height:20px; display:flex;align-items:center;justify-content:center; font-size:12px; }
+  .lane.green .lane-title { background: var(--green); }
+  .lane.amber .lane-title { background: #C7891F; }
+  .lane.slate .lane-title { background: #5A6473; }
+  .lane.pink  .lane-title { background: #C24B7A; }
+
+  .track { display:flex; align-items:flex-start; gap:0; flex-wrap:nowrap; }
+
+  .node { width: 158px; flex:0 0 auto; }
+  .frame { width:158px; border-radius:20px; overflow:hidden; background:#000; padding:5px; box-shadow: 0 10px 26px rgba(70,50,20,0.18); border:1px solid rgba(0,0,0,0.15); }
+  /* Store/market pages are captured full-height; cap the card so the flowchart
+     stays scannable while still showing several rewards (open the PNG for all). */
+  .frame img { width:100%; display:block; border-radius:15px; }
+  .frame--tall { max-height:360px; }
+  .frame--tall img { height:360px; object-fit:cover; object-position:top; }
+  .cap { margin-top:9px; text-align:center; }
+  .cap .lbl { font-size:12.5px; font-weight:700; line-height:1.25; }
+  .cap .file { font-size:10.5px; color:var(--muted); font-family: ui-monospace, Menlo, monospace; margin-top:2px; }
+
+  .conn { flex:0 0 auto; align-self:center; display:flex; flex-direction:column; align-items:center; justify-content:center; width:90px; margin-top:-26px; }
+  .conn .txt { font-size:10.5px; color:var(--muted); text-align:center; line-height:1.2; margin-bottom:5px; max-width:86px; }
+  .conn .bar { display:flex; align-items:center; width:100%; }
+  .conn .bar::before { content:""; height:2px; flex:1; background:var(--line); }
+  .conn .bar::after { content:"›"; color:var(--line); font-size:22px; line-height:0; margin-left:-3px; font-weight:900; }
+
+  .branch { flex:0 0 auto; display:flex; flex-direction:column; gap:16px; }
+  .branch .node .frame { box-shadow: 0 6px 16px rgba(70,50,20,0.14); }
+
+  .group { display:flex; gap:20px; flex-wrap:wrap; }
+  .sub { font-size:12px; font-weight:700; color:var(--muted); margin: 4px 0 14px; text-transform:uppercase; letter-spacing:0.5px; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>PackPerks BYO — Screen Flow</h1>
+    <p>Every customer-facing screen state in the Bring-Your-Own-Cup app, grouped by journey. Captured at 375×812 (2×).</p>
+    <div class="meta"><b>37 app screens + 3 consent + 7 emails</b> · file names match <span style="font-family:ui-monospace,Menlo,monospace">docs/byo-screens/&lt;name&gt;.png</span> · store pages &amp; emails are full-height PNGs (cropped here)</div>
+  </div>
+
+  <!-- LANE 0 — ONBOARDING -->
+  <div class="lane pink">
+    <div class="lane-title"><span class="n">0</span> Onboarding (first run)</div>
+    <div class="track">
+      <div class="node"><div class="frame"><img src="./onboarding-1.png"></div><div class="cap"><div class="lbl">Value prop</div><div class="file">onboarding-1</div></div></div>
+      <div class="conn"><div class="txt">show me</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./onboarding-2.png"></div><div class="cap"><div class="lbl">How you earn it</div><div class="file">onboarding-2</div></div></div>
+      <div class="conn"><div class="txt">personalise</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./onboarding-3.png"></div><div class="cap"><div class="lbl">Personalise</div><div class="file">onboarding-3</div></div></div>
+      <div class="conn"><div class="txt">create list</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./onboarding-4.png"></div><div class="cap"><div class="lbl">Building your list</div><div class="file">onboarding-4</div></div></div>
+    </div>
+  </div>
+
+  <!-- LANE 1 — DISCOVER -->
+  <div class="lane">
+    <div class="lane-title"><span class="n">1</span> Discover &amp; choose a café</div>
+    <div class="track">
+      <div class="node"><div class="frame frame--tall"><img src="./stores-list.png"></div><div class="cap"><div class="lbl">Stores hub — list</div><div class="file">stores-list</div></div></div>
+      <div class="conn"><div class="txt">tap “Map view”</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./stores-map.png"></div><div class="cap"><div class="lbl">Stores hub — map</div><div class="file">stores-map</div></div></div>
+      <div class="conn"><div class="txt">pick a café</div><div class="bar"></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./home-empty.png"></div><div class="cap"><div class="lbl">Venue home — 0 cups</div><div class="file">home-empty</div></div></div>
+    </div>
+  </div>
+
+  <!-- LANE 2 — COLLECT CUPS -->
+  <div class="lane green">
+    <div class="lane-title"><span class="n">2</span> Collect cups</div>
+    <div class="track">
+      <div class="node"><div class="frame"><img src="./cup-scan.png"></div><div class="cap"><div class="lbl">Scan counter QR</div><div class="file">cup-scan</div></div></div>
+      <div class="conn"><div class="txt">QR scanned</div><div class="bar"></div></div>
+      <div class="branch">
+        <div class="node"><div class="frame"><img src="./cup-scan-success.png"></div><div class="cap"><div class="lbl">Cup added ✓</div><div class="file">cup-scan-success</div></div></div>
+        <div class="node"><div class="frame"><img src="./byo-popup.png"></div><div class="cap"><div class="lbl">Daily cup limit</div><div class="file">byo-popup</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE 3 — VENUE HOME STATES -->
+  <div class="lane">
+    <div class="lane-title"><span class="n">3</span> Venue home (market) — states</div>
+    <div class="track">
+      <div class="node"><div class="frame frame--tall"><img src="./home-empty.png"></div><div class="cap"><div class="lbl">0 cups</div><div class="file">home-empty</div></div></div>
+      <div class="conn"><div class="txt">collect</div><div class="bar"></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./home-partial.png"></div><div class="cap"><div class="lbl">Collecting</div><div class="file">home-partial</div></div></div>
+      <div class="conn"><div class="txt">goal reached</div><div class="bar"></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./home-full.png"></div><div class="cap"><div class="lbl">Reward ready</div><div class="file">home-full</div></div></div>
+      <div class="conn"><div class="txt">member</div><div class="bar"></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./home-member.png"></div><div class="cap"><div class="lbl">Member</div><div class="file">home-member</div></div></div>
+    </div>
+
+    <div class="sub" style="margin-top:22px">Story guide (opened from home) — 3 steps</div>
+    <div class="track">
+      <div class="node"><div class="frame"><img src="./how-it-works-1.png"></div><div class="cap"><div class="lbl">Bring your cup</div><div class="file">how-it-works-1</div></div></div>
+      <div class="conn"><div class="txt">next</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./how-it-works-2.png"></div><div class="cap"><div class="lbl">Collect cups</div><div class="file">how-it-works-2</div></div></div>
+      <div class="conn"><div class="txt">next</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./how-it-works-3.png"></div><div class="cap"><div class="lbl">Get cashback</div><div class="file">how-it-works-3</div></div></div>
+    </div>
+
+    <div class="sub" style="margin-top:22px">Other overlays</div>
+    <div class="group">
+      <div class="node"><div class="frame"><img src="./reward-detail.png"></div><div class="cap"><div class="lbl">Reward detail sheet</div><div class="file">reward-detail</div></div></div>
+      <div class="node"><div class="frame"><img src="./terms.png"></div><div class="cap"><div class="lbl">Cashback terms</div><div class="file">terms</div></div></div>
+      <div class="node"><div class="frame"><img src="./budget-paused.png"></div><div class="cap"><div class="lbl">Rewards paused</div><div class="file">budget-paused</div></div></div>
+      <div class="node"><div class="frame"><img src="./inapp-prompt.png"></div><div class="cap"><div class="lbl">In-app browser prompt</div><div class="file">inapp-prompt</div></div></div>
+    </div>
+  </div>
+
+  <!-- LANE 4 — CLAIM -->
+  <div class="lane amber">
+    <div class="lane-title"><span class="n">4</span> Claim a reward → cashback</div>
+    <div class="track">
+      <div class="node"><div class="frame"><img src="./reward-detail.png"></div><div class="cap"><div class="lbl">Reward detail</div><div class="file">reward-detail</div></div></div>
+      <div class="conn"><div class="txt">Claim</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./receipt-rules.png"></div><div class="cap"><div class="lbl">Receipt rules</div><div class="file">receipt-rules</div></div></div>
+      <div class="conn"><div class="txt">continue</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./receipt-camera.png"></div><div class="cap"><div class="lbl">Receipt camera</div><div class="file">receipt-camera</div></div></div>
+      <div class="conn"><div class="txt">upload</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./verifying.png"></div><div class="cap"><div class="lbl">Verifying</div><div class="file">verifying</div></div></div>
+      <div class="conn"><div class="txt">AI + human review</div><div class="bar"></div></div>
+      <div class="branch">
+        <div class="node"><div class="frame"><img src="./success.png"></div><div class="cap"><div class="lbl">Submitted ✓</div><div class="file">success</div></div></div>
+        <div class="node"><div class="frame"><img src="./rejected.png"></div><div class="cap"><div class="lbl">Receipt rejected</div><div class="file">rejected</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE 5 — ACCOUNT -->
+  <div class="lane">
+    <div class="lane-title"><span class="n">5</span> Account</div>
+    <div class="track">
+      <div class="node"><div class="frame frame--tall"><img src="./user-visitor.png"></div><div class="cap"><div class="lbl">Account — visitor</div><div class="file">user-visitor</div></div></div>
+      <div class="conn"><div class="txt">add email</div><div class="bar"></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./user-member.png"></div><div class="cap"><div class="lbl">Account — member</div><div class="file">user-member</div></div></div>
+      <div class="conn"><div class="txt">edit</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./edit-profile.png"></div><div class="cap"><div class="lbl">Edit profile</div><div class="file">edit-profile</div></div></div>
+      <div class="conn"><div class="txt">from Stores hub</div><div class="bar"></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./user-combined.png"></div><div class="cap"><div class="lbl">Account — all stores</div><div class="file">user-combined</div></div></div>
+    </div>
+  </div>
+
+  <!-- LANE 6 — SIGN IN -->
+  <div class="lane green">
+    <div class="lane-title"><span class="n">6</span> Sign in</div>
+    <div class="track">
+      <div class="node"><div class="frame"><img src="./signin-idle.png"></div><div class="cap"><div class="lbl">Sign in</div><div class="file">signin-idle</div></div></div>
+      <div class="conn"><div class="txt">send code</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./signin-sent.png"></div><div class="cap"><div class="lbl">Code sent</div><div class="file">signin-sent</div></div></div>
+      <div class="conn"><div class="txt">verify / manage</div><div class="bar"></div></div>
+      <div class="branch">
+        <div class="node"><div class="frame"><img src="./signin-signedin.png"></div><div class="cap"><div class="lbl">Signed in</div><div class="file">signin-signedin</div></div></div>
+        <div class="node"><div class="frame"><img src="./signin-change.png"></div><div class="cap"><div class="lbl">Change email</div><div class="file">signin-change</div></div></div>
+        <div class="node"><div class="frame"><img src="./signin-merge.png"></div><div class="cap"><div class="lbl">Merge accounts</div><div class="file">signin-merge</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE 7 — SYSTEM -->
+  <div class="lane slate">
+    <div class="lane-title"><span class="n">7</span> System states</div>
+    <div class="group">
+      <div class="node"><div class="frame"><img src="./loading.png"></div><div class="cap"><div class="lbl">Loading / boot</div><div class="file">loading</div></div></div>
+      <div class="node"><div class="frame"><img src="./error.png"></div><div class="cap"><div class="lbl">Error</div><div class="file">error</div></div></div>
+      <div class="node"><div class="frame"><img src="./maintenance.png"></div><div class="cap"><div class="lbl">Maintenance</div><div class="file">maintenance</div></div></div>
+    </div>
+
+    <div class="sub" style="margin-top:22px">Cookie consent (first run)</div>
+    <div class="track">
+      <div class="node"><div class="frame"><img src="./consent-main.png"></div><div class="cap"><div class="lbl">Cookie choice</div><div class="file">consent-main</div></div></div>
+      <div class="conn"><div class="txt">customize</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./consent-customize.png"></div><div class="cap"><div class="lbl">Granular toggles</div><div class="file">consent-customize</div></div></div>
+      <div class="conn"><div class="txt">reject essential</div><div class="bar"></div></div>
+      <div class="node"><div class="frame"><img src="./consent-reject.png"></div><div class="cap"><div class="lbl">Blocked (essential needed)</div><div class="file">consent-reject</div></div></div>
+    </div>
+  </div>
+
+  <!-- LANE 8 — EMAILS -->
+  <div class="lane amber">
+    <div class="lane-title"><span class="n">8</span> Transactional emails</div>
+    <div class="group">
+      <div class="node"><div class="frame frame--tall"><img src="./email-confirm-signup.png"></div><div class="cap"><div class="lbl">Confirm signup</div><div class="file">email-confirm-signup</div></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./email-magic-link.png"></div><div class="cap"><div class="lbl">Magic link / code</div><div class="file">email-magic-link</div></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./email-cashback-ready.png"></div><div class="cap"><div class="lbl">Cashback ready</div><div class="file">email-cashback-ready</div></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./email-change-email.png"></div><div class="cap"><div class="lbl">Change email</div><div class="file">email-change-email</div></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./email-reset-password.png"></div><div class="cap"><div class="lbl">Reset password</div><div class="file">email-reset-password</div></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./email-reauthentication.png"></div><div class="cap"><div class="lbl">Reauthentication</div><div class="file">email-reauthentication</div></div></div>
+      <div class="node"><div class="frame frame--tall"><img src="./email-invite.png"></div><div class="cap"><div class="lbl">Admin invite</div><div class="file">email-invite</div></div></div>
+    </div>
+  </div>
+</body>
+</html>

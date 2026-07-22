@@ -55,7 +55,19 @@ export default function ReceiptRejectedPage({
     { codes: ['is_newer_than_cup_return'], label: 'Dated after your cup return' },
     { codes: ['duplicate_receipt'], label: 'Not claimed before' },
   ];
-  const checks = CHECKLIST.map(c => ({ label: c.label, passed: !c.codes.some(code => failureChecks.includes(code)) }));
+  // The AI checks the criteria one at a time and STOPS at the first failure,
+  // so anything AFTER the failing check was never evaluated. Show those as
+  // pending (empty) rather than a misleading green pass: passed → failed →
+  // pending, in list order.
+  let stopped = false;
+  const checks = CHECKLIST.map((c) => {
+    if (stopped) return { label: c.label, status: 'pending' };
+    if (c.codes.some((code) => failureChecks.includes(code))) {
+      stopped = true;
+      return { label: c.label, status: 'failed' };
+    }
+    return { label: c.label, status: 'passed' };
+  });
 
   return (
     <RejectShell
@@ -92,13 +104,13 @@ function RejectShell({ tone, title, checks, message, primaryLabel, onTryAgain, o
         {checks && checks.length > 0 && (
           <ul className="rj__checklist">
             {checks.map(c => (
-              <li key={c.label} className={`rj__check rj__check--${c.passed ? 'yes' : 'no'}`}>
+              <li key={c.label} className={`rj__check rj__check--${c.status === 'passed' ? 'yes' : c.status === 'failed' ? 'no' : 'pending'}`}>
                 <span className="rj__check-mark" aria-hidden="true">
-                  {c.passed ? (
+                  {c.status === 'passed' ? (
                     <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10L8 14L16 6" /></svg>
-                  ) : (
+                  ) : c.status === 'failed' ? (
                     <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="5" x2="15" y2="15" /><line x1="15" y1="5" x2="5" y2="15" /></svg>
-                  )}
+                  ) : null /* pending — empty circle, not yet checked */}
                 </span>
                 <span className="rj__check-label">{c.label}</span>
               </li>

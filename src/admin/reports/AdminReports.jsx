@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { applyOrgFilter } from '../context/orgState';
 import { useAuth } from '../auth/AuthContext';
 import { logAction } from '../auth/actionLog';
+import { getAutomatedReports, saveAutomatedReports, AUTOMATED_REPORTS_DEFAULT } from '../lib/adminApi';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminReports.css';
 
@@ -679,7 +680,155 @@ export default function AdminReports({ onNavigate }) {
         </section>
       </div>
 
+      <AutomatedReports canManage={canExportPii} />
+
       <QuickLinks currentPage="reports" onNavigate={onNavigate} />
     </div>
+  );
+}
+
+/* ── Automated reports ──────────────────────────────────────────────────
+ * Config for a scheduled report email (defaults to the weekly per-store
+ * valid-claims summary that feeds vendor direct-debit batching). Persists to
+ * app_config; a cron + edge function reads it and sends the mail. */
+function AutomatedReports({ canManage }) {
+  const [cfg, setCfg] = useState(AUTOMATED_REPORTS_DEFAULT);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(false);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    getAutomatedReports().then((c) => { if (alive) { setCfg(c); setLoaded(true); } })
+      .catch(() => { if (alive) setLoaded(true); });
+    return () => { alive = false; };
+  }, []);
+
+  const patch = (p) => setCfg((c) => ({ ...c, ...p }));
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((cfg.recipient || '').trim());
+
+  const save = async () => {
+    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
+    setSaving(true); setErr(null);
+    try {
+      const v = await saveAutomatedReports(cfg);
+      setCfg((c) => ({ ...c, ...v }));
+      setSavedAt(true);
+      setTimeout(() => setSavedAt(false), 2200);
+    } catch (e) {
+      setErr(e?.message || 'Could not save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cadenceLabel = cfg.frequency === 'weekly'
+    ? `every ${cfg.dayOfWeek.charAt(0).toUpperCase() + cfg.dayOfWeek.slice(1)}`
+    : cfg.frequency === 'daily' ? 'every day' : 'on the 1st of each month';
+
+  return (
+    <section className="rep-auto">
+      <div className="rep-auto__head">
+        <div>
+          <h2 className="rep-auto__title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Automated reports
+          </h2>
+          <p className="rep-auto__sub">Email a scheduled report automatically — e.g. the weekly valid-claims summary per store for vendor direct debits.</p>
+        </div>
+        <label className="rep-auto__switch">
+          <input type="checkbox" checked={!!cfg.enabled} disabled={!canManage || !loaded} onChange={(e) => patch({ enabled: e.target.checked })} />
+          <span className="rep-auto__switch-track"><span className="rep-auto__switch-thumb" /></span>
+          <span className="rep-auto__switch-lbl">{cfg.enabled ? 'On' : 'Off'}</span>
+        </label>
+      </div>
+
+      <div className={`rep-auto__grid${cfg.enabled ? '' : ' rep-auto__grid--muted'}`}>
+        <label className="rep-auto__field">
+          <span className="rep-auto__label">Report</span>
+          <select className="rep-auto__input" value={cfg.dataset} disabled={!canManage} onChange={(e) => patch({ dataset: e.target.value })}>
+            <option value="claims">Reward claims</option>
+            <option value="cup_scans">Cup scans</option>
+            <option value="activity">Activity</option>
+          </select>
+        </label>
+
+        <label className="rep-auto__field">
+          <span className="rep-auto__label">Only include</span>
+          <select className="rep-auto__input" value={cfg.status} disabled={!canManage} onChange={(e) => patch({ status: e.target.value })}>
+            <option value="completed">Valid / paid claims</option>
+            <option value="all">All statuses</option>
+            <option value="pending">Pending only</option>
+          </select>
+        </label>
+
+        <label className="rep-auto__field">
+          <span className="rep-auto__label">Break down</span>
+          <select className="rep-auto__input" value={cfg.scope} disabled={!canManage} onChange={(e) => patch({ scope: e.target.value })}>
+            <option value="per_store">Per store</option>
+            <option value="all">Whole programme</option>
+          </select>
+        </label>
+
+        <label className="rep-auto__field">
+          <span className="rep-auto__label">Frequency</span>
+          <select className="rep-auto__input" value={cfg.frequency} disabled={!canManage} onChange={(e) => patch({ frequency: e.target.value })}>
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </label>
+
+        {cfg.frequency === 'weekly' && (
+          <label className="rep-auto__field">
+            <span className="rep-auto__label">Send on</span>
+            <select className="rep-auto__input" value={cfg.dayOfWeek} disabled={!canManage} onChange={(e) => patch({ dayOfWeek: e.target.value })}>
+              {['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map((d) => (
+                <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <label className="rep-auto__field">
+          <span className="rep-auto__label">Format</span>
+          <select className="rep-auto__input" value={cfg.format} disabled={!canManage} onChange={(e) => patch({ format: e.target.value })}>
+            <option value="csv">CSV (Excel)</option>
+            <option value="xlsx">CSV (plain)</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </label>
+
+        <label className="rep-auto__field rep-auto__field--wide">
+          <span className="rep-auto__label">Send to</span>
+          <input
+            type="email"
+            className={`rep-auto__input${!emailValid ? ' rep-auto__input--bad' : ''}`}
+            value={cfg.recipient}
+            disabled={!canManage}
+            placeholder="name@packback.network"
+            onChange={(e) => patch({ recipient: e.target.value })}
+          />
+        </label>
+      </div>
+
+      <div className="rep-auto__foot">
+        <span className="rep-auto__summary">
+          {cfg.enabled
+            ? <>Sends the <strong>{cfg.dataset === 'claims' ? 'reward claims' : cfg.dataset}</strong> report {cadenceLabel} to <strong>{cfg.recipient}</strong>.</>
+            : 'Turn on to schedule an automatic report email.'}
+        </span>
+        <div className="rep-auto__actions">
+          {err && <span className="rep-auto__err">{err}</span>}
+          {savedAt && <span className="rep-auto__ok">Saved ✓</span>}
+          <button className="rep-btn rep-btn--primary" onClick={save} disabled={!canManage || saving || !loaded}>
+            {saving ? 'Saving…' : 'Save schedule'}
+          </button>
+        </div>
+      </div>
+      {!canManage && <p className="rep-auto__gate">Only Owners and Admins can change automated reports.</p>}
+    </section>
   );
 }

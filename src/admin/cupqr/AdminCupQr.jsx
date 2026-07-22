@@ -8,6 +8,7 @@ import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import QuickLinks from '../shared/QuickLinks';
+import { APP_URL } from '../../lib/appUrl';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminCupQr.css';
@@ -29,7 +30,10 @@ const EXPIRY_PRESETS = [
 // customer's phone, which must land on the live, working app (not a
 // localhost dev server they can't reach). So batches generated from
 // localhost OR Vercel both produce QRs that open the Vercel app.
-const PROD_URL = 'https://perks.packback.app/';
+// Canonical customer domain baked into the printed QR (VITE_APP_URL, default
+// .network). Redemption ignores the QR's host, so this only affects native
+// phone-camera scans — keep the old .app domain live for existing prints.
+const PROD_URL = APP_URL;
 
 /* ─────────────────────────────────────────────────────────────────────
  * AdminCupQr — generates and prints scannable cup-return receipts.

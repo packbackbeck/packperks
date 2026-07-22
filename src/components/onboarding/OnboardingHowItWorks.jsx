@@ -5,7 +5,7 @@
 const STEPS = [
   {
     n: 1,
-    image: '/how-it-works/byo-1.png',
+    image: '/how-it-works/onb-1.png',
     bg: 'linear-gradient(155deg, #FCEEE4 0%, #F7D6C1 100%)',
     accent: '#E07E4F',
     title: 'Bring your reusable cup',
@@ -13,15 +13,15 @@ const STEPS = [
   },
   {
     n: 2,
-    image: '/how-it-works/byo-2.png',
-    bg: 'linear-gradient(155deg, #EAF6EC 0%, #CFEAD5 100%)',
-    accent: '#4FA167',
+    image: '/how-it-works/onb-2.png',
+    bg: 'linear-gradient(155deg, #FCF2D6 0%, #F8E7B9 100%)',
+    accent: '#E0A12B',
     title: 'Collect enough cups',
     body: 'Collect enough cups to unlock a reward.',
   },
   {
     n: 3,
-    image: '/how-it-works/byo-5.png',
+    image: '/how-it-works/onb-3.png',
     bg: 'linear-gradient(155deg, #E7F6EF 0%, #CDEEDF 100%)',
     accent: '#3FA97C',
     title: 'Buy it and get cashback',

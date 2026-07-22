@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, cloneElement, isValidElement } from 'react';
 import CookieConsent, { CookieBlocked } from './CookieConsent';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import { getConsent, setConsent, setConsentPrefs, clearConsent } from '../lib/consent';
@@ -28,9 +28,16 @@ export default function ConsentGate({ children }) {
     );
   }
 
+  // The app renders behind the banner (dimmed) so it feels alive, but the
+  // onboarding flow must wait until the visitor has made a cookie choice —
+  // pass that readiness down so App doesn't auto-open onboarding first.
+  const gatedChildren = isValidElement(children)
+    ? cloneElement(children, { consentReady: !!consent })
+    : children;
+
   return (
     <>
-      {children}
+      {gatedChildren}
       {!consent && <CookieConsent onChoose={choose} onCustomize={customize} onPolicy={() => setShowPolicy(true)} />}
       {policyModal}
     </>

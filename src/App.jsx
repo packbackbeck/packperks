@@ -186,7 +186,7 @@ const EMPTY_REWARD = {
   displayLines: [],
 };
 
-export default function App() {
+export default function App({ consentReady = true } = {}) {
   /* ── Supabase-backed state ── */
   const [userId, setUserId] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -370,11 +370,14 @@ export default function App() {
   const onboardingAutoRef = useRef(false);
   useEffect(() => {
     if (shot || onboardingAutoRef.current) return;
+    // Cookie banner first: don't open onboarding until the visitor has made a
+    // cookie choice (ConsentGate passes consentReady once consent is stored).
+    if (!consentReady) return;
     if (page === 'stores' && !isOnboardingDone()) {
       onboardingAutoRef.current = true;
       setShowOnboarding(true);
     }
-  }, [page, shot]);
+  }, [page, shot, consentReady]);
 
   /* ── Detail sheet ── */
   const [detailReward, setDetailReward] = useState(null);

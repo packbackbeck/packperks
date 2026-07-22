@@ -3,7 +3,6 @@ import QRCode from 'qrcode';
 import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import RewardsReceiptGenerator from '../cupqr/RewardsReceiptGenerator';
-import { APP_URL } from '../../lib/appUrl';
 import './AdminByoRequests.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -17,7 +16,7 @@ import './AdminByoRequests.css';
  * customers scan to collect — print it and stand it on the counter.
  * ───────────────────────────────────────────────────────────────────── */
 
-const PROD_URL = APP_URL;   // canonical domain for the BYO QR (VITE_APP_URL)
+const PROD_URL = 'https://perks.packback.network/';   // BYO QR/link always points at the .network domain
 
 const STATUSES = [
   { key: 'pending',  label: 'Pending' },

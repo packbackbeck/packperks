@@ -1,0 +1,60 @@
+/* FaqSheet — customer FAQ accordion, shown as a bottom sheet from the account
+ * page. Portaled to <body> so position:fixed anchors to the viewport. */
+.faq-overlay {
+  position: fixed; inset: 0; z-index: 2100;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  font-family: var(--font-primary, system-ui, sans-serif);
+}
+.faq-sheet {
+  width: 100%; max-width: 560px; max-height: 90dvh;
+  background: var(--white, #fff);
+  border-radius: 22px 22px 0 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
+  animation: faq-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes faq-rise { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.faq-head {
+  flex-shrink: 0;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 18px 14px;
+  border-bottom: 1px solid #EFE9DC;
+}
+.faq-head__eyebrow {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--pb-green, #1A8737);
+}
+.faq-head__title { margin: 2px 0 0; font-size: 18px; font-weight: 800; color: var(--black, #1a1a1a); }
+.faq-close {
+  flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: #F3EEE4; color: var(--text-muted, #6C6259);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.faq-close:hover { background: #E9E2D4; }
+
+.faq-body {
+  flex: 1; overflow-y: auto;
+  padding: 6px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+
+.faq-item { border-bottom: 1px solid #F2ECE0; }
+.faq-item:last-child { border-bottom: none; }
+.faq-item__q {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 15px 4px; background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 14.5px; font-weight: 700; color: #1F1B16; text-align: left;
+  line-height: 1.35;
+}
+.faq-item__chev {
+  flex-shrink: 0; color: #9A9186; transition: transform 0.2s ease;
+}
+.faq-item--open .faq-item__chev { transform: rotate(180deg); color: var(--pb-green, #1A8737); }
+.faq-item__a {
+  margin: -2px 4px 15px;
+  font-size: 13.5px; line-height: 1.6; color: var(--text-muted, #5A554F);
+  animation: faq-fade 0.18s ease both;
+}
+@keyframes faq-fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

@@ -5,6 +5,7 @@ import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
 import ActivityDetailModal from './ActivityDetailModal';
 import PrivacyPolicyView from './PrivacyPolicyView';
+import FaqSheet from './FaqSheet';
 import PendingClaims from './PendingClaims';
 import { getGlobalImpact } from '../lib/api';
 import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
@@ -305,6 +306,7 @@ export default function UserPage({
 
   // ── Data & privacy controls (GDPR items 13, 19, 21) ──
   const [policyOpen, setPolicyOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
   // Re-open the cookie banner IN PLACE (ConsentGate listens for this) instead of
   // clearing consent + reloading. The old reload re-bootstrapped the app and could
   // dump the user on the "trouble loading your cups" error screen and strand them.
@@ -524,26 +526,10 @@ export default function UserPage({
       {/* ── Info + install section: "How does it work?" plus an "Add to home
            screen" button that installs the app like a native one. The install
            button disappears once the app is installed. No section title. ── */}
-      {(onOpenHowItWorks || !pwa.installed) && (
+      {/* "How does it work?" moved into the Help block below; only the
+           install prompt lives here now. */}
+      {!pwa.installed && (
         <div className="user-page__howto-group">
-          {onOpenHowItWorks && (
-            <button type="button" className="user-page__howto" onClick={() => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); }}>
-              <span className="user-page__howto-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M9.3 9.2a2.8 2.8 0 0 1 5.3 1c0 1.9-2.6 2.2-2.6 3.6" />
-                  <line x1="12" y1="17.4" x2="12.01" y2="17.4" />
-                </svg>
-              </span>
-              <span className="user-page__howto-text">
-                <span className="user-page__howto-title">How does it work?</span>
-              </span>
-              <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="9 6 15 12 9 18" />
-              </svg>
-            </button>
-          )}
-
           {!pwa.installed && (
             <button type="button" className="user-page__howto user-page__howto--install" onClick={handleAddToHome} aria-expanded={iosInstallHint}>
               <span className="user-page__howto-icon user-page__howto-icon--install">
@@ -713,14 +699,38 @@ export default function UserPage({
         />
       )}
 
-      {/* ── Data & privacy control (GDPR items 13, 19, 21) ──
-       *  Contact support lives here now too, as the first row, so the
-       *  "need a hand?" entry point sits with the other account controls. */}
+      {/* ── Help ── same list layout as Data & privacy. Contact support and
+           "How does it work?" moved here; FAQ opens an in-app popup. */}
+      <div className="user-page__history">
+        <span className="user-page__section-title">Help</span>
+        <div className="user-page__card user-page__card--list">
+          {[
+            { label: 'Contact support', on: () => { window.location.href = '/support'; } },
+            ...(onOpenHowItWorks ? [{ label: 'How does it work?', on: () => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); } }] : []),
+            { label: 'FAQ', on: () => setFaqOpen(true) },
+          ].map((row, i) => (
+            <div key={row.label}>
+              {i > 0 && <div className="user-page__divider" />}
+              <button
+                type="button"
+                className="user-page__data-row"
+                onClick={row.on}
+              >
+                <span>{row.label}</span>
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M7 4L13 10L7 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Data & privacy control (GDPR items 13, 19, 21) ── */}
       <div className="user-page__history">
         <span className="user-page__section-title">Data &amp; privacy</span>
         <div className="user-page__card user-page__card--list">
           {[
-            { label: 'Contact support', on: () => { window.location.href = '/support'; } },
             { label: 'Privacy & cookie policy', on: () => setPolicyOpen(true) },
             { label: 'Manage cookie choices', on: handleManageCookies },
             { label: 'Export my data', on: handleExportData },
@@ -749,6 +759,7 @@ export default function UserPage({
       </div>
 
       {policyOpen && <PrivacyPolicyView text={privacyPolicy} onClose={() => setPolicyOpen(false)} />}
+      {faqOpen && <FaqSheet onClose={() => setFaqOpen(false)} />}
 
       {editOpen && (
         <ProfileEditModal

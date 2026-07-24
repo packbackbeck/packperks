@@ -8,6 +8,7 @@ import {
   finaliseRestore,
   checkEmailSaveOrMerge,
   mergeByEmail,
+  mergeGuard,
   changeAuthEmail,
 } from '../lib/api';
 import PrivacyPolicyView from './PrivacyPolicyView';
@@ -65,6 +66,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
   const [otpCode, setOtpCode] = useState('');
   const [newEmail, setNewEmail] = useState(''); // for the change-email flow
   const [restoreResult, setRestoreResult] = useState(null); // { status, merged_balance? }
+  const [mergeHeldMsg, setMergeHeldMsg] = useState(null); // weekly-limit "sent for review" copy
   const [error, setError] = useState(null);
   const [currentEmail, setCurrentEmail] = useState(import.meta.env.DEV && __devEmail ? __devEmail : null);
   const inputRef = useRef(null);
@@ -306,6 +308,16 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
     setStatus('restore_verifying');
     try {
       await verifyRestoreOtp(email, otpCode);
+      // Weekly merge-limit gate: if this email has already used its allowance
+      // this week, the merge is filed for admin review instead of running now.
+      const guard = await mergeGuard(mergeFromSave.current ? 'merge_by_email' : 'restore');
+      if (guard?.held) {
+        setMergeHeldMsg(guard.message || 'Your merge request was sent to the store for review.');
+        setCurrentEmail(email.trim());
+        setStatus('merge_held');
+        onLinked?.();
+        return;
+      }
       // Auth session is now in place. Use the merge-all flow if we came
       // from a duplicate-email save; otherwise use the legacy pairwise
       // restore (existing "I lost my cups" UX).
@@ -804,6 +816,21 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, requi
             </p>
             <button className="signin-btn signin-btn--primary" onClick={onClose}>
               Done
+            </button>
+          </div>
+        )}
+
+        {status === 'merge_held' && (
+          <div className="signin-state">
+            <div className="signin-art signin-art--pending">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
+            <h2 className="signin-title">Sent for review</h2>
+            <p className="signin-sub">{mergeHeldMsg}</p>
+            <button className="signin-btn signin-btn--primary" onClick={onClose}>
+              Got it
             </button>
           </div>
         )}

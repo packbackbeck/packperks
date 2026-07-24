@@ -51,13 +51,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  let body: { user_id?: string; device_id?: string; org_id?: string };
+  let body: { user_id?: string; device_id?: string; org_id?: string; location_id?: string };
   try { body = await req.json(); }
   catch { return json({ error: "invalid_json" }, 400); }
 
   const userId   = body?.user_id ?? null;
   const deviceId = body?.device_id ?? null;
   const orgId    = body?.org_id ?? null;
+  const rawLocationId = body?.location_id ?? null;
   if (!userId || !UUID_RE.test(userId)) return json({ error: "missing_or_invalid_user_id" }, 400);
   if (!orgId  || !UUID_RE.test(orgId))  return json({ error: "missing_or_invalid_org_id" }, 400);
 
@@ -89,6 +90,18 @@ Deno.serve(async (req) => {
     .from("app_config").select("value").eq("key", `published:group:${org.group_id}`).maybeSingle();
   if ((cfg?.value as { settings?: { mode?: string } } | null)?.settings?.mode !== "byo") {
     return json({ error: "not_byo" }, 400);
+  }
+
+  // ── Optional per-location tag ────────────────────────────────────────
+  // The counter QR may carry ?loc=<location_id>. Accept it only if that
+  // location belongs to THIS org — an invalid/foreign id is ignored, never
+  // fails the scan. Cups themselves stay org-wide (cross-location redeemable);
+  // this just records WHERE the scan happened for analytics.
+  let locationId: string | null = null;
+  if (rawLocationId && UUID_RE.test(rawLocationId)) {
+    const { data: loc } = await supabase
+      .from("locations").select("id").eq("id", rawLocationId).eq("org_id", orgId).maybeSingle();
+    if (loc) locationId = loc.id;
   }
 
   // ── Per-store daily auto-credit cap (admin-set on the BYO requests page).
@@ -123,7 +136,7 @@ Deno.serve(async (req) => {
     if (!existing) {
       await supabase.from("byo_cup_requests").insert({
         org_id: orgId, user_id: userId, identity_id: userRow.identity_id || null,
-        cups: 1, status: "pending",
+        cups: 1, status: "pending", location_id: locationId,
         device_id: userRow.device_id || deviceId || null,
         note: "Auto-credit cap reached (rolling 24h)",
       });
@@ -143,7 +156,8 @@ Deno.serve(async (req) => {
   if (incErr) return json({ error: "balance_update_failed", detail: incErr.message }, 500);
 
   await supabase.from("cup_scans").insert({
-    user_id: userId, org_id: orgId, scan_type: "byo", source: "byo_qr",
+    user_id: userId, org_id: orgId, location_id: locationId,
+    scan_type: "byo", source: "byo_qr",
     status: "success", cups_awarded: 1, scanned_at: new Date().toISOString(),
   });
   await supabase.from("activity_history").insert({

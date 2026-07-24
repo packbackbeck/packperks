@@ -58,6 +58,11 @@
   box-shadow: var(--shadow-screen);
   display: flex;
   flex-direction: column;
+  /* All cards in the rail stretch to the tallest (e.g. a rejected card). Push
+     the bottom block (CTA / progress / reject chips) to the bottom so the extra
+     height lands as space BETWEEN the top part and the CTA, not as a big empty
+     margin under the CTA. The blocks keep their own top-margin as the min gap. */
+  justify-content: space-between;
 }
 /* One card per view (full width), whichever count — swipe between them. */
 
@@ -123,6 +128,43 @@
   color: #A85320;
 }
 .pc-card__badge.is-ready { background: #E3F3E8; color: var(--pb-green); }
+.pc-card__badge--rejected { background: #FBE3DE; color: #B4463E; }
+
+/* ── Rejected claim card ──
+ * Failed criteria are compact chips (not full-height rows) so a rejected claim
+ * never balloons the widget and pushes the other claim cards around. */
+.pc-card--rejected { border-color: #F0D4CD; background: #FEFAF9; }
+.pc-reject { margin-top: 12px; }
+/* One row of chips that scrolls horizontally rather than wrapping — keeps the
+   card a fixed height no matter how many criteria failed. */
+.pc-reject__chips {
+  display: flex; flex-wrap: nowrap; gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 1px; /* room for the scroll track without clipping chips */
+}
+.pc-reject__chips::-webkit-scrollbar { display: none; }
+.pc-reject__chip {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px;
+  background: #FCF1EF; border: 1px solid #F3DBD5; border-radius: 999px;
+  font-size: 12px; font-weight: 700; color: #8A2C22; line-height: 1.1;
+  white-space: nowrap;
+}
+.pc-reject__chip-icon { font-size: 12px; line-height: 1; }
+.pc-reject__generic { margin: 0; font-size: 13px; font-weight: 600; color: #8A2C22; }
+.pc-reject__retry {
+  margin-top: 12px; width: 100%;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 42px; border: 1px solid #E0D6C6; border-radius: 12px;
+  background: var(--white, #fff); color: #2A2724;
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background 0.14s ease;
+}
+.pc-reject__retry:hover { background: #F8F4EC; }
+.pc-reject__retry:active { transform: scale(0.99); }
 
 .pc-card__msg {
   margin: 13px 0 0;

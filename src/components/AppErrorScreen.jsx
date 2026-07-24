@@ -71,8 +71,8 @@ export default function AppErrorScreen({ error }) {
           </svg>
         </button>
 
-        <a className="app-err__support" href="mailto:info@packback.network?subject=PackPerks%20-%20can't%20load%20app">
-          Still stuck? Email support
+        <a className="app-err__support" href="/support">
+          Still stuck? Contact support
         </a>
 
         {/* Hidden technical details — useful when an engineer is

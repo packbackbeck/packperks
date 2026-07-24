@@ -507,3 +507,52 @@
 .udp__consent-switch:checked { background: var(--pb-green); }
 .udp__consent-switch:checked::after { transform: translateX(17px); }
 .udp__consent-state { font-size: 13px; font-weight: 600; color: #4A4540; }
+
+/* ── Account merge requests ── */
+.mergereq { margin-top: 26px; background: #fff; border: 1px solid #ECE5D8; border-radius: 14px; padding: 20px 22px 22px; }
+.mergereq__head { margin-bottom: 16px; }
+.mergereq__title { margin: 0 0 3px; font-size: 16px; font-weight: 800; color: #1D1D1D; }
+.mergereq__sub { margin: 0; font-size: 13px; color: #8B8577; }
+
+.mergereq__settings {
+  display: grid; grid-template-columns: 220px 1fr; gap: 14px 18px;
+  align-items: start; padding: 16px; margin-bottom: 18px;
+  background: #FAF8F3; border: 1px solid #EEE7DA; border-radius: 12px;
+}
+.mergereq__setting { display: flex; flex-direction: column; gap: 6px; }
+.mergereq__setting--wide { grid-column: 2; grid-row: 1 / span 2; }
+.mergereq__label { font-size: 11.5px; font-weight: 700; color: #8B8577; text-transform: uppercase; letter-spacing: 0.4px; }
+.mergereq__num { height: 40px; width: 100px; padding: 0 12px; border: 1.5px solid #E6DECE; border-radius: 9px; background: #fff; font-family: inherit; font-size: 15px; color: #1D1D1D; }
+.mergereq__copy { padding: 10px 12px; border: 1.5px solid #E6DECE; border-radius: 9px; background: #fff; font-family: inherit; font-size: 13.5px; line-height: 1.45; color: #1D1D1D; resize: vertical; }
+.mergereq__num:focus, .mergereq__copy:focus { outline: none; border-color: #1A8737; }
+.mergereq__settings-foot { grid-column: 1; display: flex; align-items: center; gap: 12px; }
+.mergereq__cfg-msg { font-size: 12.5px; color: #1A8737; font-weight: 600; }
+.mergereq__save { height: 38px; padding: 0 16px; border: none; border-radius: 10px; background: #1A8737; color: #fff; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.mergereq__save:disabled { opacity: 0.45; cursor: default; }
+
+.mergereq__tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.mergereq__tab { padding: 7px 13px; border: 1px solid #E6DECE; border-radius: 999px; background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 600; color: #6B6154; cursor: pointer; }
+.mergereq__tab--on { background: #1D1D1D; border-color: #1D1D1D; color: #fff; }
+
+.mergereq__error { padding: 10px 14px; border-radius: 9px; background: #FBECEC; color: #B23B3B; font-size: 13px; margin-bottom: 12px; }
+.mergereq__notice { padding: 10px 14px; border-radius: 9px; background: #EAF6EC; color: #1A6B34; font-size: 13px; margin-bottom: 12px; }
+.mergereq__empty { padding: 22px 0; text-align: center; color: #9A9186; font-size: 13.5px; }
+
+.mergereq__table-wrap { overflow-x: auto; }
+.mergereq__table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.mergereq__table th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 700; color: #9A9186; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid #EEE7DA; }
+.mergereq__th-actions { text-align: right; }
+.mergereq__table td { padding: 11px 12px; border-bottom: 1px solid #F3EEE3; vertical-align: top; }
+.mergereq__cust { font-weight: 700; color: #1D1D1D; }
+.mergereq__cust-sub { font-size: 11.5px; color: #9A9186; margin-top: 2px; }
+.mergereq__muted { color: #9A9186; }
+.mergereq__when { color: #6B6154; white-space: nowrap; }
+.mergereq__pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.mergereq__pill--pending { background: #FCEBDD; color: #B4791C; }
+.mergereq__pill--approved { background: #E4F4E9; color: #1A6B34; }
+.mergereq__pill--denied { background: #FBE7E7; color: #B23B3B; }
+.mergereq__actions { display: flex; gap: 7px; justify-content: flex-end; }
+.mergereq__btn { padding: 6px 12px; border: none; border-radius: 8px; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.mergereq__btn--approve { background: #1A8737; color: #fff; }
+.mergereq__btn--deny { background: #fff; border: 1px solid #E0B4B4; color: #B23B3B; }
+.mergereq__btn:disabled { opacity: 0.5; cursor: default; }

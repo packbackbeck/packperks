@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { COLLECT_WINDOW_MS } from '../lib/collectedClaims';
 import { useMoney, useRegion } from '../lib/RegionContext';
+import { getFailureCopy, getFailureLabel } from '../admin/lib/aiVerdictLabels';
 import './PendingClaims.css';
 
 /* A claim is only "ready" once an admin has approved it AND minted the Tikkie
@@ -9,6 +10,19 @@ import './PendingClaims.css';
  * yet) is still shown as "in review" until the team sends the link. */
 const isReady = (c) => c.status === 'completed' && !!c.tikkie_url;
 const isUnderReview = (c) => c.status === 'pending' || (c.status === 'completed' && !c.tikkie_url);
+const isRejected = (c) => c.status === 'failed';
+
+/* A rejected claim lingers in the widget for a fortnight so the customer sees
+ * why it didn't go through (and can re-submit), then drops off. */
+const REJECT_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+/* The criteria to show as "failed" on a rejected card: an admin's manual
+ * per-rule verdict takes precedence over the AI's pre-screen. */
+function failedCriteria(claim) {
+  const admin = claim.admin_failure_checks;
+  if (Array.isArray(admin) && admin.length) return admin;
+  return Array.isArray(claim.ai_failure_checks) ? claim.ai_failure_checks : [];
+}
 
 /* Active cashback claims the customer is waiting on — a prominent, highlighted
  * section near the top of the profile with a per-claim status + steps:
@@ -17,19 +31,22 @@ const isUnderReview = (c) => c.status === 'pending' || (c.status === 'completed'
  * A single claim fills the width; several become a swipeable slideshow with
  * pagination dots. A claim disappears from here once its Collect CTA is tapped
  * once (tracked in `collectedIds`) — the record lives on in Activity. */
-export default function PendingClaims({ claims = [], collectedMap = {}, onCollect }) {
+export default function PendingClaims({ claims = [], collectedMap = {}, onCollect, partnerBrand, onRetry }) {
   const now = Date.now();
   // A collected claim lingers for a 24h grace window, then drops off.
   const collectExpired = (id) => {
     const t = collectedMap[id];
     return t != null && (now - t) > COLLECT_WINDOW_MS;
   };
+  const rejectedRecent = (c) => {
+    const t = new Date(c.approved_at || c.verified_at || c.created_at || 0).getTime();
+    return Number.isFinite(t) && (now - t) < REJECT_WINDOW_MS;
+  };
   const active = (claims || []).filter(c =>
     (c.type === 'cashback' || c.type === 'direct_refund') &&
-    c.status !== 'failed' &&
     c.tikkie_status !== 'redeemed' &&
     !collectExpired(c.id) &&
-    (isReady(c) || isUnderReview(c)),
+    (isReady(c) || isUnderReview(c) || (isRejected(c) && rejectedRecent(c))),
   );
   const railRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -57,7 +74,7 @@ export default function PendingClaims({ claims = [], collectedMap = {}, onCollec
         <span className="pc__count">{active.length} in progress</span>
       </div>
       <div className={`pc__rail${active.length === 1 ? ' pc__rail--single' : ''}`} ref={railRef} onScroll={onScroll}>
-        {active.map(c => <ClaimCard key={c.id} claim={c} onCollect={onCollect} collected={collectedMap[c.id] != null} />)}
+        {active.map(c => <ClaimCard key={c.id} claim={c} onCollect={onCollect} collected={collectedMap[c.id] != null} partnerBrand={partnerBrand} onRetry={onRetry} />)}
       </div>
       {active.length > 1 && (
         <div className="pc__dots" role="tablist" aria-label="Claims">
@@ -114,15 +131,18 @@ function ReviewProgress({ claim }) {
   );
 }
 
-function ClaimCard({ claim, onCollect, collected }) {
+function ClaimCard({ claim, onCollect, collected, partnerBrand, onRetry }) {
   const money = useMoney();
   const { symbol, collectLabel } = useRegion();
   const ready = isReady(claim);
+  const rejected = isRejected(claim);
   const amount = money(claim.payout_amount);
   const name = claim.rewardName || 'Cashback reward';
+  const state = rejected ? 'rejected' : ready ? 'ready' : 'checking';
+  const failedCodes = rejected ? failedCriteria(claim) : [];
 
   return (
-    <article className={`pc-card pc-card--${ready ? 'ready' : 'checking'}`}>
+    <article className={`pc-card pc-card--${state}`}>
       <div className="pc-card__top">
         <div className="pc-card__thumb" style={claim.rewardBg ? { background: claim.rewardBg } : undefined}>
           {claim.rewardImage
@@ -133,7 +153,12 @@ function ClaimCard({ claim, onCollect, collected }) {
           <span className="pc-card__name">{name}</span>
           <span className="pc-card__amount">{amount} cashback</span>
         </div>
-        {!ready && (
+        {rejected ? (
+          <span className="pc-card__badge pc-card__badge--rejected">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Not approved
+          </span>
+        ) : !ready && (
           <span className="pc-card__badge">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
             In review
@@ -141,7 +166,32 @@ function ClaimCard({ claim, onCollect, collected }) {
         )}
       </div>
 
-      {ready ? (
+      {rejected ? (
+        /* Rejected by review — show which receipt rules it failed as compact
+           chips (the admin's per-criteria verdict, falling back to the AI
+           pre-screen) so the card stays small, plus a re-try action. */
+        <div className="pc-reject">
+          {failedCodes.length > 0 ? (
+            <div className="pc-reject__chips">
+              {failedCodes.map(code => {
+                const info = getFailureCopy(code, { partnerBrand });
+                return (
+                  <span key={code} className="pc-reject__chip">
+                    <span className="pc-reject__chip-icon" aria-hidden="true">{info.icon}</span>
+                    {getFailureLabel(code, { partnerBrand })}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="pc-reject__generic">Your receipt didn’t pass our checks this time.</p>
+          )}
+          <button type="button" className="pc-reject__retry" onClick={() => onRetry?.(claim)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Upload a different receipt
+          </button>
+        </div>
+      ) : ready ? (
         /* Once the payout link exists, the review progress is done — its block
            becomes the full-width Collect action. Label is region-aware so the
            UAE flow doesn't say "Tikkie". */

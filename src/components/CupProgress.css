@@ -110,14 +110,20 @@
   inset: -5px;
   border-radius: 50%;
   border: 2px solid white;
-  animation: nudge-pulse 1.1s ease-in-out infinite;
+  /* Calmer, slower pulse — the old 1.1s/scale-1.25 read as "pulsing too fast".
+     3 gentle beats over the ~3s nudge window instead of a frantic flutter. */
+  animation: nudge-pulse 1.6s ease-in-out infinite;
   pointer-events: none;
 }
 
 @keyframes nudge-pulse {
-  0%   { opacity: 0.9; transform: scale(1); }
-  50%  { opacity: 0.4; transform: scale(1.25); }
-  100% { opacity: 0.9; transform: scale(1); }
+  0%   { opacity: 0.85; transform: scale(1); }
+  50%  { opacity: 0.35; transform: scale(1.16); }
+  100% { opacity: 0.85; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cup-progress__cup-ring { animation-duration: 2.4s; }
 }
 
 @keyframes cup-pop-in {

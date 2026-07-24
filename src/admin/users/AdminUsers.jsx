@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords } from '../lib/adminApi';
+import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
+import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import PiiMask from '../shared/PiiMask';
 import EmptyState from '../shared/EmptyState';
@@ -609,7 +610,174 @@ export default function AdminUsers({ onNavigate }) {
         }}
       />
 
+      <MergeRequestsSection />
+
       <QuickLinks currentPage="users" onNavigate={onNavigate} />
     </div>
+  );
+}
+
+/* ── Account-merge requests ──────────────────────────────────────────────
+ * Per-org weekly merge limit + the review queue. Customers over the limit
+ * land in 'pending'; admins approve (runs the merge) or reject. The log tab
+ * shows every merge event (self-serve, approved, rejected, admin-initiated). */
+const MERGE_TABS = [
+  { key: 'pending',   label: 'Pending' },
+  { key: 'approved',  label: 'Approved' },
+  { key: 'rejected',  label: 'Rejected' },
+  { key: 'completed', label: 'Self-serve' },
+  { key: 'admin',     label: 'Admin' },
+  { key: 'all',       label: 'All' },
+];
+const MERGE_STATUS_TONE = {
+  pending: 'pending', approved: 'approved', rejected: 'denied', completed: 'approved', admin: 'approved',
+};
+
+function MergeRequestsSection() {
+  const { activeOrgId } = useOrg();
+  const [tab, setTab] = useState('pending');
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Settings
+  const [limit, setLimit] = useState(MERGE_LIMIT_DEFAULT);
+  const [limitInput, setLimitInput] = useState(String(MERGE_LIMIT_DEFAULT.weeklyLimit));
+  const [copyInput, setCopyInput] = useState(MERGE_LIMIT_DEFAULT.limitCopy);
+  const [savingCfg, setSavingCfg] = useState(false);
+  const [cfgMsg, setCfgMsg] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    getMergeLimit(activeOrgId).then((c) => {
+      if (!alive) return;
+      setLimit(c); setLimitInput(String(c.weeklyLimit)); setCopyInput(c.limitCopy);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [activeOrgId]);
+
+  const load = useMemo(() => async () => {
+    setLoading(true); setError(null);
+    try { setRows(await getMergeRequests(tab)); }
+    catch (e) { setError(e.message || 'Could not load merge requests.'); }
+    finally { setLoading(false); }
+  }, [tab, activeOrgId]);
+  useEffect(() => { load(); }, [load]);
+
+  async function saveCfg() {
+    setSavingCfg(true); setCfgMsg(null);
+    try {
+      const saved = await saveMergeLimit(activeOrgId, { weeklyLimit: limitInput, limitCopy: copyInput });
+      setLimit(saved); setLimitInput(String(saved.weeklyLimit)); setCopyInput(saved.limitCopy);
+      setCfgMsg('Saved'); setTimeout(() => setCfgMsg(null), 2200);
+    } catch (e) { setCfgMsg(e.message || 'Could not save.'); }
+    finally { setSavingCfg(false); }
+  }
+
+  async function decide(id, action) {
+    setBusyId(id); setError(null); setNotice(null);
+    try {
+      if (action === 'approve') { await approveMergeRequest(id); setNotice('Approved — the accounts were merged.'); }
+      else { await rejectMergeRequest(id); setNotice('Request rejected. No accounts were merged.'); }
+      await load();
+      setTimeout(() => setNotice(null), 4000);
+    } catch (e) { setError(e.message || 'Action failed.'); }
+    finally { setBusyId(null); }
+  }
+
+  return (
+    <section className="mergereq">
+      <header className="mergereq__head">
+        <div>
+          <h2 className="mergereq__title">Account merge requests</h2>
+          <p className="mergereq__sub">Customers who lost their cups can merge accounts. Over the weekly limit, requests land here for review.</p>
+        </div>
+      </header>
+
+      {/* Per-org limit + copy */}
+      <div className="mergereq__settings">
+        <div className="mergereq__setting">
+          <label className="mergereq__label" htmlFor="merge-limit">Merges per week (per customer)</label>
+          <div className="mergereq__setting-row">
+            <input id="merge-limit" className="mergereq__num" type="number" min="1" max="20" value={limitInput}
+              onChange={(e) => setLimitInput(e.target.value)} disabled={!activeOrgId || savingCfg} />
+          </div>
+        </div>
+        <div className="mergereq__setting mergereq__setting--wide">
+          <label className="mergereq__label" htmlFor="merge-copy">“Limit reached” message shown to the customer</label>
+          <textarea id="merge-copy" className="mergereq__copy" rows={2} value={copyInput}
+            onChange={(e) => setCopyInput(e.target.value)} disabled={!activeOrgId || savingCfg}
+            placeholder={MERGE_LIMIT_DEFAULT.limitCopy} />
+        </div>
+        <div className="mergereq__settings-foot">
+          {cfgMsg && <span className="mergereq__cfg-msg">{cfgMsg}</span>}
+          <button className="mergereq__save" onClick={saveCfg}
+            disabled={!activeOrgId || savingCfg || (limitInput === String(limit.weeklyLimit) && copyInput === limit.limitCopy)}>
+            {savingCfg ? 'Saving…' : 'Save limit'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mergereq__tabs">
+        {MERGE_TABS.map((t) => (
+          <button key={t.key} className={`mergereq__tab${tab === t.key ? ' mergereq__tab--on' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
+        ))}
+      </div>
+
+      {error && <div className="mergereq__error">{error}</div>}
+      {notice && <div className="mergereq__notice">{notice}</div>}
+
+      {loading ? (
+        <div className="mergereq__empty">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="mergereq__empty">
+          {tab === 'pending' ? 'No merge requests waiting for review.' : 'Nothing here.'}
+        </div>
+      ) : (
+        <div className="mergereq__table-wrap">
+          <table className="mergereq__table">
+            <thead>
+              <tr>
+                <th>Customer</th><th>Accounts</th><th>Source</th><th>Reason</th><th>When</th><th>Status</th><th className="mergereq__th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <div className="mergereq__cust">{r.survivorName || 'Anonymous'}</div>
+                    {r.survivorEmail && <div className="mergereq__cust-sub">{r.survivorEmail}</div>}
+                  </td>
+                  <td>{r.absorbedCount + 1} → 1</td>
+                  <td className="mergereq__muted">{r.source === 'restore' ? 'Lost cups' : r.source === 'admin' ? 'Admin' : 'Merge offer'}</td>
+                  <td className="mergereq__muted">{r.reason || '—'}</td>
+                  <td className="mergereq__when">{formatDate(r.requested_at)}</td>
+                  <td>
+                    <span className={`mergereq__pill mergereq__pill--${MERGE_STATUS_TONE[r.status] || 'pending'}`}>{r.status}</span>
+                    {r.decided_at && r.status !== 'pending' && <div className="mergereq__cust-sub">{formatDate(r.decided_at)}</div>}
+                  </td>
+                  <td>
+                    {r.status === 'pending' ? (
+                      <div className="mergereq__actions">
+                        <button className="mergereq__btn mergereq__btn--approve" disabled={busyId === r.id} onClick={() => decide(r.id, 'approve')}>
+                          {busyId === r.id ? '…' : 'Approve'}
+                        </button>
+                        <button className="mergereq__btn mergereq__btn--deny" disabled={busyId === r.id} onClick={() => decide(r.id, 'reject')}>Reject</button>
+                      </div>
+                    ) : (
+                      <span className="mergereq__muted">
+                        {r.merged_balance != null ? `${r.merged_balance} cups merged` : '—'}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }

@@ -139,12 +139,12 @@ export default function FeaturedReward({
                 {isUnlocked
                   ? <>Buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>
                   : <>Once you unlock this, buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>}
-                <strong>Save your receipt</strong>. You'll need it. We'll send your cashback via{' '}
+                We'll send your cashback via{' '}
                 {isTikkie
                   ? <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>
                   : <span className="featured-reward__tikkie-link">a {payoutNoun}</span>}.
                 {' '}
-                <button className="featured-reward__info-link" onClick={onOpenTerms}>Read the cashback terms</button>
+                <button className="featured-reward__info-link" onClick={onOpenTerms}>Cashback terms</button>
                 {onOpenRefund && (
                   <><span style={{ margin: '0 4px' }}>or</span>
                   <button className="featured-reward__info-link" onClick={onOpenRefund}>Get the direct refund</button></>

@@ -27,14 +27,16 @@ const InfoIcon = () => (
   </svg>
 );
 
-export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked }) {
+export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked, isByo = false }) {
   const money = useMoney();
   const { payoutNoun } = useRegion();
   if (!reward) return null;
 
   const isUnlocked = cupCount >= reward.cupsNeeded;
   const cupsRemaining = Math.max(0, reward.cupsNeeded - cupCount);
-  const brand = orgName || 'the restaurant';
+  // BYO venues are cafés where you bring your own cup and buy the reward on-site —
+  // there's no cup-return ticket and nothing is bought "at a supermarket".
+  const brand = orgName || (isByo ? 'the café' : 'the restaurant');
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) onClose();
@@ -103,35 +105,35 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               <li className="rds-step">
                 <span className="rds-step__num">1</span>
                 <span className="rds-step__text">
-                  Collect <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> to unlock this reward by returning your reusable cups at {brand}.
+                  {isByo
+                    ? <>Collect <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> to unlock this reward. You earn one each time you bring your own cup to {brand}.</>
+                    : <>Collect <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> to unlock this reward by returning your reusable cups at {brand}.</>}
                 </span>
               </li>
               <li className="rds-step">
                 <span className="rds-step__num">2</span>
                 <span className="rds-step__text">
-                  Buy your <strong>{reward.name}</strong> at any supermarket or grocery store in the Netherlands, and keep the printed receipt. <em>Keep it; it can't be added later.</em>
+                  {isByo
+                    ? <>Buy your <strong>{reward.name}</strong> at {brand} and keep the printed receipt. <em>Keep it; it can't be added later.</em></>
+                    : <>Buy your <strong>{reward.name}</strong> at any supermarket or grocery store in the Netherlands, and keep the printed receipt. <em>Keep it; it can't be added later.</em></>}
                 </span>
               </li>
               <li className="rds-step">
                 <span className="rds-step__num">3</span>
                 <span className="rds-step__text">
-                  Upload a <strong>photo of your receipt</strong> to verify your purchase. We'll send your cashback via a {payoutNoun}.
-                </span>
-              </li>
-              <li className="rds-step">
-                <span className="rds-step__num">4</span>
-                <span className="rds-step__text">
-                  Once verified, we'll send you a <strong>{payoutNoun}</strong> to collect your <strong>{money(reward.euros)} cashback</strong>, usually within a few days.
+                  Upload a <strong>photo of your receipt</strong>. Once it's verified, we'll send your <strong>{money(reward.euros)} cashback</strong> via a {payoutNoun}, usually within a few days.
                 </span>
               </li>
             </ol>
           </div>
 
-          {/* Allergy info */}
+          {/* Allergy info — only when the dashboard actually provided some. */}
+          {reward.allergyInfo?.trim() && (
           <div className="rds-allergy">
             <InfoIcon />
             <p className="rds-allergy-text">{reward.allergyInfo}</p>
           </div>
+          )}
 
         </div>
 

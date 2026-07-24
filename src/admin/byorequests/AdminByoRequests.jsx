@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT } from '../lib/adminApi';
+import { toPng } from 'html-to-image';
+import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT, getLocations } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
+import packbackLogo from '../../assets/images/packback-logo.png';
 import RewardsReceiptGenerator from '../cupqr/RewardsReceiptGenerator';
 import './AdminByoRequests.css';
 
@@ -12,8 +14,10 @@ import './AdminByoRequests.css';
  * rolling 24h (the byo-mint edge function). The 3rd+ scan lands here as
  * a pending request: an admin Approves (credits the cup) or Denies.
  *
- * Also hosts the store's stationary "counter QR" (/<slug>/?byo=1) that
- * customers scan to collect — print it and stand it on the counter.
+ * Also hosts the store's stationary "counter QR" (/<slug>/?byo=1). One org
+ * can have MULTIPLE locations, each with its own counter QR (?loc=<id>) so
+ * scans are attributed to the right address — but a cup earned at any
+ * location is redeemable across the whole organisation.
  * ───────────────────────────────────────────────────────────────────── */
 
 const PROD_URL = 'https://perks.packback.network/';   // BYO QR/link always points at the .network domain
@@ -32,15 +36,20 @@ function fmtWhen(iso) {
   } catch { return iso; }
 }
 
+/* One-line address for the subtle caption under the QR. */
+function addressLine(loc) {
+  if (!loc) return '';
+  return [loc.address, loc.postal_code, loc.city].filter(Boolean).join(', ');
+}
+
 export default function AdminByoRequests() {
-  const { activeOrgId, activeOrgSlug } = useOrg();
+  const { activeOrg, activeOrgId, activeOrgSlug } = useOrg();
   const [status, setStatus]   = useState('pending');
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [busyId, setBusyId]   = useState(null);
   const [notice, setNotice]   = useState(null);
-  const qrRef = useRef(null);
 
   // Per-store daily auto-credit cap (how many times/day a customer can scan
   // this store's QR before extra scans are held for review).
@@ -49,10 +58,18 @@ export default function AdminByoRequests() {
   const [savingCap, setSavingCap] = useState(false);
   const [capMsg, setCapMsg]   = useState(null);
 
-  // TEST ONLY: how many cups this QR adds per scan. Encoded as ?cups=N on the
-  // counter URL; the customer app credits N cups on scan (for demoing).
-  const [testCups, setTestCups] = useState('1');
-  const testCupsN = Math.max(1, Math.min(50, parseInt(testCups, 10) || 1));
+  // Locations for this org + the one whose counter QR we're showing.
+  const [locations, setLocations] = useState([]);
+  const [locId, setLocId]     = useState(''); // '' = whole store (no ?loc)
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const qrCardRef = useRef(null);
+
+  const selectedLocation = useMemo(
+    () => locations.find(l => l.id === locId) || null,
+    [locations, locId],
+  );
+  const brandName = activeOrg?.partner_brand_name || activeOrg?.name || 'Your store';
 
   useEffect(() => {
     let alive = true;
@@ -61,6 +78,12 @@ export default function AdminByoRequests() {
       if (!alive) return;
       setCap(n); setCapInput(String(n));
     }).catch(() => {});
+    getLocations(activeOrgId).then(locs => {
+      if (!alive) return;
+      setLocations(locs);
+      // Default to the first location if the org has any; else the whole store.
+      setLocId(locs.length ? locs[0].id : '');
+    }).catch(() => { if (alive) { setLocations([]); setLocId(''); } });
     return () => { alive = false; };
   }, [activeOrgId]);
 
@@ -93,16 +116,45 @@ export default function AdminByoRequests() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Per-location counter URL. ?loc=<id> tags the scan with its location; a cup
+  // is still added to the customer's org-wide balance (redeemable anywhere).
   const byoUrl = activeOrgSlug
-    ? `${PROD_URL}${activeOrgSlug}/?byo=1${testCupsN > 1 ? `&cups=${testCupsN}` : ''}`
+    ? `${PROD_URL}${activeOrgSlug}/?byo=1${locId ? `&loc=${locId}` : ''}`
     : null;
+
+  // Render the QR as a data URL (an <img>, not a live canvas) so html-to-image
+  // captures it reliably when downloading the branded card.
   useEffect(() => {
-    if (!byoUrl || !qrRef.current) return;
-    QRCode.toCanvas(qrRef.current, byoUrl, {
-      width: 168, margin: 1, errorCorrectionLevel: 'M',
+    if (!byoUrl) { setQrDataUrl(''); return; }
+    QRCode.toDataURL(byoUrl, {
+      width: 320, margin: 1, errorCorrectionLevel: 'M',
       color: { dark: '#0F0F0F', light: '#FFFFFF' },
-    }).catch(err => console.error('BYO QR draw failed:', err));
+    }).then(setQrDataUrl).catch(err => console.error('BYO QR draw failed:', err));
   }, [byoUrl]);
+
+  async function handleDownload() {
+    if (!qrCardRef.current) return;
+    setDownloading(true);
+    try {
+      const dataUrl = await toPng(qrCardRef.current, {
+        pixelRatio: 3,
+        backgroundColor: '#FFFFFF',
+        cacheBust: true,
+      });
+      const a = document.createElement('a');
+      const locSlug = selectedLocation
+        ? '-' + (selectedLocation.name || 'location').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        : '';
+      a.href = dataUrl;
+      a.download = `packperks-counter-qr-${activeOrgSlug || 'store'}${locSlug}.png`;
+      a.click();
+    } catch (e) {
+      console.error('QR download failed:', e);
+      setError('Could not download the QR image. If your logo is hosted elsewhere it may block the export — try again or remove the logo.');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function decide(id, action) {
     setBusyId(id);
@@ -139,12 +191,76 @@ export default function AdminByoRequests() {
         </div>
       </header>
 
-      {/* Stationary counter QR for this store */}
+      {/* Stationary counter QR — branded + per location */}
       <section className="byoreq__qr-card">
-        <canvas ref={qrRef} className="byoreq__qr" width="168" height="168" />
+        <div className="byoreq__qr-left">
+          {/* Branded, downloadable QR poster. This exact node is what's exported. */}
+          <div className="byoreq__qr-brand" ref={qrCardRef}>
+            <div className="byoreq__qr-brand-head">
+              <img
+                className="byoreq__qr-logo"
+                src={activeOrg?.logo_url || packbackLogo}
+                alt=""
+                crossOrigin="anonymous"
+                onError={(e) => { e.currentTarget.src = packbackLogo; }}
+              />
+              <span className="byoreq__qr-brand-name">{brandName}</span>
+            </div>
+
+            {qrDataUrl
+              ? <img className="byoreq__qr-img" src={qrDataUrl} alt="Counter QR" width="200" height="200" />
+              : <div className="byoreq__qr-img byoreq__qr-img--placeholder" />}
+
+            {selectedLocation && addressLine(selectedLocation) && (
+              <div className="byoreq__qr-address">{addressLine(selectedLocation)}</div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="byoreq__qr-download"
+            onClick={handleDownload}
+            disabled={!qrDataUrl || downloading}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {downloading ? 'Preparing…' : 'Download PNG'}
+          </button>
+        </div>
+
         <div className="byoreq__qr-info">
           <h3>Counter QR for this store</h3>
-          <p>Print this and stand it on the counter. Scanning it adds one cup to the customer’s balance at this store. This QR is unique to this store — it won’t add cups anywhere else.</p>
+          <p>Print this and stand it on the counter. Scanning it adds one cup to the customer’s balance — earned at any location, a cup is redeemable across your whole organisation.</p>
+
+          {/* Location picker — one counter QR per address. */}
+          <div className="byoreq__cap">
+            <label className="byoreq__cap-label" htmlFor="byo-loc">
+              Location
+              <span className="byoreq__cap-hint">
+                {locations.length
+                  ? 'Each location gets its own QR so scans are attributed to the right address.'
+                  : 'No locations yet — add them on the Organisation page. This QR works store-wide until then.'}
+              </span>
+            </label>
+            <div className="byoreq__cap-row">
+              <select
+                id="byo-loc"
+                className="byoreq__loc-select"
+                value={locId}
+                onChange={e => setLocId(e.target.value)}
+                disabled={!locations.length}
+              >
+                <option value="">Whole store (no location)</option>
+                {locations.map(l => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}{l.city ? ` · ${l.city}` : ''}{l.status && l.status !== 'active' ? ' (inactive)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {byoUrl
             ? <code className="byoreq__qr-url">{byoUrl}</code>
             : <span className="byoreq__muted">This store isn’t in a bring-your-own group yet.</span>}
@@ -173,24 +289,6 @@ export default function AdminByoRequests() {
                 {savingCap ? 'Saving…' : 'Save limit'}
               </button>
               {capMsg && <span className="byoreq__cap-msg">{capMsg}</span>}
-            </div>
-          </div>
-
-          {/* TEST ONLY — how many cups the QR adds per scan (encoded on the URL). */}
-          <div className="byoreq__cap">
-            <label className="byoreq__cap-label" htmlFor="byo-testcups">
-              Cups per scan <span className="byoreq__cap-badge">test</span>
-              <span className="byoreq__cap-hint">How many cups this QR adds each scan — for testing/demos only. The live URL updates automatically.</span>
-            </label>
-            <div className="byoreq__cap-row">
-              <input
-                id="byo-testcups"
-                className="byoreq__cap-input"
-                type="number" min="1" max="50" step="1"
-                value={testCups}
-                onChange={e => setTestCups(e.target.value)}
-              />
-              <span className="byoreq__cap-msg">{testCupsN === 1 ? 'Default — 1 cup per scan' : `Adds ${testCupsN} cups per scan`}</span>
             </div>
           </div>
         </div>
@@ -278,11 +376,7 @@ export default function AdminByoRequests() {
         </div>
       )}
 
-      {/* ── Rewards receipt generator ──
-       * The exact same generator used on the main dashboard's Receipt
-       * Generator page, embedded here so BYO stores can mint test reward
-       * receipts without leaving this page. It's the shared component
-       * (not a copy), so the two always stay in sync. */}
+      {/* ── Rewards receipt generator ── */}
       <section className="byoreq__generator">
         <div className="byoreq__generator-head">
           <h2 className="byoreq__generator-title">Rewards receipt generator</h2>

@@ -1,7 +1,9 @@
 /* StoresPage — Phase 3 multi-venue hub (redesign) */
 
 .stores2 {
-  min-height: 100dvh;
+  /* Content-height, not min 100dvh — #root fills the viewport with the cream
+     background and the impact bar is position:fixed, so dropping the forced
+     height removes the empty scroll space below the list. */
   /* Generous top spacing (larger than the store home) + clears the notch. */
   padding: calc(env(safe-area-inset-top, 0px) + 32px) 16px 40px;
   background: var(--pb-cream, #F4EBDC);

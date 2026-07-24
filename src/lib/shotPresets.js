@@ -51,6 +51,7 @@ export const SHOT_PRESETS = {
   // ── Account / profile page ──
   'user-visitor':    { page: 'user', cupCount: 0,  profile: visitorProfile, lifetimeCups: 0 },
   'user-member':     { page: 'user', cupCount: 7,  profile: memberProfile, authEmail: memberProfile.email, lifetimeCups: 26, claims: 'mix' },
+  'user-rejected':   { page: 'user', cupCount: 7,  profile: memberProfile, authEmail: memberProfile.email, lifetimeCups: 26, claims: 'rejected' },
   'user-combined':   { page: 'user', accountCombined: true, profile: memberProfile, authEmail: memberProfile.email, lifetimeCups: 26, claims: 'mix', memberBalances: [7, 4] },
 
   // ── Stores hub (the BYO multi-venue screen) ──

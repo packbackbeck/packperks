@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { applyOrgFilter } from '../context/orgState';
 import { useAuth } from '../auth/AuthContext';
+import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
-import { getAutomatedReports, saveAutomatedReports, AUTOMATED_REPORTS_DEFAULT } from '../lib/adminApi';
+import { getAutomatedReports, saveAutomatedReports, AUTOMATED_REPORTS_DEFAULT, getWeeklyDigest, saveWeeklyDigest, sendDigestTest, DIGEST_METRICS, WEEKLY_DIGEST_DEFAULT, getNotificationCenter, saveNotificationCenter, sendNotificationTest, NOTIFICATION_EVENTS, NOTIFICATION_CENTER_DEFAULT } from '../lib/adminApi';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminReports.css';
 
@@ -682,6 +683,10 @@ export default function AdminReports({ onNavigate }) {
 
       <AutomatedReports canManage={canExportPii} />
 
+      <WeeklyDigest canManage={canExportPii} />
+
+      <NotificationCenter canManage={canExportPii} />
+
       <QuickLinks currentPage="reports" onNavigate={onNavigate} />
     </div>
   );
@@ -829,6 +834,297 @@ function AutomatedReports({ canManage }) {
         </div>
       </div>
       {!canManage && <p className="rep-auto__gate">Only Owners and Admins can change automated reports.</p>}
+    </section>
+  );
+}
+
+/* ── Weekly digest ──────────────────────────────────────────────────────
+ * Pick any subset of dashboard metrics and mail them as a designed email
+ * letter on a schedule. Config persists to app_config ('weekly_digest');
+ * the send-digest edge function renders + sends. "Send test now" fires a
+ * one-off to the recipient so the layout can be eyeballed. */
+function WeeklyDigest({ canManage }) {
+  const { activeOrgId } = useOrg();
+  const [cfg, setCfg] = useState(WEEKLY_DIGEST_DEFAULT);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    getWeeklyDigest().then((c) => { if (alive) { setCfg(c); setLoaded(true); } })
+      .catch(() => { if (alive) setLoaded(true); });
+    return () => { alive = false; };
+  }, []);
+
+  const patch = (p) => setCfg((c) => ({ ...c, ...p }));
+  const toggleMetric = (id) => setCfg((c) => {
+    const has = c.metrics.includes(id);
+    return { ...c, metrics: has ? c.metrics.filter((m) => m !== id) : [...c.metrics, id] };
+  });
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((cfg.recipient || '').trim());
+
+  const save = async () => {
+    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
+    if (!cfg.metrics.length) { setErr('Pick at least one metric to include.'); return; }
+    setSaving(true); setErr(null);
+    try {
+      const v = await saveWeeklyDigest({ ...cfg, org_id: cfg.org_id || activeOrgId || null });
+      setCfg((c) => ({ ...c, ...v }));
+      setSavedAt(true);
+      setTimeout(() => setSavedAt(false), 2200);
+    } catch (e) { setErr(e?.message || 'Could not save.'); }
+    finally { setSaving(false); }
+  };
+
+  const sendTest = async () => {
+    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
+    if (!cfg.metrics.length) { setErr('Pick at least one metric first.'); return; }
+    setTesting(true); setErr(null); setMsg(null);
+    try {
+      await saveWeeklyDigest({ ...cfg, org_id: cfg.org_id || activeOrgId || null }); // persist latest picks first
+      await sendDigestTest(activeOrgId, cfg.recipient);
+      setMsg(`Test digest sent to ${cfg.recipient}.`);
+      setTimeout(() => setMsg(null), 4000);
+    } catch (e) { setErr(e?.message || 'Could not send the test email.'); }
+    finally { setTesting(false); }
+  };
+
+  const cadence = cfg.frequency === 'weekly'
+    ? `every ${cfg.dayOfWeek.charAt(0).toUpperCase() + cfg.dayOfWeek.slice(1)}`
+    : 'on the 1st of each month';
+
+  return (
+    <section className="rep-auto rep-digest">
+      <div className="rep-auto__head">
+        <div>
+          <h2 className="rep-auto__title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+            Weekly digest
+          </h2>
+          <p className="rep-auto__sub">Pick the metrics you care about and get them as a designed email letter, {cadence}.</p>
+        </div>
+        <label className="rep-auto__switch">
+          <input type="checkbox" checked={!!cfg.enabled} disabled={!canManage || !loaded} onChange={(e) => patch({ enabled: e.target.checked })} />
+          <span className="rep-auto__switch-track"><span className="rep-auto__switch-thumb" /></span>
+          <span className="rep-auto__switch-lbl">{cfg.enabled ? 'On' : 'Off'}</span>
+        </label>
+      </div>
+
+      <div className={`rep-digest__body${cfg.enabled ? '' : ' rep-auto__grid--muted'}`}>
+        {/* Metric picker */}
+        <div className="rep-digest__metrics">
+          <span className="rep-auto__label">Metrics to include ({cfg.metrics.length})</span>
+          <div className="rep-digest__chips">
+            {DIGEST_METRICS.map((m) => {
+              const on = cfg.metrics.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`rep-digest__chip${on ? ' is-on' : ''}`}
+                  disabled={!canManage}
+                  aria-pressed={on}
+                  onClick={() => toggleMetric(m.id)}
+                  title={m.hint}
+                >
+                  <span className="rep-digest__chip-check">{on ? '✓' : '+'}</span>
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Settings grid */}
+        <div className="rep-auto__grid">
+          <label className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Email title</span>
+            <input className="rep-auto__input" value={cfg.title} disabled={!canManage} onChange={(e) => patch({ title: e.target.value })} placeholder="Your PackPerks weekly digest" />
+          </label>
+          <label className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Intro line</span>
+            <input className="rep-auto__input" value={cfg.intro} disabled={!canManage} onChange={(e) => patch({ intro: e.target.value })} placeholder="Here’s how your programme performed this week." />
+          </label>
+          <label className="rep-auto__field">
+            <span className="rep-auto__label">Frequency</span>
+            <select className="rep-auto__input" value={cfg.frequency} disabled={!canManage} onChange={(e) => patch({ frequency: e.target.value })}>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </label>
+          {cfg.frequency === 'weekly' && (
+            <label className="rep-auto__field">
+              <span className="rep-auto__label">Send on</span>
+              <select className="rep-auto__input" value={cfg.dayOfWeek} disabled={!canManage} onChange={(e) => patch({ dayOfWeek: e.target.value })}>
+                {['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map((d) => (
+                  <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="rep-auto__field">
+            <span className="rep-auto__label">Scope</span>
+            <select className="rep-auto__input" value={cfg.scope} disabled={!canManage} onChange={(e) => patch({ scope: e.target.value })}>
+              <option value="org">This store</option>
+              <option value="group">Whole group</option>
+            </select>
+          </label>
+          <label className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Send to</span>
+            <input type="email" className={`rep-auto__input${!emailValid ? ' rep-auto__input--bad' : ''}`} value={cfg.recipient} disabled={!canManage} onChange={(e) => patch({ recipient: e.target.value })} placeholder="name@packback.network" />
+          </label>
+        </div>
+      </div>
+
+      <div className="rep-auto__foot">
+        <span className="rep-auto__summary">
+          {cfg.enabled
+            ? <>Sends <strong>{cfg.metrics.length}</strong> metric{cfg.metrics.length === 1 ? '' : 's'} {cadence} to <strong>{cfg.recipient}</strong>.</>
+            : 'Turn on to schedule the digest email.'}
+        </span>
+        <div className="rep-auto__actions">
+          {err && <span className="rep-auto__err">{err}</span>}
+          {msg && <span className="rep-auto__ok">{msg}</span>}
+          {savedAt && <span className="rep-auto__ok">Saved ✓</span>}
+          <button className="rep-btn rep-btn--ghost" onClick={sendTest} disabled={!canManage || testing || !loaded}>
+            {testing ? 'Sending…' : 'Send test now'}
+          </button>
+          <button className="rep-btn rep-btn--primary" onClick={save} disabled={!canManage || saving || !loaded}>
+            {saving ? 'Saving…' : 'Save digest'}
+          </button>
+        </div>
+      </div>
+      {!canManage && <p className="rep-auto__gate">Only Owners and Admins can change the weekly digest.</p>}
+    </section>
+  );
+}
+
+/* ── Notification center ────────────────────────────────────────────────
+ * Real-time admin email alerts. Pick which activities send an email and to
+ * whom. DB triggers fire the notify-event edge fn on matching inserts. */
+function NotificationCenter({ canManage }) {
+  const { activeOrgId } = useOrg();
+  const [cfg, setCfg] = useState(NOTIFICATION_CENTER_DEFAULT);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    getNotificationCenter().then((c) => { if (alive) { setCfg(c); setLoaded(true); } })
+      .catch(() => { if (alive) setLoaded(true); });
+    return () => { alive = false; };
+  }, []);
+
+  const patch = (p) => setCfg((c) => ({ ...c, ...p }));
+  const toggleEvent = (id) => setCfg((c) => {
+    const has = c.events.includes(id);
+    return { ...c, events: has ? c.events.filter((e) => e !== id) : [...c.events, id] };
+  });
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((cfg.recipient || '').trim());
+
+  const save = async () => {
+    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
+    setSaving(true); setErr(null);
+    try {
+      const v = await saveNotificationCenter({ ...cfg, org_id: cfg.org_id || activeOrgId || null });
+      setCfg((c) => ({ ...c, ...v }));
+      setSavedAt(true); setTimeout(() => setSavedAt(false), 2200);
+    } catch (e) { setErr(e?.message || 'Could not save.'); }
+    finally { setSaving(false); }
+  };
+
+  const sendTest = async () => {
+    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
+    setTesting(true); setErr(null); setMsg(null);
+    try {
+      await sendNotificationTest(cfg.recipient);
+      setMsg(`Test alert sent to ${cfg.recipient}.`);
+      setTimeout(() => setMsg(null), 4000);
+    } catch (e) { setErr(e?.message || 'Could not send the test email.'); }
+    finally { setTesting(false); }
+  };
+
+  return (
+    <section className="rep-auto rep-notify">
+      <div className="rep-auto__head">
+        <div>
+          <h2 className="rep-auto__title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            Notification center
+          </h2>
+          <p className="rep-auto__sub">Get an email the moment something happens. Pick the activities and the address.</p>
+        </div>
+        <label className="rep-auto__switch">
+          <input type="checkbox" checked={!!cfg.enabled} disabled={!canManage || !loaded} onChange={(e) => patch({ enabled: e.target.checked })} />
+          <span className="rep-auto__switch-track"><span className="rep-auto__switch-thumb" /></span>
+          <span className="rep-auto__switch-lbl">{cfg.enabled ? 'On' : 'Off'}</span>
+        </label>
+      </div>
+
+      <div className={`rep-notify__body${cfg.enabled ? '' : ' rep-auto__grid--muted'}`}>
+        <div className="rep-notify__events">
+          <span className="rep-auto__label">Notify me when… ({cfg.events.length} selected)</span>
+          <div className="rep-notify__list">
+            {NOTIFICATION_EVENTS.map((ev) => {
+              const on = cfg.events.includes(ev.id);
+              return (
+                <button key={ev.id} type="button" className={`rep-notify__row${on ? ' is-on' : ''}`}
+                  disabled={!canManage} aria-pressed={on} onClick={() => toggleEvent(ev.id)}>
+                  <span className="rep-notify__check">{on ? '✓' : ''}</span>
+                  <span className="rep-notify__row-txt">
+                    <span className="rep-notify__row-label">{ev.label}</span>
+                    <span className="rep-notify__row-hint">{ev.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rep-auto__grid">
+          <label className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Send alerts to</span>
+            <input type="email" className={`rep-auto__input${!emailValid ? ' rep-auto__input--bad' : ''}`} value={cfg.recipient}
+              disabled={!canManage} onChange={(e) => patch({ recipient: e.target.value })} placeholder="name@packback.network" />
+          </label>
+          <label className="rep-auto__field">
+            <span className="rep-auto__label">Scope</span>
+            <select className="rep-auto__input" value={cfg.org_id ? 'org' : 'all'} disabled={!canManage}
+              onChange={(e) => patch({ org_id: e.target.value === 'org' ? (activeOrgId || null) : null })}>
+              <option value="org">This store only</option>
+              <option value="all">Any store</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div className="rep-auto__foot">
+        <span className="rep-auto__summary">
+          {cfg.enabled && cfg.events.length
+            ? <>Emailing <strong>{cfg.recipient}</strong> on <strong>{cfg.events.length}</strong> event{cfg.events.length === 1 ? '' : 's'}.</>
+            : 'Turn on and pick at least one activity to start getting alerts.'}
+        </span>
+        <div className="rep-auto__actions">
+          {err && <span className="rep-auto__err">{err}</span>}
+          {msg && <span className="rep-auto__ok">{msg}</span>}
+          {savedAt && <span className="rep-auto__ok">Saved ✓</span>}
+          <button className="rep-btn rep-btn--ghost" onClick={sendTest} disabled={!canManage || testing || !loaded}>
+            {testing ? 'Sending…' : 'Send test now'}
+          </button>
+          <button className="rep-btn rep-btn--primary" onClick={save} disabled={!canManage || saving || !loaded}>
+            {saving ? 'Saving…' : 'Save notifications'}
+          </button>
+        </div>
+      </div>
+      {!canManage && <p className="rep-auto__gate">Only Owners and Admins can change notifications.</p>}
     </section>
   );
 }

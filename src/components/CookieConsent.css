@@ -18,6 +18,7 @@
 @keyframes cc-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .cc-sheet {
+  position: relative;
   width: 100%;
   max-width: 460px;
   background: var(--pb-cream, #F4EBDC);
@@ -27,6 +28,15 @@
   font-family: var(--font-primary, system-ui, sans-serif);
   animation: cc-rise 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+/* Close affordance shown only when the banner is re-opened from "Manage cookie
+ * choices" (first-run gate stays modal). */
+.cc-dismiss {
+  position: absolute; top: 12px; right: 12px;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: rgba(0,0,0,0.05); color: #6B645B; cursor: pointer;
+}
+.cc-dismiss:hover { background: rgba(0,0,0,0.09); }
 @keyframes cc-rise { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 .cc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }

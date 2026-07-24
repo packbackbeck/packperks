@@ -114,7 +114,13 @@ export default function CupScanPage({ onScan, onBack, onError }) {
     ctx.drawImage(video, 0, 0, w, h);
     const image = ctx.getImageData(0, 0, w, h);
 
-    const code = jsQR(image.data, w, h, { inversionAttempts: 'dontInvert' });
+    // 'attemptBoth' lets jsQR decode both a standard dark-on-light QR *and*
+    // an inverted (white/light modules on a dark background) one. The spec
+    // assumes dark-on-light, so with the old 'dontInvert' a white cup QR on a
+    // dark poster was never detected. It tries the normal orientation first,
+    // so standard codes are unaffected; the extra inverted pass only runs on
+    // frames that didn't already decode, and at our 6Hz throttle it's cheap.
+    const code = jsQR(image.data, w, h, { inversionAttempts: 'attemptBoth' });
     if (code?.data) {
       const parsed = parseCupQr(code.data);
       if (parsed) {

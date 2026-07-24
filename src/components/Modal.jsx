@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import './Modal.css';
 
 export default function Modal({ open, onClose, title, children }) {
@@ -30,7 +31,11 @@ export default function Modal({ open, onClose, title, children }) {
     if (e.target === overlayRef.current) onClose();
   };
 
-  return (
+  // Portal to <body> so `position: fixed` is relative to the VIEWPORT, not a
+  // transformed ancestor (the app has animated/scaled containers). Without this,
+  // on some larger screens the sheet anchored to the wrong box and its header
+  // (title + ✕) scrolled off the top of the screen.
+  return createPortal(
     <div
       className="modal-overlay"
       ref={overlayRef}
@@ -56,6 +61,7 @@ export default function Modal({ open, onClose, title, children }) {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

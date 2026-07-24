@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { toJpeg } from 'html-to-image';
 import './UserPage.css';
 import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
@@ -86,6 +85,7 @@ export default function UserPage({
   lifetimeCups = 0,
   copy = {},
   onRefreshClaims,
+  onRetryClaim,
   onClose,
   onOpenHowItWorks,
   // Phase 3: "general" account view opened from the Stores hub — cupCount is
@@ -129,6 +129,61 @@ export default function UserPage({
     const reward = rewards.find(r => r.id === c.reward_id);
     return { ...c, rewardName: reward?.name || 'Cashback reward', rewardImage: reward?.image || null, rewardBg: reward?.bgColor || null };
   });
+
+  // ── Activity feed: split each cashback claim into two events ──
+  // The single "Claimed" row becomes (1) "Receipt sent for review" — the moment
+  // they submit — and, once an admin (or the AI) rules on it, a separate
+  // (2) "Cashback approved" / "Cashback not approved" verdict row. The verdict is
+  // derived from the matching claim (paired by created_at proximity, the same
+  // rule ActivityDetailModal uses), so no extra server-side history rows exist.
+  const feedItems = useMemo(() => {
+    const fmtWhen = (ts) =>
+      new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const cashbackClaims = enrichedClaims.filter(c => c.type === 'cashback');
+    const used = new Set();
+    const matchClaim = (createdAt) => {
+      if (!createdAt) return null;
+      const t = new Date(createdAt).getTime();
+      let best = null, bestDelta = 60_000;
+      for (const c of cashbackClaims) {
+        if (used.has(c.id)) continue;
+        const d = Math.abs(new Date(c.created_at).getTime() - t);
+        if (d < bestDelta) { bestDelta = d; best = c; }
+      }
+      return best;
+    };
+    const out = [];
+    for (const item of history) {
+      if (item.type === 'reward_claimed') {
+        // 1) the receipt submission itself
+        out.push({ ...item, label: 'Receipt sent for review', sortAt: item.createdAt });
+        // 2) the admin/AI verdict — only once the claim has actually been ruled on
+        const claim = matchClaim(item.createdAt);
+        if (claim) {
+          used.add(claim.id);
+          const approved = claim.status === 'completed' && !!claim.tikkie_url;
+          const rejected = claim.status === 'failed';
+          if (approved || rejected) {
+            const at = claim.approved_at || claim.verified_at || claim.paid_at || item.createdAt;
+            out.push({
+              type: 'claim_verdict',
+              verdict: approved ? 'approved' : 'rejected',
+              label: approved ? 'Cashback approved' : 'Cashback not approved',
+              time: fmtWhen(at),
+              createdAt: at,
+              sortAt: at,
+              storeName: item.storeName || null,
+              baseItem: item, // clicking a verdict opens the full claim detail
+            });
+          }
+        }
+      } else {
+        out.push({ ...item, sortAt: item.createdAt });
+      }
+    }
+    out.sort((a, b) => new Date(a.sortAt).getTime() - new Date(b.sortAt).getTime());
+    return out;
+  }, [history, enrichedClaims]);
   // Claims whose Tikkie CTA has been tapped once — hidden from the pending
   // block (but kept in Activity). Persisted in localStorage.
   const [collectedClaims, setCollectedClaims] = useState(() => getCollectedMap());
@@ -250,7 +305,13 @@ export default function UserPage({
 
   // ── Data & privacy controls (GDPR items 13, 19, 21) ──
   const [policyOpen, setPolicyOpen] = useState(false);
-  const handleManageCookies = () => { clearConsent(); window.location.reload(); };
+  // Re-open the cookie banner IN PLACE (ConsentGate listens for this) instead of
+  // clearing consent + reloading. The old reload re-bootstrapped the app and could
+  // dump the user on the "trouble loading your cups" error screen and strand them.
+  const handleManageCookies = () => {
+    try { window.dispatchEvent(new CustomEvent('packperks:open-consent')); }
+    catch { clearConsent(); window.location.reload(); } // last-resort fallback
+  };
   const handleResetDevice = () => {
     if (!window.confirm('Reset this device? Your cups stay safe in your account, but this browser will forget your local data and sign out.')) return;
     try { localStorage.clear(); } catch { /* ignore */ }
@@ -458,7 +519,7 @@ export default function UserPage({
         </div>
       </div>
 
-      <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} onCollect={handleCollectClaim} />
+      <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} onCollect={handleCollectClaim} partnerBrand={storeName} onRetry={onRetryClaim} />
 
       {/* ── Info + install section: "How does it work?" plus an "Add to home
            screen" button that installs the app like a native one. The install
@@ -558,15 +619,25 @@ export default function UserPage({
           )
         ) : (
           <div className="user-page__card user-page__card--list user-page__history-scroll">
-            {[...history].reverse().map((item, idx) => (
+            {[...feedItems].reverse().map((item, idx) => (
               <div key={idx}>
                 {idx > 0 && <div className="user-page__divider" />}
                 <button
                   className="user-page__history-item user-page__history-item--clickable"
-                  onClick={() => setActiveActivity(item)}
+                  onClick={() => setActiveActivity(item.baseItem || item)}
                   type="button"
                 >
-                  <div className={`user-page__history-dot user-page__history-dot--${item.type}`}>
+                  <div className={`user-page__history-dot user-page__history-dot--${item.type}${item.verdict ? ' user-page__history-dot--verdict-' + item.verdict : ''}`}>
+                    {item.type === 'claim_verdict' && item.verdict === 'approved' && (
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                        <path d="M4 10L8 14L16 6" stroke="#1A8737" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    {item.type === 'claim_verdict' && item.verdict === 'rejected' && (
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                        <path d="M6 6L14 14M14 6L6 14" stroke="#C73E1D" strokeWidth="2.5" strokeLinecap="round"/>
+                      </svg>
+                    )}
                     {item.type === 'cup_added' && (
                       <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
                         <line x1="10" y1="4" x2="10" y2="16" stroke="#1A8737" strokeWidth="2.5" strokeLinecap="round"/>
@@ -574,8 +645,11 @@ export default function UserPage({
                       </svg>
                     )}
                     {item.type === 'reward_claimed' && (
-                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-                        <path d="M4 10L8 14L16 6" stroke="#FEA01E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      /* "Receipt sent for review" — a send/paper-plane glyph, not
+                         a check. The check is reserved for the approved verdict. */
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FEA01E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13" />
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
                       </svg>
                     )}
                     {item.type === 'cups_withdrawn' && (
@@ -639,11 +713,14 @@ export default function UserPage({
         />
       )}
 
-      {/* ── Data & privacy control (GDPR items 13, 19, 21) ── */}
+      {/* ── Data & privacy control (GDPR items 13, 19, 21) ──
+       *  Contact support lives here now too, as the first row, so the
+       *  "need a hand?" entry point sits with the other account controls. */}
       <div className="user-page__history">
         <span className="user-page__section-title">Data &amp; privacy</span>
         <div className="user-page__card user-page__card--list">
           {[
+            { label: 'Contact support', on: () => { window.location.href = '/support'; } },
             { label: 'Privacy & cookie policy', on: () => setPolicyOpen(true) },
             { label: 'Manage cookie choices', on: handleManageCookies },
             { label: 'Export my data', on: handleExportData },
@@ -865,7 +942,7 @@ function ProfileEditModal({
               <h3 className="upedit-confirm__title">Switch to {next.flag} {next.label}?</h3>
               <p className="upedit-confirm__sub">Changing your region updates how the app works for you:</p>
               <ul className="upedit-confirm__list">
-                <li>Prices show in <strong>{next.currency}</strong> — e.g. {formatMoney(4.8, next.key)}.</li>
+                <li>Prices show in <strong>{next.currency}</strong>, e.g. {formatMoney(4.8, next.key)}.</li>
                 <li>Cashback is paid using the <strong>{next.label}</strong> payout method.</li>
                 <li>The café list and map focus on <strong>{next.label}</strong> first (other regions stay visible).</li>
                 <li><strong>{next.label}</strong> data-protection terms apply.</li>
@@ -991,14 +1068,10 @@ function ImpactSummary({ cups }) {
 }
 
 /* ─── ImpactDetailModal — opens when the summary card is tapped.
- * Shows the personal stats, the community totals (server-sourced),
- * and a Share button that captures a branded card as an image. ─── */
-function ImpactDetailModal({ cups, profile, onClose }) {
+ * Shows the personal stats and the community totals (server-sourced). ─── */
+function ImpactDetailModal({ cups, onClose }) {
   const [community, setCommunity] = useState(null); // { totalLifetimeCups, returningUsers }
   const [communityErr, setCommunityErr] = useState(null);
-  const [sharing, setSharing] = useState(false);
-  const [shared, setShared] = useState(false);
-  const shareCardRef = useRef(null);
 
   // Pull community totals once on open. We don't pass orgId — the
   // RLS-readable cup_balances rows are already org-scoped for the
@@ -1036,52 +1109,6 @@ function ImpactDetailModal({ cups, profile, onClose }) {
   // every cup returned through PackPerks, expressed as CO₂e avoided.
   const communityTotalCups = NETWORK_BASE_CUPS + (community?.totalLifetimeCups || 0);
   const communityCo2  = communityTotalCups * CO2_GRAMS_PER_CUP;
-
-  async function handleShare() {
-    if (!shareCardRef.current) return;
-    setSharing(true);
-    setShared(false);
-    try {
-      // Capture the off-screen branded share card. Pixel-ratio 2x for
-      // crisp text on phone screens; cacheBust avoids html-to-image
-      // re-using a stale render if the user re-shares.
-      const dataUrl = await toJpeg(shareCardRef.current, {
-        quality: 0.92,
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: '#F4EBDC',
-      });
-      // navigator.share with files isn't universally supported. Best
-      // path: fetch the data-URL as a Blob, hand it to share. Fall
-      // back to a download link otherwise.
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], 'packperks-impact.jpg', { type: 'image/jpeg' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'My PackPerks impact',
-          text: `I've returned ${cups} cups with PackPerks. That's ~${formatCo2(co2)} of CO₂ avoided.`,
-        });
-        setShared(true);
-      } else {
-        // Plain download fallback.
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = 'packperks-impact.jpg';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setShared(true);
-      }
-    } catch (e) {
-      // AbortError fires when the user cancels the native share sheet
-      // — not an error from our side, just suppress.
-      if (e?.name !== 'AbortError') console.error('Share failed:', e);
-    } finally {
-      setSharing(false);
-      setTimeout(() => setShared(false), 2400);
-    }
-  }
 
   /* Portal to document.body so the fixed-position backdrop + sheet
    * are NOT contained by any ancestor with a transform / filter /
@@ -1141,56 +1168,6 @@ function ImpactDetailModal({ cups, profile, onClose }) {
           )}
         </div>
 
-        <button
-          className="impact-modal__share"
-          onClick={handleShare}
-          disabled={sharing}
-        >
-          {sharing ? 'Preparing image…' : shared ? '✓ Shared!' : (
-            <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
-              Share my impact
-            </>
-          )}
-        </button>
-
-        {/* ─── Off-screen branded share card ───
-         * Rendered absolutely-positioned at -9999px so it's not visible
-         * but html-to-image can still rasterise it. Designed to look
-         * great as a square-ish social image (1080×1350 at 2x). */}
-        <div className="impact-share-card" ref={shareCardRef} aria-hidden="true">
-          <div className="impact-share-card__brand">
-            <span className="impact-share-card__brand-tag">PackPerks</span>
-            <span className="impact-share-card__brand-tagline">Reusable cups · real rewards</span>
-          </div>
-          <div className="impact-share-card__hero">
-            <div className="impact-share-card__big">{cups.toLocaleString()}</div>
-            <div className="impact-share-card__big-label">cups collected</div>
-          </div>
-          <div className="impact-share-card__rows">
-            <div className="impact-share-card__row">
-              <span className="impact-share-card__row-label">CO₂ avoided</span>
-              <span className="impact-share-card__row-val">~{formatCo2(co2)}</span>
-            </div>
-            <div className="impact-share-card__row">
-              <span className="impact-share-card__row-label">Equivalent</span>
-              <span className="impact-share-card__row-val impact-share-card__row-val--small">{comparison}</span>
-            </div>
-            {community && (
-              <div className="impact-share-card__row impact-share-card__row--community">
-                <span className="impact-share-card__row-label">Packback network</span>
-                <span className="impact-share-card__row-val">{communityTotalCups.toLocaleString()} cups returned</span>
-              </div>
-            )}
-          </div>
-          <div className="impact-share-card__footer">
-            {profile?.displayName ? `Returned by ${profile.displayName}` : 'Returned with PackPerks'}
-          </div>
-        </div>
       </div>
     </div>
   ), document.body);

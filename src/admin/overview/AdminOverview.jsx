@@ -3,7 +3,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { getAdminStats, getRewardBudget } from '../lib/adminApi';
+import { getAdminStats, getRewardBudget, getScansByLocation } from '../lib/adminApi';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import { useOrg } from '../context/OrgContext';
 import ScopeToggle from '../shared/ScopeToggle';
@@ -977,7 +977,72 @@ export default function AdminOverview({ draftState, onNavigate }) {
         </div>
       </div>
 
+      {/* ── Cup scans by location — share within one organisation ──
+       * Uses cup_scans.location_id (set by the per-location counter QR) to
+       * show how BYO collection is split across an org's addresses. */}
+      <LocationShare orgIds={scopeOrgIds} depKey={`${statsScope}:${activeOrg?.id || ''}`} />
+
       <QuickLinks currentPage="overview" onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+/* ── Cup scans by location ───────────────────────────────────────────
+ * Share of BYO counter-QR scans across an org's physical locations. A cup
+ * is redeemable org-wide; this only reflects WHERE it was collected. */
+const LOC_PALETTE = ['#1A8737', '#6C4CE0', '#C7891F', '#2E86C1', '#C0392B', '#16A085', '#8E44AD', '#D35400'];
+function LocationShare({ orgIds, depKey }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getScansByLocation(orgIds)
+      .then(d => { if (alive) { setData(d); setLoading(false); } })
+      .catch(() => { if (alive) { setData(null); setLoading(false); } });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depKey]);
+
+  const rows = data?.locations || [];
+  const total = data?.total || 0;
+  const color = (r, i) => (r.locationId ? LOC_PALETTE[i % LOC_PALETTE.length] : '#CFC7B8');
+
+  return (
+    <div className="ov-locshare">
+      <header className="ov-locshare__header">
+        <h2 className="ov-locshare__title">Cup scans by location</h2>
+        <p className="ov-locshare__sub">Where cups are collected across this organisation. Cups stay redeemable at every location.</p>
+      </header>
+      {loading ? (
+        <div className="ov-locshare__empty">Loading…</div>
+      ) : total === 0 ? (
+        <div className="ov-locshare__empty">No location-tagged cup scans yet. Give each counter QR a location on the BYO&nbsp;requests page.</div>
+      ) : (
+        <>
+          <div className="ov-locshare__bar" role="img" aria-label="Cup scans split by location">
+            {rows.map((r, i) => (
+              <span
+                key={r.locationId || 'none'}
+                className="ov-locshare__seg"
+                style={{ width: `${r.share}%`, background: color(r, i) }}
+                title={`${r.label}: ${r.count} (${r.share}%)`}
+              />
+            ))}
+          </div>
+          <ul className="ov-locshare__legend">
+            {rows.map((r, i) => (
+              <li key={r.locationId || 'none'} className="ov-locshare__row">
+                <span className="ov-locshare__dot" style={{ background: color(r, i) }} />
+                <span className="ov-locshare__name">{r.label}</span>
+                <span className="ov-locshare__count">{r.count.toLocaleString()}</span>
+                <span className="ov-locshare__pct">{r.share}%</span>
+              </li>
+            ))}
+          </ul>
+          <div className="ov-locshare__total">{total.toLocaleString()} BYO scans total</div>
+        </>
+      )}
     </div>
   );
 }

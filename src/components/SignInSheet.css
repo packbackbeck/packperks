@@ -81,6 +81,7 @@
 }
 .signin-art--sent { background: #FBEEDA; color: var(--pb-orange, #E4572E); }
 .signin-art--ok   { background: #E3F3E8; color: var(--pb-green, #1A8737); }
+.signin-art--pending { background: #FCEBDD; color: #C7891F; }
 
 .signin-title {
   margin: 0 0 8px;

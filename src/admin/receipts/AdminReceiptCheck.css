@@ -457,3 +457,42 @@
   color: #3B3833;
   line-height: 1.45;
 }
+
+/* ── Per-criteria review checklist (Approve / Reject modal) ─────────────
+ * The admin ticks each receipt rule Yes/No before deciding. The rules marked
+ * "No" are stored on the claim and shown to the customer on their rejected
+ * screen, so a rejection always explains itself. */
+.rc-criteria {
+  margin: 2px 0 16px;
+  border: 1px solid #ECE7DD;
+  border-radius: 12px;
+  background: #FBF9F5;
+  overflow: hidden;
+}
+.rc-criteria__head { padding: 10px 12px 8px; border-bottom: 1px solid #EFEAE0; }
+.rc-criteria__title { display: block; font-size: 12px; font-weight: 800; color: #1A1A1A; }
+.rc-criteria__hint { display: block; margin-top: 2px; font-size: 11px; color: #8A8175; line-height: 1.4; }
+.rc-criterion {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid #F2EEE6;
+}
+.rc-criterion:first-of-type { border-top: none; }
+.rc-criterion__label { font-size: 12.5px; font-weight: 600; color: #3B3833; line-height: 1.35; }
+.rc-criterion--failed .rc-criterion__label { color: #B4463E; }
+.rc-criterion__toggle {
+  display: inline-flex; flex-shrink: 0;
+  border: 1px solid #E0DBD1; border-radius: 8px; overflow: hidden; background: #FFFFFF;
+}
+.rc-criterion__opt {
+  border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 11.5px; font-weight: 700; color: #8A8175;
+  padding: 5px 12px; line-height: 1;
+}
+.rc-criterion__opt + .rc-criterion__opt { border-left: 1px solid #E0DBD1; }
+.rc-criterion__opt--yes.is-on { background: #DFF5E3; color: #197A32; }
+.rc-criterion__opt--no.is-on  { background: #FBE3DE; color: #B4463E; }
+.rc-criteria__warn {
+  margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 600; color: #B4463E;
+  background: #FBF1EF; border-top: 1px solid #F2EEE6;
+}

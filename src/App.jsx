@@ -43,6 +43,7 @@ import {
   getHistory,
   addHistoryEntry,
   createClaim,
+  sendClaimConfirmation,
   setClaimNotifyPrefs,
   addDonationClaim,
   updateUserProfile,
@@ -389,7 +390,13 @@ export default function App({ consentReady = true } = {}) {
   // animation is deferred until the guide is dismissed (pendingNudge) so it
   // isn't wasted behind the full-screen guide.
   const [nudgeActive, setNudgeActive] = useState(false);
-  const [pendingNudge, setPendingNudge] = useState(false);
+  // Deferred-nudge bookkeeping lives in refs, not state: closing the story guide
+  // can fire onClose more than once (fast tap / swipe-through + backdrop click),
+  // and a stale-closure state read would let the nudge run twice — restarting the
+  // pulse mid-cycle so the cups appeared to flicker/pulse frantically. A ref guard
+  // makes the nudge strictly fire-once, and a timer ref stops stacked 3s timeouts.
+  const pendingNudgeRef = useRef(false);
+  const nudgeTimerRef = useRef(null);
 
   /* ── Modal state ── */
   const [termsOpen, setTermsOpen] = useState(false);
@@ -535,10 +542,11 @@ export default function App({ consentReady = true } = {}) {
               payout_amount: Number(euro(rw).toFixed(2)), created_at: '2026-07-06T10:00:00Z', notify_email: true, notify_push: false,
               ...(kind === 'pending' ? { status: 'pending' }
                 : kind === 'ready' ? { status: 'completed', tikkie_url: 'https://tikkie.me/pay/demo/abc', tikkie_status: 'created' }
-                : { status: 'failed' }),
+                : { status: 'failed', approved_at: '2026-07-21T14:20:00Z', admin_failure_checks: ['contains_required_item', 'is_newer_than_cup_return'] }),
             });
             if (preset.claims === 'pending') setUserClaims([mkClaim('pending', featured)]);
             else if (preset.claims === 'ready') setUserClaims([mkClaim('ready', featured)]);
+            else if (preset.claims === 'rejected') setUserClaims([mkClaim('rejected', rlist[3] || featured)]);
             else if (preset.claims === 'mix') setUserClaims([mkClaim('pending', featured), mkClaim('ready', rlist[1] || featured), mkClaim('rejected', rlist[3] || featured)]);
             if (preset.detailIdx != null) setDetailReward(rlist[preset.detailIdx] || rlist[1] || featured);
 
@@ -842,19 +850,17 @@ export default function App({ consentReady = true } = {}) {
         if (urlByo && org?.id) {
           window.history.replaceState({}, '', window.location.pathname);
           const gcopy = gctx ? composeGroupCopy(gctx) : null;
-          // Test-only: the counter QR can carry ?cups=N to add several cups
-          // per scan (the admin generator sets this). The edge mint remains the
-          // authority (+1, cap-aware); any extra test cups are credited client-side.
-          const testCups = Math.max(1, Math.min(50, parseInt(sp.get('cups'), 10) || 1));
-          mintByoCup(user.id, org.id)
+          // The counter QR is per-location: ?loc=<location_id> records WHERE the
+          // scan happened. The cup itself is org-wide (redeemable at any of the
+          // org's locations); loc is just for analytics + branded QR.
+          const scanLocationId = sp.get('loc') || null;
+          mintByoCup(user.id, org.id, scanLocationId)
             .then(res => {
               if (res?.status === 'credited') {
                 // Show the SAME success popup as a normal cup claim
                 // (CupScanSuccess) rather than a bespoke BYO modal.
-                const total = testCups > 1 ? res.newBalance + (testCups - 1) : res.newBalance;
-                if (testCups > 1) persist(updateCupBalance(user.id, total));
-                setCupCount(total);
-                setLastCupsScanned(testCups);
+                setCupCount(res.newBalance);
+                setLastCupsScanned(1);
                 setPage('cup-scan-success');
               } else if (res?.status === 'pending_review') {
                 setByoResult({
@@ -1283,6 +1289,11 @@ export default function App({ consentReady = true } = {}) {
         addHistoryEntry(userId, 'reward_claimed', label)
       );
 
+      // Claim went to human review → tell the user we've got their request and
+      // it's now awaiting approval. Best-effort; the edge function resolves the
+      // recipient itself and no-ops when there's no email or it auto-approved.
+      if (result?.status === 'pending') sendClaimConfirmation(claimId);
+
       haptic('success');
       setPage('success');
     } catch (err) {
@@ -1463,22 +1474,27 @@ export default function App({ consentReady = true } = {}) {
 
   /* ── Nudge ── */
   const handleNudge = (remaining) => {
+    // Clear any in-flight nudge window first so a re-trigger can't leave two
+    // timers racing (one clearing the count while the other still expects it
+    // set), which is what made the pulse stutter.
+    if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
     setNudgeCount(remaining);
-    setTimeout(() => setNudgeCount(0), 3000);
+    nudgeTimerRef.current = setTimeout(() => { setNudgeCount(0); nudgeTimerRef.current = null; }, 3000);
   };
 
   // Locked "Get cashback" tap: open the story guide + reveal the "collect more"
   // block, and remember to run the cup nudge once the guide closes.
   const handleLockedClaim = () => {
     setNudgeActive(true);
-    setPendingNudge(true);
+    pendingNudgeRef.current = true;
     setHowItWorksOpen(true);
   };
-  // Fired when the story guide is dismissed — run the deferred cup nudge.
+  // Fired when the story guide is dismissed — run the deferred cup nudge exactly
+  // once, even if onClose fires several times as the guide tears down.
   const closeGuide = () => {
     setHowItWorksOpen(false);
-    if (pendingNudge) {
-      setPendingNudge(false);
+    if (pendingNudgeRef.current) {
+      pendingNudgeRef.current = false;
       handleNudge(cupsRemaining);
     }
   };
@@ -1543,7 +1559,7 @@ export default function App({ consentReady = true } = {}) {
   }
 
   if (page === 'receipt') {
-    return <ReceiptPage reward={selectedReward} onSubmit={handleReceiptSubmit} onBack={() => setPage('home')} orgName={activeOrg?.partner_brand_name || activeOrg?.name} />;
+    return <ReceiptPage reward={selectedReward} onSubmit={handleReceiptSubmit} onBack={() => setPage('home')} orgName={activeOrg?.partner_brand_name || activeOrg?.name} isByo={isByo} />;
   }
 
   if (page === 'verifying') {
@@ -1819,6 +1835,14 @@ export default function App({ consentReady = true } = {}) {
               try { setUserClaims(await getMyClaims(userId)); } catch (e) { console.error(e); }
             }
           }}
+          onRetryClaim={(claim) => {
+            // "Upload a different receipt" on a rejected claim → re-claim the same
+            // reward. Cups aren't deducted on rejection, so it's still unlocked;
+            // select it and jump straight to the receipt-upload flow.
+            if (claim?.reward_id) setSelectedRewardId(claim.reward_id);
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            setPage('receipt');
+          }}
           onClose={() => {
             // From the combined (Stores) view, go back to the Stores hub;
             // otherwise back to this store's home.
@@ -1918,7 +1942,8 @@ export default function App({ consentReady = true } = {}) {
 
       <section className="app__hero">
         <h1 className="app__headline">{(heroHeadline || '').replace(/,\s*/g, ',\n')}</h1>
-        <p className="app__subtext">{heroSubtext}</p>
+        {/* BYO venues keep the hero tight — no subtext under the headline. */}
+        {!isByo && <p className="app__subtext">{heroSubtext}</p>}
       </section>
 
       <CupProgress
@@ -1979,6 +2004,7 @@ export default function App({ consentReady = true } = {}) {
           onBudgetBlocked={handleBudgetBlocked}
           onClose={() => setDetailReward(null)}
           orgName={activeOrg?.partner_brand_name || activeOrg?.name}
+          isByo={isByo}
         />
       )}
 

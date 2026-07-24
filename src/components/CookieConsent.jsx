@@ -51,7 +51,7 @@ function ToggleRow({ id, title, desc, checked, onChange }) {
   );
 }
 
-export default function CookieConsent({ onChoose, onCustomize, onPolicy }) {
+export default function CookieConsent({ onChoose, onCustomize, onPolicy, onDismiss }) {
   const [page, setPage] = useState('main');           // 'main' | 'customize'
   const init = getConsentPrefs() || DEFAULT_PREFS;    // default: all ON
   const [technical, setTechnical] = useState(init.technical);
@@ -59,8 +59,17 @@ export default function CookieConsent({ onChoose, onCustomize, onPolicy }) {
   const [marketing, setMarketing] = useState(init.marketing);
 
   return createPortal(
-    <div className="cc-overlay" role="dialog" aria-modal="true" aria-label="Cookie choices">
+    // When re-opened from "Manage cookie choices" (onDismiss set) the backdrop
+    // closes without changing anything; the first-run gate has no onDismiss so
+    // it stays modal until a choice is made.
+    <div className="cc-overlay" role="dialog" aria-modal="true" aria-label="Cookie choices"
+      onClick={onDismiss ? (e) => { if (e.target === e.currentTarget) onDismiss(); } : undefined}>
       <div className="cc-sheet">
+        {onDismiss && (
+          <button type="button" className="cc-dismiss" onClick={onDismiss} aria-label="Keep current choices">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        )}
         {page === 'main' ? (
           <>
             <div className="cc-head">

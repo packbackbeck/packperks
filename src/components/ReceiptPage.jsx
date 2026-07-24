@@ -43,7 +43,7 @@ const RULES_SEEN_KEY = 'packperks_receipt_rules_seen';
 
 /* The receipt requirements — shown on the first-time rules screen AND in the
  * "Which photos do we accept?" popup, so both read identically. */
-function ReceiptRules({ itemName }) {
+function ReceiptRules({ itemName, isByo = false }) {
   return (
     <>
       <div className="receipt-page__requirements">
@@ -51,7 +51,7 @@ function ReceiptRules({ itemName }) {
         <ul className="receipt-page__req-list">
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span>The <strong>printed store receipt</strong> from your purchase, not the cup-return ticket</span>
+            <span>The <strong>printed receipt</strong> from your purchase{isByo ? '' : ', not the cup-return ticket'}</span>
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
@@ -59,7 +59,7 @@ function ReceiptRules({ itemName }) {
           </li>
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10L8 14L16 6"/></svg>
-            <span><strong>Dated after</strong> your cup return</span>
+            <span><strong>Dated after</strong> {isByo ? 'you collected your cups' : 'your cup return'}</span>
           </li>
         </ul>
       </div>
@@ -67,10 +67,12 @@ function ReceiptRules({ itemName }) {
       <div className="receipt-page__requirements">
         <p className="receipt-page__req-label">Not accepted</p>
         <ul className="receipt-page__req-list">
+          {!isByo && (
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
             <span>Your <strong>cup-return ticket</strong> (the QR receipt from the bin), that one only adds cups</span>
           </li>
+          )}
           <li className="receipt-page__req-item">
             <svg className="receipt-page__req-icon receipt-page__req-icon--no" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
             <span>A <strong>bank app</strong> or online-order receipt, or any screenshot</span>
@@ -85,7 +87,7 @@ function ReceiptRules({ itemName }) {
   );
 }
 
-export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
+export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo = false }) {
   const brand = orgName || 'the café';  // D.11.2: BYO venues are cafés, not restaurants
   const itemName = reward?.name || 'item';
   const videoRef = useRef(null);
@@ -188,7 +190,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
       </div>
 
       {/* ── Receipt requirements ── */}
-      <ReceiptRules itemName={itemName} />
+      <ReceiptRules itemName={itemName} isByo={isByo} />
 
       {/* Understood → move to the camera screen */}
       <button className="receipt-page__understood" onClick={goToCamera}>
@@ -293,7 +295,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName }) {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <ReceiptRules itemName={itemName} />
+            <ReceiptRules itemName={itemName} isByo={isByo} />
           </div>
         </div>,
         document.body,

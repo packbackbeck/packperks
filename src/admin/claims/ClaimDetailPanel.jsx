@@ -48,6 +48,37 @@ function formatDate(ts) {
  * could be tuned to 70-80%. */
 const AI_CONFIDENCE_PASS_THRESHOLD = 0.50;
 
+/* The receipt rules an admin ticks off before deciding. Order = severity, so
+ * the customer's rejected screen leads with the most actionable failure. The
+ * moderation-only `inappropriate_image` code is intentionally excluded — it's
+ * handled by the hide-image flow, not a manual pass/fail. */
+const REVIEW_CRITERIA = [
+  'is_receipt',
+  'is_authentic_burger_king',
+  'contains_required_item',
+  'is_newer_than_cup_return',
+  'duplicate_receipt',
+];
+
+/* Seed the per-criteria marks from whatever the AI already decided, so the admin
+ * usually only has to flip the one or two rows they disagree with. `true` = pass.
+ * A null/absent AI boolean is treated as "pass" unless the code is in the AI's
+ * failure list. */
+function seedCriteriaMarks(claim) {
+  const failed = claim?.ai_failure_checks || [];
+  const boolFor = {
+    is_receipt: claim?.ai_is_receipt,
+    is_authentic_burger_king: claim?.ai_is_burger_king,
+    contains_required_item: claim?.ai_contains_required_item,
+  };
+  const marks = {};
+  for (const code of REVIEW_CRITERIA) {
+    if (code in boolFor && boolFor[code] === false) marks[code] = false;
+    else marks[code] = !failed.includes(code);
+  }
+  return marks;
+}
+
 function AiVerdictPanel({ claim }) {
   const { activeOrg } = useOrg();
   const partnerBrand = activeOrg?.partner_brand_name || activeOrg?.name;
@@ -516,11 +547,11 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
           claim={claim}
           updating={updating}
           onCancel={() => setDecision(null)}
-          onConfirm={(reason) => {
-            // Hand the reason back to the parent via the existing onApprove/onFail
-            // signatures; AdminClaims has been updated to accept (id, reason).
-            if (decision === 'approve') onApprove(claim.id, reason);
-            else onFail(claim.id, reason);
+          onConfirm={(reason, failedChecks) => {
+            // Hand the reason + per-criteria verdict back to the parent via the
+            // onApprove/onFail signatures; AdminClaims accepts (id, reason, failedChecks).
+            if (decision === 'approve') onApprove(claim.id, reason, failedChecks);
+            else onFail(claim.id, reason, failedChecks);
             setDecision(null);
           }}
         />
@@ -682,9 +713,19 @@ function HideImageModal({ busy, onCancel, onConfirm }) {
  * Reason gets persisted to claim.rejection_note (existing column) and
  * to the actionLog row written by AdminClaims. */
 function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
+  const { activeOrg } = useOrg();
+  const partnerBrand = activeOrg?.partner_brand_name || activeOrg?.name;
   const [reason, setReason] = useState('');
   const isReject = kind === 'reject';
-  const canSubmit = isReject ? reason.trim().length >= 3 : true;
+  // Per-criteria pass/fail marks, seeded from the AI verdict. The customer sees
+  // the ones marked "No" on their rejected screen, so rejecting requires at
+  // least one failed criterion (you can't reject a receipt that passes them all).
+  const [marks, setMarks] = useState(() => seedCriteriaMarks(claim));
+  const setMark = (code, pass) => setMarks(m => ({ ...m, [code]: pass }));
+  const failedCodes = REVIEW_CRITERIA.filter(c => marks[c] === false);
+  const canSubmit = isReject
+    ? (reason.trim().length >= 3 && failedCodes.length > 0)
+    : true;
 
   /* Detect human override against the AI check and surface it before
    * the admin commits. Two override directions (false-positive vs
@@ -746,6 +787,44 @@ function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
           </div>
         )}
 
+        <div className="rc-criteria">
+          <div className="rc-criteria__head">
+            <span className="rc-criteria__title">Receipt criteria</span>
+            <span className="rc-criteria__hint">
+              {isReject
+                ? 'Mark every rule Yes/No — the ones you mark “No” are shown to the customer.'
+                : 'Confirm each rule reads Yes before releasing the payout.'}
+            </span>
+          </div>
+          {REVIEW_CRITERIA.map(code => {
+            const pass = marks[code] !== false;
+            return (
+              <div key={code} className={`rc-criterion${pass ? '' : ' rc-criterion--failed'}`}>
+                <span className="rc-criterion__label">
+                  {pass
+                    ? getPassLabel(code, { partnerBrand })
+                    : getFailureLabel(code, { partnerBrand, long: true })}
+                </span>
+                <div className="rc-criterion__toggle" role="group" aria-label={code}>
+                  <button
+                    type="button"
+                    className={`rc-criterion__opt rc-criterion__opt--yes${pass ? ' is-on' : ''}`}
+                    onClick={() => setMark(code, true)}
+                  >Yes</button>
+                  <button
+                    type="button"
+                    className={`rc-criterion__opt rc-criterion__opt--no${!pass ? ' is-on' : ''}`}
+                    onClick={() => setMark(code, false)}
+                  >No</button>
+                </div>
+              </div>
+            );
+          })}
+          {isReject && failedCodes.length === 0 && (
+            <p className="rc-criteria__warn">Mark at least one criterion “No” to reject this receipt.</p>
+          )}
+        </div>
+
         <label className="admin-publish-modal__label">
           {isReject ? 'Reason (required)' : (overridingFail ? 'Reason for overriding AI (recommended)' : 'Note (optional)')}
         </label>
@@ -765,10 +844,10 @@ function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
           </button>
           <button
             className="admin-publish-modal__confirm"
-            onClick={() => onConfirm(reason.trim())}
+            onClick={() => onConfirm(reason.trim(), failedCodes)}
             disabled={!canSubmit || updating}
             style={isReject ? { background: '#DC2626' } : { background: '#16A34A' }}
-            title={!canSubmit ? 'Please describe why you\'re rejecting this claim' : ''}
+            title={!canSubmit ? 'Mark at least one failed criterion and add a reason' : ''}
           >
             {updating
               ? (isReject ? 'Rejecting…' : 'Approving…')

@@ -6,11 +6,16 @@ import AdminApp from './admin/AdminApp.jsx'
 import MockupMaster from './mockup/MockupMaster.jsx'
 import ConsentGate from './components/ConsentGate.jsx'
 import ModelChooser from './components/ModelChooser.jsx'
+import SupportForm from './components/SupportForm.jsx'
 import { RegionProvider } from './lib/RegionContext.jsx'
 
 const path = window.location.pathname
 const isAdmin = path.startsWith('/admin')
 const isMockup = path.startsWith('/mockup')
+// Standalone contact-support pages. /vendor-support is intentionally unlinked —
+// share the URL directly with vendors. (Check vendor first: distinct prefixes.)
+const isVendorSupport = path.startsWith('/vendor-support')
+const isSupport = path.startsWith('/support')
 // The bare root has no venue slug. Show the model chooser instead of booting the
 // customer app (which would resolve a fallback org — historically Burger King).
 const isRoot = path === '/' || path === ''
@@ -21,9 +26,13 @@ createRoot(document.getElementById('root')).render(
       ? <MockupMaster />
       : isAdmin
         ? <AdminApp />
-        : isRoot
-          ? <ModelChooser />
-          : <RegionProvider><ConsentGate><App /></ConsentGate></RegionProvider>}
+        : isVendorSupport
+          ? <SupportForm audience="vendor" />
+          : isSupport
+            ? <SupportForm audience="user" />
+            : isRoot
+              ? <ModelChooser />
+              : <RegionProvider><ConsentGate><App /></ConsentGate></RegionProvider>}
   </StrictMode>,
 )
 

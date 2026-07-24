@@ -1499,7 +1499,139 @@ export async function mergeUsers(survivorId, absorbedIds) {
     try { payload = await error.context?.json?.(); } catch { /* ignore */ }
     throw Object.assign(new Error(payload?.detail || payload?.error || error.message), { detail: payload });
   }
+  // Log the admin-initiated merge into merge_requests so it shows in the merge
+  // activity log alongside self-serve merges. Best-effort — never fail the merge.
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('merge_requests').insert({
+      org_id: data?.survivor_org_id || getActiveOrgId() || null,
+      survivor_user_id: survivorId,
+      absorbed_user_ids: absorbedIds,
+      source: 'admin',
+      status: 'admin',
+      reason: 'Admin-initiated merge',
+      merged_balance: data?.merged_balance ?? null,
+      merged_lifetime: data?.merged_lifetime ?? null,
+      decided_at: new Date().toISOString(),
+      decided_by: user?.id ?? null,
+    });
+  } catch { /* logging is best-effort */ }
   return data;
+}
+
+/* ── Account-merge weekly limit + request queue ────────────────────────
+ * Per-org setting mirrors the byo:cap pattern. `merge:limit:<orgId>` holds
+ * { weeklyLimit, limitCopy }. The merge-guard edge function enforces it and
+ * files pending rows into `merge_requests`; admins review them here. */
+export const MERGE_LIMIT_DEFAULT = {
+  weeklyLimit: 1,
+  limitCopy: 'You have reached this store’s weekly account-merge limit. We have sent your request to the store for review, and they will approve it shortly.',
+};
+
+export async function getMergeLimit(orgId) {
+  const oid = orgId || getActiveOrgId();
+  if (!oid) return { ...MERGE_LIMIT_DEFAULT };
+  const { data } = await supabase.from('app_config').select('value').eq('key', `merge:limit:${oid}`).maybeSingle();
+  const v = data?.value || {};
+  return {
+    weeklyLimit: Number.isFinite(Number(v.weeklyLimit)) && Number(v.weeklyLimit) > 0 ? Math.floor(Number(v.weeklyLimit)) : MERGE_LIMIT_DEFAULT.weeklyLimit,
+    limitCopy: typeof v.limitCopy === 'string' && v.limitCopy.trim() ? v.limitCopy : MERGE_LIMIT_DEFAULT.limitCopy,
+  };
+}
+
+export async function saveMergeLimit(orgId, { weeklyLimit, limitCopy }) {
+  const oid = orgId || getActiveOrgId();
+  if (!oid) throw new Error('No active store selected.');
+  const n = Math.max(1, Math.min(20, parseInt(weeklyLimit, 10) || MERGE_LIMIT_DEFAULT.weeklyLimit));
+  const copy = (limitCopy || '').trim() || MERGE_LIMIT_DEFAULT.limitCopy;
+  const { error } = await supabase.from('app_config').upsert({
+    key: `merge:limit:${oid}`, value: { weeklyLimit: n, limitCopy: copy }, updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  return { weeklyLimit: n, limitCopy: copy };
+}
+
+/* Merge requests + activity log, org-scoped. status: 'pending' | 'approved' |
+ * 'rejected' | 'completed' | 'admin' | 'all'. Enriches each row with the
+ * survivor's display name/email for the table. */
+export async function getMergeRequests(status = 'pending') {
+  let q = supabase.from('merge_requests')
+    .select('id, org_id, survivor_user_id, absorbed_user_ids, email, source, status, reason, merged_balance, merged_lifetime, requested_at, decided_at, decided_by, decided_note')
+    .order('requested_at', { ascending: false })
+    .limit(200);
+  q = applyOrgFilter(q);
+  if (status && status !== 'all') q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = data || [];
+
+  // Resolve survivor names in one round trip.
+  const ids = [...new Set(rows.map(r => r.survivor_user_id).filter(Boolean))];
+  const names = {};
+  if (ids.length) {
+    const { data: users } = await supabase.from('users').select('id, display_name, email').in('id', ids);
+    (users || []).forEach(u => { names[u.id] = { name: u.display_name, email: u.email }; });
+  }
+  return rows.map(r => ({
+    ...r,
+    survivorName: names[r.survivor_user_id]?.name || null,
+    survivorEmail: names[r.survivor_user_id]?.email || r.email || null,
+    absorbedCount: Array.isArray(r.absorbed_user_ids) ? r.absorbed_user_ids.length : 0,
+  }));
+}
+
+export async function getMergeRequestCount(status = 'pending') {
+  let q = supabase.from('merge_requests').select('id', { count: 'exact', head: true });
+  q = applyOrgFilter(q);
+  if (status && status !== 'all') q = q.eq('status', status);
+  const { count } = await q;
+  return count || 0;
+}
+
+/* Approve a pending request: run the merge (admin-merge-users) with the stored
+ * survivor/absorbed, then mark it approved. */
+export async function approveMergeRequest(reqId) {
+  const { data: reqRow, error: rErr } = await supabase
+    .from('merge_requests').select('*').eq('id', reqId).maybeSingle();
+  if (rErr) throw rErr;
+  if (!reqRow) throw new Error('Request not found.');
+  if (reqRow.status !== 'pending') throw new Error('This request was already decided.');
+
+  const absorbed = Array.isArray(reqRow.absorbed_user_ids) ? reqRow.absorbed_user_ids : [];
+  let merged = null;
+  if (reqRow.survivor_user_id && absorbed.length) {
+    // Reuse the audited admin merge path. It re-validates survivors/absorbed.
+    merged = await supabase.functions.invoke('admin-merge-users', {
+      body: { survivor_id: reqRow.survivor_user_id, absorbed_ids: absorbed },
+    });
+    if (merged.error) {
+      let payload = null;
+      try { payload = await merged.error.context?.json?.(); } catch { /* ignore */ }
+      throw Object.assign(new Error(payload?.detail || payload?.error || merged.error.message), { detail: payload });
+    }
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error: uErr } = await supabase.from('merge_requests').update({
+    status: 'approved',
+    decided_at: new Date().toISOString(),
+    decided_by: user?.id ?? null,
+    merged_balance: merged?.data?.merged_balance ?? reqRow.merged_balance ?? null,
+    merged_lifetime: merged?.data?.merged_lifetime ?? reqRow.merged_lifetime ?? null,
+  }).eq('id', reqId);
+  if (uErr) throw uErr;
+  return true;
+}
+
+export async function rejectMergeRequest(reqId, note) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from('merge_requests').update({
+    status: 'rejected',
+    decided_at: new Date().toISOString(),
+    decided_by: user?.id ?? null,
+    decided_note: (note || '').trim() || null,
+  }).eq('id', reqId).eq('status', 'pending');
+  if (error) throw error;
+  return true;
 }
 
 export async function adminUpdateUser(userId, updates) {
@@ -1594,6 +1726,10 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
   // Backwards compat: callers may pass either a plain note string
   // (new ClaimDetailPanel modal) or an options bag (older callers).
   const note = typeof opts === 'string' ? opts : (opts?.note || '');
+  // Per-criteria manual verdict (which receipt rules the admin marked failed).
+  // Only meaningful for a manual decision; surfaced to the customer on their
+  // rejected-receipt screen. undefined → leave the column untouched.
+  const failedChecks = (opts && typeof opts === 'object') ? opts.failedChecks : undefined;
   const { data: { user } } = await supabase.auth.getUser();
   const update = { status };
   // Only stamp the approver when the status is a final decision; pending
@@ -1602,10 +1738,17 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
     update.approved_by = user?.id ?? null;
     update.approved_at = new Date().toISOString();
     if (note) update.approval_note = note;
+    // Reject → store the criteria the admin marked failed. Approve → empty
+    // (every criterion passed). Only written when the admin actually supplied
+    // a per-criteria verdict, so older/bulk callers don't clobber it.
+    if (Array.isArray(failedChecks)) {
+      update.admin_failure_checks = status === 'completed' ? [] : failedChecks;
+    }
   } else {
     update.approved_by = null;
     update.approved_at = null;
     update.approval_note = null;
+    update.admin_failure_checks = null;
   }
 
   // Look up the claim's type + whether a Tikkie cashback was already minted,
@@ -2617,6 +2760,116 @@ export async function saveAutomatedReports(config) {
   return value;
 }
 
+/* ── Weekly digest ─────────────────────────────────────────────────────
+ * A configurable "nice email letter" that picks any subset of dashboard
+ * metrics and mails them on a schedule. Config lives in app_config; the
+ * `send-digest` edge function reads it, computes the metrics server-side,
+ * renders the branded email and sends it (Brevo). The catalog below is the
+ * single source of truth for BOTH the admin picker and the edge function. */
+export const DIGEST_METRICS = [
+  { id: 'new_users',       label: 'New users',              hint: 'Signed up in the period' },
+  { id: 'total_users',     label: 'Total users',            hint: 'All-time' },
+  { id: 'active_users',    label: 'Active users',           hint: 'Any cup activity in the period' },
+  { id: 'cups_period',     label: 'Cups collected',         hint: 'In the period' },
+  { id: 'cups_lifetime',   label: 'Cups collected (all time)', hint: 'Lifetime total' },
+  { id: 'cups_redeemed',   label: 'Cups redeemed',          hint: 'Spent on rewards in the period' },
+  { id: 'cashback_paid',   label: 'Cashback paid',          hint: 'Approved payouts in the period' },
+  { id: 'pending_claims',  label: 'Claims awaiting review', hint: 'Right now' },
+  { id: 'byo_scans',       label: 'BYO cup scans',          hint: 'Counter-QR scans in the period' },
+  { id: 'top_location',    label: 'Busiest location',       hint: 'Most scans in the period' },
+  { id: 'co2_avoided',     label: 'CO₂ avoided',            hint: 'From cups collected in the period' },
+];
+
+const WEEKLY_DIGEST_KEY = 'weekly_digest';
+export const WEEKLY_DIGEST_DEFAULT = {
+  enabled: false,
+  org_id: null,                   // the org the digest reports on (set on save)
+  frequency: 'weekly',            // 'weekly' | 'monthly'
+  dayOfWeek: 'monday',            // used when frequency === 'weekly'
+  recipient: 'beke@packback.network',
+  title: 'Your PackPerks weekly digest',
+  intro: 'Here’s how your reusable-cup programme performed this week.',
+  metrics: ['new_users', 'active_users', 'cups_period', 'cups_redeemed', 'cashback_paid', 'byo_scans', 'top_location'],
+  scope: 'org',                   // 'org' | 'group'
+};
+
+export async function getWeeklyDigest() {
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', WEEKLY_DIGEST_KEY).maybeSingle();
+  return { ...WEEKLY_DIGEST_DEFAULT, ...(data?.value || {}) };
+}
+
+export async function saveWeeklyDigest(config) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const value = { ...WEEKLY_DIGEST_DEFAULT, ...(config || {}), updated_at: new Date().toISOString(), updated_by: user?.id ?? null };
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key: WEEKLY_DIGEST_KEY, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
+/* Fire a one-off test send of the digest to the configured recipient (or an
+ * override). Invokes the send-digest edge function in 'test' mode with the
+ * admin's JWT (the function verifies the caller is an admin). */
+export async function sendDigestTest(orgId, toOverride) {
+  const oid = orgId || getActiveOrgId();
+  const { data, error } = await supabase.functions.invoke('send-digest', {
+    body: { mode: 'test', org_id: oid || null, to: toOverride || null },
+  });
+  if (error) {
+    let payload = null;
+    try { payload = await error.context?.json?.(); } catch { /* ignore */ }
+    throw Object.assign(new Error(payload?.error || error.message), { detail: payload });
+  }
+  return data;
+}
+
+/* ── Notification center ───────────────────────────────────────────────
+ * Real-time admin email alerts on chosen activities. DB triggers fire the
+ * notify-event edge fn when a matching row is inserted. Config in app_config
+ * 'notification_center'. The event ids MUST match the trigger TG_ARGV values. */
+export const NOTIFICATION_EVENTS = [
+  { id: 'claim_created',   label: 'New claim',        hint: 'A user submits a cashback/refund claim' },
+  { id: 'account_created', label: 'New account',      hint: 'A new customer account is created' },
+  { id: 'cup_scanned',     label: 'Cup scanned',      hint: 'A cup is collected (high volume — one email each)' },
+  { id: 'byo_request',     label: 'BYO cup request',  hint: 'An over-cap cup scan is held for review' },
+  { id: 'merge_request',   label: 'Merge request',    hint: 'An over-limit account merge is held for review' },
+];
+
+const NOTIFICATION_CENTER_KEY = 'notification_center';
+export const NOTIFICATION_CENTER_DEFAULT = {
+  enabled: false,
+  org_id: null,
+  recipient: 'beke@packback.network',
+  events: [],
+};
+
+export async function getNotificationCenter() {
+  const { data } = await supabase.from('app_config').select('value').eq('key', NOTIFICATION_CENTER_KEY).maybeSingle();
+  return { ...NOTIFICATION_CENTER_DEFAULT, ...(data?.value || {}) };
+}
+
+export async function saveNotificationCenter(config) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const value = { ...NOTIFICATION_CENTER_DEFAULT, ...(config || {}), updated_at: new Date().toISOString(), updated_by: user?.id ?? null };
+  const { error } = await supabase.from('app_config').upsert({ key: NOTIFICATION_CENTER_KEY, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
+export async function sendNotificationTest(toOverride) {
+  const { data, error } = await supabase.functions.invoke('notify-event', {
+    body: { mode: 'test', to: toOverride || null },
+  });
+  if (error) {
+    let payload = null;
+    try { payload = await error.context?.json?.(); } catch { /* ignore */ }
+    throw Object.assign(new Error(payload?.error || error.message), { detail: payload });
+  }
+  return data;
+}
+
 /* Assign an org to a region by setting its country — region derives from it. */
 export async function setOrgRegion(orgId, country) {
   const { error } = await supabase
@@ -3113,6 +3366,60 @@ export async function upsertLocation(orgId, location) {
 export async function deleteLocation(locationId) {
   const { error } = await supabase.from('locations').delete().eq('id', locationId);
   if (error) throw error;
+}
+
+/* Lightweight locations list for a single org (used by the per-location counter
+ * QR picker). Ordered by name; active first. */
+export async function getLocations(orgId) {
+  const oid = orgId || getActiveOrgId();
+  if (!oid) return [];
+  const { data, error } = await supabase
+    .from('locations')
+    .select('id, name, address, postal_code, city, country, status')
+    .eq('org_id', oid)
+    .order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+/* Cup scans grouped by location for the "share between locations" overview
+ * card. Counts BYO counter-QR scans per location within the scoped org(s).
+ * Scans with no location_id (older scans, or orgs with a single unnamed QR)
+ * roll into an "Unassigned" bucket. Returns rows sorted busiest-first with a
+ * precomputed share (% of the org total). */
+export async function getScansByLocation(orgIds) {
+  let q = supabase
+    .from('cup_scans')
+    .select('location_id, org_id, scanned_at')
+    .eq('scan_type', 'byo')
+    .eq('status', 'success');
+  q = applyOrgFilter(q, orgIds);
+  const { data: scans, error } = await q;
+  if (error) throw error;
+
+  // Resolve location names in one round trip.
+  const locIds = [...new Set((scans || []).map(s => s.location_id).filter(Boolean))];
+  let names = {};
+  if (locIds.length) {
+    const { data: locs } = await supabase
+      .from('locations').select('id, name, city').in('id', locIds);
+    (locs || []).forEach(l => { names[l.id] = l.city ? `${l.name} · ${l.city}` : l.name; });
+  }
+
+  const counts = new Map();
+  for (const s of scans || []) {
+    const key = s.location_id || '__none__';
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const total = (scans || []).length;
+  const rows = [...counts.entries()].map(([key, count]) => ({
+    locationId: key === '__none__' ? null : key,
+    label: key === '__none__' ? 'Unassigned' : (names[key] || 'Unknown location'),
+    count,
+    share: total ? Math.round((count / total) * 100) : 0,
+  })).sort((a, b) => b.count - a.count);
+
+  return { total, locations: rows };
 }
 
 export async function updateTeamMember(memberId, updates) {

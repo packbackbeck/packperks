@@ -515,6 +515,23 @@ export async function checkEmailSaveOrMerge(email) {
 // current device user — into one survivor. Returns the merged result so
 // the UI can show "you now have N cups total". Must be called AFTER
 // verifyRestoreOtp() succeeds so there's a valid auth session.
+// Pre-check the per-org WEEKLY merge limit before actually merging. Call after
+// verifyRestoreOtp() (needs the auth session). Returns { held: true, message }
+// when the limit is reached (the merge was filed for admin review — do NOT
+// proceed), or { held: false } when it's fine to merge. `source` is
+// 'merge_by_email' (merge offer) or 'restore' (lost-my-cups).
+export async function mergeGuard(source = 'merge_by_email') {
+  try {
+    const { data, error } = await supabase.functions.invoke('merge-guard', {
+      body: { device_id: getDeviceId(), source },
+    })
+    if (error) return { held: false } // never block a merge on a guard failure
+    return data || { held: false }
+  } catch {
+    return { held: false }
+  }
+}
+
 export async function mergeByEmail() {
   const { data, error } = await supabase.functions.invoke('merge-by-email', {
     body: { device_id: getDeviceId() },
@@ -534,6 +551,20 @@ export async function mergeByEmail() {
 //
 // Returns the function's structured response — UIs that want to show
 // "we restored N cups" can read `merged_balance` when status === 'merged'.
+// Public contact-support form (customer + vendor). Emails info@packback.network
+// with a subject tagged USER/VENDOR + topic. No auth needed.
+export async function sendSupportMessage({ audience = 'user', topic, email, message, company = '', hp = '' }) {
+  const { data, error } = await supabase.functions.invoke('send-support', {
+    body: { audience, topic, email, message, company, hp },
+  })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.error || error.message), { detail: payload })
+  }
+  return data
+}
+
 export async function finaliseRestore() {
   const deviceId = getDeviceId()
   const { data, error } = await supabase.functions.invoke('restore-by-email', {
@@ -820,9 +851,9 @@ export async function claimCups(userId, parsed, opts = {}) {
 // soft cap: it auto-credits ≤2 cups, and the 3rd+ returns
 // { status:'pending_review' } (creating an admin approval request) instead of
 // crediting. Success returns { status:'credited', newBalance, preBalance, ... }.
-export async function mintByoCup(userId, orgId) {
+export async function mintByoCup(userId, orgId, locationId = null) {
   const { data, error } = await supabase.functions.invoke('byo-mint', {
-    body: { user_id: userId, org_id: orgId, device_id: getDeviceId() },
+    body: { user_id: userId, org_id: orgId, device_id: getDeviceId(), location_id: locationId || null },
   })
   if (error) {
     let payload = null
@@ -1107,6 +1138,25 @@ export async function createClaim(userId, { type, rewardId, cupsRedeemed, payout
   const { error } = await supabase.from('claims').insert(insert)
   if (error) throw error
   return id
+}
+
+// Fire the customer a "we've received your cashback request" confirmation email
+// once their claim is in review. The recipient is resolved SERVER-SIDE from the
+// claim's own user row — we only hand over the claim id — so this can't be used
+// to email an arbitrary address. Best-effort and never throws: a failed
+// confirmation must not disrupt the claim flow, and it simply no-ops when the
+// user has no email on file or the claim isn't a pending cashback.
+export async function sendClaimConfirmation(claimId) {
+  if (!claimId) return { sent: false }
+  try {
+    const { data, error } = await supabase.functions.invoke('send-claim-confirmation', {
+      body: { claim_id: claimId },
+    })
+    if (error) return { sent: false }
+    return data || { sent: false }
+  } catch {
+    return { sent: false }
+  }
 }
 
 // ── Receipt upload + AI verification ───────────────────────────────────────

@@ -1,4 +1,7 @@
-.admin-claims { padding: 32px 32px 48px; display: flex; flex-direction: column; min-height: calc(100vh - 56px); }
+/* Pin the page to the viewport so the table + review panel scroll INSIDE their
+ * own boxes (sticky column headers stay put) instead of the whole page scrolling.
+ * Matches the standalone receipts page, which already fit the screen this way. */
+.admin-claims { padding: 24px 32px 20px; display: flex; flex-direction: column; height: calc(100vh - 56px); overflow: hidden; }
 
 .ac-header { margin-bottom: 16px; flex-shrink: 0; }
 .ac-header__title { font-size: 22px; font-weight: 800; color: #1A1A1A; margin: 0 0 8px; }
@@ -659,16 +662,50 @@
 /* ── Review split layout ──────────────────────────────────────────── */
 .ac-layout--review {
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(360px, 460px);
-  gap: 16px;
+  /* Default columns; a drag on .ac-resizer overrides this inline with
+   * `<table>px 9px minmax(320px,1fr)`. gap:0 because the resizer IS the gap. */
+  grid-template-columns: minmax(420px, 1fr) 9px minmax(360px, 460px);
+  gap: 0;
 }
+/* Grid children must be allowed to shrink below their content so each pane
+ * scrolls internally and the row of column headers stays pinned. */
+.ac-layout--review > .ac-table-wrap,
+.ac-layout--review > .rc-detail { min-height: 0; height: 100%; }
+
+/* Draggable divider between the table and the review panel. */
+.ac-resizer {
+  align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  cursor: col-resize;
+  position: relative;
+  touch-action: none;
+}
+.ac-resizer::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 2px; background: #E8E6E1; border-radius: 2px; transition: background 0.14s ease, width 0.14s ease;
+}
+.ac-resizer:hover::before,
+.ac-resizer:active::before { background: var(--pb-orange-warm); width: 3px; }
+.ac-resizer__grip {
+  position: relative; z-index: 1;
+  width: 4px; height: 30px; border-radius: 3px;
+  background: #D8D2C6; transition: background 0.14s ease;
+}
+.ac-resizer:hover .ac-resizer__grip { background: var(--pb-orange-warm); }
+
 @media (max-width: 1100px) {
-  .ac-layout--review { grid-template-columns: 1fr; }
+  /* Stack on narrow screens; !important beats the inline drag width. */
+  .ac-layout--review { grid-template-columns: 1fr !important; }
+  .ac-resizer { display: none; }
 }
 
-/* Highlight the row whose detail is open on the right */
-.ac-table__row--active { background: #FFF8F1 !important; }
-.ac-table__row--active td { box-shadow: inset 3px 0 0 var(--pb-orange-warm); }
+/* Highlight the row whose detail is open on the right. In review mode a faint
+ * side-stroke was too easy to lose — give the active row a solid amber wash, a
+ * bold left accent bar, and an inset ring so it's unmistakable at a glance. */
+.ac-table__row--active { background: #FFEFD9 !important; box-shadow: inset 0 0 0 1.5px var(--pb-orange-warm); }
+.ac-table__row--active td { box-shadow: inset 0 0 0 0 transparent; }
+.ac-table__row--active td:first-child { box-shadow: inset 4px 0 0 var(--pb-orange-warm); }
+.ac-table__row--active:hover { background: #FFE9CC !important; }
 
 /* Admin "marked for a second look" — an amber wash + left accent so
  * flagged claims stand out in the list at a glance. */

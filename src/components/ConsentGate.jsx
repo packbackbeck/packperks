@@ -1,4 +1,4 @@
-import { useState, cloneElement, isValidElement } from 'react';
+import { useState, useEffect, cloneElement, isValidElement } from 'react';
 import CookieConsent, { CookieBlocked } from './CookieConsent';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import { getConsent, setConsent, setConsentPrefs, clearConsent } from '../lib/consent';
@@ -10,13 +10,23 @@ import { getConsent, setConsent, setConsentPrefs, clearConsent } from '../lib/co
 export default function ConsentGate({ children }) {
   const [consent, setLocal] = useState(() => getConsent());
   const [showPolicy, setShowPolicy] = useState(false);
+  // Re-opened from the in-app "Manage cookie choices" affordance. We show the
+  // banner again IN PLACE (pre-filled with the current choice) rather than
+  // clearing consent + reloading — that reload re-bootstrapped the whole app and
+  // could strand the user on the "trouble loading your cups" error screen.
+  const [reopen, setReopen] = useState(false);
+  useEffect(() => {
+    const onOpen = () => setReopen(true);
+    window.addEventListener('packperks:open-consent', onOpen);
+    return () => window.removeEventListener('packperks:open-consent', onOpen);
+  }, []);
 
   // Simple choices (Accept all / Essential only) and the granular Customize save
   // both funnel through the consent store; setLocal reads back the DERIVED level
   // ('all' / 'essential' / 'rejected') so unchecking Technical shows the blocked
   // screen.
-  const choose = (level) => { setConsent(level); setLocal(getConsent()); };
-  const customize = (prefs) => { setConsentPrefs(prefs); setLocal(getConsent()); };
+  const choose = (level) => { setConsent(level); setLocal(getConsent()); setReopen(false); };
+  const customize = (prefs) => { setConsentPrefs(prefs); setLocal(getConsent()); setReopen(false); };
   const policyModal = showPolicy ? <PrivacyPolicyView onClose={() => setShowPolicy(false)} /> : null;
 
   if (consent === 'rejected') {
@@ -38,7 +48,16 @@ export default function ConsentGate({ children }) {
   return (
     <>
       {gatedChildren}
-      {!consent && <CookieConsent onChoose={choose} onCustomize={customize} onPolicy={() => setShowPolicy(true)} />}
+      {(!consent || reopen) && (
+        <CookieConsent
+          onChoose={choose}
+          onCustomize={customize}
+          onPolicy={() => setShowPolicy(true)}
+          // Only the re-opened banner can be dismissed without choosing; the
+          // first-run gate (no prior consent) stays modal until a choice is made.
+          onDismiss={consent && reopen ? () => setReopen(false) : undefined}
+        />
+      )}
       {policyModal}
     </>
   );

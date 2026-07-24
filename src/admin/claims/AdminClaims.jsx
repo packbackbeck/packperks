@@ -1,15 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { getAdminClaims, updateClaimStatus, markClaim, getReceiptSignedUrl, deleteRecords, refreshTikkieStatus, mintTikkieLink } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
-import PermissionGate from '../auth/PermissionGate';
 import { useAuth, hasPermission } from '../auth/AuthContext';
 import { logAction } from '../auth/actionLog';
 import ClaimDetailPanel from './ClaimDetailPanel';
 import PiiMask from '../shared/PiiMask';
 import ClaimStatusPills, { ClaimStatusPill } from '../shared/ClaimStatusPills';
 import EmptyState from '../shared/EmptyState';
-import QuickLinks from '../shared/QuickLinks';
 import ColumnPicker from '../shared/ColumnPicker';
 import './AdminClaims.css';
 
@@ -365,6 +363,42 @@ export default function AdminClaims({ onNavigate, draftState }) {
   const [selectedId, setSelectedId] = useState(null);
   const [tikkieModal, setTikkieModal] = useState(null); // claim whose Tikkie timeline is open
 
+  /* Resizable split (review mode): drag the divider between the table and the
+   * detail panel. Stored as the LEFT (table) column width in px, persisted so
+   * each admin's chosen split sticks. */
+  const layoutRef = useRef(null);
+  const draggingSplit = useRef(false);
+  const [reviewSplit, setReviewSplit] = useState(() => {
+    if (typeof window === 'undefined') return 560;
+    const saved = Number(localStorage.getItem('pp_admin_claims_split'));
+    return saved >= 360 ? saved : 560;
+  });
+  useEffect(() => {
+    function onMove(e) {
+      if (!draggingSplit.current || !layoutRef.current) return;
+      const rect = layoutRef.current.getBoundingClientRect();
+      // Clamp so neither pane collapses (table ≥360, detail panel ≥340).
+      const w = Math.max(360, Math.min(rect.width - 340, e.clientX - rect.left));
+      setReviewSplit(w);
+    }
+    function onUp() {
+      if (!draggingSplit.current) return;
+      draggingSplit.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try { localStorage.setItem('pp_admin_claims_split', String(Math.round(reviewSplit))); } catch { /* ignore */ }
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [reviewSplit]);
+  function startSplitDrag(e) {
+    e.preventDefault();
+    draggingSplit.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
   /* Column visibility (user-toggleable).
    *
    * The Claims table used to surface every claim attribute in a wide
@@ -450,12 +484,15 @@ export default function AdminClaims({ onNavigate, draftState }) {
     }
   }
 
-  async function handleStatusUpdate(claimId, newStatus, reason = '') {
+  async function handleStatusUpdate(claimId, newStatus, reason = '', failedChecks) {
     setUpdating(claimId);
     setActionError(null);
     try {
       const before = claims.find(c => c.id === claimId);
-      const updated = await updateClaimStatus(claimId, newStatus, reason);
+      // When the review panel supplied a per-criteria verdict, pass it through
+      // so the failed rules get stored and shown to the customer.
+      const opts = failedChecks !== undefined ? { note: reason, failedChecks } : reason;
+      const updated = await updateClaimStatus(claimId, newStatus, opts);
       // Merge in the approver reference for instant UI feedback.
       setClaims(prev => prev.map(c => c.id === claimId ? { ...c, ...updated } : c));
 
@@ -512,6 +549,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
           reason: reason || null,
           ai_confidence: before?.ai_confidence ?? null,
           ai_failure_checks: aiFailedChecks,
+          admin_failure_checks: failedChecks ?? null,
           human_override: humanOverride,
           override_kind: overrideKind,
         },
@@ -797,7 +835,11 @@ export default function AdminClaims({ onNavigate, draftState }) {
         </div>
       )}
 
-      <div className={`ac-layout${viewMode === 'review' ? ' ac-layout--review' : ''}`}>
+      <div
+        className={`ac-layout${viewMode === 'review' ? ' ac-layout--review' : ''}`}
+        ref={layoutRef}
+        style={viewMode === 'review' ? { gridTemplateColumns: `${reviewSplit}px 9px minmax(320px, 1fr)` } : undefined}
+      >
         <div className="ac-table-wrap">
           {loading ? (
             <Spinner label="Loading claims…" />
@@ -822,15 +864,14 @@ export default function AdminClaims({ onNavigate, draftState }) {
                   <ThCol label="Date" sortable field="created_at" />
                   {isCol('review')    && <ThCol label="Review" sortable field="status" />}
                   {isCol('decided_by') && <ThCol label="Decided by" />}
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  // 4 fixed cols (checkbox, User, Date, Actions) + the
-                  // toggleable ones still on. Was 5 before Receipt
-                  // became toggleable.
-                  <tr><td colSpan={4 + visibleCols.size} className="ac-table__empty">
+                  // 3 fixed cols (checkbox, User, Date) + the toggleable ones
+                  // still on. (Actions column removed — approve/reject now live
+                  // in the review panel only.)
+                  <tr><td colSpan={3 + visibleCols.size} className="ac-table__empty">
                     {claims.length === 0 ? (
                       <EmptyState
                         icon={
@@ -875,8 +916,8 @@ export default function AdminClaims({ onNavigate, draftState }) {
                         viewMode === 'review' && selectedId === claim.id ? 'ac-table__row--active' : '',
                         claim.flagged ? 'ac-table__row--flagged' : '',
                       ].filter(Boolean).join(' ')}
-                      onClick={() => viewMode === 'review' && setSelectedId(claim.id)}
-                      style={viewMode === 'review' ? { cursor: 'pointer' } : undefined}
+                      onClick={() => { setSelectedId(claim.id); if (viewMode !== 'review') setViewMode('review'); }}
+                      style={{ cursor: 'pointer' }}
                     >
                       <td style={{ padding: '0 8px 0 16px' }} onClick={e => e.stopPropagation()}>
                         <input type="checkbox"
@@ -972,37 +1013,6 @@ export default function AdminClaims({ onNavigate, draftState }) {
                           )}
                         </td>
                       )}
-                      <td>
-                        {claim.status === 'pending' && (
-                          <div className="ac-actions" onClick={e => e.stopPropagation()}>
-                            <PermissionGate action="claim.approve">
-                              <button
-                                className="ac-action-btn ac-action-btn--complete"
-                                disabled={updating === claim.id}
-                                onClick={() => handleStatusUpdate(claim.id, 'completed')}
-                                title="Approve"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                  <polyline points="20 6 9 17 4 12"/>
-                                </svg>
-                              </button>
-                            </PermissionGate>
-                            <PermissionGate action="claim.approve">
-                              <button
-                                className="ac-action-btn ac-action-btn--fail"
-                                disabled={updating === claim.id}
-                                onClick={() => handleStatusUpdate(claim.id, 'failed')}
-                                title="Reject"
-                                aria-label="Reject claim"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                </svg>
-                              </button>
-                            </PermissionGate>
-                          </div>
-                        )}
-                      </td>
                     </tr>
                   );
                 })}
@@ -1016,11 +1026,25 @@ export default function AdminClaims({ onNavigate, draftState }) {
          *  Check tab, but the selected claim state is shared with the
          *  same approve/reject handlers used by the table view. */}
         {viewMode === 'review' && (
+          <div
+            className="ac-resizer"
+            onMouseDown={startSplitDrag}
+            onDoubleClick={() => setReviewSplit(560)}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Drag to resize the table and review panel"
+            title="Drag to resize · double-click to reset"
+          >
+            <span className="ac-resizer__grip" aria-hidden="true" />
+          </div>
+        )}
+
+        {viewMode === 'review' && (
           <ClaimDetailPanel
             claim={filtered.find(c => c.id === selectedId) || null}
             updating={updating !== null}
-            onApprove={(id, reason) => handleStatusUpdate(id, 'completed', reason)}
-            onFail={(id, reason) => handleStatusUpdate(id, 'failed', reason)}
+            onApprove={(id, reason, failedChecks) => handleStatusUpdate(id, 'completed', reason, failedChecks)}
+            onFail={(id, reason, failedChecks) => handleStatusUpdate(id, 'failed', reason, failedChecks)}
             onFlag={handleFlag}
             onClaimUpdate={(updated) => {
               // Merge a partial update (e.g. from hide/unhide image) back
@@ -1064,7 +1088,6 @@ export default function AdminClaims({ onNavigate, draftState }) {
         />
       )}
 
-      <QuickLinks currentPage="claims" onNavigate={onNavigate} />
     </div>
   );
 }

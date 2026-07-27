@@ -210,10 +210,11 @@ export default function AdminByoRequests() {
               ? <img className="byoreq__qr-img" src={qrDataUrl} alt="Counter QR" width="200" height="200" />
               : <div className="byoreq__qr-img byoreq__qr-img--placeholder" />}
 
-            <span className="byoreq__qr-brand-name">{brandName}</span>
-            {selectedLocation && addressLine(selectedLocation) && (
-              <div className="byoreq__qr-address">{addressLine(selectedLocation)}</div>
-            )}
+            {/* Name + address on one line: bold venue name, then ", address". */}
+            <div className="byoreq__qr-address">
+              <span className="byoreq__qr-brand-name">{brandName}</span>
+              {selectedLocation && addressLine(selectedLocation) ? <>, {addressLine(selectedLocation)}</> : null}
+            </div>
           </div>
 
           <button

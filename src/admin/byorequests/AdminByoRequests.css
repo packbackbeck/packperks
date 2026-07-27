@@ -25,34 +25,31 @@
 
 /* Branded, downloadable QR poster — this exact node is exported as PNG. */
 .byoreq__qr-brand {
-  /* Square poster — width === height so the exported PNG is square too. The
-     stack (logo, QR, name, address) is centered and sized to fit. */
-  width: 340px;
-  height: 340px;
+  /* Square poster — width === height so the exported PNG is square too. Tight
+     margins, no border/rounding/shadow: it exports as a clean square with the
+     stack (logo, QR, name + address) centered. */
+  width: 296px;
+  height: 296px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 16px;
+  gap: 4px;
+  padding: 8px;
   background: #FFFFFF;
-  border: 1px solid #ECE5D8;
-  border-radius: 16px;
-  box-shadow: 0 2px 10px rgba(40, 30, 15, 0.05);
   text-align: center;
   overflow: hidden;
 }
 .byoreq__qr-brand-head { display: flex; align-items: center; justify-content: center; gap: 9px; max-width: 100%; }
-.byoreq__qr-logo { height: 30px; width: auto; max-width: 120px; object-fit: contain; border-radius: 6px; }
+.byoreq__qr-logo { height: 30px; width: auto; max-width: 120px; object-fit: contain; }
 .byoreq__qr-img {
   width: 200px; height: 200px;
-  border-radius: 10px;
   background: #FFFFFF;
 }
 .byoreq__qr-img--placeholder { border: 1px dashed #DDD4C4; }
-/* Brand name sits right above the address and matches its size. */
-.byoreq__qr-brand-name { font-size: 11.5px; font-weight: 800; color: #14100A; line-height: 1.3; max-width: 100%; }
+/* Brand name is inline, first on the address line, then ", address". Same size. */
+.byoreq__qr-brand-name { font-size: 11.5px; font-weight: 800; color: #14100A; }
 .byoreq__qr-address { font-size: 11.5px; color: #9A9186; line-height: 1.4; max-width: 100%; }
 
 .byoreq__qr-download {

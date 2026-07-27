@@ -204,13 +204,13 @@ export default function AdminByoRequests() {
                 crossOrigin="anonymous"
                 onError={(e) => { e.currentTarget.src = packbackLogo; }}
               />
-              <span className="byoreq__qr-brand-name">{brandName}</span>
             </div>
 
             {qrDataUrl
               ? <img className="byoreq__qr-img" src={qrDataUrl} alt="Counter QR" width="200" height="200" />
               : <div className="byoreq__qr-img byoreq__qr-img--placeholder" />}
 
+            <span className="byoreq__qr-brand-name">{brandName}</span>
             {selectedLocation && addressLine(selectedLocation) && (
               <div className="byoreq__qr-address">{addressLine(selectedLocation)}</div>
             )}

@@ -2,13 +2,22 @@ import { useState } from 'react';
 import {
   signInWithEmail,
   signUpWithEmail,
-  signInWithGoogle,
   verifyEmailOtp,
   resendEmailOtp,
   sendPasswordReset,
 } from './authApi';
 import packperksLogo from '../../assets/images/packperks-logo.svg';
 import './LoginPage.css';
+
+/* Admin self-registration is restricted to the internal team domain. Anyone
+ * with a @packback.network address can create an admin account; everyone
+ * else is turned away here (and again server-side in bootstrap-admin). */
+const ADMIN_EMAIL_DOMAIN = 'packback.network';
+function isPackbackEmail(email) {
+  const at = String(email).lastIndexOf('@');
+  if (at < 0) return false;
+  return email.slice(at + 1).trim().toLowerCase().replace(/\.$/, '') === ADMIN_EMAIL_DOMAIN;
+}
 
 /* Login / Signup page for admins.
  *
@@ -43,6 +52,10 @@ export default function LoginPage() {
   async function handleSignUp(e) {
     e.preventDefault();
     setErr(null); setInfo(null); setBusy(true);
+    if (!isPackbackEmail(email)) {
+      setErr(`Admin accounts are limited to @${ADMIN_EMAIL_DOMAIN} email addresses.`);
+      setBusy(false); return;
+    }
     if (password.length < 8) {
       setErr('Pick a password with at least 8 characters.'); setBusy(false); return;
     }
@@ -92,12 +105,6 @@ export default function LoginPage() {
     } finally { setBusy(false); }
   }
 
-  async function handleGoogle() {
-    setErr(null); setBusy(true);
-    try { await signInWithGoogle(); }
-    catch (e) { setErr(friendlyError(e)); setBusy(false); }
-  }
-
   return (
     <div className="auth-page">
       <div className="auth-card">
@@ -129,13 +136,9 @@ export default function LoginPage() {
 
         {mode === 'signin' && (
           <form className="auth-form" onSubmit={handleSignIn}>
-            <button type="button" className="auth-btn auth-btn--google" onClick={handleGoogle} disabled={busy}>
-              <GoogleIcon /> Continue with Google
-            </button>
-            <div className="auth-divider"><span>or</span></div>
             <label className="auth-field">
               <span>Work email</span>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@burgerking.nl" autoComplete="email" required disabled={busy} />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@packback.network" autoComplete="email" required disabled={busy} />
             </label>
             <label className="auth-field">
               <span>Password</span>
@@ -154,13 +157,16 @@ export default function LoginPage() {
 
         {mode === 'signup' && (
           <form className="auth-form" onSubmit={handleSignUp}>
-            <button type="button" className="auth-btn auth-btn--google" onClick={handleGoogle} disabled={busy}>
-              <GoogleIcon /> Sign up with Google
-            </button>
-            <div className="auth-divider"><span>or use email</span></div>
+            <div className="auth-locked">
+              <LockIcon />
+              <div>
+                <strong>Restricted to the PackPerks team</strong>
+                <span>Only <b>@{ADMIN_EMAIL_DOMAIN}</b> email addresses can register for admin access.</span>
+              </div>
+            </div>
             <label className="auth-field">
               <span>Work email</span>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@burgerking.nl" autoComplete="email" required disabled={busy} />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={`you@${ADMIN_EMAIL_DOMAIN}`} autoComplete="email" required disabled={busy} />
             </label>
             <label className="auth-field">
               <span>Choose a password</span>
@@ -168,7 +174,7 @@ export default function LoginPage() {
             </label>
             {err && <p className="auth-err">{err}</p>}
             {info && <p className="auth-info">{info}</p>}
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy}>
+            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy || !isPackbackEmail(email)}>
               {busy ? 'Creating account…' : 'Create account'}
             </button>
             <p className="auth-fineprint">
@@ -251,17 +257,14 @@ function friendlyError(e) {
   if (m.includes('email not confirmed') || m.includes('not confirmed')) return 'Confirm your email first. Check your inbox for the verification code.';
   if (m.includes('token has expired') || m.includes('expired')) return 'That code has expired — request a new one.';
   if (m.includes('rate limit')) return 'Too many tries — please wait a minute and try again.';
-  if (m.includes('provider is not enabled')) return 'Google sign-in isn\'t configured for this project yet. Use email + password instead.';
   return e?.message || 'Something went wrong. Please try again.';
 }
 
-function GoogleIcon() {
+function LockIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 5.8 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
-      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16.1 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.8 29.5 5 24 5 16 5 9.2 9.5 6.3 14.7z"/>
-      <path fill="#4CAF50" d="M24 44c5.4 0 10.3-2 14-5.3l-6.5-5.3c-2 1.5-4.6 2.5-7.5 2.5-5.2 0-9.6-3.3-11.2-8L6.2 32.8C9.1 38.8 16 44 24 44z"/>
-      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.4l6.5 5.3c-.4.3 7-5.1 7-14.7 0-1.3-.1-2.4-.4-3.5z"/>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="10.5" width="16" height="10" rx="2.2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M7.5 10.5V7.8a4.5 4.5 0 0 1 9 0v2.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
   );
 }

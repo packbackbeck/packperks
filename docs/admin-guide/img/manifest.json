@@ -1,0 +1,70 @@
+[
+  {
+    "route": "overview",
+    "file": "overview"
+  },
+  {
+    "route": "claims",
+    "file": "claims"
+  },
+  {
+    "route": "users",
+    "file": "users"
+  },
+  {
+    "route": "rewards",
+    "file": "rewards"
+  },
+  {
+    "route": "appdesign",
+    "file": "appdesign"
+  },
+  {
+    "route": "byorequests",
+    "file": "byo-qr"
+  },
+  {
+    "route": "cupscans",
+    "file": "cupscans"
+  },
+  {
+    "route": "futurevendors",
+    "file": "futurevendors"
+  },
+  {
+    "route": "reports",
+    "file": "reports"
+  },
+  {
+    "route": "stats",
+    "file": "system-health"
+  },
+  {
+    "route": "behaviour",
+    "file": "behaviour"
+  },
+  {
+    "route": "settings",
+    "file": "org-settings"
+  },
+  {
+    "route": "organizations",
+    "file": "organizations"
+  },
+  {
+    "route": "support",
+    "file": "support"
+  },
+  {
+    "route": "org-switcher",
+    "file": "org-switcher"
+  },
+  {
+    "route": "byorequests-full",
+    "file": "byo-qr-full"
+  },
+  {
+    "route": "reports-full",
+    "file": "reports-full"
+  }
+]

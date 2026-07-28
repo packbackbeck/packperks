@@ -144,32 +144,21 @@
 }
 .auth-btn--primary:hover:not(:disabled) { background: #E55A30; box-shadow: 0 8px 22px rgba(253, 111, 70, 0.28); }
 
-.auth-btn--google {
-  background: white;
-  color: #1A1A1A;
-  border: 1px solid #E0DDD8;
-}
-.auth-btn--google:hover:not(:disabled) { background: #F4EFE5; }
-
-/* Divider */
-.auth-divider {
+/* Restricted-registration notice (signup only) */
+.auth-locked {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  color: #9E9A93;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin: 4px 0;
+  padding: 12px 14px;
+  border: 1px solid #E7DFCE;
+  border-radius: 12px;
+  background: #FAF6EC;
+  color: #6A6154;
 }
-.auth-divider::before,
-.auth-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: #EBE6DE;
-}
+.auth-locked svg { flex-shrink: 0; margin-top: 1px; color: var(--pb-orange-warm); }
+.auth-locked strong { display: block; font-size: 13px; color: #2A2622; }
+.auth-locked span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.45; }
+.auth-locked b { color: #2A2622; font-weight: 700; }
 
 /* Links + helpers */
 .auth-link {

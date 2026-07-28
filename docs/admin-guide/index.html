@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PackPerks Admin Guide</title>
+<style>
+  :root {
+    --ink: #17130D;
+    --ink-2: #3A342B;
+    --muted: #6E665A;
+    --faint: #948B7D;
+    --line: #E7DFD0;
+    --line-2: #F0EAdd;
+    --page: #F7F3EB;
+    --card: #FFFFFF;
+    --accent: #D2542B;      /* readable orange for links / markers */
+    --accent-soft: #FBEEE4;
+    --green: #157A34;
+    --green-soft: #E7F4EA;
+    --danger: #B23B2F;
+    --danger-soft: #FBEBE7;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(23,19,13,.04), 0 8px 28px rgba(23,19,13,.05);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Inter", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--page);
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ---- Masthead ---- */
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F1 100%);
+  }
+  .masthead__inner {
+    max-width: 1200px; margin: 0 auto; padding: 34px 28px 30px;
+  }
+  .brandline { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .brandmark {
+    width: 30px; height: 30px; border-radius: 8px; flex: none;
+    background: #14100A; color: #fff; display: grid; place-items: center;
+  }
+  .brandmark svg { display:block; }
+  .brandtext { font-weight: 700; letter-spacing: .2px; font-size: 15px; }
+  .brandtext span { color: var(--faint); font-weight: 500; }
+  .masthead h1 { margin: 0 0 8px; font-size: 34px; letter-spacing: -.5px; line-height: 1.12; }
+  .masthead p.lede { margin: 0; max-width: 720px; color: var(--ink-2); font-size: 16px; }
+  .masthead .scope {
+    margin-top: 18px; display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--muted);
+    background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+
+  /* ---- Layout ---- */
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: grid; grid-template-columns: 244px 1fr; gap: 46px; }
+  nav.toc {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+    padding: 34px 0 40px; margin-top: 4px;
+  }
+  nav.toc .toc-title { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin: 0 0 12px; font-weight: 700; }
+  nav.toc ol { list-style: none; margin: 0 0 22px; padding: 0; counter-reset: t; }
+  nav.toc li { margin: 0; }
+  nav.toc a {
+    display: block; padding: 6px 12px 6px 14px; border-left: 2px solid transparent;
+    color: var(--muted); font-size: 13.5px; border-radius: 0 6px 6px 0;
+  }
+  nav.toc a:hover { color: var(--ink); background: #fff; text-decoration: none; }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent); background: #fff; font-weight: 600; }
+
+  main { padding: 34px 0 90px; min-width: 0; }
+
+  section { scroll-margin-top: 20px; padding: 8px 0 10px; }
+  section + section { border-top: 1px solid var(--line); margin-top: 34px; padding-top: 40px; }
+  .eyebrow { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin: 0 0 6px; }
+  h2 { font-size: 25px; letter-spacing: -.3px; margin: 0 0 8px; line-height: 1.2; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; letter-spacing: -.1px; }
+  p { margin: 0 0 14px; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 650; }
+
+  ul.clean, ol.steps { margin: 0 0 16px; padding-left: 0; list-style: none; }
+  ul.clean li { position: relative; padding-left: 20px; margin-bottom: 7px; }
+  ul.clean li::before { content: ""; position: absolute; left: 4px; top: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  ol.steps { counter-reset: s; }
+  ol.steps li { position: relative; padding-left: 34px; margin-bottom: 11px; }
+  ol.steps li::before {
+    counter-increment: s; content: counter(s);
+    position: absolute; left: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 12px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+
+  code { font-family: var(--mono); font-size: .88em; background: #F1EADB; padding: 1px 6px; border-radius: 5px; color: var(--ink-2); }
+
+  /* ---- Figures ---- */
+  figure.shot { margin: 18px 0 22px; }
+  figure.shot img { width: 100%; display: block; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); background: #14100A; }
+  figure.shot figcaption { margin-top: 9px; font-size: 12.5px; color: var(--faint); }
+  figure.shot figcaption b { color: var(--muted); font-weight: 650; }
+  .shot--scroll .frame { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .shot--scroll .frame img { border: none; border-radius: 0; box-shadow: none; }
+  .shot--scroll .hint { font-size: 12px; color: var(--faint); margin-top: 8px; }
+
+  /* ---- Callouts ---- */
+  .call { display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 14px 16px; border-radius: 10px; margin: 16px 0; font-size: 14px; }
+  .call .ic { margin-top: 1px; }
+  .call p { margin: 0; }
+  .call p + p { margin-top: 6px; }
+  .call--note { background: #FFFFFF; border: 1px solid var(--line); }
+  .call--note .ic { color: var(--faint); }
+  .call--caution { background: var(--danger-soft); border: 1px solid #F1CDC6; }
+  .call--caution .ic { color: var(--danger); }
+  .call--caution b { color: var(--danger); }
+  .call--tip { background: var(--green-soft); border: 1px solid #C6E4CD; }
+  .call--tip .ic { color: var(--green); }
+  .lbl { font-weight: 700; }
+
+  /* ---- Role table ---- */
+  table.roles { width: 100%; border-collapse: collapse; margin: 8px 0 6px; font-size: 14px; background:#fff; border:1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  table.roles th, table.roles td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+  table.roles th { background: #FBF7EF; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  table.roles tr:last-child td { border-bottom: none; }
+  table.roles td:first-child { font-weight: 650; white-space: nowrap; }
+
+  /* chips used inline to name UI controls */
+  .chip { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 1px 8px; border-radius: 6px; background: #EFE8DA; color: var(--ink-2); white-space: nowrap; }
+  .chip--go { background: var(--green-soft); color: var(--green); }
+  .chip--warn { background: #FBEEDA; color: #A85320; }
+  .chip--stop { background: var(--danger-soft); color: var(--danger); }
+
+  /* ---- Task walkthroughs ---- */
+  .task { border: 1px solid var(--line); background: #FFFDF8; border-radius: 12px; padding: 16px 20px 6px; margin: 18px 0 22px; box-shadow: var(--shadow); }
+  .task__head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .task__head .tk { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--accent); color: #fff; display: grid; place-items: center; }
+  .task__head .tk svg { display: block; }
+  .task__title { font-weight: 700; font-size: 15.5px; margin: 0; }
+  .task__freq { margin-left: auto; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: #F3ECDD; border-radius: 999px; padding: 3px 10px; }
+  .task ol.steps { margin: 12px 0 8px; }
+  .task ol.steps li { margin-bottom: 14px; }
+  .stepshot { margin: 10px 0 2px; }
+  .stepshot img { display: block; width: 100%; border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 1px 2px rgba(23,19,13,.05); background: #fff; }
+  .stepshot--modal img { max-width: 372px; }
+  .stepshot--panel img { max-width: 420px; }
+  .stepshot--md img { max-width: 600px; }
+  .stepshot--wide img { max-width: 100%; }
+  .stepshot--sm img { max-width: 290px; }
+  .stepshot figcaption { font-size: 12px; color: var(--faint); margin-top: 6px; }
+
+  .backtop { display:inline-block; margin-top: 6px; font-size: 12.5px; color: var(--faint); }
+
+  footer.doc { border-top: 1px solid var(--line); margin-top: 40px; padding: 26px 0 10px; color: var(--faint); font-size: 12.5px; }
+
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; gap: 0; }
+    nav.toc { position: static; height: auto; overflow: visible; padding: 22px 0 6px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+    nav.toc ol { columns: 2; column-gap: 18px; }
+    .masthead h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead__inner">
+    <div class="brandline">
+      <span class="brandmark" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4 8 4v14"/><path d="M9 9h.01M9 13h.01M9 17h.01M14 9h.01M14 13h.01M14 17h.01"/></svg>
+      </span>
+      <span class="brandtext">PackPerks <span>/ Admin Console</span></span>
+    </div>
+    <h1>Admin dashboard guide</h1>
+    <p class="lede">A plain-language walkthrough of the PackPerks admin dashboard: what each page is for, where to click, and what to double-check before any action that reaches a customer. Written for people who are new to the console and do not need to touch code.</p>
+    <span class="scope"><span class="dot"></span>Screens in this guide use the <b>La Place</b> store, one of the Bring Your Own vendors.</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-title">On this page</p>
+    <ol>
+      <li><a href="#start">Getting started</a></li>
+      <li><a href="#layout">The interface</a></li>
+      <li><a href="#switching">Switching stores and groups</a></li>
+      <li><a href="#publish">Draft, Preview and Publish</a></li>
+      <li><a href="#claims">Claims</a></li>
+      <li><a href="#users">Users</a></li>
+      <li><a href="#rewards">Rewards &amp; Offers</a></li>
+      <li><a href="#appdesign">App Design</a></li>
+      <li><a href="#byo">BYO QR Codes</a></li>
+      <li><a href="#cupscans">Cup Scans</a></li>
+      <li><a href="#future">Future Vendors</a></li>
+      <li><a href="#reports">Reports and emails</a></li>
+      <li><a href="#health">System Health</a></li>
+      <li><a href="#behaviour">User Behaviour</a></li>
+      <li><a href="#orgsettings">Org settings</a></li>
+      <li><a href="#orgs">Organizations &amp; Groups</a></li>
+      <li><a href="#support">Getting help</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- 1 -->
+    <section id="start">
+      <p class="eyebrow">Start here</p>
+      <h2>Getting started</h2>
+      <p>The admin console lives at <code>/admin</code> on the PackPerks site. Sign in with your <code>@packback.network</code> account. Only that email domain can create an admin account, so if you cannot register, ask a teammate to invite you.</p>
+
+      <h3>One store at a time</h3>
+      <p>Almost everything you see is scoped to a single active store. The active store shows at the top left (next to the PackPerks mark) and again at the bottom left of the sidebar. To work on a different store, switch it first (see <a href="#switching">Switching stores and groups</a>).</p>
+
+      <h3>Roles and what they can do</h3>
+      <p>Your role decides which pages you can open and whether the controls inside them are editable. If a page is missing from your sidebar, or a button looks greyed out, your role does not have access.</p>
+      <table class="roles">
+        <tr><th>Role</th><th>What it can do</th></tr>
+        <tr><td>Owner</td><td>Full control, including the Organizations list, groups and regions.</td></tr>
+        <tr><td>Admin</td><td>Full control of stores, rewards, design, claims and settings.</td></tr>
+        <tr><td>Manager</td><td>Day to day work: rewards, claims, design, users and reports. Limited on org level settings.</td></tr>
+        <tr><td>Checker</td><td>Review focused: claims, cup scans and users. Editing controls are disabled.</td></tr>
+      </table>
+    </section>
+
+    <!-- 2 -->
+    <section id="layout">
+      <p class="eyebrow">Orientation</p>
+      <h2>The interface</h2>
+      <p>Every page shares the same frame: a top bar, a left sidebar and the main content area. Learn these three and the rest of the dashboard is easy to move around.</p>
+
+      <figure class="shot">
+        <img src="img/overview.png" alt="The Overview page, showing the top bar, the left sidebar and the main content area" loading="lazy" />
+        <figcaption><b>The Overview page.</b> Top bar across the top, navigation sidebar on the left, and the active page filling the rest.</figcaption>
+      </figure>
+
+      <h3>Top bar</h3>
+      <ul class="clean">
+        <li><b>PackPerks mark and store name</b> on the far left tell you which store you are editing.</li>
+        <li><b>Search the dashboard</b> (also opens with <code>Cmd/Ctrl + K</code>) jumps to any page or setting by name.</li>
+        <li><b>Timezone</b> shows the clock the data is displayed in.</li>
+        <li><b>Settings, Help and Version history</b> are the three small icons. Help opens the support page; Version history lets you roll back a previous publish.</li>
+        <li><span class="chip">Preview</span> opens the customer app with your current unpublished draft.</li>
+        <li><span class="chip" style="background:#EDE7FB;color:#5B3FBF">Publish</span> pushes your staged changes live. See <a href="#publish">Draft, Preview and Publish</a>.</li>
+      </ul>
+
+      <h3>Left sidebar</h3>
+      <ul class="clean">
+        <li>The <b>page list</b> is your main navigation. The set of pages changes slightly per store type; a Bring Your Own store shows <b>BYO QR Codes</b>, for example.</li>
+        <li>The <b>Cashback and Refund rates</b> block near the bottom is a shortcut; clicking it opens Org settings.</li>
+        <li>The <b>store switcher</b> and <b>your profile</b> sit at the very bottom.</li>
+      </ul>
+    </section>
+
+    <!-- 3 -->
+    <section id="switching">
+      <p class="eyebrow">Navigation</p>
+      <h2>Switching stores and groups</h2>
+      <p>Click the store name at the bottom left to open the switcher. Standalone stores are listed flat. Stores that belong to a group are nested under the group name.</p>
+
+      <figure class="shot">
+        <img src="img/org-switcher.png" alt="The store switcher open, showing standalone stores and the Bring Your Own group with La Place and The Chocolate Company nested inside" loading="lazy" />
+        <figcaption><b>The store switcher.</b> The <b>Bring Your Own</b> group holds La Place and The Chocolate Company; the active store is highlighted.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li>Click any store to switch to it. The whole dashboard reloads scoped to that store.</li>
+        <li>The <b>gear on a store</b> opens that store's settings.</li>
+        <li>The <b>gear on a group</b> opens the Organizations page, where group members are managed.</li>
+        <li><b>Add organisation</b> starts the new store wizard. <b>Manage organisations</b> opens the full Organizations list.</li>
+      </ul>
+      <div class="call call--note">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg></span>
+        <p>Grouped stores such as the Bring Your Own vendors share a single customer balance, so a cup earned at one member is redeemable at the others.</p>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section id="publish">
+      <p class="eyebrow">How changes go live</p>
+      <h2>Draft, Preview and Publish</h2>
+      <p>There is no separate staging website. Instead PackPerks uses a draft for each store. When you change design, copy or settings, those edits save to a <b>draft</b> for the active store. Customers keep seeing the last published version until you publish.</p>
+      <ol class="steps">
+        <li>Make your edits on <a href="#appdesign">App Design</a>, <a href="#rewards">Rewards &amp; Offers</a> or <a href="#orgsettings">Org settings</a>. They save to the draft automatically or with a <span class="chip">Save changes</span> button.</li>
+        <li>Press <span class="chip">Preview</span> in the top bar to open the customer app with your draft, so you can check it before anyone else sees it.</li>
+        <li>When it looks right, press <span class="chip" style="background:#EDE7FB;color:#5B3FBF">Publish</span> to push the draft live.
+          <figure class="stepshot stepshot--sm"><img src="img/crop-publish.png" alt="The Publish button in the top bar" loading="lazy" /></figure>
+        </li>
+      </ol>
+      <div class="call call--caution">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <p><b>Publish is immediate and public.</b> It affects the live customer app for that store right away. If something looks wrong after publishing, use <b>Version history</b> (top bar) to roll back to an earlier snapshot.</p>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section id="claims">
+      <p class="eyebrow">Daily work</p>
+      <h2>Claims</h2>
+      <p>Claims are cashback and refund requests from customers, each with a receipt photo. This is where you approve or reject them.</p>
+
+      <figure class="shot">
+        <img src="img/claims.png" alt="The Claims page listing requests with receipt thumbnails, validation chips, amounts and review status" loading="lazy" />
+        <figcaption><b>The Claims list.</b> Counts at the top, filters and search below, then one row per request.</figcaption>
+      </figure>
+
+      <h3>Reading the list</h3>
+      <ul class="clean">
+        <li>The counts at the top read <span class="chip chip--warn">Pending</span> <span class="chip chip--go">Approved</span> <span class="chip chip--stop">Rejected</span>. Filters and a search box sit under them.</li>
+        <li><b>Validation</b> is an automatic first check on the receipt, for example <span class="chip chip--go">Passed</span>, <span class="chip chip--stop">Flagged</span>, <span class="chip chip--stop">not a receipt</span> or <span class="chip chip--stop">wrong item</span>. Treat it as a hint, not a decision.</li>
+        <li><b>Amount</b> is the cashback value. <b>Tikkie status</b> tracks the payout once approved. <b>Decided by</b> shows who reviewed it.</li>
+        <li>Use the <span class="chip">Table</span> and <span class="chip">Review</span> toggle at the top right to switch between the list and a focused one at a time review mode.</li>
+      </ul>
+
+      <h3>The two everyday tasks</h3>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <h4 class="task__title">Approve a claim and pay the customer</h4>
+          <span class="task__freq">Most frequent</span>
+        </div>
+        <ol class="steps">
+          <li>Open <b>Claims</b>, then click <span class="chip">Review</span> at the top right to switch from the table to the review layout. It selects the first pending claim for you.
+            <figure class="stepshot stepshot--sm"><img src="img/crop-claims-toggle.png" alt="The Table and Review toggle at the top of the Claims page" loading="lazy" /></figure>
+          </li>
+          <li>The review panel opens on the right: the receipt photo, the AI check, the claimant and the payout amount. Click the photo to enlarge it and confirm it is a genuine receipt that matches the reward.
+            <figure class="stepshot stepshot--panel"><img src="img/crop-review-panel.png" alt="The claim review panel with the receipt photo, AI check and claimant details" loading="lazy" /></figure>
+          </li>
+          <li>When you are satisfied, press <span class="chip chip--go">Approve &amp; Pay</span>.
+            <figure class="stepshot stepshot--sm"><img src="img/crop-review-buttons.png" alt="The Approve and Pay and Reject buttons at the bottom of the review panel" loading="lazy" /></figure>
+          </li>
+          <li>In the confirm box, check that every receipt rule reads <b>Yes</b>, add a note if you want, then press <b>Approve &amp; pay</b>. A payout link is created (Tikkie in the Netherlands) and the customer is notified.
+            <figure class="stepshot stepshot--modal"><img src="img/crop-approve-modal.png" alt="The approve confirmation with the receipt criteria set to Yes and an Approve and pay button" loading="lazy" /></figure>
+          </li>
+        </ol>
+      </div>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true" style="background:var(--danger)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+          <h4 class="task__title">Reject a claim</h4>
+          <span class="task__freq">Frequent</span>
+        </div>
+        <ol class="steps">
+          <li>In the same review panel, press <span class="chip chip--stop">Reject</span> instead of Approve.</li>
+          <li>In the confirm box, mark each rule that failed as <b>No</b>. The rules you mark No are the exact reasons the customer sees on their rejected screen, so be accurate. You must mark at least one No and add a short reason.
+            <figure class="stepshot stepshot--modal"><img src="img/crop-reject-modal.png" alt="The reject confirmation with one criterion marked No and a required reason field" loading="lazy" /></figure>
+          </li>
+          <li>Press <b>Reject claim</b>. The customer keeps their cups, sees why it failed, and can upload a new receipt. No payout is sent.</li>
+        </ol>
+      </div>
+
+      <div class="call call--caution">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <p><b>Approve &amp; Pay creates a real payout.</b> Check the receipt matches the reward and the amount is right before you confirm. A rejection is recoverable; a payout is not. If the confirm box warns that you are <b>overriding the AI</b>, look once more before committing.</p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section id="users">
+      <p class="eyebrow">Daily work</p>
+      <h2>Users</h2>
+      <p>Everyone who has opened this store's app. The header counts split them into two kinds.</p>
+
+      <figure class="shot">
+        <img src="img/users.png" alt="The Users page with a searchable table of visitors and users, showing type, email, marketing opt-in, device and cup counts" loading="lazy" />
+        <figcaption><b>The Users list.</b> A <b>Visitor</b> opened the app but has not earned a cup yet; a <b>User</b> has activity.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li>The <span class="chip">Show visitors</span> toggle (top right) hides or shows people who have not earned a cup yet.</li>
+        <li>Search by name, email or the short ID (first 8 characters).</li>
+        <li>Columns cover type, marketing opt in, device, current cups, lifetime cups, joined and last active.</li>
+        <li>Click any customer to open their detail panel on the right (balance, claims, activity). Drag the divider to resize it. Opening a customer from <a href="#cupscans">Cup Scans</a> lands you here with them already selected.</li>
+      </ul>
+      <div class="call call--note">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg></span>
+        <p>If a customer used the app on two devices and ended up with two accounts, an account merge can join them. Large or frequent merges are held for review to protect balances.</p>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section id="rewards">
+      <p class="eyebrow">Setup</p>
+      <h2>Rewards &amp; Offers</h2>
+      <p>The catalog of rewards customers redeem their cups for. The list is on the left; the editor for the selected reward is on the right.</p>
+
+      <figure class="shot">
+        <img src="img/rewards.png" alt="The Rewards and Offers page with the catalog list on the left and the reward editor on the right" loading="lazy" />
+        <figcaption><b>Rewards &amp; Offers.</b> Live and Draft counts at the top; the selected reward opens in the Setup editor.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li><span class="chip">Add Reward</span> creates one from scratch. <span class="chip">Import CSV</span> and <span class="chip">Download template</span> handle bulk changes.</li>
+        <li><span class="chip">Rearrange order</span> lets you drag rewards into the order customers see.</li>
+        <li>The editor has <b>Setup</b> (status, release window, name, description, price and cups needed, image), plus <b>Promotion</b> and <b>Content</b> tabs.</li>
+        <li>A reward's status can be Draft, Scheduled, Live, Paused, Expired or Archived. A release window can flip it live and expired on set dates automatically.</li>
+        <li><span class="chip">Set featured</span> stars a reward so it stands out in the app.</li>
+      </ul>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <h4 class="task__title">Add a new reward</h4>
+        </div>
+        <ol class="steps">
+          <li>Press <span class="chip">Add Reward</span> at the top right. To add many at once, use <b>Import CSV</b> with the downloadable template instead.
+            <figure class="stepshot stepshot--md"><img src="img/crop-add-reward.png" alt="The Download template, Import CSV and Add Reward buttons" loading="lazy" /></figure>
+          </li>
+          <li>In the editor, set the <b>Status</b> (keep it Draft while you work, set it Live when ready), then fill in the name, description, price and cups needed, and add a photo. A release window can flip it live and expired on set dates for you.
+            <figure class="stepshot stepshot--panel"><img src="img/crop-reward-editor.png" alt="The reward editor showing the status options and basic info fields" loading="lazy" /></figure>
+          </li>
+          <li>Your edits save to the draft. Press <b>Publish</b> in the top bar to put the reward in front of customers.</li>
+        </ol>
+      </div>
+
+      <div class="call call--caution">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <p><b>Archive</b> retires a reward from the menu. It is kept for reporting rather than deleted, but customers can no longer claim it. Reward changes save to the draft, so <b>Publish</b> to make them live.</p>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section id="appdesign">
+      <p class="eyebrow">Setup</p>
+      <h2>App Design</h2>
+      <p>Controls how the customer app looks and reads for this store. Each store has its own design; switching the active store loads its own draft.</p>
+
+      <figure class="shot">
+        <img src="img/appdesign.png" alt="The App Design page with the palette editor on the left and a live phone preview of the customer app on the right" loading="lazy" />
+        <figcaption><b>App Design.</b> Edit on the left, watch the <b>Live preview</b> phone update on the right.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li>Tabs across the top: <b>Colors</b>, <b>Copy</b>, <b>Sections</b>, <b>Guide stories</b> and <b>Smart import</b>.</li>
+        <li>The palette sets the brand colours (primary, accent, deep accent), the two surface layers and the text colours. Contrast ratios are shown so text stays readable.</li>
+        <li><span class="chip">Save changes</span> stores your edits to the draft; <span class="chip">Revert</span> discards them.</li>
+      </ul>
+      <div class="call call--tip">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <p>Use the live preview and the top bar <b>Preview</b> to check a change, then <b>Publish</b> when you are happy. Nothing here is public until you publish.</p>
+      </div>
+    </section>
+
+    <!-- 9 -->
+    <section id="byo">
+      <p class="eyebrow">Bring Your Own</p>
+      <h2>BYO QR Codes</h2>
+      <p>This page belongs to Bring Your Own stores. It holds the counter QR that customers scan to earn a cup, and the review queue for scans that go over the daily limit.</p>
+
+      <figure class="shot">
+        <img src="img/byo-qr.png" alt="The BYO QR Codes page with the counter QR poster, location selector, auto-credit limit and the review queue" loading="lazy" />
+        <figcaption><b>BYO QR Codes.</b> The counter QR on the left; the location, link and auto-credit limit on the right.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li><b>Counter QR</b>: print it and stand it on the counter. Each scan adds one cup to the customer's balance.</li>
+        <li><b>Location</b>: pick the location so scans are attributed to the right address. Each location has its own QR. <span class="chip">Download PNG</span> saves the poster.</li>
+        <li><b>Auto-credit limit</b>: how many scans one customer can auto-collect per 24 hours before extra scans need review. Change it and press <span class="chip">Save limit</span>.</li>
+        <li><b>Review queue</b>: when a customer goes over the limit, the extra cup lands here under <span class="chip">Pending</span>. Approve to credit it, or deny to reject.</li>
+      </ul>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v6M17 20h3"/></svg></span>
+          <h4 class="task__title">Print the counter QR for a location</h4>
+        </div>
+        <ol class="steps">
+          <li>Choose the <b>Location</b> from the dropdown so scans are credited to the right address.</li>
+          <li>Press <span class="chip">Download PNG</span>, then print it and stand it on the counter. Every scan adds one cup to the customer's balance.
+            <figure class="stepshot stepshot--sm"><img src="img/crop-byo-qr.png" alt="The counter QR poster with the Download PNG button" loading="lazy" /></figure>
+          </li>
+        </ol>
+      </div>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span>
+          <h4 class="task__title">Change the daily auto-credit limit</h4>
+        </div>
+        <ol class="steps">
+          <li>In <b>Auto-credit limit</b>, set how many scans one customer can auto collect per 24 hours.</li>
+          <li>Press <span class="chip">Save limit</span>. Scans above the limit are not lost; they wait in the queue below for you to approve or deny.
+            <figure class="stepshot stepshot--sm"><img src="img/crop-byo-limit.png" alt="The auto-credit limit field with a Save limit button" loading="lazy" /></figure>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section id="cupscans">
+      <p class="eyebrow">Records and review</p>
+      <h2>Cup Scans</h2>
+      <p>A log of every cup return scan for this store, with its photo and location. It is also the review queue for Bring Your Own scans: when a customer goes over the store's daily auto-credit limit, the extra scan is held here for you to approve or reject.</p>
+
+      <figure class="shot">
+        <img src="img/cupscans.png" alt="The Cup Scans page with a Held status filter and a Table / Review toggle" loading="lazy" />
+        <figcaption><b>Cup Scans.</b> Filter by status (including <b>Held</b>), switch between the <b>Table</b> and <b>Review</b> layouts, and click any customer to open them on the Users page.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li>Held scans float to the top with a purple accent and an <b>Approve</b> / <b>Reject</b> action. A <b>"N awaiting review"</b> chip in the header jumps straight to them.</li>
+        <li>The <span class="chip">Table</span> / <span class="chip">Review</span> toggle (top right) opens a resizable split with a detail panel on the right. Drag the divider to set the width.</li>
+        <li>Click a customer in any row to jump to the <a href="#users">Users</a> page with that person already open.</li>
+      </ul>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <h4 class="task__title">Review a held cup scan</h4>
+          <span class="task__freq">Bring Your Own</span>
+        </div>
+        <ol class="steps">
+          <li>Open <b>Cup Scans</b>. Held scans sit at the top with <b>Approve</b> / <b>Reject</b> right in the row, or click the <b>awaiting review</b> chip to filter to just them.
+            <figure class="stepshot stepshot--wide"><img src="img/crop-cs-held.png" alt="A held cup scan row with Approve and Reject buttons" loading="lazy" /></figure>
+          </li>
+          <li>To see the full picture first, switch to <span class="chip">Review</span> and select the row. The panel explains why it was held and who it belongs to (click the customer to open them on Users).
+            <figure class="stepshot stepshot--panel"><img src="img/crop-cs-detail.png" alt="The held cup request detail panel with an Approve and credit and a Reject button" loading="lazy" /></figure>
+          </li>
+          <li>Press <b>Approve &amp; credit</b> to add the cup to the customer's balance, or <b>Reject</b> to credit nothing.</li>
+        </ol>
+      </div>
+
+      <div class="call call--caution">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <p><b>Approving credits a real cup.</b> Only approve over-limit scans you believe are genuine. The daily auto-credit limit itself is set per store on the <a href="#byo">BYO QR Codes</a> page.</p>
+      </div>
+    </section>
+
+    <!-- 11 -->
+    <section id="future">
+      <p class="eyebrow">Growth</p>
+      <h2>Future Vendors</h2>
+      <p>Places that are not live yet but appear as coming soon pins on the customer Stores map. They hint to customers that more locations are on the way.</p>
+      <figure class="shot">
+        <img src="img/futurevendors.png" alt="The Future Vendors page for managing coming soon venues on the customer map" loading="lazy" />
+        <figcaption><b>Future Vendors.</b> Add and manage the coming soon pins shown to customers.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 12 -->
+    <section id="reports">
+      <p class="eyebrow">Data and email</p>
+      <h2>Reports and emails</h2>
+      <p>Two jobs live here. The top of the page builds and exports data on demand. Further down are three email tools that send information out on a schedule or the moment something happens.</p>
+
+      <figure class="shot">
+        <img src="img/reports.png" alt="The Reports page top, with dataset, columns, time period and format controls and a data preview" loading="lazy" />
+        <figcaption><b>Reports, top of page.</b> Choose a dataset, columns, time period and format, then export.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li><b>Dataset</b>: Users, Claims, Cup Scans or Activity. Tick the <b>columns</b> you want, pick a <b>time period</b>, choose a <b>format</b> (CSV, Excel, JSON or PDF).</li>
+        <li><span class="chip">Export CSV</span>, <span class="chip">Copy</span> and <span class="chip">Print / PDF</span> are at the top right.</li>
+      </ul>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+          <h4 class="task__title">Export a data file</h4>
+        </div>
+        <ol class="steps">
+          <li>Pick a <b>dataset</b>, tick the <b>columns</b> you want, set a <b>time period</b> and a <b>format</b>, then press <b>Export</b>. The rows update as a live preview so you can check before you download.
+            <figure class="stepshot stepshot--sm"><img src="img/crop-report-export.png" alt="The report builder with dataset, columns, time period and format controls" loading="lazy" /></figure>
+          </li>
+        </ol>
+      </div>
+
+      <h3>The three email tools</h3>
+      <ul class="clean">
+        <li><b>Automated reports</b>: emails a scheduled data export, for example a weekly valid claims summary per store for vendor direct debits.</li>
+        <li><b>Weekly digest</b>: a designed email of the metrics you pick (new users, cups collected, cashback paid, CO&#8322; avoided and more), sent every week.</li>
+        <li><b>Notification center</b>: an instant email the moment something happens. You choose the events: new claim, new account, cup scanned, BYO cup request or an account merge held for review.</li>
+      </ul>
+      <p>Each tool has its own <b>Send to</b> address, a <b>Scope</b> (this store, or the whole group) and a <span class="chip">Send test now</span> button so you can check the email before turning it on.</p>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+          <h4 class="task__title">Turn on instant email alerts</h4>
+        </div>
+        <ol class="steps">
+          <li>In <b>Notification center</b>, switch it <span class="chip chip--go">On</span>, then tick the events you want to hear about (new claim, new account, cup scanned, BYO cup request, account merge).</li>
+          <li>Set the <b>Send alerts to</b> address and the <b>Scope</b>, press <span class="chip">Send test now</span> to check it arrives, then <b>Save notifications</b>.
+            <figure class="stepshot stepshot--wide"><img src="img/crop-notifications.png" alt="The Notification center with event checkboxes, a send-to address, scope, Send test now and Save notifications" loading="lazy" /></figure>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 13 -->
+    <section id="health">
+      <p class="eyebrow">Diagnostics</p>
+      <h2>System Health</h2>
+      <p>A go or no-go dashboard for the technical return flow: QR generation, scanning, rewarding and dashboard tracking. It is where you confirm the mechanics are working for a store.</p>
+
+      <figure class="shot">
+        <img src="img/system-health.png" alt="The System Health page with an overall verdict banner and metric cards showing go, conditional and no-go bands" loading="lazy" />
+        <figcaption><b>System Health.</b> An overall verdict at the top, then one card per metric.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li>The banner at the top gives an overall <span class="chip chip--go">Go</span> or <span class="chip chip--stop">No-go</span> verdict.</li>
+        <li>Each card (scan success, correct organization page, cup count, event accuracy, duplicate handling, critical errors, user stuck rate and more) reports a percentage against <b>Go</b>, <b>Conditional</b> and <b>No-go</b> bands.</li>
+        <li>Use <span class="chip">Inspect rows</span> on a card to see the exact scans behind the number.</li>
+      </ul>
+      <div class="call call--note">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg></span>
+        <p>A metric can read <b>Not measurable</b> or <b>N/A</b> when there is not enough data yet. That is expected for a new or quiet store, not an error.</p>
+      </div>
+    </section>
+
+    <!-- 14 -->
+    <section id="behaviour">
+      <p class="eyebrow">Diagnostics</p>
+      <h2>User Behaviour</h2>
+      <p>The behavioural view of the same audience: how visitors turn into users, where people drop off, and how they move through the app. Use it to understand the funnel rather than individual accounts.</p>
+      <figure class="shot">
+        <img src="img/behaviour.png" alt="The User Behaviour page with funnel and engagement metrics" loading="lazy" />
+        <figcaption><b>User Behaviour.</b> Funnel and engagement metrics for the active store.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 15 -->
+    <section id="orgsettings">
+      <p class="eyebrow">Configuration</p>
+      <h2>Org settings</h2>
+      <p>Everything for one store in a single place: profile, locations, team, payout rates, app copy and policies. Open it from the store gear in the switcher, or by clicking the rates block in the sidebar.</p>
+
+      <figure class="shot">
+        <img src="img/org-settings.png" alt="The Settings and Organisation page with tabs and the organisation profile, locations and team sections" loading="lazy" />
+        <figcaption><b>Settings &amp; Organisation.</b> Tabs across the top, then the profile card, locations and team.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li>Tabs: <b>Profile</b>, <b>Locations</b>, <b>Team</b>, <b>Activity</b>, <b>Payout rates</b>, <b>App copy</b>, <b>Cup rules</b>, <b>Feature flags</b>.</li>
+        <li><b>Profile</b> (via <span class="chip">Edit</span>): URL slug, brand name, KVK and BTW, address, <b>country</b>, contact details and brand colour.</li>
+        <li><b>Locations</b>: <span class="chip">Add location</span>, or <b>Edit</b> and <b>Delete</b> an existing one.</li>
+        <li><b>Team members</b>: <span class="chip">Invite teammate</span> by email and set their role.</li>
+      </ul>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z"/><path d="M12 7v6M9 10h6"/></svg></span>
+          <h4 class="task__title">Add a location</h4>
+        </div>
+        <ol class="steps">
+          <li>On the <b>Locations</b> card, press <span class="chip">+ Add location</span>, fill in the address, and save. Each location gets its own BYO QR so scans are attributed correctly.
+            <figure class="stepshot stepshot--md"><img src="img/crop-locations.png" alt="The Locations card with the Add location button and an Edit and Delete row" loading="lazy" /></figure>
+          </li>
+          <li>Use <b>Edit</b> to change a location later. <b>Delete</b> removes it and its QR, so use it with care.</li>
+        </ol>
+      </div>
+
+      <div class="task">
+        <div class="task__head">
+          <span class="tk" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></span>
+          <h4 class="task__title">Invite a teammate</h4>
+        </div>
+        <ol class="steps">
+          <li>On the <b>Team members</b> card, press <span class="chip">+ Invite teammate</span>, enter their email, choose a role, and send. They receive an invite and get that role on their first sign in.
+            <figure class="stepshot stepshot--md"><img src="img/crop-team.png" alt="The Team members card with the Invite teammate button" loading="lazy" /></figure>
+          </li>
+        </ol>
+      </div>
+
+      <div class="call call--caution">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <p><b>Country drives payouts.</b> It sets the currency and the payout method (the Netherlands uses Tikkie). The wrong country means no payout link for customers. Also treat <b>Delete location</b> with care; it removes the location and its own QR.</p>
+      </div>
+    </section>
+
+    <!-- 16 -->
+    <section id="orgs">
+      <p class="eyebrow">Configuration</p>
+      <h2>Organizations &amp; Groups</h2>
+      <p>The PackPerks staff view of every client brand. This is where you add stores, switch between them, bundle them into groups, and take one offline. The group gear in the switcher and the Manage organisations link both open this page.</p>
+
+      <figure class="shot">
+        <img src="img/organizations.png" alt="The Organizations page listing every store with open settings, switch to, duplicate and soft delete actions" loading="lazy" />
+        <figcaption><b>Organisations.</b> Every store, its slug and status, and its actions. Bring Your Own stores carry the group tag.</figcaption>
+      </figure>
+
+      <ul class="clean">
+        <li>Per store: <span class="chip">Open settings</span>, <span class="chip">Switch to</span>, <span class="chip">Duplicate</span> and <span class="chip chip--stop">Soft delete</span>.</li>
+        <li><span class="chip">Add organisation</span> starts the new store wizard.</li>
+        <li><b>Groups</b> (such as Bring Your Own) bundle stores that share a customer balance. <b>Regions</b> at the bottom handle multi regional setups.</li>
+      </ul>
+      <div class="call call--caution">
+        <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <p><b>Soft delete</b> hides a store from the switcher and the customer app. The good news: data is preserved and the store can be restored later. It is safer than a hard delete, but customers lose access straight away, so confirm you have the right store first.</p>
+      </div>
+    </section>
+
+    <!-- 17 -->
+    <section id="support">
+      <p class="eyebrow">When you are stuck</p>
+      <h2>Getting help</h2>
+      <p>Open the help page from the question mark icon in the top bar. It has quick links to resources and three forms that reach the PackBack team.</p>
+
+      <figure class="shot">
+        <img src="img/support.png" alt="The support page with a hero, resource links and three contact forms" loading="lazy" />
+        <figcaption><b>Support.</b> Resource links, then the Contact support, Share feedback and Request a feature forms.</figcaption>
+      </figure>
+
+      <h3>Where does support email go</h3>
+      <p>Each form opens your own mail client with a prefilled message, then sends to the right inbox. Every message includes a short context footer with your role, organisation, browser and the page you were on, so the team can triage faster.</p>
+      <table class="roles">
+        <tr><th>Form</th><th>Goes to</th></tr>
+        <tr><td>Contact support</td><td><code>info@packback.network</code></td></tr>
+        <tr><td>Share feedback</td><td><code>feedback@packback.network</code></td></tr>
+        <tr><td>Request a feature</td><td><code>product@packback.network</code></td></tr>
+      </table>
+      <p class="muted" style="font-size:13.5px">The Resources row also links to the PackBack website, the admin documentation, the live status page and the privacy and legal pages.</p>
+    </section>
+
+    <footer class="doc">
+      PackPerks admin guide. Screens captured from the live dashboard using the La Place store. Figures may show sample account data.
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  // Scrollspy: highlight the current section in the table of contents.
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var sections = Array.prototype.slice.call(document.querySelectorAll('main section'));
+    var current = null;
+    function onScroll() {
+      var y = window.scrollY + 120;
+      var active = sections[0];
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].offsetTop <= y) active = sections[i];
+      }
+      if (active && active.id !== current) {
+        if (current && map[current]) map[current].classList.remove('active');
+        current = active.id;
+        if (map[current]) map[current].classList.add('active');
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+</script>
+
+</body>
+</html>

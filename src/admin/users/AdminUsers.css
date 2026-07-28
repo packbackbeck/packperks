@@ -71,8 +71,58 @@
 .au-layout {
   display: flex;
   gap: 20px;
-  flex: 1;
+  /* Fixed height so the table (and detail panel) scroll internally and fill
+   * the screen like the Claims table, instead of growing the page. The merge
+   * requests block sits below and the page scrolls to reach it. */
+  flex: none;
+  height: calc(100vh - 204px);
+  min-height: 440px;
+}
+
+/* Review layout: table on the left, a resizable detail panel on the right.
+ * The grid-template-columns are set inline (table 1fr · 9px resizer · panel). */
+.au-layout--review {
+  display: grid;
+  gap: 0;
+  align-items: stretch;
+}
+.au-layout--review > .au-table-wrap,
+.au-layout--review > .udp {
   min-height: 0;
+  height: 100%;
+}
+.au-layout--review > .udp { width: auto; }
+
+/* Drag handle between the table and the detail panel. */
+.au-resizer {
+  position: relative;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+}
+.au-resizer::before {
+  content: '';
+  width: 1.5px;
+  height: 100%;
+  background: #E8E6E1;
+  transition: background 0.12s ease, width 0.12s ease;
+}
+.au-resizer:hover::before,
+.au-resizer:active::before { background: var(--pb-orange-warm); width: 3px; }
+.au-resizer__grip {
+  position: absolute;
+  width: 4px; height: 34px; border-radius: 3px;
+  background: #D8D2C8;
+  transition: background 0.12s ease;
+}
+.au-resizer:hover .au-resizer__grip,
+.au-resizer:active .au-resizer__grip { background: var(--pb-orange-warm); }
+
+@media (max-width: 900px) {
+  .au-layout--review { grid-template-columns: 1fr !important; }
+  .au-resizer, .au-layout--review > .udp { display: none; }
 }
 
 .au-table-wrap {

@@ -50,6 +50,17 @@ const ICONS: Record<string, string> = {
   merge_request: '🔗',
   test: '🔔',
 };
+// Where each event's "open it" button should land the admin. The admin app
+// routes by URL hash and reads ?org=<slug>, so we deep-link straight to the
+// relevant review page scoped to the right store.
+const ADMIN_URL = 'https://perks.packback.network/admin';
+const CTA: Record<string, { label: string; page: string }> = {
+  claim_created:   { label: 'Review claim',         page: 'claims' },
+  account_created: { label: 'View customer',        page: 'users' },
+  cup_scanned:     { label: 'Open cup scans',        page: 'cupscans' },
+  byo_request:     { label: 'Review request',        page: 'byorequests' },
+  merge_request:   { label: 'Review merge request',  page: 'users' },
+};
 const esc = (s: string) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] || c));
 const fmtWhen = (ts: string | null | undefined) =>
   ts ? new Date(ts).toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : null;
@@ -196,10 +207,17 @@ Deno.serve(async (req) => {
   // Specifics (who / what / where / when).
   const { rows: detailRows, orgId } = isTest ? { rows: [] as string[][], orgId: null } : await loadDetails(eventType, body.row_id || null);
   let orgName = '';
+  let orgSlug = '';
   if (orgId) {
-    const { data: org } = await supabase.from('organizations').select('name, partner_brand_name').eq('id', orgId).maybeSingle();
+    const { data: org } = await supabase.from('organizations').select('name, partner_brand_name, slug').eq('id', orgId).maybeSingle();
     orgName = org?.partner_brand_name || org?.name || '';
+    orgSlug = org?.slug || '';
   }
+
+  // CTA: deep-link to the relevant admin page (scoped to the store) so the
+  // admin lands where they can act on this exact notification.
+  const cta = isTest ? { label: 'Open dashboard', page: 'overview' } : CTA[eventType];
+  const ctaUrl = cta ? `${ADMIN_URL}${orgSlug ? '?org=' + orgSlug : ''}#${cta.page}` : '';
 
   const rowHtml = detailRows.map((r) =>
     `<tr><td style='padding:7px 0;border-top:1px solid #F0EADD;color:#8B8577;font-size:12.5px;'>${esc(r[0])}</td>` +
@@ -220,6 +238,7 @@ Deno.serve(async (req) => {
     `<h1 style='margin:6px 0 8px;font-size:20px;font-weight:800;color:#14100A;'>${icon} ${esc(label)}</h1>` +
     `<p style='margin:0 0 4px;font-size:14.5px;line-height:1.5;color:#5A554F;'>${esc(summary)}</p>` +
     detailBlock +
+    (cta ? `<div style='margin-top:18px;'><a href='${ctaUrl}' style='display:inline-block;background:#6C4CE0;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 22px;border-radius:10px;'>${esc(cta.label)} &rarr;</a></div>` : '') +
     `<div style='margin-top:14px;font-size:12px;color:#A89E92;'>Received ${esc(nowStr)}</div>` +
     `</td></tr>` +
     `<tr><td style='padding:14px;text-align:center;'><p style='margin:0;font-size:11.5px;color:#B4AC9E;'>` +
@@ -233,6 +252,7 @@ Deno.serve(async (req) => {
     '',
     summary,
     ...(textLines ? ['', textLines] : []),
+    ...(cta ? ['', `${cta.label}: ${ctaUrl}`] : []),
     '',
     `Received ${nowStr}`,
     '',

@@ -101,16 +101,23 @@ function AdminShell() {
   const { profile } = useAuthRole();
   const { activeOrgId, activeOrgSlug } = useOrg();
   const [wizardOpen, setWizardOpen] = useState(false);
+  /* When another page (e.g. Cup Scans) wants to hand off to the Users
+   * page with a specific customer opened, it calls onNavigate('users',
+   * { focusUserId }). We stash the id here and pass it to AdminUsers,
+   * which selects that user and then clears it via onFocusConsumed. */
+  const [focusUserId, setFocusUserId] = useState(null);
 
   /* Track which pages have been visited so we can keep them mounted
    * after first visit. Set is fine here — React's reference equality
    * isn't checked because we only ever add, never remove. */
   const [visited, setVisited] = useState(() => new Set([page]));
 
-  /* Wrap setPage so URL hash and visited-set stay in sync. */
-  function setPage(next) {
+  /* Wrap setPage so URL hash and visited-set stay in sync. An optional
+   * second arg carries cross-page intent (currently { focusUserId }). */
+  function setPage(next, opts) {
     if (next === 'org') next = 'settings'; // merged page
     if (!VALID_PAGES.has(next)) return;
+    if (opts?.focusUserId) setFocusUserId(opts.focusUserId);
     setPageState(next);
     setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
     // Update the hash without a scroll jump.
@@ -179,7 +186,7 @@ function AdminShell() {
             <AdminAppDesign draftState={draftState} />
           </KeepAlive>
           <KeepAlive id="users" activeId={page} visited={visited}>
-            <AdminUsers onNavigate={setPage} />
+            <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} />
           </KeepAlive>
           <KeepAlive id="claims" activeId={page} visited={visited}>
             <AdminClaims onNavigate={setPage} draftState={draftState} />

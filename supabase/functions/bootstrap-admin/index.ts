@@ -15,8 +15,8 @@
 //           (TRUSTED_ADMIN_DOMAINS, e.g. @packback.network), grant 'admin'
 //           so staff can self-register with working access — no invite
 //           needed.
-//        d. Else default to 'checker' so unsolicited signups can't
-//           accidentally see private data; an owner can promote later.
+//        d. Else reject with 403 registration_locked — admin sign-up is
+//           locked to @packback.network + invited teammates.
 //   3. Insert the profile with org_id = NULL (global: every admin sees
 //      and controls all orgs), write a `user.signup` audit log entry,
 //      record the first login in `admin_login_history`, and return.
@@ -131,13 +131,22 @@ Deno.serve(async (req) => {
     consumedInvitationId = invitation.id;
   } else {
     // No invitation. If there are no admins at all yet, this user is the
-    // founding owner. Otherwise, trusted-domain staff self-register as
-    // 'admin'; everyone else drops in as 'checker' — safe default.
+    // founding owner. Otherwise, only trusted-domain staff (@packback.network)
+    // may self-register, as 'admin'. Everyone else is turned away: admin
+    // registration is locked to the internal team + invited teammates.
     const { count } = await supabase
       .from("admin_profiles")
       .select("id", { count: "exact", head: true });
     if ((count ?? 0) === 0) role = "owner";
     else if (isTrustedAdminEmail(email)) role = "admin";
+    else
+      return jsonResponse(
+        {
+          error: "registration_locked",
+          detail: "Admin access is limited to @packback.network email addresses or invited teammates. Ask a PackPerks admin to invite you.",
+        },
+        403,
+      );
   }
 
   // ── 3. Insert the profile (org_id = NULL → global admin).

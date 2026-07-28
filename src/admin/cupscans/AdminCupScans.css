@@ -1,11 +1,22 @@
 .admin-cup-scans {
-  padding: 32px 32px 48px;
+  padding: 28px 32px 20px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px);
+  /* Fill the viewport so the table (and review panel) scroll internally and
+   * fit the screen height, like the Claims table. */
+  height: calc(100vh - 56px);
+  overflow: hidden;
 }
 
-.cs-header { margin-bottom: 16px; flex-shrink: 0; }
+.cs-header {
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cs-header__left { min-width: 0; }
 .cs-header__title {
   font-size: 22px;
   font-weight: 800;
@@ -241,6 +252,7 @@
 .cs-status--partial   { background: rgba(249,115,22,0.12); color: #EA580C; }
 .cs-status--failed    { background: rgba(248,113,113,0.12); color: #DC2626; }
 .cs-status--pending   { background: rgba(249,115,22,0.12); color: #EA580C; }
+.cs-status--pending_review { background: rgba(147,51,234,0.12); color: #7C3AED; }
 .cs-status--approved  { background: rgba(74,222,128,0.12); color: #16A34A; }
 .cs-status--rejected  { background: rgba(248,113,113,0.12); color: #DC2626; }
 .cs-status--completed { background: rgba(74,222,128,0.12); color: #16A34A; }
@@ -326,3 +338,159 @@
   box-shadow: inset 3px 0 0 var(--pb-purple-600);
 }
 .cs-row:hover { background: #F5F2EE; }
+
+/* ── View-mode toggle (Table / Review) ── */
+.cs-viewmode {
+  display: inline-flex;
+  background: #F1EDE6;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.cs-viewmode__btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 13px;
+  border: none; background: transparent;
+  border-radius: 8px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  color: #6C6259; cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+.cs-viewmode__btn--active {
+  background: #FFFFFF; color: #1A1A1A;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* Held-count chip doubles as a button that jumps to the review queue. */
+.cs-chip--held {
+  border: none; cursor: pointer; font-family: inherit;
+  background: rgba(147,51,234,0.12); color: #7C3AED;
+  transition: filter 0.14s ease;
+}
+.cs-chip--held:hover { filter: brightness(0.96); }
+
+/* ── Action result banner ── */
+.cs-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 12px; padding: 10px 14px;
+  background: #E7F6EC; border: 1px solid #A9DCBC; color: #1A6B38;
+  border-radius: 10px; font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.cs-banner--error { background: #FEECEA; border-color: #F5C4BD; color: #B4463E; }
+.cs-banner__x {
+  border: none; background: transparent; font-size: 18px; line-height: 1;
+  color: inherit; cursor: pointer; opacity: 0.7;
+}
+.cs-banner__x:hover { opacity: 1; }
+
+/* ── Review layout: table + resizable detail panel ── */
+.cs-layout { flex: 1; min-height: 0; display: flex; }
+.cs-layout--review { display: grid; gap: 0; align-items: stretch; }
+.cs-layout--review > .cs-table-wrap,
+.cs-layout--review > .cs-detail { min-height: 0; height: 100%; }
+
+.cs-resizer {
+  position: relative; cursor: col-resize;
+  display: flex; align-items: center; justify-content: center; align-self: stretch;
+}
+.cs-resizer::before {
+  content: ''; width: 1.5px; height: 100%; background: #E8E6E1;
+  transition: background 0.12s ease, width 0.12s ease;
+}
+.cs-resizer:hover::before, .cs-resizer:active::before { background: var(--pb-orange-warm); width: 3px; }
+.cs-resizer__grip {
+  position: absolute; width: 4px; height: 34px; border-radius: 3px; background: #D8D2C8;
+  transition: background 0.12s ease;
+}
+.cs-resizer:hover .cs-resizer__grip, .cs-resizer:active .cs-resizer__grip { background: var(--pb-orange-warm); }
+
+@media (max-width: 900px) {
+  .cs-layout--review { grid-template-columns: 1fr !important; }
+  .cs-resizer, .cs-layout--review > .cs-detail { display: none; }
+}
+
+/* ── Held rows + inline approve/reject ── */
+.cs-row--held { background: rgba(147,51,234,0.045); }
+.cs-row--held:hover { background: rgba(147,51,234,0.09); }
+.cs-row--held td:first-child { box-shadow: inset 3px 0 0 #7C3AED; }
+.cs-held-cell { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.cs-held-actions { display: flex; gap: 6px; }
+.cs-act {
+  padding: 4px 11px; border-radius: 7px; border: 1px solid transparent;
+  font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.cs-act:disabled { opacity: 0.5; cursor: default; }
+.cs-act--approve { background: var(--pb-green); color: #fff; }
+.cs-act--approve:hover:not(:disabled) { background: #14702D; }
+.cs-act--reject { background: transparent; color: #B4463E; border-color: #E4C9C4; }
+.cs-act--reject:hover:not(:disabled) { background: #FDECEA; }
+
+/* ── Scan detail panel ── */
+.cs-detail {
+  background: #FFFFFF; border: 1px solid #E8E6E1; border-radius: 16px;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04); min-width: 0;
+}
+.cs-detail--empty {
+  align-items: center; justify-content: center; gap: 12px;
+  color: #9E9A93; font-size: 13px; text-align: center; padding: 24px;
+}
+.cs-detail--empty p { margin: 0; max-width: 200px; }
+.cs-detail__header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 16px 14px; border-bottom: 1px solid #F0EDE8; flex-shrink: 0;
+}
+.cs-detail__heading { flex: 1; min-width: 0; }
+.cs-detail__title { font-size: 14px; font-weight: 800; color: #1A1A1A; }
+.cs-detail__id { font-size: 11px; color: #9E9A93; font-family: ui-monospace, monospace; margin-top: 1px; }
+.cs-detail__close {
+  width: 28px; height: 28px; border: none; background: #F8F4EC; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; color: #7A7166; cursor: pointer; flex-shrink: 0;
+}
+.cs-detail__close:hover { background: #ECEAE5; color: #1A1A1A; }
+.cs-detail__body { flex: 1; overflow-y: auto; padding: 16px; scrollbar-width: thin; scrollbar-color: #E0DDD8 transparent; }
+
+.cs-detail__hold-note {
+  background: rgba(147,51,234,0.07); border: 1px solid rgba(147,51,234,0.18);
+  color: #5B21A6; border-radius: 10px; padding: 11px 13px; font-size: 12.5px; line-height: 1.5; margin-bottom: 14px;
+}
+.cs-detail__photo {
+  display: block; width: 100%; border: none; padding: 0; margin: 0 0 14px; cursor: zoom-in;
+  background: #14100A; border-radius: 12px; overflow: hidden;
+}
+.cs-detail__photo img { width: 100%; max-height: 340px; object-fit: contain; display: block; }
+.cs-detail__photo--empty {
+  cursor: default; background: #F8F7F5; color: #9E9A93; font-size: 12.5px;
+  padding: 28px 12px; text-align: center; border: 1px dashed #E0DDD4;
+}
+.cs-detail__user {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 12px; margin-bottom: 14px; border: 1px solid #EDE9E2; border-radius: 12px;
+  background: #FAF9F6; cursor: pointer; text-align: left; transition: background 0.14s ease, border-color 0.14s ease;
+}
+.cs-detail__user:hover { background: #F4EFE5; border-color: #E0D8C8; }
+.cs-detail__user-arrow { margin-left: auto; color: #B5AEA2; flex-shrink: 0; }
+
+.cs-detail__rows { display: flex; flex-direction: column; }
+.cs-detail__row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #F5F2EC; font-size: 12.5px; }
+.cs-detail__row:last-child { border-bottom: none; }
+.cs-detail__row-label { color: #8A8175; font-weight: 600; flex-shrink: 0; }
+.cs-detail__row-val { color: #2A2724; text-align: right; word-break: break-word; }
+.cs-detail__row-val--strong { font-weight: 800; }
+.cs-detail__row-val--mono { font-family: ui-monospace, monospace; }
+
+.cs-detail__actions { border-top: 1px solid #F0EDE8; padding: 14px 16px; flex-shrink: 0; }
+.cs-detail__actions-hint { margin: 0 0 10px; font-size: 12px; color: #8A8175; }
+.cs-detail__btns { display: flex; gap: 10px; }
+.cs-detail__btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid transparent;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.14s ease;
+}
+.cs-detail__btn:disabled { opacity: 0.55; cursor: default; }
+.cs-detail__btn--approve { background: var(--pb-green); color: #fff; }
+.cs-detail__btn--approve:hover:not(:disabled) { background: #14702D; }
+.cs-detail__btn--reject { background: #FFFFFF; color: #B4463E; border-color: #E4C9C4; }
+.cs-detail__btn--reject:hover:not(:disabled) { background: #FDECEA; }

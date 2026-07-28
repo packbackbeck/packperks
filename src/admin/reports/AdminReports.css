@@ -59,8 +59,16 @@
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 16px;
-  flex: 1;
+  /* Fixed height so the config sidebar and the preview both fit the screen
+   * and scroll on their own, instead of growing the page. The email tools
+   * below sit under the builder and the page scrolls to reach them. */
+  height: calc(100vh - 188px);
+  min-height: 420px;
+}
+.rep-layout > .rep-config,
+.rep-layout > .rep-preview {
   min-height: 0;
+  height: 100%;
 }
 
 /* Config sidebar */

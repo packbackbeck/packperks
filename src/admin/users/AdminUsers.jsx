@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import PiiMask from '../shared/PiiMask';
 import EmptyState from '../shared/EmptyState';
-import QuickLinks from '../shared/QuickLinks';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
 import MergeUsersModal from './MergeUsersModal';
@@ -353,7 +352,7 @@ const SORT_KEYS = {
   active:  (u) => new Date(u.updated_at).getTime(),
 };
 
-export default function AdminUsers({ onNavigate }) {
+export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -371,6 +370,52 @@ export default function AdminUsers({ onNavigate }) {
       .finally(() => setLoading(false));
   };
   useEffect(() => { reload(); }, []);
+
+  /* Another page (Cup Scans) can deep-link to a specific customer via
+   * onNavigate('users', { focusUserId }). Open that user's panel once the
+   * list has loaded, then tell the shell it's been consumed. */
+  useEffect(() => {
+    if (!focusUserId || loading) return;
+    const u = users.find(x => x.id === focusUserId);
+    if (u) setSelectedUser(u);
+    onFocusConsumed?.();
+  }, [focusUserId, users, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Resizable split (review layout): drag the divider to set the detail
+   * panel's width. Persisted so each admin's chosen width sticks. */
+  const layoutRef = useRef(null);
+  const draggingSplit = useRef(false);
+  const [reviewSplit, setReviewSplit] = useState(() => {
+    if (typeof window === 'undefined') return 420;
+    const saved = Number(localStorage.getItem('pp_admin_users_split'));
+    return saved >= 320 ? saved : 420;
+  });
+  useEffect(() => {
+    function onMove(e) {
+      if (!draggingSplit.current || !layoutRef.current) return;
+      const rect = layoutRef.current.getBoundingClientRect();
+      // Panel width = distance from cursor to the right edge. Clamp so the
+      // table keeps ≥420px and the panel keeps ≥320px.
+      const w = Math.max(320, Math.min(rect.width - 420, rect.right - e.clientX));
+      setReviewSplit(w);
+    }
+    function onUp() {
+      if (!draggingSplit.current) return;
+      draggingSplit.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try { localStorage.setItem('pp_admin_users_split', String(Math.round(reviewSplit))); } catch { /* ignore */ }
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [reviewSplit]);
+  function startSplitDrag(e) {
+    e.preventDefault();
+    draggingSplit.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
 
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -441,7 +486,11 @@ export default function AdminUsers({ onNavigate }) {
         </label>
       </div>
 
-      <div className="au-layout">
+      <div
+        className={`au-layout${selectedUser ? ' au-layout--review' : ''}`}
+        ref={layoutRef}
+        style={selectedUser ? { gridTemplateColumns: `minmax(420px, 1fr) 9px ${reviewSplit}px` } : undefined}
+      >
         <div className="au-table-wrap">
           <div className="au-search-bar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9E9A93" strokeWidth="2">
@@ -566,6 +615,20 @@ export default function AdminUsers({ onNavigate }) {
         </div>
 
         {selectedUser && (
+          <div
+            className="au-resizer"
+            onMouseDown={startSplitDrag}
+            onDoubleClick={() => setReviewSplit(420)}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Drag to resize the table and detail panel"
+            title="Drag to resize · double-click to reset"
+          >
+            <span className="au-resizer__grip" aria-hidden="true" />
+          </div>
+        )}
+
+        {selectedUser && (
           <UserDetailPanel
             user={selectedUser}
             onClose={() => setSelectedUser(null)}
@@ -611,8 +674,6 @@ export default function AdminUsers({ onNavigate }) {
       />
 
       <MergeRequestsSection />
-
-      <QuickLinks currentPage="users" onNavigate={onNavigate} />
     </div>
   );
 }

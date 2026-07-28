@@ -6,6 +6,17 @@ import { supabase } from '../../lib/supabase';
  * directly so we can centralise the bootstrap flow + error mapping.
  * ───────────────────────────────────────────────────────────────────── */
 
+/* Canonical admin console URL. Auth emails (verification, magic link,
+ * password reset) must send the user here and NOT to window.location.origin:
+ * an admin who requests a reset from a localhost/preview build would
+ * otherwise get a link back to localhost. This value must also be listed in
+ * the Supabase Auth "Site URL" + "Redirect URLs" allow-list, or GoTrue
+ * silently falls back to the (possibly stale) Site URL. */
+const ADMIN_ORIGIN = 'https://perks.packback.network';
+function adminUrl(suffix = '') {
+  return ADMIN_ORIGIN + '/admin' + suffix;
+}
+
 /* Email + password signup. Sends a 6-digit OTP code to the inbox; the
  * user enters it via verifyEmailOtp() on the next screen. */
 export async function signUpWithEmail(email, password) {
@@ -14,7 +25,7 @@ export async function signUpWithEmail(email, password) {
     password,
     options: {
       // Don't redirect; we handle verification inline with the OTP code.
-      emailRedirectTo: window.location.origin + '/admin',
+      emailRedirectTo: adminUrl(),
     },
   });
   if (error) throw error;
@@ -48,18 +59,9 @@ export async function signInWithEmail(email, password) {
 export async function signInWithMagicLink(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin + '/admin' },
+    options: { emailRedirectTo: adminUrl() },
   });
   if (error) throw error;
-}
-
-export async function signInWithGoogle() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: window.location.origin + '/admin' },
-  });
-  if (error) throw error;
-  return data;
 }
 
 export async function signOut() {
@@ -69,7 +71,7 @@ export async function signOut() {
 
 export async function sendPasswordReset(email) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/admin#reset',
+    redirectTo: adminUrl('#reset'),
   });
   if (error) throw error;
 }

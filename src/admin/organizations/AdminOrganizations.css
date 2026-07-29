@@ -234,7 +234,8 @@
   justify-content: flex-end;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .ao-action {

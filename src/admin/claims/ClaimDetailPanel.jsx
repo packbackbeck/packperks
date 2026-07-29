@@ -723,8 +723,10 @@ function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
   const [marks, setMarks] = useState(() => seedCriteriaMarks(claim));
   const setMark = (code, pass) => setMarks(m => ({ ...m, [code]: pass }));
   const failedCodes = REVIEW_CRITERIA.filter(c => marks[c] === false);
+  // Reason is now optional on reject too; we still require at least one failed
+  // criterion so the customer sees a concrete reason on their rejected screen.
   const canSubmit = isReject
-    ? (reason.trim().length >= 3 && failedCodes.length > 0)
+    ? (failedCodes.length > 0)
     : true;
 
   /* Detect human override against the AI check and surface it before
@@ -826,7 +828,7 @@ function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
         </div>
 
         <label className="admin-publish-modal__label">
-          {isReject ? 'Reason (required)' : (overridingFail ? 'Reason for overriding AI (recommended)' : 'Note (optional)')}
+          {isReject ? 'Reason (optional)' : (overridingFail ? 'Reason for overriding AI (recommended)' : 'Note (optional)')}
         </label>
         <input
           className="admin-publish-modal__input"

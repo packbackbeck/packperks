@@ -8,7 +8,11 @@
   align-items: center;
   justify-content: center;
   position: fixed;
-  inset: 0;
+  /* height:100dvh (not bottom:0) so on mobile the box matches the VISIBLE
+   * viewport — fixed/inset:0 otherwise resolves to the taller layout viewport,
+   * letting you scroll down past the content into an empty gap. */
+  inset: 0 0 auto 0;
+  height: 100dvh;
   background: var(--white);
   padding: var(--sp-5);
   overflow-y: auto;

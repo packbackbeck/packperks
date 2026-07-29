@@ -197,7 +197,7 @@ const FEATURES = [
   { id: 'f-future',       name: 'Future Vendors',          desc: 'Coming-soon pins on the map',       group: 'Content',    page: 'futurevendors', icon: Icon.org, keywords: 'future vendors coming soon map pins venues stores prospects nearby' },
 
   // ── System Health ──────────────────────────────────────────────────
-  { id: 'f-health',       name: 'System Health',           desc: 'Go / no-go feasibility metrics',    group: 'System',     page: 'stats',    icon: Icon.activity, keywords: 'system health status go no-go feasibility scan success qr generation metrics technical uptime diagnostics' },
+  { id: 'f-health',       name: 'System Health',           desc: 'Scan, QR & reward health metrics',  group: 'System',     page: 'stats',    icon: Icon.activity, keywords: 'system health status scan success qr generation metrics uptime diagnostics' },
   { id: 'f-health-scan',  name: 'Scan success rate',       desc: 'How many scans succeed',            group: 'System',     page: 'stats',    icon: Icon.activity, keywords: 'scan success rate qr health metric go no-go failure' },
 
   // ── User Behaviour ─────────────────────────────────────────────────

@@ -182,7 +182,6 @@ export default function AdminByoRequests() {
     <div className="byoreq">
       <header className="byoreq__head">
         <div>
-          <span className="byoreq__eyebrow">Phase 3 · Bring-Your-Own</span>
           <h1 className="byoreq__title">BYO cup requests</h1>
           <p className="byoreq__sub">
             Customers auto-collect up to {cap} {cap === 1 ? 'cup' : 'cups'} per 24&nbsp;hours at this store.

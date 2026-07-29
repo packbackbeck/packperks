@@ -40,7 +40,7 @@ function formatDate(iso) {
   }
 }
 
-export default function AdminOrganizations({ onAddOrg, onNavigate }) {
+export default function AdminOrganizations({ onAddOrg, onNavigate, focusSection, onSectionConsumed }) {
   const { activeOrgId, switchOrg, refresh } = useOrg();
   const [orgs, setOrgs]       = useState([]);
   const [groups, setGroups]   = useState([]);
@@ -73,6 +73,16 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
   }, [groups]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Deep-link from the switcher's group gear / "Manage groups": scroll to the
+  // groups panel once it has rendered, then tell the shell it's consumed.
+  useEffect(() => {
+    if (focusSection !== 'groups' || loading) return;
+    const el = document.getElementById('s-org-groups');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onSectionConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSection, loading]);
 
   async function handleSoftDelete(id) {
     try {
@@ -133,7 +143,6 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
     <div className="admin-organizations">
       <header className="ao-header">
         <div>
-          <span className="ao-eyebrow">PackPerks staff</span>
           <h1 className="ao-title">Organisations</h1>
           <p className="ao-sub">
             Add new client brands, switch between them, or take an org offline.
@@ -257,16 +266,16 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
                     <td className="ao-date">{formatDate(org.created_at)}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <div className="ao-actions">
-                        {!isDeleted && (
-                          <button className="ao-action ao-action--primary" onClick={() => handleOpen(org.id)}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>
-                            <span>Open settings</span>
+                        {!isDeleted && !isActive && (
+                          <button className="ao-action ao-action--primary" onClick={() => handleSwitch(org.id)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+                            <span>Open</span>
                           </button>
                         )}
-                        {!isDeleted && !isActive && (
-                          <button className="ao-action" onClick={() => handleSwitch(org.id)}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
-                            <span>Switch to</span>
+                        {!isDeleted && (
+                          <button className="ao-action" onClick={() => handleOpen(org.id)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>
+                            <span>Settings</span>
                           </button>
                         )}
                         {!isDeleted && (
@@ -309,7 +318,11 @@ export default function AdminOrganizations({ onAddOrg, onNavigate }) {
 
       {!loading && <RegionsPanel orgs={orgs} onChanged={load} />}
 
-      {!loading && <OrgGroupsPanel orgs={orgs} groups={groups} onChanged={load} />}
+      {!loading && (
+        <div id="s-org-groups" style={{ scrollMarginTop: '72px' }}>
+          <OrgGroupsPanel orgs={orgs} groups={groups} onChanged={load} />
+        </div>
+      )}
 
       {confirmDelete && (
         <div className="ao-modal-backdrop" onClick={() => setConfirmDelete(null)}>

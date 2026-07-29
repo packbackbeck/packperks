@@ -214,7 +214,7 @@ export default function AdminStats() {
         <div>
           <h1 className="stats-header__title">System Health</h1>
           <p className="stats-header__sub">
-            Technical feasibility of the {orgName} return flow: QR generation, scan, reward, and dashboard tracking.
+            Health of the {orgName} return flow: QR generation, scan, reward, and dashboard tracking.
           </p>
         </div>
         <div className="stats-header__actions">

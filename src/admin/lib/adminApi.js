@@ -477,8 +477,8 @@ export async function getStatsMetrics({ fromTs = null, toTs = null, orgIds } = {
       id: 'uptime', label: 'Setup uptime',
       value: m10, numerator: cleanHours, denominator: activeHours,
       lowerIsBetter: false, thresholds: { go: 95, condLow: 85 },
-      formula: 'Time setup works / total test time',
-      note: 'Proxy: active hours with zero critical errors. True uptime needs health pings (Phase 2).',
+      formula: 'Time setup works / total active time',
+      note: 'Proxy: active hours with zero critical errors. True uptime needs health pings.',
     },
   ].map(m => ({
     ...m,
@@ -1789,6 +1789,16 @@ export async function updateClaimStatus(claimId, status, opts = {}) {
       .select('*')
   ).maybeSingle();
   if (error) throw error;
+
+  // Rejection notice to the customer (best-effort). Fires on a reject so the
+  // customer learns their claim wasn't approved + why — even though they're no
+  // longer on the in-app rejected screen. The recipient + reasons are resolved
+  // server-side from the claim; we never block the decision on the email.
+  if (status === 'failed' && data?.type === 'cashback' && data?.notify_email !== false) {
+    supabase.functions
+      .invoke('send-claim-rejection', { body: { claim_id: claimId } })
+      .catch(() => { /* email is best-effort; the reject already stands */ });
+  }
 
   // Mint the REAL Tikkie cashback for a freshly approved cashback/refund. The
   // edge function is the sole holder of the Tikkie secrets; it POSTs a cashback

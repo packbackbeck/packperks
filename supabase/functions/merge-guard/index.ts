@@ -74,7 +74,11 @@ Deno.serve(async (req) => {
   const survivor = candidates.find((c) => c.auth_user_id === authUser!.id)
     || [...candidates].sort((a, b) => ts(b) - ts(a))[0];
   const absorbed = candidates.filter((c) => c.id !== survivor.id).map((c) => c.id);
-  if (!absorbed.length) return json({ held: false, reason: 'nothing_to_merge' });
+  // A cross-store link (this email already has an account in another store)
+  // is itself a merge event for the person's single identity, so it must be
+  // limit-gated too — not just same-store duplicates.
+  const crossOrg = ((emailRows || []) as Row[]).some((r) => r.org_id !== orgId);
+  if (!absorbed.length && !crossOrg) return json({ held: false, reason: 'nothing_to_merge' });
 
   // Per-org weekly limit + copy.
   const { data: limitCfg } = await supabase.from('app_config').select('value').eq('key', `merge:limit:${orgId}`).maybeSingle();

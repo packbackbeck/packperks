@@ -29,7 +29,7 @@ import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
 import Onboarding from './components/onboarding/Onboarding';
 import MaintenancePage from './components/MaintenancePage';
-import { getOnboarding, setOnboarding, isOnboardingDone } from './lib/onboarding';
+import { getOnboarding, setOnboarding, isOnboardingDone, markOnboardingSeen } from './lib/onboarding';
 import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
 import { getShotPreset } from './lib/shotPresets'; // DEV-only screen-audit harness
@@ -948,6 +948,38 @@ export default function App({ consentReady = true } = {}) {
     try { localStorage.setItem('packperks_region', r.key); } catch { /* ignore */ }
   };
 
+  // Lock the account region to the FIRST vendor the customer actually scanned a
+  // cup at (lifetimeCups > 0), so later browsing stores in another region does
+  // not flip their currency/payout. Only runs until a region is saved once.
+  useEffect(() => {
+    if (accountRegion) return;
+    try { if (localStorage.getItem('packperks_region')) return; } catch { /* ignore */ }
+    if ((lifetimeCups || 0) > 0 && activeOrg?.country) {
+      const r = regionForCountry(activeOrg.country);
+      if (r) {
+        setAccountRegion(r.key);
+        try { localStorage.setItem('packperks_region', r.key); } catch { /* ignore */ }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lifetimeCups, activeOrg?.country, accountRegion]);
+
+  // Keep the Stores hub's per-store balances fresh. A scan updates only the
+  // ACTIVE store's live count (cupCount); the other stores render from the
+  // cached groupBalances map, which otherwise showed a stale 0 after a scan.
+  // Re-pull it whenever the hub opens (and after a scan returns to it).
+  useEffect(() => {
+    if (page !== 'stores') return;
+    const idId = identityIdRef.current;
+    const members = groupCtx?.members;
+    if (!idId || !members?.length) return;
+    let alive = true;
+    getGroupBalances(idId, members.map(m => m.id))
+      .then(bals => { if (alive) setGroupBalances(bals); })
+      .catch(() => { /* best-effort */ });
+    return () => { alive = false; };
+  }, [page, groupCtx]);
+
   /* ── Preview-mode override (admin App Design tab) ──
    * When the user app runs inside the admin's App Design iframe, the
    * parent posts the current DRAFT design over postMessage on every
@@ -1511,7 +1543,13 @@ export default function App({ consentReady = true } = {}) {
   if (showOnboarding) {
     return (
       <Onboarding
-        onClose={() => setShowOnboarding(false)}
+        onClose={() => {
+          // Closing (even without finishing) counts as seen, so onboarding
+          // only ever auto-opens once. A manual re-open still works.
+          markOnboardingSeen();
+          setOnboardingPrefs(getOnboarding());
+          setShowOnboarding(false);
+        }}
         onComplete={(data) => {
           setOnboarding(data);
           setOnboardingPrefs(data);

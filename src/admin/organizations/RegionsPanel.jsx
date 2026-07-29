@@ -160,7 +160,6 @@ export default function RegionsPanel({ orgs = [], onChanged }) {
     <section className="og-panel">
       <header className="og-panel__head">
         <div>
-          <span className="og-eyebrow">Multi-regional · platform</span>
           <h2 className="og-panel__title">Regions</h2>
           <p className="og-panel__sub">
             A region sets the <strong>currency</strong>, <strong>map focus</strong> and
@@ -257,10 +256,10 @@ export default function RegionsPanel({ orgs = [], onChanged }) {
                           <input className="og-cf__input" type="number" step="0.01" value={draft.lng} onChange={e => set({ lng: e.target.value })} /></label>
                         <label className="og-cf"><span className="og-cf__label">Map zoom</span>
                           <input className="og-cf__input" type="number" step="1" min="1" max="18" value={draft.zoom} onChange={e => set({ zoom: e.target.value })} /></label>
-                        <label className="og-toggle" style={{ alignSelf: 'end' }} title="Offer this region in onboarding + new assignments">
+                        <label className="og-toggle" style={{ alignSelf: 'end' }} title="When on, customers can choose this region during onboarding, and newly assigned stores default to it.">
                           <input type="checkbox" checked={draft.enabled} onChange={e => set({ enabled: e.target.checked })} />
                           <span className="og-toggle__track"><span className="og-toggle__thumb" /></span>
-                          <span className="og-toggle__label">{draft.enabled ? 'Enabled' : 'Disabled'}</span>
+                          <span className="og-toggle__label">{draft.enabled ? 'Available to customers' : 'Hidden'}</span>
                         </label>
                       </div>
                       <p className="og-hint">Example: <strong>{formatMoney(4.8, r.key)}</strong> renders in this region.</p>

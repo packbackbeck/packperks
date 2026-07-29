@@ -106,6 +106,9 @@ function AdminShell() {
    * { focusUserId }). We stash the id here and pass it to AdminUsers,
    * which selects that user and then clears it via onFocusConsumed. */
   const [focusUserId, setFocusUserId] = useState(null);
+  /* Cross-page scroll target for the Organizations page (currently only
+   * 'groups', fired by the group gear + "Manage groups" in the switcher). */
+  const [focusOrgSection, setFocusOrgSection] = useState(null);
 
   /* Track which pages have been visited so we can keep them mounted
    * after first visit. Set is fine here — React's reference equality
@@ -118,6 +121,7 @@ function AdminShell() {
     if (next === 'org') next = 'settings'; // merged page
     if (!VALID_PAGES.has(next)) return;
     if (opts?.focusUserId) setFocusUserId(opts.focusUserId);
+    if (opts?.section) setFocusOrgSection(opts.section);
     setPageState(next);
     setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
     // Update the hash without a scroll jump.
@@ -201,7 +205,7 @@ function AdminShell() {
             <AdminTransactions onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="organizations" activeId={page} visited={visited}>
-            <AdminOrganizations onNavigate={setPage} onAddOrg={() => setWizardOpen(true)} />
+            <AdminOrganizations onNavigate={setPage} onAddOrg={() => setWizardOpen(true)} focusSection={focusOrgSection} onSectionConsumed={() => setFocusOrgSection(null)} />
           </KeepAlive>
           <KeepAlive id="settings" activeId={page} visited={visited}>
             <AdminWorkspace draftState={draftState} onNavigate={setPage} />

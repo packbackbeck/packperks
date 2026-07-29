@@ -210,6 +210,20 @@
 .rep__input--mono { font-family: monospace; font-size: 12px; }
 .rep__input--sm { padding: 7px 10px; font-size: 12px; }
 
+/* Required-field error state (empty/invalid price or cups). */
+.rep__input--error {
+  border-color: #E5484D;
+  background: #FEF2F2;
+}
+.rep__input--error:focus { border-color: #E5484D; }
+.rep__field-error {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #C62A2F;
+}
+
 .rep__textarea {
   width: 100%;
   padding: 9px 12px;
@@ -619,7 +633,8 @@
 
 .rep-econ__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* auto-fit so the grid flows cleanly whether COGS adds a 5th cell or not. */
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
 }
 @media (max-width: 720px) { .rep-econ__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -649,6 +664,24 @@
   color: #7C5A00;
   line-height: 1.5;
 }
+
+/* Gross-margin readout (only when a COGS / cost-to-make is set). */
+.rep-econ__margin {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px dashed #E8E6E1;
+}
+.rep-econ__margin-label { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #8A857F; }
+.rep-econ__margin-val   { font-size: 15px; font-weight: 800; letter-spacing: -0.012em; text-align: right; }
+.rep-econ__margin--pos .rep-econ__margin-val { color: #16A34A; }
+.rep-econ__margin--neg .rep-econ__margin-val { color: #C62A2F; }
+.rep-econ__margin-note  { grid-column: 1 / -1; font-size: 11px; color: #6C6259; line-height: 1.5; }
 
 /* P-44: tab strip in the reward editor. Sits between header and body
  * so the active surface is obvious without scrolling. Tabs are flush-

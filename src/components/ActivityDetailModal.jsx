@@ -1,7 +1,32 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRegion } from '../lib/RegionContext';
+import { getFailureCopy } from '../admin/lib/aiVerdictLabels';
 import './ActivityDetailModal.css';
+
+/* Claim "phase" views. A single receipt claim shows up in Activity as up to
+ * three taps — the submission, then an approved OR rejected verdict — and each
+ * gets its own header, tone, and body so they no longer look identical:
+ *   • submitted → in-review framing, NO payout link
+ *   • approved  → green, keeps the collect-cashback link
+ *   • rejected  → red, lists the reasons it wasn't approved, NO payout link */
+const CLAIM_PHASE = {
+  submitted: {
+    title: 'Receipt sent for review', tone: 'amber', icon: 'send',
+    sub: "We've got your receipt — our team is reviewing it now. We'll let you know as soon as there's a verdict.",
+    statusLabel: 'In review by our team', statusColor: '#B8922A',
+  },
+  approved: {
+    title: 'Cashback approved', tone: 'green', icon: 'check',
+    sub: 'Nice one — your cashback is approved and ready to collect below.',
+    statusLabel: 'Approved', statusColor: '#1A8737',
+  },
+  rejected: {
+    title: 'Cashback not approved', tone: 'red', icon: 'cross',
+    sub: "We couldn't approve this claim. Here's what to check before trying again:",
+    statusLabel: 'Not approved', statusColor: '#C73E1D',
+  },
+};
 
 const TYPE_META = {
   cup_added:       { title: 'Cup collected',     tone: 'green',  icon: 'plus',  statusLabel: 'Added to balance',   statusColor: '#1A8737' },
@@ -76,6 +101,8 @@ function ToneIcon({ icon }) {
   if (icon === 'minus') return <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><line x1="4" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>;
   if (icon === 'share') return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>;
   if (icon === 'heart') return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+  if (icon === 'send')  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
+  if (icon === 'cross') return <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M6 6L14 14M14 6L6 14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>;
   return null;
 }
 
@@ -90,14 +117,33 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
   }, [onClose]);
 
   if (!item) return null;
-  const meta = TYPE_META[item.type] || { title: 'Activity', tone: 'gray', icon: 'plus', statusLabel: 'Recorded', statusColor: '#1A8737' };
+
+  // Which claim "phase" was tapped (set by UserPage): submitted / approved /
+  // rejected. When present it fully re-skins the modal (title, tone, body).
+  const phase = item._view || null;
+  const phaseMeta = phase ? CLAIM_PHASE[phase] : null;
+  const baseMeta = TYPE_META[item.type] || { title: 'Activity', tone: 'gray', icon: 'plus', statusLabel: 'Recorded', statusColor: '#1A8737' };
+  const meta = phaseMeta ? { ...baseMeta, ...phaseMeta } : baseMeta;
   const refId = makeRefId(item.type, item.time);
 
-  // For reward_claimed, the live claim status overrides the default
-  // "Submitted" label so the user sees real updates from admin review.
+  // For reward_claimed, the live claim status can refine the label (e.g.
+  // "Collected" vs "Ready to collect") and carries the payout link.
   const liveStatus = liveStatusForClaim(item, userClaims);
-  const statusLabel = liveStatus?.label || meta.statusLabel;
-  const statusColor = liveStatus?.color || meta.statusColor;
+  // Status line: submitted/rejected phases keep their fixed framing (never leak
+  // a later verdict); the approved phase may upgrade to the live "Collected"
+  // label. Non-claim activities fall back to the live/meta status as before.
+  const statusLabel = phase === 'approved'
+    ? (liveStatus?.label || meta.statusLabel)
+    : (phaseMeta ? meta.statusLabel : (liveStatus?.label || meta.statusLabel));
+  const statusColor = phase === 'approved'
+    ? (liveStatus?.color || meta.statusColor)
+    : (phaseMeta ? meta.statusColor : (liveStatus?.color || meta.statusColor));
+
+  // The payout link is shown ONLY for the approved verdict (and for legacy
+  // non-phase reward_claimed taps) — never on the submission or a rejection.
+  const showCollect = (phase === 'approved' || !phaseMeta) && !!liveStatus?.tikkieUrl;
+  // Rejection reasons, mapped from the claim's failure codes to friendly copy.
+  const failureCodes = phase === 'rejected' ? (item._failureCodes || []) : [];
 
   function handleDownloadPdf() {
     const html = cardRef.current?.outerHTML || '';
@@ -141,7 +187,7 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
             <ToneIcon icon={meta.icon} />
           </div>
           <h2 className="adm-title">{meta.title}</h2>
-          <p className="adm-sub">{item.label}</p>
+          <p className="adm-sub">{phaseMeta ? phaseMeta.sub : item.label}</p>
 
           <div className="adm-dashed" />
 
@@ -156,10 +202,37 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
           <div className="adm-row"><span className="adm-row__label">Status</span><span className="adm-row__val" style={{ color: statusColor }}>{statusLabel}</span></div>
         </div>
 
-        {/* Persistent Tikkie CTA — stays available from the activity record
-            forever, even after the pending block is gone and even if the link
-            has expired (kept outside the card so it isn't captured in the PDF). */}
-        {liveStatus?.tikkieUrl && (
+        {/* Rejection reasons — only on a "not approved" verdict. Mapped from the
+            claim's failure codes to friendly, actionable copy. */}
+        {phase === 'rejected' && (
+          <div className="adm-reasons">
+            <span className="adm-reasons__title">Why it wasn’t approved</span>
+            {failureCodes.length > 0 ? (
+              failureCodes.map(code => {
+                const info = getFailureCopy(code);
+                return (
+                  <div key={code} className="adm-reason">
+                    <span className="adm-reason__icon" aria-hidden>{info.icon}</span>
+                    <span className="adm-reason__body">
+                      <span className="adm-reason__title">{info.title}</span>
+                      <span className="adm-reason__hint">{info.hint}</span>
+                      {info.nextStep && <span className="adm-reason__next">{info.nextStep}</span>}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="adm-reason__hint">
+                Our team couldn’t verify this receipt. Please try again with a clear photo of the full printed receipt, or contact support.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Persistent Tikkie CTA — approved verdict only. Kept outside the card
+            so it isn't captured in the PDF; stays available even if the link
+            has since expired. */}
+        {showCollect && (
           <div className="adm-collect-wrap">
             <a className="adm-collect" href={liveStatus.tikkieUrl} target="_blank" rel="noopener noreferrer">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

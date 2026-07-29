@@ -78,12 +78,19 @@ Deno.serve(async (req) => {
   const deviceUser = deviceRows?.[0];
   if (!deviceUser) return jsonResponse({ error: "device_user_not_found" }, 404);
 
-  // ── Count OTHER same-email accounts in the same org ──────────────────
+  // ── Count OTHER same-email accounts in ANY store ─────────────────────
+  // The email identifies the person, and one person keeps a single identity
+  // across every store in a group (users.identity_id, linked via auth). If we
+  // only checked the SAME org here, connecting an email whose account lives in
+  // a sibling store would take the frictionless "saved" path — which never
+  // establishes an auth session — so the fresh account never links to the
+  // existing identity (split name + balances, and the merge limit never fires).
+  // Checking across all stores routes those through the OTP verify + merge
+  // flow, which links the identity and honours the weekly merge limit.
   // (case-insensitive; ignore tombstoned `merged_into` rows; exclude self)
   const { data: others, error: othersErr } = await supabase
     .from("users")
     .select("id")
-    .eq("org_id", deviceUser.org_id)
     .ilike("email", email)
     .is("merged_into", null)
     .neq("id", deviceUser.id);

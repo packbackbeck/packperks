@@ -684,7 +684,17 @@ export default function AdminCupScans({ onNavigate }) {
                 <tr
                   key={scan.id}
                   className={`cs-row${sel.isSelected(scan.id) ? ' cs-row--selected' : ''}${scan.__held ? ' cs-row--held' : ''}${selectedId === scan.id ? ' cs-row--active' : ''}`}
-                  onClick={() => setSelectedId(prev => (prev === scan.id ? null : scan.id))}
+                  onClick={() => {
+                    // Click a row → open review + select it. Click the same
+                    // highlighted row again → back to the normal table view.
+                    if (viewMode === 'review' && selectedId === scan.id) {
+                      setSelectedId(null);
+                      setViewMode('table');
+                    } else {
+                      setSelectedId(scan.id);
+                      setViewMode('review');
+                    }
+                  }}
                 >
                   <td className="bulk-check-cell" onClick={e => e.stopPropagation()}>
                     {!scan.__held && (

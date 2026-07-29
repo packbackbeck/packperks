@@ -19,6 +19,27 @@ import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, formatCo2 } from '../lib/impact';
 
 const PUSH_PREF_KEY = 'packperks_push_rewards';
 
+/* Build the payload handed to ActivityDetailModal, tagging which "phase" of a
+ * claim the user tapped so the modal renders a distinct view:
+ *   • a verdict row       → its verdict ('approved' | 'rejected') + reasons
+ *   • a receipt-submission → the 'submitted' (in-review) view, no payout link
+ *   • anything else        → the row itself, unchanged. */
+function activityPayload(item) {
+  if (item.type === 'claim_verdict') {
+    return {
+      ...(item.baseItem || item),
+      _view: item.verdict,
+      _failureCodes: item.failureCodes || [],
+      time: item.time,
+      storeName: item.storeName || null,
+    };
+  }
+  if (item.type === 'reward_claimed') {
+    return { ...item, _view: 'submitted' };
+  }
+  return item;
+}
+
 const DSAR_EMAIL = 'info@packback.network';
 const AVATAR_KEY = 'packperks_profile_avatar';
 
@@ -166,6 +187,11 @@ export default function UserPage({
           const rejected = claim.status === 'failed';
           if (approved || rejected) {
             const at = claim.approved_at || claim.verified_at || claim.paid_at || item.createdAt;
+            // Rejection reasons: admin overrides take priority, then AI checks.
+            const failureCodes = [
+              ...(claim.admin_failure_checks || []),
+              ...(claim.ai_failure_checks || []),
+            ].filter((c, i, a) => c && a.indexOf(c) === i);
             out.push({
               type: 'claim_verdict',
               verdict: approved ? 'approved' : 'rejected',
@@ -174,6 +200,7 @@ export default function UserPage({
               createdAt: at,
               sortAt: at,
               storeName: item.storeName || null,
+              failureCodes,
               baseItem: item, // clicking a verdict opens the full claim detail
             });
           }
@@ -610,7 +637,7 @@ export default function UserPage({
                 {idx > 0 && <div className="user-page__divider" />}
                 <button
                   className="user-page__history-item user-page__history-item--clickable"
-                  onClick={() => setActiveActivity(item.baseItem || item)}
+                  onClick={() => setActiveActivity(activityPayload(item))}
                   type="button"
                 >
                   <div className={`user-page__history-dot user-page__history-dot--${item.type}${item.verdict ? ' user-page__history-dot--verdict-' + item.verdict : ''}`}>

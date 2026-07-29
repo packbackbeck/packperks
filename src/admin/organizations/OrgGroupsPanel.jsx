@@ -410,7 +410,6 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
     <section className="og-panel">
       <header className="og-panel__head">
         <div>
-          <span className="og-eyebrow">Phase 3 · Bring-Your-Own</span>
           <h2 className="og-panel__title">Store groups</h2>
           <p className="og-panel__sub">
             Group several venues so customers keep one account across them — each store still

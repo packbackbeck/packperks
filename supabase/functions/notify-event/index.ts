@@ -58,7 +58,7 @@ const CTA: Record<string, { label: string; page: string }> = {
   claim_created:   { label: 'Review claim',         page: 'claims' },
   account_created: { label: 'View customer',        page: 'users' },
   cup_scanned:     { label: 'Open cup scans',        page: 'cupscans' },
-  byo_request:     { label: 'Review request',        page: 'byorequests' },
+  byo_request:     { label: 'Review the cup scan',    page: 'cupscans' },
   merge_request:   { label: 'Review merge request',  page: 'users' },
 };
 const esc = (s: string) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] || c));

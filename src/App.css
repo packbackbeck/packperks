@@ -4,8 +4,9 @@
   align-items: center;
   gap: var(--sp-5);
   /* Tighter side margins so cards sit closer to the screen edges
-     (was --sp-6 / 30px horizontally). */
-  padding: 30px var(--sp-4) var(--sp-6);
+     (was --sp-6 / 30px horizontally). Bottom trimmed to --sp-4 so you can't
+     scroll far past the last card into empty space. */
+  padding: 30px var(--sp-4) var(--sp-4);
   /* No min-height here — #root already fills the viewport with the cream
      background, so forcing 100dvh on the content wrapper too only created
      empty scrollable space below short screens. Each screen is now exactly

@@ -53,7 +53,7 @@ export default function ModelChooser() {
               </svg>
             </span>
             <span className="mc__tile-title">SmartBin deposit</span>
-            <span className="mc__tile-sub">at Titaan</span>
+            <span className="mc__tile-sub">Deposit venues</span>
           </a>
         </div>
       </div>

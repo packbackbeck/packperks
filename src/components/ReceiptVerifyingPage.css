@@ -1,8 +1,12 @@
 .rv-page {
   /* Fixed-position so we cover the full viewport (escapes the 375px #root
-   * max-width on desktop and the .user-page transform stacking context). */
+   * max-width on desktop and the .user-page transform stacking context).
+   * height:100dvh (not bottom:0) so on mobile the box tracks the VISIBLE
+   * viewport — otherwise fixed/inset:0 resolves to the taller layout viewport
+   * and you can scroll down into an empty gap under the toolbar. */
   position: fixed;
-  inset: 0;
+  inset: 0 0 auto 0;
+  height: 100dvh;
   background: #FFF8F4;
   padding: 1.5rem;
   display: flex;

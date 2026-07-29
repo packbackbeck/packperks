@@ -1,8 +1,13 @@
 .admin-rewards {
-  padding: 32px 32px 48px;
+  padding: 32px 32px 24px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px);
+  /* Bound the page to the visible area (viewport − top bar) and hide its own
+   * overflow so the two columns below fit the screen and scroll on their own,
+   * instead of growing the page into one long scroll. */
+  height: calc(100vh - 56px);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .rew-header {

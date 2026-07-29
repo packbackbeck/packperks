@@ -29,7 +29,15 @@ export function clearOnboarding() {
   catch { /* non-fatal */ }
 }
 
-/** Has the customer finished onboarding at least once? */
+/** Mark onboarding as seen even if the customer closed it without finishing,
+ * so it only ever auto-opens once. Preserves any partial answers. */
+export function markOnboardingSeen() {
+  const cur = getOnboarding() || {};
+  try { localStorage.setItem(KEY, JSON.stringify({ ...cur, seen: true, seenAt: cur.seenAt || Date.now() })); }
+  catch { /* non-fatal */ }
+}
+
+/** Has the customer seen onboarding at least once (completed OR dismissed)? */
 export function isOnboardingDone() {
   return !!getOnboarding();
 }

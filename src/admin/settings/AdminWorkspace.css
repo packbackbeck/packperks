@@ -99,6 +99,54 @@
 .wkspace-toc__item--active .wkspace-toc__icon--cream  { background: #B48C28; }
 .wkspace-toc__item--active .wkspace-toc__icon--slate  { background: #475569; }
 
+/* ── Tabs variant ──────────────────────────────────────────────────────
+ * Clean underline tabs that blend with the light chrome: no pills, no
+ * coloured icon chips. Muted text, and the active tab gets an orange
+ * underline. The icon rides inline in the same colour as its label. */
+.wkspace-toc--tabs {
+  padding: 0;
+  background: transparent;
+  border-bottom: 1px solid #EAE5DB;
+  margin-bottom: 22px;
+}
+.wkspace-toc--tabs .wkspace-toc__inner { gap: 0; }
+.wkspace-toc--tabs .wkspace-toc__cell { gap: 0; }
+.wkspace-toc--tabs .wkspace-toc__item {
+  border: none;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #7A7166;
+  font-weight: 600;
+  padding: 10px 13px;
+  margin-bottom: -1px;
+  box-shadow: none;
+}
+.wkspace-toc--tabs .wkspace-toc__item:hover {
+  background: transparent;
+  color: #1D1D1D;
+}
+.wkspace-toc--tabs .wkspace-toc__item--active {
+  background: transparent;
+  color: var(--pb-orange-warm, #E4572E);
+  border: none;
+  border-bottom: 2px solid var(--pb-orange-warm, #E4572E);
+  box-shadow: none;
+}
+.wkspace-toc--tabs .wkspace-toc__icon,
+.wkspace-toc--tabs .wkspace-toc__item--active .wkspace-toc__icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: transparent !important;
+  color: currentColor !important;
+}
+.wkspace-toc--tabs .wkspace-toc__divider {
+  height: 16px;
+  background: #E4DCCB;
+  margin: 0 6px;
+}
+
 /* ── Section anchors: clear the sticky topbar + TOC bar on jump ── */
 .wkspace-content [id^="s-"] { scroll-margin-top: 84px; }
 .wkspace-anchor { display: block; }

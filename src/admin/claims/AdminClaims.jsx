@@ -916,7 +916,16 @@ export default function AdminClaims({ onNavigate, draftState }) {
                         viewMode === 'review' && selectedId === claim.id ? 'ac-table__row--active' : '',
                         claim.flagged ? 'ac-table__row--flagged' : '',
                       ].filter(Boolean).join(' ')}
-                      onClick={() => { setSelectedId(claim.id); if (viewMode !== 'review') setViewMode('review'); }}
+                      onClick={() => {
+                        // Re-clicking the highlighted row returns to the table.
+                        if (viewMode === 'review' && selectedId === claim.id) {
+                          setSelectedId(null);
+                          setViewMode('table');
+                        } else {
+                          setSelectedId(claim.id);
+                          setViewMode('review');
+                        }
+                      }}
                       style={{ cursor: 'pointer' }}
                     >
                       <td style={{ padding: '0 8px 0 16px' }} onClick={e => e.stopPropagation()}>

@@ -12,9 +12,9 @@
 //        b. Else if NO admin exists yet at all, this user becomes the
 //           founding 'owner'.
 //        c. Else if their email is on a trusted internal domain
-//           (TRUSTED_ADMIN_DOMAINS, e.g. @packback.network), grant 'admin'
+//           (TRUSTED_ADMIN_DOMAINS, e.g. @packback.network), grant 'manager'
 //           so staff can self-register with working access — no invite
-//           needed.
+//           needed. (Owners/Admins can promote them afterwards.)
 //        d. Else reject with 403 registration_locked — admin sign-up is
 //           locked to @packback.network + invited teammates.
 //   3. Insert the profile with org_id = NULL (global: every admin sees
@@ -132,13 +132,14 @@ Deno.serve(async (req) => {
   } else {
     // No invitation. If there are no admins at all yet, this user is the
     // founding owner. Otherwise, only trusted-domain staff (@packback.network)
-    // may self-register, as 'admin'. Everyone else is turned away: admin
+    // may self-register, as 'manager' — the lowest working role; owners/admins
+    // can promote afterwards. Everyone else is turned away: admin
     // registration is locked to the internal team + invited teammates.
     const { count } = await supabase
       .from("admin_profiles")
       .select("id", { count: "exact", head: true });
     if ((count ?? 0) === 0) role = "owner";
-    else if (isTrustedAdminEmail(email)) role = "admin";
+    else if (isTrustedAdminEmail(email)) role = "manager";
     else
       return jsonResponse(
         {

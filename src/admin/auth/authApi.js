@@ -29,6 +29,21 @@ export async function signUpWithEmail(email, password) {
     },
   });
   if (error) throw error;
+  // Supabase returns a user with an EMPTY `identities` array when the email is
+  // already registered — and, for that case, signUp does NOT send a fresh
+  // code. So an existing admin who tries to "create account" would sit on the
+  // verify screen forever. Detect it and send a login OTP instead, so they get
+  // a 6-digit code and sign straight in.
+  const alreadyExists = !!data?.user
+    && Array.isArray(data.user.identities)
+    && data.user.identities.length === 0;
+  if (alreadyExists) {
+    const { error: otpErr } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, emailRedirectTo: adminUrl() },
+    });
+    if (otpErr) throw otpErr;
+  }
   return data;
 }
 

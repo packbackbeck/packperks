@@ -97,7 +97,23 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
 
   const flush = useCallback(() => {
     if (!dirtyRef.current) return;
-    onChangeRef.current(formRef.current);
+    const f = formRef.current;
+    // Fields are edited as raw strings (so numbers type normally); coerce them
+    // back to numbers before committing to the draft. Block committing an
+    // incomplete reward — an empty/invalid price or cups keeps the last valid
+    // draft value instead of saving a broken 0/1.
+    const eurosNum = Number(f.euros);
+    const cupsNum = parseInt(f.cupsNeeded, 10);
+    if (!(eurosNum > 0) || !(cupsNum >= 1)) return;
+    const numOrNull = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const committed = {
+      ...f,
+      euros: eurosNum,
+      cupsNeeded: cupsNum,
+      cogs: numOrNull(f.cogs),
+      subsidy: numOrNull(f.subsidy) ?? 0,
+    };
+    onChangeRef.current(committed);
     dirtyRef.current = false;
     setDirty(false);
   }, []);
@@ -135,6 +151,11 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
     setForm(prev => ({ ...prev, [field]: value }));
     setDirty(true);
   }
+
+  // Required-field validity for the raw-string price/cups inputs. Empty or
+  // non-positive → highlight the field + block the commit (see flush()).
+  const priceInvalid = form.euros === '' || form.euros == null || !(Number(form.euros) > 0);
+  const cupsInvalid = form.cupsNeeded === '' || form.cupsNeeded == null || !(parseInt(form.cupsNeeded, 10) >= 1);
 
 
   function toggleTag(tag) {
@@ -238,7 +259,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
           </div>
           <div>
             <div className="rep__reward-name">{form.name || 'Untitled Reward'}</div>
-            <div className="rep__reward-meta">€{(form.euros || 0).toFixed(2)} · {form.cupsNeeded || 0} cups</div>
+            <div className="rep__reward-meta">€{(Number(form.euros) || 0).toFixed(2)} · {parseInt(form.cupsNeeded, 10) || 0} cups</div>
           </div>
         </div>
         <div className="rep__header-actions">
@@ -263,7 +284,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
               <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
               <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
             </svg>
-            Archive
+            Delete
           </button>
         </div>
       </div>
@@ -385,23 +406,53 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
           <div className="rep__row">
             <div className="rep__field">
               <label className="rep__label">Price (€)</label>
-              <input className="rep__input" type="number" step="0.01" min="0" value={form.euros || ''} onChange={e => update('euros', parseFloat(e.target.value) || 0)} placeholder="5.49" />
+              {/* Store the raw string so a number can be typed/cleared normally
+               *  (the old `parseFloat(..) || 0` forced 0 and ate decimals).
+               *  Required: an empty or non-positive price highlights + blocks. */}
+              <input
+                className={`rep__input${priceInvalid ? ' rep__input--error' : ''}`}
+                type="number" step="0.01" min="0" inputMode="decimal"
+                value={form.euros ?? ''}
+                onChange={e => update('euros', e.target.value)}
+                placeholder="5.49"
+              />
+              {priceInvalid && <span className="rep__field-error">Enter a price above €0.</span>}
             </div>
             <div className="rep__field">
               <label className="rep__label">Cups needed</label>
-              <input className="rep__input" type="number" min="1" max="20" value={form.cupsNeeded || ''} onChange={e => update('cupsNeeded', parseInt(e.target.value) || 1)} placeholder="3" />
+              <input
+                className={`rep__input${cupsInvalid ? ' rep__input--error' : ''}`}
+                type="number" min="1" max="20" inputMode="numeric"
+                value={form.cupsNeeded ?? ''}
+                onChange={e => update('cupsNeeded', e.target.value)}
+                placeholder="3"
+              />
+              {cupsInvalid && <span className="rep__field-error">Enter how many cups this costs.</span>}
+            </div>
+          </div>
+          <div className="rep__row">
+            <div className="rep__field">
+              <label className="rep__label">Cost to make (€)</label>
+              {/* COGS — the real cost to produce the product. Admin-only: it
+               *  feeds Reward economics and is NEVER shown in the customer app. */}
+              <input
+                className="rep__input"
+                type="number" step="0.01" min="0" inputMode="decimal"
+                value={form.cogs ?? ''}
+                onChange={e => update('cogs', e.target.value)}
+                placeholder="1.20"
+                title="Your actual cost to produce this reward (cost of goods). Admin only — never shown to customers. Used by Reward economics."
+              />
             </div>
             <div className="rep__field">
               <label className="rep__label">Partner subsidy (€)</label>
               <input
                 className="rep__input"
-                type="number"
-                step="0.01"
-                min="0"
+                type="number" step="0.01" min="0" inputMode="decimal"
                 value={form.subsidy ?? ''}
-                onChange={e => update('subsidy', parseFloat(e.target.value) || 0)}
+                onChange={e => update('subsidy', e.target.value)}
                 placeholder="0.00"
-                title="Optional cash the partner (e.g. Burger King) adds on top of what cups fund. Use to close the funding gap on premium rewards."
+                title="Optional cash the partner adds on top of what cups fund. Use to close the funding gap on premium rewards."
               />
             </div>
           </div>
@@ -705,6 +756,12 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
   const price = Number(form.euros) || 0;
   const cups = Number(form.cupsNeeded) || 0;
   const subsidy = Number(form.subsidy) || 0;
+  // COGS — your real cost to produce the reward. Admin-only, never shown to
+  // customers. Drives the gross-margin readout below.
+  const cogs = Number(form.cogs) || 0;
+  const hasCogs = cogs > 0;
+  const margin = +(price - cogs).toFixed(2);
+  const marginPct = price > 0 ? Math.round((margin / price) * 100) : 0;
   const cupsFunded = +(cups * cashbackRate).toFixed(2);
   const totalFunded = +(cupsFunded + subsidy).toFixed(2);
   const gap = +(price - totalFunded).toFixed(2);
@@ -738,6 +795,13 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
           <span className="rep-econ__cell-label">Partner subsidy</span>
           <span className="rep-econ__cell-val">€{subsidy.toFixed(2)}</span>
         </div>
+        {hasCogs && (
+          <div className="rep-econ__cell">
+            <span className="rep-econ__cell-label">Cost to make</span>
+            <span className="rep-econ__cell-val">€{cogs.toFixed(2)}</span>
+            <span className="rep-econ__cell-sub">Admin only</span>
+          </div>
+        )}
         <div className={`rep-econ__cell rep-econ__cell--gap rep-econ__cell--gap-${tone}`}>
           <span className="rep-econ__cell-label">
             {tone === 'under' ? 'Funding gap' : tone === 'over' ? 'Over-funded' : 'Gap'}
@@ -756,6 +820,18 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
           This reward pays €{totalFunded.toFixed(2)} cashback against a €{price.toFixed(2)} product.
           Either raise cups needed, add a partner subsidy, or accept that the
           customer covers €{gap.toFixed(2)} themselves on top of the cashback.
+        </p>
+      )}
+
+      {hasCogs && (
+        <p className={`rep-econ__margin rep-econ__margin--${margin >= 0 ? 'pos' : 'neg'}`}>
+          <span className="rep-econ__margin-label">Gross margin</span>
+          <span className="rep-econ__margin-val">
+            €{margin.toFixed(2)}{price > 0 ? ` · ${marginPct}%` : ''}
+          </span>
+          <span className="rep-econ__margin-note">
+            €{price.toFixed(2)} price − €{cogs.toFixed(2)} to make. This cost is never shown to customers.
+          </span>
         </p>
       )}
     </div>

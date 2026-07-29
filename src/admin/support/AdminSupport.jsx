@@ -25,6 +25,10 @@ const SUPPORT_EMAIL = 'info@packback.network';
 const FEEDBACK_EMAIL = 'feedback@packback.network';
 const FEATURE_EMAIL = 'product@packback.network';
 
+/* The Bring Your Own guidebook ships as a static page under public/ so it
+ * is served in dev + production at the same path (outside the SPA router). */
+const GUIDE_URL = '/admin-guide/index.html';
+
 /* ── Static content blocks ───────────────────────────────────────── */
 
 const RESOURCE_LINKS = [
@@ -238,6 +242,38 @@ export default function AdminSupport({ onNavigate }) {
               </svg>
             </a>
           ))}
+        </div>
+      </section>
+
+      {/* Bring Your Own guidebook — the full admin walkthrough, embedded
+       *  inline. Served as a static page from /admin-guide so it works in
+       *  production too; the button opens it full-screen in a new tab. */}
+      <section className="sup-section" id="sup-guide">
+        <header className="sup-section__header">
+          <h2 className="sup-section__title">Bring Your Own guidebook</h2>
+          <p className="sup-section__sub">
+            A step-by-step walkthrough of the whole dashboard — from approving cup
+            scans to setting up rewards and reading your reports.
+          </p>
+        </header>
+        <div className="sup-guide">
+          <div className="sup-guide__bar">
+            <span className="sup-guide__bar-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              Bring Your Own guidebook
+            </span>
+            <a href={GUIDE_URL} target="_blank" rel="noopener noreferrer" className="sup-btn sup-btn--ghost sup-btn--sm">
+              Open full guide
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="7" y1="17" x2="17" y2="7" />
+                <polyline points="7 7 17 7 17 17" />
+              </svg>
+            </a>
+          </div>
+          <iframe className="sup-guide__frame" src={GUIDE_URL} title="Bring Your Own guidebook" loading="lazy" />
         </div>
       </section>
 

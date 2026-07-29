@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import './ModelChooser.css';
 import logo from '../assets/images/packperks-logo.svg';
+import { supabase } from '../lib/supabase';
 
 /* Root-path ('/') venue-model chooser.
  *
@@ -11,6 +13,18 @@ import logo from '../assets/images/packperks-logo.svg';
  * the app for that venue with a proper org resolved. No data is collected here,
  * so there is no cookie gate. */
 export default function ModelChooser() {
+  // The BYO café tile points at the café GROUP slug. Resolve it live from the
+  // DB so it follows any future rename (was hard-coded to the old '/byonl').
+  // Falls back to '/byo' until the lookup resolves.
+  const [byoHref, setByoHref] = useState('/byo');
+  useEffect(() => {
+    let alive = true;
+    supabase.from('org_groups').select('slug').order('created_at').limit(1).maybeSingle()
+      .then(({ data }) => { if (alive && data?.slug) setByoHref(`/${data.slug}`); })
+      .catch(() => { /* keep the fallback */ });
+    return () => { alive = false; };
+  }, []);
+
   return (
     <div className="mc">
       <div className="mc__inner">
@@ -18,7 +32,7 @@ export default function ModelChooser() {
         <p className="mc__prompt">Choose the model</p>
 
         <div className="mc__tiles">
-          <a className="mc__tile mc__tile--byo" href="/byonl">
+          <a className="mc__tile mc__tile--byo" href={byoHref}>
             <span className="mc__tile-icon" aria-hidden="true">
               <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 4h14l-1.3 15.3a2.5 2.5 0 0 1-2.5 2.2H8.8a2.5 2.5 0 0 1-2.5-2.2L5 4z" />

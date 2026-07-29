@@ -51,22 +51,24 @@
   width: 32px;
   padding: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.68);
+  color: #6C6259;
 }
 .wd-icon:hover {
-  background: rgba(255, 255, 255, 0.10);
-  color: #FFFFFF;
+  background: #F3EEE4;
+  color: #1A1A1A;
 }
 
 /* ── Preview (labelled ghost) ────────────────────────────────────── */
 .wd-preview {
   padding: 0 14px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.78);
+  color: #4A4540;
+  border-color: #E0DAD0;
 }
 .wd-preview:hover {
-  background: rgba(255, 255, 255, 0.10);
-  color: #FFFFFF;
+  background: #F3EEE4;
+  color: #1A1A1A;
+  border-color: #D5CDBE;
 }
 
 /* ── Publish (highlighted primary) ───────────────────────────────── */

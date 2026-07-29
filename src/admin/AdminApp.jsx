@@ -95,6 +95,14 @@ function readHashPage() {
   return resolved === 'org' ? 'settings' : resolved;
 }
 
+// Optional cross-page scroll target carried in the hash query, e.g. a
+// notification deep-link `#users?section=merge` scrolls to the merge queue.
+function readHashSection() {
+  if (typeof window === 'undefined') return null;
+  const q = (window.location.hash || '').split('?')[1] || '';
+  return new URLSearchParams(q).get('section') || null;
+}
+
 function AdminShell() {
   const [page, setPageState] = useState(readHashPage);
   const draftState = useAdminDraft();
@@ -109,6 +117,9 @@ function AdminShell() {
   /* Cross-page scroll target for the Organizations page (currently only
    * 'groups', fired by the group gear + "Manage groups" in the switcher). */
   const [focusOrgSection, setFocusOrgSection] = useState(null);
+  /* Scroll target parsed from a notification deep-link hash (e.g.
+   * `#users?section=merge` → scroll the Users page to the merge queue). */
+  const [deepSection, setDeepSection] = useState(readHashSection);
 
   /* Track which pages have been visited so we can keep them mounted
    * after first visit. Set is fine here — React's reference equality
@@ -139,6 +150,7 @@ function AdminShell() {
     function onHashChange() {
       const next = readHashPage();
       setPageState(next);
+      setDeepSection(readHashSection());
       setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
     }
     window.addEventListener('hashchange', onHashChange);
@@ -190,7 +202,7 @@ function AdminShell() {
             <AdminAppDesign draftState={draftState} />
           </KeepAlive>
           <KeepAlive id="users" activeId={page} visited={visited}>
-            <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} />
+            <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} focusSection={page === 'users' ? deepSection : null} onSectionConsumed={() => setDeepSection(null)} />
           </KeepAlive>
           <KeepAlive id="claims" activeId={page} visited={visited}>
             <AdminClaims onNavigate={setPage} draftState={draftState} />

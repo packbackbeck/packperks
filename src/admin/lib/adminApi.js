@@ -1583,6 +1583,31 @@ export async function getMergeRequests(status = 'pending') {
   }));
 }
 
+/* Full detail for one merge request: the surviving account plus every account
+ * being merged into it, with balances/join dates so an admin can review the two
+ * sides before approving. Used by the row-click review modal. */
+export async function getMergeRequestDetail(reqId) {
+  let q = supabase.from('merge_requests').select('*').eq('id', reqId);
+  q = applyOrgFilter(q);
+  const { data: req, error } = await q.maybeSingle();
+  if (error) throw error;
+  if (!req) return null;
+  const ids = [req.survivor_user_id, ...((req.absorbed_user_ids) || [])].filter(Boolean);
+  const byId = {};
+  if (ids.length) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, display_name, email, balance, lifetime_cups, created_at, device_id, auth_user_id')
+      .in('id', ids);
+    (users || []).forEach((u) => { byId[u.id] = u; });
+  }
+  return {
+    request: req,
+    survivor: byId[req.survivor_user_id] || { id: req.survivor_user_id },
+    absorbed: ((req.absorbed_user_ids) || []).map((id) => byId[id] || { id }),
+  };
+}
+
 export async function getMergeRequestCount(status = 'pending') {
   let q = supabase.from('merge_requests').select('id', { count: 'exact', head: true });
   q = applyOrgFilter(q);

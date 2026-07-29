@@ -54,12 +54,13 @@ const ICONS: Record<string, string> = {
 // routes by URL hash and reads ?org=<slug>, so we deep-link straight to the
 // relevant review page scoped to the right store.
 const ADMIN_URL = 'https://perks.packback.network/admin';
-const CTA: Record<string, { label: string; page: string }> = {
+const CTA: Record<string, { label: string; page: string; section?: string }> = {
   claim_created:   { label: 'Review claim',         page: 'claims' },
   account_created: { label: 'View customer',        page: 'users' },
   cup_scanned:     { label: 'Open cup scans',        page: 'cupscans' },
   byo_request:     { label: 'Review the cup scan',    page: 'cupscans' },
-  merge_request:   { label: 'Review merge request',  page: 'users' },
+  // section=merge scrolls the Users page straight to the merge-request queue.
+  merge_request:   { label: 'Review merge request',  page: 'users', section: 'merge' },
 };
 const esc = (s: string) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] || c));
 const fmtWhen = (ts: string | null | undefined) =>
@@ -217,7 +218,9 @@ Deno.serve(async (req) => {
   // CTA: deep-link to the relevant admin page (scoped to the store) so the
   // admin lands where they can act on this exact notification.
   const cta = isTest ? { label: 'Open dashboard', page: 'overview' } : CTA[eventType];
-  const ctaUrl = cta ? `${ADMIN_URL}${orgSlug ? '?org=' + orgSlug : ''}#${cta.page}` : '';
+  const ctaUrl = cta
+    ? `${ADMIN_URL}${orgSlug ? '?org=' + orgSlug : ''}#${cta.page}${cta.section ? '?section=' + cta.section : ''}`
+    : '';
 
   const rowHtml = detailRows.map((r) =>
     `<tr><td style='padding:7px 0;border-top:1px solid #F0EADD;color:#8B8577;font-size:12.5px;'>${esc(r[0])}</td>` +

@@ -21,11 +21,21 @@ import { bootstrapAdmin, signOut } from './authApi';
 
 const AuthCtx = createContext(null);
 
+/* Captured once at module load — BEFORE supabase-js processes and strips the
+ * URL hash — so we know a password-recovery link was opened even after the
+ * token has been consumed. supabase also fires a PASSWORD_RECOVERY event we
+ * listen for below as a backup. */
+const INITIAL_RECOVERY =
+  typeof window !== 'undefined' && /[#&]type=recovery/.test(window.location.hash || '');
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [status, setStatus]   = useState('loading');
   const [error, setError]     = useState(null);
+  // When true, AuthGate shows the "set a new password" screen instead of the
+  // app / login, regardless of profile status.
+  const [recovering, setRecovering] = useState(INITIAL_RECOVERY);
 
   // Tracks the user id behind the current session so we can tell a genuine
   // account change (sign-in/out, switch user) apart from a token refresh.
@@ -43,6 +53,8 @@ export function AuthProvider({ children }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       const nextUserId = sess?.user?.id ?? null;
+      // A recovery link opened in this tab — show the reset-password screen.
+      if (_event === 'PASSWORD_RECOVERY') setRecovering(true);
       setSession(sess ?? null);
       // Only invalidate the cached profile when the actual signed-in user
       // changes (sign-out, or a different account signs in). Supabase fires
@@ -96,11 +108,22 @@ export function AuthProvider({ children }) {
     setStatus('unauthenticated');
   }
 
+  // Leave the password-recovery flow: clear the flag + scrub any leftover token
+  // fragment from the URL so a refresh doesn't re-trigger the reset screen.
+  function endRecovery() {
+    setRecovering(false);
+    if (typeof window !== 'undefined' && window.location.hash) {
+      try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* ignore */ }
+    }
+  }
+
   const value = {
     session,
     profile,
     status,
     error,
+    recovering,
+    endRecovery,
     refresh,
     signOut: handleSignOut,
     setProfile, // for ProfileSetup to update without a round-trip

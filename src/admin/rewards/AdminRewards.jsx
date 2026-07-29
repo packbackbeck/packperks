@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import RewardEditPanel from './RewardEditPanel';
-import QuickLinks from '../shared/QuickLinks';
 import './AdminRewards.css';
 
 /* P-43: full status palette, with 'hidden' aliased to the paused
@@ -574,8 +573,6 @@ export default function AdminRewards({ draftState, onNavigate }) {
           )}
         </div>
       </div>
-
-      <QuickLinks currentPage="rewards" onNavigate={onNavigate} />
     </div>
   );
 }

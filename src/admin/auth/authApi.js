@@ -85,8 +85,13 @@ export async function signOut() {
 }
 
 export async function sendPasswordReset(email) {
+  // redirectTo must be a clean URL with NO hash of our own: Supabase appends the
+  // recovery token to the URL hash (#access_token=…&type=recovery), and a
+  // pre-existing '#reset' fragment collides with it so supabase-js can't parse
+  // the token — the user lands back on the sign-in screen. The admin app detects
+  // the recovery from `type=recovery` in the hash / the PASSWORD_RECOVERY event.
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: adminUrl('#reset'),
+    redirectTo: adminUrl(),
   });
   if (error) throw error;
 }

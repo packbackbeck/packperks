@@ -72,13 +72,12 @@ const NAV_ITEMS = [
   {
     id: 'cupscans',
     label: 'Cup Scans',
-    /* Camera/scan-frame glyph: each scan is a photo of the bin scanning
-     *  a cup, distinct from the QR-codes tab below which is about
-     *  minting the printed batches. */
+    /* Cup glyph — each scan is a returned cup. */
     icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-        <circle cx="12" cy="13" r="4" />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 3h12l-1.2 15.3A2 2 0 0 1 14.8 20H9.2a2 2 0 0 1-2-1.7L6 3z" />
+        <path d="M5 3h14" />
+        <path d="M9 10h6" />
       </svg>
     ),
   },
@@ -131,12 +130,13 @@ const NAV_ITEMS = [
   {
     id: 'byorequests',
     label: 'BYO QR Codes',
-    /* Cup + check glyph — the bring-your-own approval queue. */
+    /* QR-code glyph — minting + reviewing the printed bring-your-own codes. */
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 3h12l-1 15a2 2 0 0 1-2 1.8H9A2 2 0 0 1 7 18L6 3z" />
-        <path d="M5 3h14" />
-        <path d="M9.5 11.5l2 2 3.5-4" />
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <path d="M14 14h3v3M20.5 14v3.5M14 20.5h3.5M20.5 20.5v.01" />
       </svg>
     ),
   },

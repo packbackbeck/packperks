@@ -7,6 +7,7 @@ import EmptyState from '../shared/EmptyState';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
 import MergeUsersModal from './MergeUsersModal';
+import MergeRequestModal from './MergeRequestModal';
 import './AdminUsers.css';
 
 function formatDate(ts) {
@@ -352,7 +353,7 @@ const SORT_KEYS = {
   active:  (u) => new Date(u.updated_at).getTime(),
 };
 
-export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed }) {
+export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, focusSection, onSectionConsumed }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -673,7 +674,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed })
         }}
       />
 
-      <MergeRequestsSection />
+      <MergeRequestsSection focusSection={focusSection} onSectionConsumed={onSectionConsumed} />
     </div>
   );
 }
@@ -694,7 +695,7 @@ const MERGE_STATUS_TONE = {
   pending: 'pending', approved: 'approved', rejected: 'denied', completed: 'approved', admin: 'approved',
 };
 
-function MergeRequestsSection() {
+function MergeRequestsSection({ focusSection, onSectionConsumed }) {
   const { activeOrgId } = useOrg();
   const [tab, setTab] = useState('pending');
   const [rows, setRows] = useState([]);
@@ -702,6 +703,8 @@ function MergeRequestsSection() {
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState(null);
   const [error, setError] = useState(null);
+  // Row-click review modal.
+  const [activeReq, setActiveReq] = useState(null);
 
   // Settings
   const [limit, setLimit] = useState(MERGE_LIMIT_DEFAULT);
@@ -742,14 +745,25 @@ function MergeRequestsSection() {
     try {
       if (action === 'approve') { await approveMergeRequest(id); setNotice('Approved — the accounts were merged.'); }
       else { await rejectMergeRequest(id); setNotice('Request rejected. No accounts were merged.'); }
+      setActiveReq(null);
       await load();
       setTimeout(() => setNotice(null), 4000);
     } catch (e) { setError(e.message || 'Action failed.'); }
     finally { setBusyId(null); }
   }
 
+  // Deep-link from the merge-request notification email (#users?section=merge):
+  // scroll to this section once its rows have rendered, then mark it consumed.
+  useEffect(() => {
+    if (focusSection !== 'merge' || loading) return;
+    const el = document.getElementById('s-merge-requests');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onSectionConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSection, loading]);
+
   return (
-    <section className="mergereq">
+    <section className="mergereq" id="s-merge-requests" style={{ scrollMarginTop: '72px' }}>
       <header className="mergereq__head">
         <div>
           <h2 className="mergereq__title">Account merge requests</h2>
@@ -806,7 +820,7 @@ function MergeRequestsSection() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className="mergereq__row" onClick={() => setActiveReq(r)} title="Open review">
                   <td>
                     <div className="mergereq__cust">{r.survivorName || 'Anonymous'}</div>
                     {r.survivorEmail && <div className="mergereq__cust-sub">{r.survivorEmail}</div>}
@@ -819,7 +833,7 @@ function MergeRequestsSection() {
                     <span className={`mergereq__pill mergereq__pill--${MERGE_STATUS_TONE[r.status] || 'pending'}`}>{r.status}</span>
                     {r.decided_at && r.status !== 'pending' && <div className="mergereq__cust-sub">{formatDate(r.decided_at)}</div>}
                   </td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     {r.status === 'pending' ? (
                       <div className="mergereq__actions">
                         <button className="mergereq__btn mergereq__btn--approve" disabled={busyId === r.id} onClick={() => decide(r.id, 'approve')}>
@@ -838,6 +852,15 @@ function MergeRequestsSection() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {activeReq && (
+        <MergeRequestModal
+          req={activeReq}
+          busy={busyId === activeReq.id}
+          onClose={() => setActiveReq(null)}
+          onDecide={(action) => decide(activeReq.id, action)}
+        />
       )}
     </section>
   );

@@ -1,0 +1,152 @@
+/* MergeRequestModal — account-merge review dialog. On-brand with the rest of
+ * the admin (white cards, cream detail strips, PackPerks purple + green). */
+
+.mrm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(26, 22, 18, 0.42);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: mrm-fade 0.14s ease both;
+}
+@keyframes mrm-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.mrm {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #FFFFFF;
+  border: 1px solid #E8E6E1;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  animation: mrm-pop 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes mrm-pop { from { transform: translateY(8px) scale(0.99); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.mrm__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 22px 12px;
+}
+.mrm__eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #8A857F; }
+.mrm__title { margin: 4px 0 0; font-size: 20px; font-weight: 800; color: #1A1A1A; letter-spacing: -0.01em; }
+.mrm__close {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  border: none; border-radius: 9px;
+  background: #F4F1EC; color: #6C6259;
+  font-size: 20px; line-height: 1; cursor: pointer;
+  transition: background 0.14s;
+}
+.mrm__close:hover { background: #ECE7DF; }
+
+.mrm__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 0 22px 14px;
+}
+.mrm__meta-item { font-size: 12px; color: #6C6259; }
+.mrm__pill {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 3px 9px; border-radius: 999px; text-transform: capitalize;
+}
+.mrm__pill--pending  { background: #FFF3D6; color: #B7791F; }
+.mrm__pill--approved { background: #E4F6E9; color: #1A8737; }
+.mrm__pill--completed{ background: #E4F6E9; color: #1A8737; }
+.mrm__pill--rejected { background: #FCE4E0; color: #C0392B; }
+
+.mrm__loading, .mrm__error, .mrm__none {
+  padding: 22px; text-align: center; font-size: 13px; color: #8A857F;
+}
+.mrm__error { color: #C0392B; }
+
+.mrm__grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 22px 6px;
+}
+.mrm__arrow { color: #B7ADA0; display: flex; justify-content: center; }
+.mrm__absorbed-col { display: flex; flex-direction: column; gap: 10px; }
+
+.mrm-acct {
+  border: 1.5px solid #E8E6E1;
+  border-radius: 14px;
+  padding: 14px;
+  background: #FCFBF9;
+}
+.mrm-acct--keep  { border-color: #BCE3C6; background: #F4FBF6; }
+.mrm-acct--merge { border-color: #E3DAF4; background: #FAF8FE; }
+.mrm-acct__badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px; margin-bottom: 8px;
+}
+.mrm-acct--keep  .mrm-acct__badge { background: #1A8737; color: #fff; }
+.mrm-acct--merge .mrm-acct__badge { background: #5333A5; color: #fff; }
+.mrm-acct__name { font-size: 15px; font-weight: 800; color: #1A1A1A; }
+.mrm-acct__email { font-size: 12px; color: #6C6259; margin-top: 2px; word-break: break-all; }
+.mrm-acct__stats {
+  margin: 12px 0 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px;
+}
+.mrm-acct__stats > div { display: flex; flex-direction: column; gap: 1px; }
+.mrm-acct__stats dt { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #9E978D; margin: 0; }
+.mrm-acct__stats dd { margin: 0; font-size: 14px; font-weight: 700; color: #1A1A1A; }
+.mrm-acct__mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px !important; font-weight: 600 !important; }
+
+.mrm__result {
+  margin: 12px 22px 4px;
+  padding: 14px 16px;
+  background: #FBF7F0;
+  border: 1px solid #EEE7DA;
+  border-radius: 14px;
+}
+.mrm__result-title { font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8A857F; margin-bottom: 10px; }
+.mrm__result-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; }
+.mrm__result-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.mrm__result-row span { font-size: 12px; color: #6C6259; }
+.mrm__result-row strong { font-size: 13px; font-weight: 700; color: #1A1A1A; text-align: right; word-break: break-all; }
+.mrm__reason { margin: 12px 0 0; font-size: 12.5px; line-height: 1.5; color: #2C2A26; }
+.mrm__reason span { color: #8A857F; }
+
+.mrm__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 22px 20px;
+  margin-top: 6px;
+}
+.mrm__foot-actions { display: flex; gap: 10px; }
+.mrm__btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px; font-weight: 700;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: filter 0.14s, background 0.14s;
+}
+.mrm__btn:disabled { opacity: 0.6; cursor: default; }
+.mrm__btn--ghost { background: #F4F1EC; color: #4A4540; }
+.mrm__btn--ghost:hover:not(:disabled) { background: #ECE7DF; }
+.mrm__btn--approve { background: #1A8737; color: #fff; }
+.mrm__btn--approve:hover:not(:disabled) { filter: brightness(0.95); }
+.mrm__btn--deny { background: #fff; color: #C0392B; border-color: #F0C9C1; }
+.mrm__btn--deny:hover:not(:disabled) { background: #FCF2F0; }
+
+@media (max-width: 560px) {
+  .mrm__grid { grid-template-columns: 1fr; }
+  .mrm__arrow { transform: rotate(90deg); }
+  .mrm__result-rows { grid-template-columns: 1fr; }
+}

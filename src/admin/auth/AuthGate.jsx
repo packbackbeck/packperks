@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import LoginPage from './LoginPage';
+import ResetPasswordPage from './ResetPasswordPage';
 import ProfileSetup from './ProfileSetup';
 import WelcomeSplash from './WelcomeSplash';
 import Spinner from '../lib/Spinner';
@@ -18,7 +19,7 @@ import Spinner from '../lib/Spinner';
  * onboarding wizard flips the heuristic. The user can always re-edit
  * later from the top-bar profile menu. */
 export default function AuthGate({ children }) {
-  const { status, profile } = useAuth();
+  const { status, profile, recovering, endRecovery, signOut } = useAuth();
   const [setupDone, setSetupDone]   = useState(false);
   const [welcomeDone, setWelcomeDone] = useState(false);
 
@@ -27,6 +28,17 @@ export default function AuthGate({ children }) {
     setSetupDone(false);
     setWelcomeDone(false);
   }, [profile?.id]);
+
+  // A password-reset link was opened — show the set-new-password screen before
+  // any other routing (the recovery session would otherwise fall through to the
+  // app or, for a non-team account, bounce to the login screen).
+  if (recovering) {
+    return (
+      <ResetPasswordPage
+        onFinish={async () => { try { await signOut(); } catch { /* ignore */ } endRecovery(); }}
+      />
+    );
+  }
 
   if (status === 'loading') {
     return (

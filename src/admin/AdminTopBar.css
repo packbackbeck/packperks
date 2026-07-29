@@ -37,8 +37,8 @@
   left: 0;
   right: 0;
   height: 56px;
-  background: #1A1A1A;
-  border-bottom: 1px solid #2D2D2D;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E8E6E1;
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -78,7 +78,7 @@
 }
 
 .admin-topbar__logo-title {
-  color: #FFFFFF;
+  color: #14100A;
   font-weight: 700;
   font-size: 13px;
   line-height: 1;
@@ -112,21 +112,21 @@
 }
 
 .admin-topbar__status--dirty {
-  background: rgba(255, 197, 47, 0.1);
-  border-color: rgba(255, 197, 47, 0.25);
-  color: #FFC52F;
+  background: rgba(166, 106, 0, 0.10);
+  border-color: rgba(166, 106, 0, 0.24);
+  color: #A66A00;
 }
 
 .admin-topbar__status--published {
-  background: rgba(26, 127, 75, 0.1);
-  border-color: rgba(26, 127, 75, 0.25);
-  color: #4ADE80;
+  background: rgba(21, 122, 52, 0.10);
+  border-color: rgba(21, 122, 52, 0.24);
+  color: #157A34;
 }
 
 .admin-topbar__status--saved {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #6C6259;
+  background: #F1EDE6;
+  border-color: #E8E6E1;
+  color: #8A8175;
 }
 
 .admin-topbar__status-dot {
@@ -167,22 +167,22 @@
 
 .admin-topbar__btn--ghost {
   background: transparent;
-  color: #6C6259;
-  border: 1px solid #333;
+  color: #5A554F;
+  border: 1px solid #E0DAD0;
 }
 .admin-topbar__btn--ghost:hover {
-  background: #2A2A2A;
-  color: #E8E6E1;
-  border-color: #444;
+  background: #F3EEE4;
+  color: #1A1A1A;
+  border-color: #D5CDBE;
 }
 
 .admin-topbar__btn--secondary {
-  background: #2A2A2A;
-  color: #E8E6E1;
-  border: 1px solid #3A3A3A;
+  background: #F3EEE4;
+  color: #2A2724;
+  border: 1px solid #E0DAD0;
 }
 .admin-topbar__btn--secondary:hover:not(:disabled) {
-  background: #333;
+  background: #EBE4D7;
 }
 .admin-topbar__btn--secondary:disabled {
   opacity: 0.35;
@@ -342,10 +342,11 @@
   height: 28px;
   width: auto;
   display: block;
-  /* New dark-mode SVG is already light-on-dark — render it as-is. */
+  /* Light-background wordmark (packperks-logo.svg) so it stays legible on the
+   * light top bar. */
 }
 .admin-topbar__brand-x {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(20, 16, 10, 0.32);
   font-size: 14px;
   font-weight: 500;
 }
@@ -381,20 +382,20 @@
   gap: 5px;
   padding: 4px 10px;
   margin-right: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #F3EEE4;
+  border: 1px solid #E8E6E1;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.72);
+  color: #6C6259;
   cursor: help;
   transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
   white-space: nowrap;
 }
 .admin-topbar__tz:hover {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #FFFFFF;
+  background: #EBE4D7;
+  border-color: #D5CDBE;
+  color: #2A2724;
 }
 .admin-topbar__tz-label { letter-spacing: -0.005em; }
 .admin-topbar__tz-offset { opacity: 0.65; }

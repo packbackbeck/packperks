@@ -4,8 +4,8 @@
   left: 0;
   bottom: 0;
   width: 220px;
-  background: #141414;
-  border-right: 1px solid #222;
+  background: #FCFAF6;
+  border-right: 1px solid #EAE5DB;
   display: flex;
   flex-direction: column;
   z-index: 100;
@@ -41,7 +41,7 @@
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: #A8A49D;
+  color: #5A554F;
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
@@ -53,17 +53,18 @@
 }
 
 .admin-sidebar__item:hover {
-  background: #1E1E1E;
-  color: #C8C4BC;
+  background: #F3EEE4;
+  color: #1A1A1A;
 }
 
 .admin-sidebar__item--active {
-  background: rgba(214, 35, 0, 0.12);
-  color: #FF5533;
+  background: rgba(210, 84, 43, 0.12);
+  color: #C0451F;
+  font-weight: 600;
 }
 
 .admin-sidebar__item--active:hover {
-  background: rgba(214, 35, 0, 0.16);
+  background: rgba(210, 84, 43, 0.18);
 }
 
 .admin-sidebar__item-icon {
@@ -96,13 +97,13 @@
 .admin-sidebar__toggles {
   flex: 0 0 auto;
   padding: 8px 10px 6px;
-  border-top: 1px solid #222;
+  border-top: 1px solid #EAE5DB;
 }
 
 .admin-sidebar__toggles-label {
   font-size: 9px;
   font-weight: 700;
-  color: #4A4540;
+  color: #8A8175;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   padding: 0 4px;
@@ -132,8 +133,8 @@
   transition: background 0.14s ease, color 0.14s ease;
 }
 .admin-sidebar__toggles-label--link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #FFFFFF;
+  background: #F3EEE4;
+  color: #1A1A1A;
 }
 .admin-sidebar__toggles-label--link svg {
   opacity: 0.5;
@@ -145,7 +146,7 @@
 }
 
 .admin-sidebar__rates {
-  background: #1A1A1A;
+  background: #F3EEE4;
   border-radius: 8px;
   padding: 7px 8px;
   margin-bottom: 4px;
@@ -156,7 +157,7 @@
 }
 
 .admin-sidebar__rates:hover {
-  background: #222;
+  background: #EBE4D7;
 }
 
 .admin-sidebar__rate-item {
@@ -169,7 +170,7 @@
 .admin-sidebar__rate-label {
   font-size: 9px;
   font-weight: 700;
-  color: #4A4540;
+  color: #8A8175;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -177,7 +178,7 @@
 .admin-sidebar__rate-val {
   font-size: 12px;
   font-weight: 700;
-  color: #FFC52F;
+  color: #A85320;
 }
 
 .admin-sidebar__toggle-row {
@@ -192,17 +193,17 @@
 }
 
 .admin-sidebar__toggle-row:hover {
-  background: #1E1E1E;
+  background: #F3EEE4;
 }
 
 .admin-sidebar__toggle-name {
   font-size: 12px;
-  color: #6C6259;
+  color: #4A4540;
   font-weight: 500;
 }
 
 .admin-sidebar__toggle-name--warn {
-  color: #F97316;
+  color: #C2410C;
 }
 
 .admin-sidebar__toggle-pill {
@@ -213,21 +214,19 @@
   letter-spacing: 0.3px;
 }
 
-.admin-sidebar__toggle-pill--on  { background: rgba(74,222,128,0.15); color: #4ADE80; }
-.admin-sidebar__toggle-pill--off { background: rgba(255,255,255,0.06); color: #4A4540; }
-.admin-sidebar__toggle-pill--warn { background: rgba(249,115,22,0.2); color: #F97316; }
+.admin-sidebar__toggle-pill--on  { background: rgba(21, 122, 52, 0.14); color: #157A34; }
+.admin-sidebar__toggle-pill--off { background: #EFE9DE; color: #8A8175; }
+.admin-sidebar__toggle-pill--warn { background: rgba(194, 65, 12, 0.14); color: #C2410C; }
 
 .admin-sidebar__footer {
   padding: 12px 10px 16px;
-  border-top: 1px solid #222;
+  border-top: 1px solid #EAE5DB;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-/* OrgBadge + ProfileMenu (which were designed for the dark top bar)
- * drop in here directly because the sidebar uses the same dark palette.
- * We just make them stretch to full width so they read as a stacked
- * me + workspace card. */
+/* OrgBadge + ProfileMenu stretch to full width so they read as a stacked
+ * me + workspace card inside the sidebar footer. */
 .admin-sidebar__footer .ob,
 .admin-sidebar__footer .pm__trigger {
   width: 100%;
@@ -254,9 +253,9 @@
   width: 100%;
   padding: 9px 12px;
   border-radius: 8px;
-  border: 1px solid #2A2A2A;
+  border: 1px solid #E0DAD0;
   background: transparent;
-  color: #A8A49D;
+  color: #5A554F;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -265,7 +264,7 @@
 }
 
 .admin-sidebar__footer-btn:hover {
-  background: #1E1E1E;
-  color: #6C6259;
-  border-color: #333;
+  background: #F3EEE4;
+  color: #1A1A1A;
+  border-color: #D5CDBE;
 }

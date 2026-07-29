@@ -175,6 +175,61 @@ const FEATURES = [
   { id: 'f-feature-req',  name: 'Request a feature',       desc: 'Pitch us on something to build',    group: 'System',     page: 'support',  icon: Icon.settings, keywords: 'feature request idea suggestion roadmap propose pitch wish' },
   { id: 'f-changelog',    name: 'Dashboard changelog',     desc: 'What we shipped recently',          group: 'System',     page: 'support',  icon: Icon.history,  keywords: 'changelog release notes updates new shipped recent' },
 
+  // ── App Design ─────────────────────────────────────────────────────
+  { id: 'f-appdesign',      name: 'App Design',              desc: 'Customise the customer app',        group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'design theme colours colors branding customise customer app look palette preview appearance' },
+  { id: 'f-design-colours', name: 'Brand colours',           desc: 'Palette for the customer app',      group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'colour color palette primary accent background surface text contrast brand hex' },
+  { id: 'f-design-copy',    name: 'App copy and text',       desc: 'Headline + wording customers see',  group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'copy text headline wording message customer app words subtext' },
+  { id: 'f-design-sections',name: 'App sections',            desc: 'Show or hide app sections',         group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'sections layout blocks show hide toggle app guide stories smart import' },
+  { id: 'f-design-preview', name: 'Live app preview',        desc: 'Preview the customer app',          group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'preview phone live customer app mockup design' },
+
+  // ── BYO QR Codes + held-scan review ────────────────────────────────
+  { id: 'f-byo',          name: 'BYO QR Codes',            desc: 'Counter QR + held-scan review',     group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'byo bring your own counter qr poster reusable cup review pending held requests' },
+  { id: 'f-byo-qr',       name: 'Counter QR poster',       desc: 'Download the counter QR to print',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'counter qr poster download print png location bring your own byo scan' },
+  { id: 'f-byo-cap',      name: 'Daily auto-credit limit', desc: 'Scans per customer before review',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'daily limit cap auto credit per customer per day hold review byo scans over limit' },
+  { id: 'f-byo-held',     name: 'Review held BYO requests',desc: 'Approve or reject over-limit scans',group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'held pending review approve reject over limit byo cup request credit awaiting' },
+  { id: 'f-byo-receipt',  name: 'Rewards receipt generator',desc: 'Mint a test reward receipt',       group: 'Operations', page: 'byorequests', icon: Icon.receipt, keywords: 'receipt generator test reward mint image byo' },
+
+  // ── Cup Scans (held review + review mode) ──────────────────────────
+  { id: 'f-cupscans-held',  name: 'Held cup scans',        desc: 'Over-limit scans awaiting review',  group: 'Operations', page: 'cupscans', icon: Icon.qr,      keywords: 'held pending review awaiting approve reject over limit byo cup scan credit' },
+  { id: 'f-cupscans-review',name: 'Cup scan review mode',  desc: 'Split view with a scan detail panel',group: 'Operations',page: 'cupscans', icon: Icon.qr,      keywords: 'review mode split panel detail scan photo customer resize' },
+
+  // ── Future Vendors ─────────────────────────────────────────────────
+  { id: 'f-future',       name: 'Future Vendors',          desc: 'Coming-soon pins on the map',       group: 'Content',    page: 'futurevendors', icon: Icon.org, keywords: 'future vendors coming soon map pins venues stores prospects nearby' },
+
+  // ── System Health ──────────────────────────────────────────────────
+  { id: 'f-health',       name: 'System Health',           desc: 'Go / no-go feasibility metrics',    group: 'System',     page: 'stats',    icon: Icon.activity, keywords: 'system health status go no-go feasibility scan success qr generation metrics technical uptime diagnostics' },
+  { id: 'f-health-scan',  name: 'Scan success rate',       desc: 'How many scans succeed',            group: 'System',     page: 'stats',    icon: Icon.activity, keywords: 'scan success rate qr health metric go no-go failure' },
+
+  // ── User Behaviour ─────────────────────────────────────────────────
+  { id: 'f-behaviour',    name: 'User Behaviour',          desc: 'Funnel + engagement metrics',       group: 'Dashboards', page: 'behaviour',icon: Icon.user,    keywords: 'behaviour behavior funnel conversion engagement drop off visitor to user retention journey' },
+
+  // ── Reports + email tools ──────────────────────────────────────────
+  { id: 'f-export',       name: 'Export data (CSV / PDF)', desc: 'Build and download a report',       group: 'System',     page: 'reports',  icon: Icon.reports, keywords: 'export csv excel pdf json download data report build users claims cup scans activity dataset columns' },
+  { id: 'f-digest',       name: 'Weekly digest email',     desc: 'Scheduled metrics email',           group: 'System',     page: 'reports',  icon: Icon.reports, keywords: 'weekly digest email metrics letter schedule send test friday co2 cups cashback' },
+  { id: 'f-notify',       name: 'Notification center',     desc: 'Instant email alerts',              group: 'System',     page: 'reports',  icon: Icon.reports, keywords: 'notification center instant alerts email new claim account cup scan byo merge send test events' },
+  { id: 'f-auto-report',  name: 'Automated reports',       desc: 'Scheduled report email + test',     group: 'System',     page: 'reports',  icon: Icon.reports, keywords: 'automated report schedule email csv weekly claims vendor direct debit send test now' },
+
+  // ── Organizations & Groups ─────────────────────────────────────────
+  { id: 'f-orgs',         name: 'Organizations & Groups',  desc: 'All stores, groups, regions',       group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'organisations organizations stores brands groups regions manage all switch add multi org list' },
+  { id: 'f-add-org',      name: 'Add organisation',        desc: 'Start the new store wizard',        group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'add new organisation organization store brand vendor wizard onboard create' },
+  { id: 'f-switch-org',   name: 'Switch store',            desc: 'Change the active organisation',    group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'switch change active store organisation org brand select' },
+  { id: 'f-group-settings',name: 'Group settings',         desc: 'Manage a store group',              group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'group settings bring your own byo shared balance members stores' },
+  { id: 'f-soft-delete',  name: 'Take a store offline',    desc: 'Soft-delete an organisation',       group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'soft delete offline hide remove store organisation restore archive duplicate' },
+  { id: 'f-regions',      name: 'Regions',                 desc: 'Multi-regional setup',              group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'region country netherlands uae multi regional platform new region currency' },
+
+  // ── Settings tabs ──────────────────────────────────────────────────
+  { id: 'f-payout-rates', name: 'Payout rates',            desc: 'Cashback + refund per cup',         group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'payout rates cashback refund per cup euros price money tab' },
+  { id: 'f-cup-rules',    name: 'Cup rules',               desc: 'Max cups per scan + policies',      group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'cup rules policy max cups per scan limit tab' },
+  { id: 'f-feature-flags',name: 'Feature flags',           desc: 'Turn app features on / off',        group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'feature flags toggle on off sharing donations refunds activity impact tab' },
+  { id: 'f-reward-budget',name: 'Reward budget',           desc: 'Cap monthly cashback spend',        group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'reward budget cap spend limit cashback committed monthly money' },
+  { id: 'f-region-setting',name: 'Store country / region', desc: 'Sets currency + payout method',     group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'country region netherlands uae currency payout tikkie aed eur profile' },
+  { id: 'f-merge-limit',  name: 'Weekly merge limit',      desc: 'Merges per customer per week',      group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'merge limit weekly per customer per week account 0 zero hold review' },
+
+  // ── Merge + open a customer (Users) ────────────────────────────────
+  { id: 'f-merge',        name: 'Merge accounts',          desc: 'Join duplicate customer accounts',  group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'merge join combine duplicate accounts customers lost cups device select two' },
+  { id: 'f-merge-requests',name: 'Account merge requests', desc: 'Approve or reject held merges',      group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'merge requests review approve reject pending held weekly limit queue' },
+  { id: 'f-open-user',    name: 'Open a customer',         desc: 'Detail panel: balance, claims, activity', group: 'People', page: 'users',  icon: Icon.user,     keywords: 'open customer detail panel balance claims activity review resize' },
+
   // ── Account (profile menu actions) ─────────────────────────────────
   { id: 'f-prof-edit',    name: 'Edit my profile',         desc: 'Display name, avatar, colour',      group: 'Account',    page: null,       icon: Icon.user,     keywords: 'profile me name avatar photo color picture self' },
   { id: 'f-prof-pwd',     name: 'Reset password',          desc: 'Email yourself a reset link',       group: 'Account',    page: null,       icon: Icon.settings, keywords: 'password reset change lock security' },

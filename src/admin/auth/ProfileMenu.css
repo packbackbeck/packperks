@@ -8,17 +8,17 @@
   align-items: center;
   gap: 10px;
   padding: 4px 12px 4px 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #FFFFFF;
+  border: 1px solid #E8E6E1;
   border-radius: 10px;
   cursor: pointer;
   font-family: inherit;
   transition: all 0.15s;
-  color: #FFFFFF;
+  color: #1A1A1A;
 }
 .pm__trigger:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: #F3EEE4;
+  border-color: #D5CDBE;
 }
 
 .pm__avatar {
@@ -43,9 +43,9 @@
   gap: 0;
   text-align: left;
 }
-.pm__name-display { font-size: 13px; font-weight: 700; line-height: 1.2; color: #FFFFFF; }
-.pm__name-role    { font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.05em; }
-.pm__trigger > svg { color: rgba(255, 255, 255, 0.55); margin-left: 2px; }
+.pm__name-display { font-size: 13px; font-weight: 700; line-height: 1.2; color: #1A1A1A; }
+.pm__name-role    { font-size: 10px; color: #8A8175; text-transform: uppercase; letter-spacing: 0.05em; }
+.pm__trigger > svg { color: #8A8175; margin-left: 2px; }
 
 /* Dropdown */
 .pm__dropdown {

@@ -13,20 +13,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: #F3EEE4;
+  border: 1px solid #E8E6E1;
   border-radius: 10px;
   padding: 0 10px;
   height: 34px;
   transition: all 0.15s;
 }
 .fs-wrap--open .fs-input-row {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: #FFFFFF;
+  border-color: #D5CDBE;
 }
 
 .fs-icon {
-  color: rgba(255, 255, 255, 0.55);
+  color: #8A8175;
   flex-shrink: 0;
 }
 
@@ -37,17 +37,17 @@
   outline: none;
   font-family: inherit;
   font-size: 13px;
-  color: #FFFFFF;
+  color: #1A1A1A;
   min-width: 0;
 }
-.fs-input::placeholder { color: rgba(255, 255, 255, 0.45); }
+.fs-input::placeholder { color: #9A9186; }
 
 .fs-kbd {
   font-family: ui-monospace, monospace;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: #8A8175;
+  background: #FFFFFF;
+  border: 1px solid #E0DAD0;
   border-radius: 4px;
   padding: 1px 5px;
   letter-spacing: 0.05em;

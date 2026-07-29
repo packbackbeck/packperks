@@ -79,7 +79,10 @@ Deno.serve(async (req) => {
   // Per-org weekly limit + copy.
   const { data: limitCfg } = await supabase.from('app_config').select('value').eq('key', `merge:limit:${orgId}`).maybeSingle();
   const cfg = (limitCfg?.value || {}) as { weeklyLimit?: number; limitCopy?: string };
-  const weeklyLimit = Math.max(1, Number(cfg.weeklyLimit) || 1);
+  // 0 is a valid setting (hold every merge for review). Number('0')||1 would
+  // wrongly become 1, so guard with isFinite and clamp to 0..20.
+  const rawLimit = Number(cfg.weeklyLimit);
+  const weeklyLimit = Math.max(0, Math.min(20, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 1));
   const limitCopy = cfg.limitCopy
     || 'You have reached this store weekly account-merge limit. We have sent your request to the store for review, and they will approve it shortly.';
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

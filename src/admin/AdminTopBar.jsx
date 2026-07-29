@@ -1,6 +1,6 @@
 import FeatureSearch from './auth/FeatureSearch';
 import WorkflowDock from './auth/WorkflowDock';
-import packperksLogoDark from '../assets/images/packperks-logo-dark.svg';
+import packperksLogoDark from '../assets/images/packperks-logo.svg';
 import burgerKingLogo from '../assets/images/burger-king-logo.png';
 import { useOrg } from './context/OrgContext';
 import './AdminTopBar.css';

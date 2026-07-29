@@ -1534,7 +1534,7 @@ export async function getMergeLimit(orgId) {
   const { data } = await supabase.from('app_config').select('value').eq('key', `merge:limit:${oid}`).maybeSingle();
   const v = data?.value || {};
   return {
-    weeklyLimit: Number.isFinite(Number(v.weeklyLimit)) && Number(v.weeklyLimit) > 0 ? Math.floor(Number(v.weeklyLimit)) : MERGE_LIMIT_DEFAULT.weeklyLimit,
+    weeklyLimit: Number.isFinite(Number(v.weeklyLimit)) && Number(v.weeklyLimit) >= 0 ? Math.floor(Number(v.weeklyLimit)) : MERGE_LIMIT_DEFAULT.weeklyLimit,
     limitCopy: typeof v.limitCopy === 'string' && v.limitCopy.trim() ? v.limitCopy : MERGE_LIMIT_DEFAULT.limitCopy,
   };
 }
@@ -1542,7 +1542,10 @@ export async function getMergeLimit(orgId) {
 export async function saveMergeLimit(orgId, { weeklyLimit, limitCopy }) {
   const oid = orgId || getActiveOrgId();
   if (!oid) throw new Error('No active store selected.');
-  const n = Math.max(1, Math.min(20, parseInt(weeklyLimit, 10) || MERGE_LIMIT_DEFAULT.weeklyLimit));
+  // Allow 0 (hold every merge for review). parseInt('0') is falsy, so guard
+  // with Number.isFinite instead of `|| default`, then clamp to 0..20.
+  const parsed = parseInt(weeklyLimit, 10);
+  const n = Math.max(0, Math.min(20, Number.isFinite(parsed) ? parsed : MERGE_LIMIT_DEFAULT.weeklyLimit));
   const copy = (limitCopy || '').trim() || MERGE_LIMIT_DEFAULT.limitCopy;
   const { error } = await supabase.from('app_config').upsert({
     key: `merge:limit:${oid}`, value: { weeklyLimit: n, limitCopy: copy }, updated_at: new Date().toISOString(),
@@ -2758,6 +2761,21 @@ export async function saveAutomatedReports(config) {
     .upsert({ key: AUTOMATED_REPORTS_KEY, value, updated_at: new Date().toISOString() });
   if (error) throw error;
   return value;
+}
+
+/* Fire a one-off test of the automated report to the given (or configured)
+ * recipient. Passes the on-screen config so the test reflects unsaved edits.
+ * The send-report edge function emails a preview of the chosen dataset. */
+export async function sendAutomatedReportTest(config, toOverride) {
+  const { data, error } = await supabase.functions.invoke('send-report', {
+    body: { mode: 'test', config: config || null, to: toOverride || null },
+  });
+  if (error) {
+    let payload = null;
+    try { payload = await error.context?.json?.(); } catch { /* ignore */ }
+    throw Object.assign(new Error(payload?.error || error.message), { detail: payload });
+  }
+  return data;
 }
 
 /* ── Weekly digest ─────────────────────────────────────────────────────

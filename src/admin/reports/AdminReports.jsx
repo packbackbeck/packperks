@@ -4,7 +4,7 @@ import { applyOrgFilter } from '../context/orgState';
 import { useAuth } from '../auth/AuthContext';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
-import { getAutomatedReports, saveAutomatedReports, AUTOMATED_REPORTS_DEFAULT, getWeeklyDigest, saveWeeklyDigest, sendDigestTest, DIGEST_METRICS, WEEKLY_DIGEST_DEFAULT, getNotificationCenter, saveNotificationCenter, sendNotificationTest, NOTIFICATION_EVENTS, NOTIFICATION_CENTER_DEFAULT } from '../lib/adminApi';
+import { getAutomatedReports, saveAutomatedReports, sendAutomatedReportTest, AUTOMATED_REPORTS_DEFAULT, getWeeklyDigest, saveWeeklyDigest, sendDigestTest, DIGEST_METRICS, WEEKLY_DIGEST_DEFAULT, getNotificationCenter, saveNotificationCenter, sendNotificationTest, NOTIFICATION_EVENTS, NOTIFICATION_CENTER_DEFAULT } from '../lib/adminApi';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminReports.css';
 
@@ -702,6 +702,8 @@ function AutomatedReports({ canManage }) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(false);
   const [err, setErr] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const [testOk, setTestOk] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -726,6 +728,20 @@ function AutomatedReports({ canManage }) {
       setErr(e?.message || 'Could not save.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendTest = async () => {
+    if (!emailValid) { setErr('Enter a valid recipient email first.'); return; }
+    setTesting(true); setErr(null); setTestOk(false);
+    try {
+      await sendAutomatedReportTest(cfg, cfg.recipient);
+      setTestOk(true);
+      setTimeout(() => setTestOk(false), 3200);
+    } catch (e) {
+      setErr(e?.message || 'Could not send the test email.');
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -828,6 +844,10 @@ function AutomatedReports({ canManage }) {
         <div className="rep-auto__actions">
           {err && <span className="rep-auto__err">{err}</span>}
           {savedAt && <span className="rep-auto__ok">Saved ✓</span>}
+          {testOk && <span className="rep-auto__ok">Test sent ✓</span>}
+          <button className="rep-btn rep-btn--ghost" onClick={sendTest} disabled={!canManage || testing || !loaded || !emailValid}>
+            {testing ? 'Sending…' : 'Send test now'}
+          </button>
           <button className="rep-btn rep-btn--primary" onClick={save} disabled={!canManage || saving || !loaded}>
             {saving ? 'Saving…' : 'Save schedule'}
           </button>

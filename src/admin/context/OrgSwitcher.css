@@ -12,16 +12,16 @@
   width: 100%;
   padding: 8px 10px;
   background: transparent;
-  border: 1px solid #2A2A2A;
+  border: 1px solid #E8E6E1;
   border-radius: 8px;
-  color: #ECEAE5;
+  color: #2A2724;
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.14s ease, border-color 0.14s ease;
 }
-.orgsw__trigger:hover { background: #1E1E1E; border-color: #333; }
+.orgsw__trigger:hover { background: #F3EEE4; border-color: #D5CDBE; }
 
 .orgsw__chip {
   flex-shrink: 0;
@@ -52,7 +52,7 @@
  * dark dropdown. */
 .orgsw__chip--img {
   background: #FFFFFF;
-  border: 1px solid #2A2A2A;
+  border: 1px solid #E8E6E1;
   padding: 1px;
   object-fit: contain;
 }
@@ -77,11 +77,11 @@
   left: 0;
   right: 0;
   z-index: 200;
-  background: #1A1A1A;
-  border: 1px solid #2A2A2A;
+  background: #FFFFFF;
+  border: 1px solid #E8E6E1;
   border-radius: 10px;
   padding: 6px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 48px rgba(40, 30, 15, 0.18), 0 4px 12px rgba(40, 30, 15, 0.12);
   max-height: 60vh;
   overflow-y: auto;
   animation: orgsw-pop 0.12s ease-out both;
@@ -102,7 +102,7 @@
 .orgsw__section-label {
   font-size: 9px;
   font-weight: 700;
-  color: #4A4540;
+  color: #8A8175;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   padding: 4px 8px 2px;
@@ -117,7 +117,7 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: #C8C4BC;
+  color: #3A342B;
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -126,19 +126,19 @@
   transition: background 0.12s ease, color 0.12s ease;
 }
 .orgsw__item:hover {
-  background: #232323;
-  color: #FFFFFF;
+  background: #F3EEE4;
+  color: #1A1A1A;
 }
 
 .orgsw__item--active {
-  background: rgba(214, 35, 0, 0.10);
-  color: #FF5533;
+  background: rgba(210, 84, 43, 0.12);
+  color: #C0451F;
   cursor: default;
   position: relative;
 }
 .orgsw__item--active:hover {
-  background: rgba(214, 35, 0, 0.16);
-  color: #FF5533;
+  background: rgba(210, 84, 43, 0.18);
+  color: #C0451F;
 }
 
 /* Gear button — only visible on hover/focus of the active org row.
@@ -153,7 +153,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #FF5533;
+  color: #C0451F;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease, background 0.12s ease;
@@ -175,7 +175,7 @@
 
 .orgsw__check {
   flex-shrink: 0;
-  color: #FF5533;
+  color: #C0451F;
 }
 
 /* ── Group rows (Phase 3): a group listed like an org, with its member
@@ -189,12 +189,12 @@
   width: 100%;
   padding: 6px 8px;
   border-radius: 6px;
-  color: #E8E4DC;
+  color: #2A2724;
   font-size: 12px;
   font-weight: 700;
   position: relative;
 }
-.orgsw__grouprow:hover { background: #232323; }
+.orgsw__grouprow:hover { background: #F3EEE4; }
 
 /* Group leading mark — green collection glyph. */
 .orgsw__chip--group {
@@ -213,13 +213,13 @@
   box-sizing: border-box;
   width: calc(100% - 12px);
   margin-left: 12px;
-  border-left: 1.5px solid #333;
+  border-left: 1.5px solid #E0DAD0;
   border-radius: 0 6px 6px 0;
 }
 
 .orgsw__divider {
   height: 1px;
-  background: #2A2A2A;
+  background: #E8E6E1;
   margin: 4px 0;
 }
 
@@ -232,7 +232,7 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: #A8A49D;
+  color: #5A554F;
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -241,8 +241,8 @@
   transition: background 0.12s ease, color 0.12s ease;
 }
 .orgsw__action:hover {
-  background: #232323;
-  color: #FFFFFF;
+  background: #F3EEE4;
+  color: #1A1A1A;
 }
 .orgsw__action svg {
   flex-shrink: 0;

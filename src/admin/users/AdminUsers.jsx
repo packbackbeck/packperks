@@ -762,7 +762,7 @@ function MergeRequestsSection() {
         <div className="mergereq__setting">
           <label className="mergereq__label" htmlFor="merge-limit">Merges per week (per customer)</label>
           <div className="mergereq__setting-row">
-            <input id="merge-limit" className="mergereq__num" type="number" min="1" max="20" value={limitInput}
+            <input id="merge-limit" className="mergereq__num" type="number" min="0" max="20" value={limitInput}
               onChange={(e) => setLimitInput(e.target.value)} disabled={!activeOrgId || savingCfg} />
           </div>
         </div>

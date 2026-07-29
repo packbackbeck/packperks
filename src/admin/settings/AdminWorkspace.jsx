@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import AdminOrg from '../organization/AdminOrg';
 import AdminSettings, { SECTIONS as SETTINGS_SECTIONS } from './AdminSettings';
 import QuickLinks from '../shared/QuickLinks';
@@ -55,55 +55,37 @@ const ORG_SECTIONS = [
 export default function AdminWorkspace({ draftState, onNavigate }) {
   const tocSections = [...ORG_SECTIONS, ...SETTINGS_SECTIONS];
   const [activeId, setActiveId] = useState('org-profile');
-  const rafRef = useRef(0);
 
-  // Scroll-based active detection. Robust to async-loaded sections because it
-  // re-queries the DOM on every scroll instead of pre-binding observers.
+  // Tabs: show ONLY the active section. Both children render every section in
+  // `embedded` mode (each wrapped in an element with id `s-<id>`), and they
+  // mount asynchronously, so we drive visibility from the DOM and re-apply on
+  // any content change via a MutationObserver. Setting inline display never
+  // triggers childList mutations, so there is no feedback loop.
   useEffect(() => {
-    const scroller = document.querySelector('.admin-app__main') || window;
-    function onScroll() {
-      if (rafRef.current) return;
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = 0;
-        const probe = 150; // px below the viewport top (under topbar + TOC bar)
-        let best = null, bestTop = -Infinity, firstPresent = null;
-        for (const s of tocSections) {
-          const el = document.getElementById(`s-${s.id}`);
-          if (!el) continue;
-          if (!firstPresent) firstPresent = s.id;
-          const top = el.getBoundingClientRect().top;
-          if (top - probe <= 0 && top > bestTop) { bestTop = top; best = s.id; }
-        }
-        setActiveId(best || firstPresent || 'org-profile');
-      });
-    }
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => scroller.removeEventListener('scroll', onScroll);
+    const content = document.querySelector('.wkspace-content');
+    if (!content) return;
+    const apply = () => {
+      for (const s of tocSections) {
+        const el = document.getElementById(`s-${s.id}`);
+        if (el) el.style.display = s.id === activeId ? '' : 'none';
+      }
+      // The in-content group headers are redundant when one section shows.
+      content.querySelectorAll('.wkspace-group').forEach((g) => { g.style.display = 'none'; });
+    };
+    apply();
+    const obs = new MutationObserver(apply);
+    obs.observe(content, { childList: true, subtree: true });
+    return () => obs.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function jumpTo(id) {
-    const el = document.getElementById(`s-${id}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setActiveId(id);
-    }
-  }
+  }, [activeId]);
 
   return (
     <div className="wkspace-page">
       <header className="wkspace-header">
-        <span className="wkspace-header__eyebrow">Configuration</span>
         <h1 className="wkspace-header__title">Settings &amp; Organisation</h1>
-        <p className="wkspace-header__sub">
-          Everything for this organisation in one place: profile, locations, team, payout rates,
-          app copy, and policies. App settings auto-save to your draft — hit <strong>Publish</strong>{' '}
-          in the top bar to push them live.
-        </p>
       </header>
 
-      <nav className="wkspace-toc" aria-label="Settings and organisation sections">
+      <nav className="wkspace-toc wkspace-toc--tabs" role="tablist" aria-label="Settings and organisation sections">
         <div className="wkspace-toc__inner">
           {tocSections.map((s, i) => {
             const prev = tocSections[i - 1];
@@ -113,8 +95,10 @@ export default function AdminWorkspace({ draftState, onNavigate }) {
                 {groupBreak && <span className="wkspace-toc__divider" aria-hidden="true" />}
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={activeId === s.id}
                   className={`wkspace-toc__item${activeId === s.id ? ' wkspace-toc__item--active' : ''}`}
-                  onClick={() => jumpTo(s.id)}
+                  onClick={() => setActiveId(s.id)}
                 >
                   <span className={`wkspace-toc__icon wkspace-toc__icon--${s.tone || 'slate'}`}>{s.icon}</span>
                   <span className="wkspace-toc__label">{s.title}</span>

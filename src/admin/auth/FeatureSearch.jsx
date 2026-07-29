@@ -166,7 +166,7 @@ const FEATURES = [
   { id: 'f-feat-donate',  name: 'Donations toggle',        desc: 'Enable/disable donate flow',        group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'donate donation charity toggle plastic soup' },
   { id: 'f-feat-direct',  name: 'Direct refund toggle',    desc: 'Enable/disable direct refunds',     group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'direct refund toggle' },
   { id: 'f-maintenance',  name: 'Maintenance mode',        desc: 'Take user app offline',             group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'offline shutdown closed disabled emergency' },
-  { id: 'f-reports',      name: 'Reports',                 desc: 'Export CSV',                        group: 'System',     page: 'reports',  icon: Icon.reports,  keywords: 'export csv data download report' },
+  { id: 'f-reports',      name: 'Reports & alerts',        desc: 'Export CSV, digest, notifications', group: 'System',     page: 'reports',  icon: Icon.reports,  keywords: 'export csv data download report digest weekly alerts notifications email recipients' },
   { id: 'f-history',      name: 'Version History',         desc: 'Past published configs',            group: 'System',     page: 'history',  icon: Icon.history,  keywords: 'changelog rollback published versions snapshot' },
 
   // ── Support page ───────────────────────────────────────────────────
@@ -176,7 +176,7 @@ const FEATURES = [
   { id: 'f-changelog',    name: 'Dashboard changelog',     desc: 'What we shipped recently',          group: 'System',     page: 'support',  icon: Icon.history,  keywords: 'changelog release notes updates new shipped recent' },
 
   // ── App Design ─────────────────────────────────────────────────────
-  { id: 'f-appdesign',      name: 'App Design',              desc: 'Customise the customer app',        group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'design theme colours colors branding customise customer app look palette preview appearance' },
+  { id: 'f-appdesign',      name: 'Design & Copy',           desc: 'Customise the customer app',        group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'design copy theme colours colors branding customise customer app look palette preview appearance text wording' },
   { id: 'f-design-colours', name: 'Brand colours',           desc: 'Palette for the customer app',      group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'colour color palette primary accent background surface text contrast brand hex' },
   { id: 'f-design-copy',    name: 'App copy and text',       desc: 'Headline + wording customers see',  group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'copy text headline wording message customer app words subtext' },
   { id: 'f-design-sections',name: 'App sections',            desc: 'Show or hide app sections',         group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'sections layout blocks show hide toggle app guide stories smart import' },

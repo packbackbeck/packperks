@@ -354,6 +354,9 @@ const SORT_KEYS = {
 };
 
 export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, focusSection, onSectionConsumed }) {
+  // Group awareness: within a BYO group, users are one shared account across
+  // every store, so we load the whole group's deduped customer base.
+  const { activeOrgId, activeGroupId, groupMemberIds } = useOrg();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -365,12 +368,14 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
 
   const reload = () => {
     setLoading(true);
-    getAdminUsers()
+    getAdminUsers(activeGroupId ? groupMemberIds : undefined)
       .then(setUsers)
       .catch(console.error)
       .finally(() => setLoading(false));
   };
-  useEffect(() => { reload(); }, []);
+  // Reload when the store/group changes so switching between grouped stores
+  // shows the same shared base (and switching to a solo org narrows it).
+  useEffect(() => { reload(); }, [activeOrgId, activeGroupId, groupMemberIds.join(',')]);
 
   /* Another page (Cup Scans) can deep-link to a specific customer via
    * onNavigate('users', { focusUserId }). Open that user's panel once the
@@ -815,7 +820,7 @@ function MergeRequestsSection({ focusSection, onSectionConsumed }) {
           <table className="mergereq__table">
             <thead>
               <tr>
-                <th>Customer</th><th>Accounts</th><th>Source</th><th>Reason</th><th>When</th><th>Status</th><th className="mergereq__th-actions">Actions</th>
+                <th>Customer</th><th>Accounts</th><th>Source</th><th>Reason</th><th>When</th><th>Status</th><th>Decided by</th><th className="mergereq__th-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -832,6 +837,18 @@ function MergeRequestsSection({ focusSection, onSectionConsumed }) {
                   <td>
                     <span className={`mergereq__pill mergereq__pill--${MERGE_STATUS_TONE[r.status] || 'pending'}`}>{r.status}</span>
                     {r.decided_at && r.status !== 'pending' && <div className="mergereq__cust-sub">{formatDate(r.decided_at)}</div>}
+                  </td>
+                  <td>
+                    {r.decider ? (
+                      <span className="mergereq__decider" title={r.decider.email}>
+                        <span className="mergereq__decider-avatar" style={{ background: r.decider.color || '#5333A5' }}>
+                          {r.decider.avatar_url
+                            ? <img src={r.decider.avatar_url} alt="" />
+                            : (r.decider.display_name || r.decider.email || '?')[0].toUpperCase()}
+                        </span>
+                        {r.decider.display_name || (r.decider.email || '').split('@')[0]}
+                      </span>
+                    ) : <span className="mergereq__muted">—</span>}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {r.status === 'pending' ? (

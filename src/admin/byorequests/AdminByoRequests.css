@@ -1,6 +1,6 @@
 /* AdminByoRequests — Phase 3 BYO approval queue */
 
-.byoreq { padding: 28px 32px; max-width: 1000px; }
+.byoreq { padding: 28px 32px; }
 
 .byoreq__head { margin-bottom: 20px; }
 .byoreq__eyebrow {
@@ -62,6 +62,11 @@
 }
 .byoreq__qr-download:hover:not(:disabled) { background: #F3ECDD; border-color: #C9BFA9; }
 .byoreq__qr-download:disabled { opacity: 0.5; cursor: default; }
+
+/* Two download buttons side by side (single PNG + A4 sheet). Wraps on narrow. */
+.byoreq__qr-downloads { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.byoreq__qr-download--a4 { background: #F3ECDD; }
+.byoreq__qr-download--a4:hover:not(:disabled) { background: #EBE2CE; }
 
 .byoreq__loc-select {
   height: 38px; min-width: 220px; padding: 0 12px;

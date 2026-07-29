@@ -81,18 +81,6 @@ export const SECTIONS = [
     ),
   },
   {
-    id: 'legal',
-    title: 'Legal links',
-    desc: 'External URLs surfaced in the app footer.',
-    tone: 'slate',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-      </svg>
-    ),
-  },
-  {
     id: 'limits',
     title: 'Limits & caps',
     desc: 'Hold caps, daily caps, balance resets, and the reward budget — plus the message each shows when hit.',
@@ -598,36 +586,8 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             </div>
           </SectionCard>
 
-          {/* ── Legal links ── */}
-          <SectionCard section={SECTIONS[4]}>
-            <Field label="Privacy policy URL">
-              <input className="as-input as-input--mono" value={settings.privacyUrl} onChange={e => updateSetting('privacyUrl', e.target.value)} placeholder="https://packperks.nl/privacy" />
-            </Field>
-
-            <Field label="Terms of service URL">
-              <input className="as-input as-input--mono" value={settings.termsUrl} onChange={e => updateSetting('termsUrl', e.target.value)} placeholder="https://packperks.nl/terms" />
-            </Field>
-
-            <Field label="Cookie policy URL">
-              <input className="as-input as-input--mono" value={settings.cookieUrl} onChange={e => updateSetting('cookieUrl', e.target.value)} placeholder="https://packperks.nl/cookies" />
-            </Field>
-
-            <Field
-              label="Privacy & cookie policy (in-app text)"
-              hint="Shown inside the app (account page + cookie banner). Markdown supported. Leave blank to use the built-in default."
-            >
-              <textarea
-                className="as-input as-input--textarea"
-                rows={8}
-                value={settings.privacyPolicyText || ''}
-                onChange={e => updateSetting('privacyPolicyText', e.target.value, 'privacy policy')}
-                placeholder="# Our Privacy Policy&#10;&#10;## What we collect …"
-              />
-            </Field>
-          </SectionCard>
-
           {/* ── Limits & caps ── */}
-          <SectionCard section={SECTIONS[5]}>
+          <SectionCard section={SECTIONS[4]}>
             {/* Max balance a customer may hold before they must redeem. */}
             <div className="as-limit-block">
               <Field

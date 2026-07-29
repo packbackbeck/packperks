@@ -1,6 +1,6 @@
 /* AdminFutureVendors — coming-soon venues manager */
 
-.afv { padding: 28px 32px; max-width: 920px; }
+.afv { padding: 28px 32px; }
 
 /* ── Header ─────────────────────────────────────────────────────────── */
 .afv__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px; }

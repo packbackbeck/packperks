@@ -4,7 +4,7 @@ import { applyOrgFilter } from '../context/orgState';
 import { useAuth } from '../auth/AuthContext';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
-import { getAutomatedReports, saveAutomatedReports, sendAutomatedReportTest, AUTOMATED_REPORTS_DEFAULT, getWeeklyDigest, saveWeeklyDigest, sendDigestTest, DIGEST_METRICS, WEEKLY_DIGEST_DEFAULT, getNotificationCenter, saveNotificationCenter, sendNotificationTest, NOTIFICATION_EVENTS, NOTIFICATION_CENTER_DEFAULT } from '../lib/adminApi';
+import { getWeeklyDigest, saveWeeklyDigest, sendDigestTest, DIGEST_VENDOR_METRICS, DIGEST_STAFF_METRICS, WEEKLY_DIGEST_DEFAULT, getNotificationCenter, saveNotificationCenter, sendNotificationTest, NOTIFICATION_EVENTS, NOTIFICATION_CENTER_DEFAULT } from '../lib/adminApi';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminReports.css';
 
@@ -271,6 +271,9 @@ export default function AdminReports({ onNavigate }) {
   const { profile } = useAuth();
   const role = profile?.role || 'checker';
   const canExportPii = role === 'owner' || role === 'admin';
+  // Email configs (digest + notifications) can be set by any admin, managers
+  // included — only view-only checkers are locked out.
+  const canManageAlerts = role !== 'checker';
 
   const [dataset, setDataset] = useState(canExportPii ? 'users' : 'cup_scans');
   const cfg = DATASETS[dataset];
@@ -472,7 +475,7 @@ export default function AdminReports({ onNavigate }) {
     <div className="admin-reports">
       <div className="rep-header">
         <div>
-          <h1 className="rep-header__title">Reports</h1>
+          <h1 className="rep-header__title">Reports &amp; alerts</h1>
           <p className="rep-header__sub">Build, preview & export custom data reports.</p>
         </div>
         <div className="rep-header__actions">
@@ -681,241 +684,202 @@ export default function AdminReports({ onNavigate }) {
         </section>
       </div>
 
-      <AutomatedReports canManage={canExportPii} />
+      <WeeklyDigest canManage={canManageAlerts} />
 
-      <WeeklyDigest canManage={canExportPii} />
-
-      <NotificationCenter canManage={canExportPii} />
+      <NotificationCenter canManage={canManageAlerts} />
 
       <QuickLinks currentPage="reports" onNavigate={onNavigate} />
     </div>
   );
 }
 
-/* ── Automated reports ──────────────────────────────────────────────────
- * Config for a scheduled report email (defaults to the weekly per-store
- * valid-claims summary that feeds vendor direct-debit batching). Persists to
- * app_config; a cron + edge function reads it and sends the mail. */
-function AutomatedReports({ canManage }) {
-  const [cfg, setCfg] = useState(AUTOMATED_REPORTS_DEFAULT);
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState(false);
-  const [err, setErr] = useState(null);
-  const [testing, setTesting] = useState(false);
-  const [testOk, setTestOk] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    getAutomatedReports().then((c) => { if (alive) { setCfg(c); setLoaded(true); } })
-      .catch(() => { if (alive) setLoaded(true); });
-    return () => { alive = false; };
-  }, []);
-
-  const patch = (p) => setCfg((c) => ({ ...c, ...p }));
-
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((cfg.recipient || '').trim());
-
-  const save = async () => {
-    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
-    setSaving(true); setErr(null);
-    try {
-      const v = await saveAutomatedReports(cfg);
-      setCfg((c) => ({ ...c, ...v }));
-      setSavedAt(true);
-      setTimeout(() => setSavedAt(false), 2200);
-    } catch (e) {
-      setErr(e?.message || 'Could not save.');
-    } finally {
-      setSaving(false);
-    }
+/* ── Multi-recipient email input ────────────────────────────────────────
+ * A chip list of email addresses with add/remove + a one-tap "Add me". Used by
+ * the digest and notification center so admins can send to a whole team. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function EmailList({ emails, onChange, disabled, ownEmail }) {
+  const [input, setInput] = useState('');
+  const list = Array.isArray(emails) ? emails : [];
+  const norm = (e) => e.trim().toLowerCase();
+  const add = () => {
+    const e = norm(input);
+    if (!EMAIL_RE.test(e) || list.includes(e)) { setInput(''); return; }
+    onChange([...list, e]); setInput('');
   };
-
-  const sendTest = async () => {
-    if (!emailValid) { setErr('Enter a valid recipient email first.'); return; }
-    setTesting(true); setErr(null); setTestOk(false);
-    try {
-      await sendAutomatedReportTest(cfg, cfg.recipient);
-      setTestOk(true);
-      setTimeout(() => setTestOk(false), 3200);
-    } catch (e) {
-      setErr(e?.message || 'Could not send the test email.');
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const cadenceLabel = cfg.frequency === 'weekly'
-    ? `every ${cfg.dayOfWeek.charAt(0).toUpperCase() + cfg.dayOfWeek.slice(1)}`
-    : cfg.frequency === 'daily' ? 'every day' : 'on the 1st of each month';
-
   return (
-    <section className="rep-auto">
-      <div className="rep-auto__head">
-        <div>
-          <h2 className="rep-auto__title">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Automated reports
-          </h2>
-          <p className="rep-auto__sub">Email a scheduled report automatically — e.g. the weekly valid-claims summary per store for vendor direct debits.</p>
+    <div className="rep-emails">
+      <div className="rep-emails__chips">
+        {list.length === 0 && <span className="rep-emails__empty">No recipients yet — add at least one.</span>}
+        {list.map((e) => (
+          <span key={e} className="rep-emails__chip">
+            {e}{ownEmail && e === ownEmail && <span className="rep-emails__you">you</span>}
+            {!disabled && <button type="button" className="rep-emails__x" onClick={() => onChange(list.filter((x) => x !== e))} aria-label={`Remove ${e}`}>×</button>}
+          </span>
+        ))}
+      </div>
+      {!disabled && (
+        <div className="rep-emails__add">
+          <input type="email" className="rep-auto__input" value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(); } }}
+            placeholder="name@packback.network" />
+          <button type="button" className="rep-btn rep-btn--ghost" onClick={add} disabled={!EMAIL_RE.test(norm(input))}>Add</button>
+          {ownEmail && !list.includes(ownEmail) && (
+            <button type="button" className="rep-emails__self" onClick={() => onChange([...list, ownEmail])}>+ Add me</button>
+          )}
         </div>
-        <label className="rep-auto__switch">
-          <input type="checkbox" checked={!!cfg.enabled} disabled={!canManage || !loaded} onChange={(e) => patch({ enabled: e.target.checked })} />
-          <span className="rep-auto__switch-track"><span className="rep-auto__switch-thumb" /></span>
-          <span className="rep-auto__switch-lbl">{cfg.enabled ? 'On' : 'Off'}</span>
-        </label>
-      </div>
-
-      <div className={`rep-auto__grid${cfg.enabled ? '' : ' rep-auto__grid--muted'}`}>
-        <label className="rep-auto__field">
-          <span className="rep-auto__label">Report</span>
-          <select className="rep-auto__input" value={cfg.dataset} disabled={!canManage} onChange={(e) => patch({ dataset: e.target.value })}>
-            <option value="claims">Reward claims</option>
-            <option value="cup_scans">Cup scans</option>
-            <option value="activity">Activity</option>
-          </select>
-        </label>
-
-        <label className="rep-auto__field">
-          <span className="rep-auto__label">Only include</span>
-          <select className="rep-auto__input" value={cfg.status} disabled={!canManage} onChange={(e) => patch({ status: e.target.value })}>
-            <option value="completed">Valid / paid claims</option>
-            <option value="all">All statuses</option>
-            <option value="pending">Pending only</option>
-          </select>
-        </label>
-
-        <label className="rep-auto__field">
-          <span className="rep-auto__label">Break down</span>
-          <select className="rep-auto__input" value={cfg.scope} disabled={!canManage} onChange={(e) => patch({ scope: e.target.value })}>
-            <option value="per_store">Per store</option>
-            <option value="all">Whole programme</option>
-          </select>
-        </label>
-
-        <label className="rep-auto__field">
-          <span className="rep-auto__label">Frequency</span>
-          <select className="rep-auto__input" value={cfg.frequency} disabled={!canManage} onChange={(e) => patch({ frequency: e.target.value })}>
-            <option value="weekly">Weekly</option>
-            <option value="daily">Daily</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </label>
-
-        {cfg.frequency === 'weekly' && (
-          <label className="rep-auto__field">
-            <span className="rep-auto__label">Send on</span>
-            <select className="rep-auto__input" value={cfg.dayOfWeek} disabled={!canManage} onChange={(e) => patch({ dayOfWeek: e.target.value })}>
-              {['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map((d) => (
-                <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <label className="rep-auto__field">
-          <span className="rep-auto__label">Format</span>
-          <select className="rep-auto__input" value={cfg.format} disabled={!canManage} onChange={(e) => patch({ format: e.target.value })}>
-            <option value="csv">CSV (Excel)</option>
-            <option value="xlsx">CSV (plain)</option>
-            <option value="pdf">PDF</option>
-          </select>
-        </label>
-
-        <label className="rep-auto__field rep-auto__field--wide">
-          <span className="rep-auto__label">Send to</span>
-          <input
-            type="email"
-            className={`rep-auto__input${!emailValid ? ' rep-auto__input--bad' : ''}`}
-            value={cfg.recipient}
-            disabled={!canManage}
-            placeholder="name@packback.network"
-            onChange={(e) => patch({ recipient: e.target.value })}
-          />
-        </label>
-      </div>
-
-      <div className="rep-auto__foot">
-        <span className="rep-auto__summary">
-          {cfg.enabled
-            ? <>Sends the <strong>{cfg.dataset === 'claims' ? 'reward claims' : cfg.dataset}</strong> report {cadenceLabel} to <strong>{cfg.recipient}</strong>.</>
-            : 'Turn on to schedule an automatic report email.'}
-        </span>
-        <div className="rep-auto__actions">
-          {err && <span className="rep-auto__err">{err}</span>}
-          {savedAt && <span className="rep-auto__ok">Saved ✓</span>}
-          {testOk && <span className="rep-auto__ok">Test sent ✓</span>}
-          <button className="rep-btn rep-btn--ghost" onClick={sendTest} disabled={!canManage || testing || !loaded || !emailValid}>
-            {testing ? 'Sending…' : 'Send test now'}
-          </button>
-          <button className="rep-btn rep-btn--primary" onClick={save} disabled={!canManage || saving || !loaded}>
-            {saving ? 'Saving…' : 'Save schedule'}
-          </button>
-        </div>
-      </div>
-      {!canManage && <p className="rep-auto__gate">Only Owners and Admins can change automated reports.</p>}
-    </section>
+      )}
+    </div>
   );
 }
 
-/* ── Weekly digest ──────────────────────────────────────────────────────
- * Pick any subset of dashboard metrics and mail them as a designed email
- * letter on a schedule. Config persists to app_config ('weekly_digest');
- * the send-digest edge function renders + sends. "Send test now" fires a
- * one-off to the recipient so the layout can be eyeballed. */
+/* Searchable tag picker: chosen metrics as removable chips + a filtered pool
+ * of the remaining catalog to tap in. Handles the "huge list" ask. */
+function SearchableMetrics({ catalog, selected, onChange, disabled }) {
+  const [q, setQ] = useState('');
+  const sel = selected || [];
+  const query = q.trim().toLowerCase();
+  const byId = (id) => catalog.find((m) => m.id === id);
+  const toggle = (id) => onChange(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
+  const pool = catalog.filter((m) => !sel.includes(m.id) &&
+    (!query || m.label.toLowerCase().includes(query) || (m.hint || '').toLowerCase().includes(query)));
+  return (
+    <div className="rep-tags">
+      <div className="rep-tags__selected">
+        {sel.length === 0 && <span className="rep-emails__empty">No metrics chosen yet.</span>}
+        {sel.map((id) => {
+          const m = byId(id);
+          return (
+            <span key={id} className="rep-tags__chip is-on">
+              {m ? m.label : id}
+              {!disabled && <button type="button" className="rep-emails__x" onClick={() => toggle(id)} aria-label="Remove">×</button>}
+            </span>
+          );
+        })}
+      </div>
+      {!disabled && (
+        <>
+          <input
+            className="rep-auto__input rep-tags__search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={`Search ${catalog.length} metrics…`}
+          />
+          <div className="rep-tags__pool">
+            {pool.length === 0
+              ? <span className="rep-emails__empty">No matches.</span>
+              : pool.map((m) => (
+                <button key={m.id} type="button" className="rep-tags__chip" title={m.hint} onClick={() => toggle(m.id)}>
+                  <span className="rep-tags__plus">+</span>{m.label}
+                </button>
+              ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* One audience's digest config: enable + title/intro + recipients + a searchable
+ * metric picker + its own "Send test". */
+function AudienceCard({ accent, heading, sub, catalog, aud, onChange, ownEmail, canManage, onSendTest, testing }) {
+  const set = (p) => onChange({ ...aud, ...p });
+  const metrics = aud.metrics || [];
+  const recipients = aud.recipients || [];
+  return (
+    <div className={`rep-digest__aud rep-digest__aud--${accent}`}>
+      <label className="rep-digest__aud-head">
+        <input type="checkbox" checked={!!aud.enabled} disabled={!canManage} onChange={(e) => set({ enabled: e.target.checked })} />
+        <span className="rep-digest__aud-title">{heading}</span>
+        <span className="rep-digest__aud-sub">{sub}</span>
+        <span className="rep-digest__aud-count">{metrics.length} metric{metrics.length === 1 ? '' : 's'}</span>
+      </label>
+      <div className={`rep-digest__aud-body${aud.enabled ? '' : ' rep-digest__aud-body--off'}`}>
+        <div className="rep-auto__grid">
+          <label className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Email title</span>
+            <input className="rep-auto__input" value={aud.title || ''} disabled={!canManage} onChange={(e) => set({ title: e.target.value })} />
+          </label>
+          <label className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Intro line</span>
+            <input className="rep-auto__input" value={aud.intro || ''} disabled={!canManage} onChange={(e) => set({ intro: e.target.value })} />
+          </label>
+          <div className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Send to ({recipients.length})</span>
+            <EmailList emails={recipients} onChange={(v) => set({ recipients: v })} disabled={!canManage} ownEmail={ownEmail} />
+          </div>
+        </div>
+        <div className="rep-digest__metrics">
+          <span className="rep-auto__label">Metrics ({metrics.length}) — search and tap to add</span>
+          <SearchableMetrics catalog={catalog} selected={metrics} onChange={(v) => set({ metrics: v })} disabled={!canManage} />
+        </div>
+        <div className="rep-digest__aud-foot">
+          <button type="button" className="rep-btn rep-btn--ghost" disabled={!canManage || testing || !recipients.length || !metrics.length} onClick={onSendTest}>
+            {testing ? 'Sending…' : 'Send test'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Scheduled digests (vendor + staff) ─────────────────────────────────
+ * Two independent emails sent as separate letters. Shared cadence + scope;
+ * each audience has its own on/off, recipients, title and metric picks.
+ * Config persists to app_config ('weekly_digest'); send-digest mails each. */
 function WeeklyDigest({ canManage }) {
   const { activeOrgId } = useOrg();
+  const { profile } = useAuth();
+  const ownEmail = (profile?.email || '').toLowerCase();
   const [cfg, setCfg] = useState(WEEKLY_DIGEST_DEFAULT);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(false);
-  const [testing, setTesting] = useState(false);
+  const [testing, setTesting] = useState(null); // 'vendor' | 'staff' | null
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
     let alive = true;
-    getWeeklyDigest().then((c) => { if (alive) { setCfg(c); setLoaded(true); } })
-      .catch(() => { if (alive) setLoaded(true); });
+    getWeeklyDigest().then((c) => {
+      if (!alive) return;
+      const seed = (a) => ((a.recipients && a.recipients.length) || !ownEmail) ? a : { ...a, recipients: [ownEmail] };
+      c = { ...c, vendor: seed(c.vendor), staff: seed(c.staff) };
+      setCfg(c); setLoaded(true);
+    }).catch(() => { if (alive) setLoaded(true); });
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const patch = (p) => setCfg((c) => ({ ...c, ...p }));
-  const toggleMetric = (id) => setCfg((c) => {
-    const has = c.metrics.includes(id);
-    return { ...c, metrics: has ? c.metrics.filter((m) => m !== id) : [...c.metrics, id] };
-  });
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((cfg.recipient || '').trim());
+  const setAud = (key, aud) => setCfg((c) => ({ ...c, [key]: aud }));
+  const persist = () => saveWeeklyDigest({ ...cfg, org_id: cfg.org_id || activeOrgId || null });
 
   const save = async () => {
-    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
-    if (!cfg.metrics.length) { setErr('Pick at least one metric to include.'); return; }
     setSaving(true); setErr(null);
-    try {
-      const v = await saveWeeklyDigest({ ...cfg, org_id: cfg.org_id || activeOrgId || null });
-      setCfg((c) => ({ ...c, ...v }));
-      setSavedAt(true);
-      setTimeout(() => setSavedAt(false), 2200);
-    } catch (e) { setErr(e?.message || 'Could not save.'); }
+    try { const v = await persist(); setCfg((c) => ({ ...c, ...v })); setSavedAt(true); setTimeout(() => setSavedAt(false), 2200); }
+    catch (e) { setErr(e?.message || 'Could not save.'); }
     finally { setSaving(false); }
   };
 
-  const sendTest = async () => {
-    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
-    if (!cfg.metrics.length) { setErr('Pick at least one metric first.'); return; }
-    setTesting(true); setErr(null); setMsg(null);
+  const sendTest = async (which) => {
+    const aud = cfg[which] || {};
+    if (!aud.recipients?.length || !aud.metrics?.length) { setErr('Add a recipient and pick metrics first.'); return; }
+    setTesting(which); setErr(null); setMsg(null);
     try {
-      await saveWeeklyDigest({ ...cfg, org_id: cfg.org_id || activeOrgId || null }); // persist latest picks first
-      await sendDigestTest(activeOrgId, cfg.recipient);
-      setMsg(`Test digest sent to ${cfg.recipient}.`);
+      await persist();
+      const to = ownEmail || aud.recipients[0];
+      await sendDigestTest(which, activeOrgId, to);
+      setMsg(`Test ${which} digest sent to ${to}.`);
       setTimeout(() => setMsg(null), 4000);
     } catch (e) { setErr(e?.message || 'Could not send the test email.'); }
-    finally { setTesting(false); }
+    finally { setTesting(null); }
   };
 
   const cadence = cfg.frequency === 'weekly'
     ? `every ${cfg.dayOfWeek.charAt(0).toUpperCase() + cfg.dayOfWeek.slice(1)}`
     : 'on the 1st of each month';
+  const activeCount = (cfg.vendor?.enabled ? 1 : 0) + (cfg.staff?.enabled ? 1 : 0);
 
   return (
     <section className="rep-auto rep-digest">
@@ -923,52 +887,14 @@ function WeeklyDigest({ canManage }) {
         <div>
           <h2 className="rep-auto__title">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
-            Weekly digest
+            Scheduled digests
           </h2>
-          <p className="rep-auto__sub">Pick the metrics you care about and get them as a designed email letter, {cadence}.</p>
+          <p className="rep-auto__sub">Two separate emails — a vendor summary and a staff report — {cadence}. Enable and tune each below.</p>
         </div>
-        <label className="rep-auto__switch">
-          <input type="checkbox" checked={!!cfg.enabled} disabled={!canManage || !loaded} onChange={(e) => patch({ enabled: e.target.checked })} />
-          <span className="rep-auto__switch-track"><span className="rep-auto__switch-thumb" /></span>
-          <span className="rep-auto__switch-lbl">{cfg.enabled ? 'On' : 'Off'}</span>
-        </label>
       </div>
 
-      <div className={`rep-digest__body${cfg.enabled ? '' : ' rep-auto__grid--muted'}`}>
-        {/* Metric picker */}
-        <div className="rep-digest__metrics">
-          <span className="rep-auto__label">Metrics to include ({cfg.metrics.length})</span>
-          <div className="rep-digest__chips">
-            {DIGEST_METRICS.map((m) => {
-              const on = cfg.metrics.includes(m.id);
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`rep-digest__chip${on ? ' is-on' : ''}`}
-                  disabled={!canManage}
-                  aria-pressed={on}
-                  onClick={() => toggleMetric(m.id)}
-                  title={m.hint}
-                >
-                  <span className="rep-digest__chip-check">{on ? '✓' : '+'}</span>
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Settings grid */}
+      <div className="rep-digest__body">
         <div className="rep-auto__grid">
-          <label className="rep-auto__field rep-auto__field--wide">
-            <span className="rep-auto__label">Email title</span>
-            <input className="rep-auto__input" value={cfg.title} disabled={!canManage} onChange={(e) => patch({ title: e.target.value })} placeholder="Your PackPerks weekly digest" />
-          </label>
-          <label className="rep-auto__field rep-auto__field--wide">
-            <span className="rep-auto__label">Intro line</span>
-            <input className="rep-auto__input" value={cfg.intro} disabled={!canManage} onChange={(e) => patch({ intro: e.target.value })} placeholder="Here’s how your programme performed this week." />
-          </label>
           <label className="rep-auto__field">
             <span className="rep-auto__label">Frequency</span>
             <select className="rep-auto__input" value={cfg.frequency} disabled={!canManage} onChange={(e) => patch({ frequency: e.target.value })}>
@@ -993,32 +919,34 @@ function WeeklyDigest({ canManage }) {
               <option value="group">Whole group</option>
             </select>
           </label>
-          <label className="rep-auto__field rep-auto__field--wide">
-            <span className="rep-auto__label">Send to</span>
-            <input type="email" className={`rep-auto__input${!emailValid ? ' rep-auto__input--bad' : ''}`} value={cfg.recipient} disabled={!canManage} onChange={(e) => patch({ recipient: e.target.value })} placeholder="name@packback.network" />
-          </label>
         </div>
+
+        <AudienceCard
+          accent="vendor" heading="Vendor digest" sub="For the store owner"
+          catalog={DIGEST_VENDOR_METRICS} aud={cfg.vendor || {}} onChange={(a) => setAud('vendor', a)}
+          ownEmail={ownEmail} canManage={canManage} onSendTest={() => sendTest('vendor')} testing={testing === 'vendor'}
+        />
+        <AudienceCard
+          accent="admin" heading="Staff digest" sub="Everything vendors see + full platform totals"
+          catalog={DIGEST_STAFF_METRICS} aud={cfg.staff || {}} onChange={(a) => setAud('staff', a)}
+          ownEmail={ownEmail} canManage={canManage} onSendTest={() => sendTest('staff')} testing={testing === 'staff'}
+        />
       </div>
 
       <div className="rep-auto__foot">
         <span className="rep-auto__summary">
-          {cfg.enabled
-            ? <>Sends <strong>{cfg.metrics.length}</strong> metric{cfg.metrics.length === 1 ? '' : 's'} {cadence} to <strong>{cfg.recipient}</strong>.</>
-            : 'Turn on to schedule the digest email.'}
+          {activeCount ? <><strong>{activeCount}</strong> digest{activeCount === 1 ? '' : 's'} scheduled {cadence}. Each sends as its own email.</> : 'Enable the vendor and/or staff digest above.'}
         </span>
         <div className="rep-auto__actions">
           {err && <span className="rep-auto__err">{err}</span>}
           {msg && <span className="rep-auto__ok">{msg}</span>}
           {savedAt && <span className="rep-auto__ok">Saved ✓</span>}
-          <button className="rep-btn rep-btn--ghost" onClick={sendTest} disabled={!canManage || testing || !loaded}>
-            {testing ? 'Sending…' : 'Send test now'}
-          </button>
           <button className="rep-btn rep-btn--primary" onClick={save} disabled={!canManage || saving || !loaded}>
-            {saving ? 'Saving…' : 'Save digest'}
+            {saving ? 'Saving…' : 'Save digests'}
           </button>
         </div>
       </div>
-      {!canManage && <p className="rep-auto__gate">Only Owners and Admins can change the weekly digest.</p>}
+      {!canManage && <p className="rep-auto__gate">View-only accounts can’t change the digests.</p>}
     </section>
   );
 }
@@ -1028,6 +956,8 @@ function WeeklyDigest({ canManage }) {
  * whom. DB triggers fire the notify-event edge fn on matching inserts. */
 function NotificationCenter({ canManage }) {
   const { activeOrgId } = useOrg();
+  const { profile } = useAuth();
+  const ownEmail = (profile?.email || '').toLowerCase();
   const [cfg, setCfg] = useState(NOTIFICATION_CENTER_DEFAULT);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1038,9 +968,13 @@ function NotificationCenter({ canManage }) {
 
   useEffect(() => {
     let alive = true;
-    getNotificationCenter().then((c) => { if (alive) { setCfg(c); setLoaded(true); } })
-      .catch(() => { if (alive) setLoaded(true); });
+    getNotificationCenter().then((c) => {
+      if (!alive) return;
+      if ((!c.recipients || !c.recipients.length) && ownEmail) c = { ...c, recipients: [ownEmail] };
+      setCfg(c); setLoaded(true);
+    }).catch(() => { if (alive) setLoaded(true); });
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const patch = (p) => setCfg((c) => ({ ...c, ...p }));
@@ -1048,10 +982,10 @@ function NotificationCenter({ canManage }) {
     const has = c.events.includes(id);
     return { ...c, events: has ? c.events.filter((e) => e !== id) : [...c.events, id] };
   });
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((cfg.recipient || '').trim());
+  const recipients = cfg.recipients || [];
 
   const save = async () => {
-    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
+    if (!recipients.length) { setErr('Add at least one recipient.'); return; }
     setSaving(true); setErr(null);
     try {
       const v = await saveNotificationCenter({ ...cfg, org_id: cfg.org_id || activeOrgId || null });
@@ -1062,11 +996,12 @@ function NotificationCenter({ canManage }) {
   };
 
   const sendTest = async () => {
-    if (!emailValid) { setErr('Enter a valid recipient email.'); return; }
+    if (!recipients.length) { setErr('Add a recipient first.'); return; }
     setTesting(true); setErr(null); setMsg(null);
     try {
-      await sendNotificationTest(cfg.recipient);
-      setMsg(`Test alert sent to ${cfg.recipient}.`);
+      const to = ownEmail || recipients[0];
+      await sendNotificationTest(to);
+      setMsg(`Test alert sent to ${to}.`);
       setTimeout(() => setMsg(null), 4000);
     } catch (e) { setErr(e?.message || 'Could not send the test email.'); }
     finally { setTesting(false); }
@@ -1110,11 +1045,10 @@ function NotificationCenter({ canManage }) {
         </div>
 
         <div className="rep-auto__grid">
-          <label className="rep-auto__field rep-auto__field--wide">
-            <span className="rep-auto__label">Send alerts to</span>
-            <input type="email" className={`rep-auto__input${!emailValid ? ' rep-auto__input--bad' : ''}`} value={cfg.recipient}
-              disabled={!canManage} onChange={(e) => patch({ recipient: e.target.value })} placeholder="name@packback.network" />
-          </label>
+          <div className="rep-auto__field rep-auto__field--wide">
+            <span className="rep-auto__label">Send alerts to ({recipients.length})</span>
+            <EmailList emails={recipients} onChange={(v) => patch({ recipients: v })} disabled={!canManage} ownEmail={ownEmail} />
+          </div>
           <label className="rep-auto__field">
             <span className="rep-auto__label">Scope</span>
             <select className="rep-auto__input" value={cfg.org_id ? 'org' : 'all'} disabled={!canManage}
@@ -1129,7 +1063,7 @@ function NotificationCenter({ canManage }) {
       <div className="rep-auto__foot">
         <span className="rep-auto__summary">
           {cfg.enabled && cfg.events.length
-            ? <>Emailing <strong>{cfg.recipient}</strong> on <strong>{cfg.events.length}</strong> event{cfg.events.length === 1 ? '' : 's'}.</>
+            ? <>Emailing <strong>{recipients.length}</strong> recipient{recipients.length === 1 ? '' : 's'} on <strong>{cfg.events.length}</strong> event{cfg.events.length === 1 ? '' : 's'}.</>
             : 'Turn on and pick at least one activity to start getting alerts.'}
         </span>
         <div className="rep-auto__actions">
@@ -1144,7 +1078,7 @@ function NotificationCenter({ canManage }) {
           </button>
         </div>
       </div>
-      {!canManage && <p className="rep-auto__gate">Only Owners and Admins can change notifications.</p>}
+      {!canManage && <p className="rep-auto__gate">View-only accounts can’t change notifications.</p>}
     </section>
   );
 }

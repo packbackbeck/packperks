@@ -11,6 +11,7 @@ import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import AdminActivityLog from '../activity/AdminActivityLog';
 import QuickLinks from '../shared/QuickLinks';
+import { DEFAULT_REGIONS, regionForCountry } from '../../lib/regions';
 import './AdminOrg.css';
 
 /* AdminOrg — single page covering:
@@ -340,7 +341,26 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
         <EditField label="Address"           value={draft.address}            onChange={v => setDraft(d => ({ ...d, address: v }))} span={2} />
         <EditField label="Postal code"       value={draft.postal_code}        onChange={v => setDraft(d => ({ ...d, postal_code: v }))} />
         <EditField label="City"              value={draft.city}               onChange={v => setDraft(d => ({ ...d, city: v }))} />
-        <EditField label="Country"           value={draft.country}            onChange={v => setDraft(d => ({ ...d, country: v }))} />
+        {/* Region drives the store's currency, payout provider, map focus and
+         *  policy copy. Stored as organizations.country; the dropdown writes the
+         *  region's canonical ISO code so downstream resolution is unambiguous. */}
+        <div className="org-field">
+          <span className="org-field__label">Region</span>
+          <select
+            className="org-input"
+            value={regionForCountry(draft.country)?.key || ''}
+            onChange={e => {
+              const r = DEFAULT_REGIONS[e.target.value];
+              setDraft(d => ({ ...d, country: r ? r.countries[0] : d.country }));
+            }}
+          >
+            <option value="" disabled>Select a region…</option>
+            {Object.values(DEFAULT_REGIONS).map(r => (
+              <option key={r.key} value={r.key}>{r.label} · {r.currency}</option>
+            ))}
+          </select>
+          <span className="org-field__hint">Sets currency, payout method and policy for this store.</span>
+        </div>
         <EditField label="Contact email"     value={draft.contact_email}      onChange={v => setDraft(d => ({ ...d, contact_email: v }))} type="email" />
         <EditField label="Contact phone"     value={draft.contact_phone}      onChange={v => setDraft(d => ({ ...d, contact_phone: v }))} />
         <EditField label="Website"           value={draft.website}            onChange={v => setDraft(d => ({ ...d, website: v }))} span={2} />

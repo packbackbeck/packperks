@@ -189,6 +189,11 @@
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
+.org-field__hint {
+  font-size: 11px;
+  color: #9A9186;
+  line-height: 1.4;
+}
 
 /* Inputs */
 .org-input {

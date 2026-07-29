@@ -3,7 +3,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { getStatsMetrics, purgeOrgRecords } from '../lib/adminApi';
+import { getStatsMetrics, getAiAccuracy, purgeOrgRecords } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import ScopeToggle from '../shared/ScopeToggle';
 import './AdminStats.css';
@@ -137,10 +137,108 @@ function InspectModal({ view, showAll, onToggleAll, onClose }) {
   );
 }
 
+/* Colour band for an agreement rate. */
+function rateClass(rate) {
+  if (rate == null) return '';
+  if (rate >= 85) return 'is-good';
+  if (rate >= 60) return 'is-mid';
+  return 'is-bad';
+}
+
+/* AI accuracy — compares the receipt AI's verdict against the admin's decision,
+ * overall / per criterion / per store. Renders nothing heavy until at least one
+ * double-reviewed claim exists. */
+function AiAccuracySection({ acc, scope }) {
+  const has = acc && acc.total > 0;
+  return (
+    <section className="stats-ai">
+      <div className="stats-ai__head">
+        <div>
+          <h2 className="stats-ai__title">AI accuracy</h2>
+          <p className="stats-ai__sub">
+            How often the receipt AI’s verdict matched the admin’s decision — overall, per criterion and per store{scope === 'group' ? ' across the group' : ''}. Only claims an admin reviewed with a per-criteria verdict count.
+          </p>
+        </div>
+      </div>
+
+      {!has ? (
+        <div className="stats-ai__empty">
+          Not enough reviewed claims yet. As admins approve or reject receipts with a per-criteria verdict, this fills in automatically.
+        </div>
+      ) : (
+        <>
+          <div className="stats-ai__hero">
+            <div className={`stats-ai__score ${rateClass(acc.overallRate)}`}>
+              <span className="stats-ai__score-num">{acc.overallRate}%</span>
+              <span className="stats-ai__score-lbl">AI &harr; admin agreement</span>
+              <span className="stats-ai__score-sub">{acc.overallAgree} of {acc.total} reviewed claims matched</span>
+            </div>
+            <div className="stats-ai__hero-meta">
+              {acc.avgConfidence != null && (
+                <div className="stats-ai__meta">
+                  <span className="stats-ai__meta-val">{Math.round(acc.avgConfidence * 100)}%</span>
+                  <span className="stats-ai__meta-lbl">Avg AI confidence</span>
+                </div>
+              )}
+              <div className="stats-ai__meta">
+                <span className="stats-ai__meta-val">{acc.total}</span>
+                <span className="stats-ai__meta-lbl">Double-reviewed</span>
+              </div>
+              <div className="stats-ai__meta">
+                <span className="stats-ai__meta-val">{acc.perStore.length}</span>
+                <span className="stats-ai__meta-lbl">{acc.perStore.length === 1 ? 'Store' : 'Stores'}</span>
+              </div>
+            </div>
+          </div>
+
+          {acc.perCriterion.length > 0 && (
+            <div className="stats-ai__block">
+              <div className="stats-ai__block-title">By criterion — where AI and the admin diverge</div>
+              <div className="stats-ai__crit-list">
+                {acc.perCriterion.map(c => (
+                  <div key={c.code} className="stats-ai__crit">
+                    <div className="stats-ai__crit-top">
+                      <span className="stats-ai__crit-label">{c.label}</span>
+                      <span className={`stats-ai__crit-rate ${rateClass(c.rate)}`}>{c.rate}%</span>
+                    </div>
+                    <div className="stats-ai__bar"><span className={`stats-ai__bar-fill ${rateClass(c.rate)}`} style={{ width: `${c.rate}%` }} /></div>
+                    <div className="stats-ai__crit-foot">
+                      <span className="stats-ai__crit-n">{c.agree}/{c.inPlay} agreed</span>
+                      {c.aiFalsePos > 0 && <span className="stats-ai__tag stats-ai__tag--strict">{c.aiFalsePos} AI over-flagged</span>}
+                      {c.aiFalseNeg > 0 && <span className="stats-ai__tag stats-ai__tag--lax">{c.aiFalseNeg} AI missed</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {acc.perStore.length > 1 && (
+            <div className="stats-ai__block">
+              <div className="stats-ai__block-title">By store</div>
+              <div className="stats-ai__stores">
+                {acc.perStore.map(s => (
+                  <div key={s.orgId} className="stats-ai__store">
+                    <span className="stats-ai__store-name">{s.name}</span>
+                    <div className="stats-ai__bar stats-ai__bar--sm"><span className={`stats-ai__bar-fill ${rateClass(s.rate)}`} style={{ width: `${s.rate}%` }} /></div>
+                    <span className={`stats-ai__store-rate ${rateClass(s.rate)}`}>{s.rate}%</span>
+                    <span className="stats-ai__store-n">{s.total} claim{s.total === 1 ? '' : 's'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function AdminStats() {
   const { activeOrg, scopeOrgIds, statsScope } = useOrg();
   const [range, setRange] = useState('all');
   const [data, setData] = useState(null);
+  const [aiAcc, setAiAcc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -161,8 +259,12 @@ export default function AdminStats() {
     try {
       const r = RANGES.find(x => x.id === rangeId) || RANGES[0];
       const fromTs = r.days ? Date.now() - r.days * 24 * 60 * 60 * 1000 : null;
-      const result = await getStatsMetrics({ fromTs, orgIds: scopeOrgIds });
+      const [result, ai] = await Promise.all([
+        getStatsMetrics({ fromTs, orgIds: scopeOrgIds }),
+        getAiAccuracy({ orgIds: scopeOrgIds, fromTs }).catch(() => null),
+      ]);
       setData(result);
+      setAiAcc(ai);
     } catch (e) {
       console.error('getStatsMetrics failed', e);
       setError(e?.message || 'Failed to load stats.');
@@ -383,6 +485,9 @@ export default function AdminStats() {
           </div>
         </>
       )}
+
+      {/* ── AI accuracy: AI verdict vs admin decision ── */}
+      <AiAccuracySection acc={aiAcc} scope={statsScope} />
 
       {/* ── Danger zone: org-scoped test-data reset ── */}
       <div className="stats-danger">

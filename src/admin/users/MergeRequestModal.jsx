@@ -92,6 +92,9 @@ export default function MergeRequestModal({ req, onClose, onDecide, busy }) {
           <span className={`mrm__pill mrm__pill--${req.status}`}>{req.status}</span>
           <span className="mrm__meta-item">Source: {SOURCE_LABEL[req.source] || req.source || '—'}</span>
           <span className="mrm__meta-item">Requested: {fmtDate(req.requested_at)}</span>
+          {req.status !== 'pending' && req.decider && (
+            <span className="mrm__meta-item">Decided by: {req.decider.display_name || (req.decider.email || '').split('@')[0]}</span>
+          )}
         </div>
 
         {loading ? (

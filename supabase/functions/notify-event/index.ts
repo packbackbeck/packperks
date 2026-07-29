@@ -152,14 +152,16 @@ async function loadDetails(eventType: string, rowId: string | null): Promise<{ r
   return { rows, orgId };
 }
 
-async function sendBrevo(to: string, subject: string, html: string, text: string) {
+async function sendBrevo(recipients: string[], subject: string, html: string, text: string) {
   if (!BREVO_API_KEY) return { ok: false, error: 'brevo_not_configured' };
+  const to = recipients.filter(Boolean).map((email) => ({ email }));
+  if (!to.length) return { ok: false, error: 'no_recipient' };
   const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': BREVO_API_KEY, 'content-type': 'application/json', 'accept': 'application/json' },
     body: JSON.stringify({
       sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
-      to: [{ email: to }], subject, htmlContent: html, textContent: text, tags: ['notify-event'],
+      to, subject, htmlContent: html, textContent: text, tags: ['notify-event'],
     }),
   });
   return resp.ok ? { ok: true } : { ok: false, error: `brevo_${resp.status}` };
@@ -190,9 +192,13 @@ Deno.serve(async (req) => {
 
   // Config.
   const { data: cfgRow } = await supabase.from('app_config').select('value').eq('key', 'notification_center').maybeSingle();
-  const cfg = (cfgRow?.value || {}) as { enabled?: boolean; recipient?: string; events?: string[]; org_id?: string };
-  const recipient = (isTest ? (body.to || cfg.recipient) : cfg.recipient) || '';
-  if (!recipient) return json({ error: 'no_recipient' }, 400);
+  const cfg = (cfgRow?.value || {}) as { enabled?: boolean; recipient?: string; recipients?: string[]; events?: string[]; org_id?: string };
+  // Multi-recipient: prefer the list, fall back to the legacy single field; a
+  // test overrides with one address.
+  let recipients = Array.isArray(cfg.recipients) && cfg.recipients.length ? cfg.recipients : (cfg.recipient ? [cfg.recipient] : []);
+  if (isTest && body.to) recipients = [body.to];
+  recipients = [...new Set(recipients.map((r) => (r || '').trim().toLowerCase()).filter(Boolean))];
+  if (!recipients.length) return json({ error: 'no_recipient' }, 400);
 
   const eventType = isTest ? 'test' : (body.event_type || 'event');
   const label = isTest ? 'Test notification' : (LABELS[eventType] || eventType);
@@ -260,7 +266,7 @@ Deno.serve(async (req) => {
     `Received ${nowStr}`,
     '',
   ].join(NL);
-  const sent = await sendBrevo(recipient, `PackPerks: ${label}`, html, text);
+  const sent = await sendBrevo(recipients, `PackPerks: ${label}`, html, text);
   if (!sent.ok) return json({ error: sent.error || 'send_failed' }, 502);
-  return json({ status: 'sent', to: recipient, event: eventType, details: detailRows.length });
+  return json({ status: 'sent', to: recipients, event: eventType, details: detailRows.length });
 });

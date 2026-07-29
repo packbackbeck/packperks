@@ -63,6 +63,7 @@ export default function AdminByoRequests() {
   const [locId, setLocId]     = useState(''); // '' = whole store (no ?loc)
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [downloadingA4, setDownloadingA4] = useState(false);
   const qrCardRef = useRef(null);
 
   const selectedLocation = useMemo(
@@ -156,6 +157,62 @@ export default function AdminByoRequests() {
     }
   }
 
+  // Print sheet: an A4 PNG that tiles this counter QR at exactly 6cm × 6cm,
+  // 3 across × 4 down (12 total), so a store can print one page and cut them
+  // apart. Rendered at 300 DPI for crisp printing; the QR itself is re-generated
+  // at high resolution so it isn't upscaled from the on-screen preview.
+  async function handleDownloadA4() {
+    if (!byoUrl) return;
+    setDownloadingA4(true);
+    try {
+      const DPI = 300;
+      const mm = (v) => Math.round((v / 25.4) * DPI);
+      const W = mm(210), H = mm(297);       // A4 portrait
+      const QR = mm(60);                     // 6cm
+      const cols = 3, rows = 4;
+      const gapX = (W - cols * QR) / (cols + 1);
+      const gapY = (H - rows * QR) / (rows + 1);
+
+      // Crisp, print-resolution QR (a little larger than one cell so downscaling
+      // keeps the modules sharp).
+      const hiResQr = await QRCode.toDataURL(byoUrl, {
+        width: 760, margin: 1, errorCorrectionLevel: 'M',
+        color: { dark: '#0F0F0F', light: '#FFFFFF' },
+      });
+      const img = new Image();
+      img.src = hiResQr;
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, W, H);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = Math.round(gapX + c * (QR + gapX));
+          const y = Math.round(gapY + r * (QR + gapY));
+          ctx.drawImage(img, x, y, QR, QR);
+        }
+      }
+
+      const locSlug = selectedLocation
+        ? '-' + (selectedLocation.name || 'location').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        : '';
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `packperks-counter-qr-a4-${activeOrgSlug || 'store'}${locSlug}.png`;
+      a.click();
+    } catch (e) {
+      console.error('A4 QR sheet failed:', e);
+      setError('Could not build the A4 sheet. Please try again.');
+    } finally {
+      setDownloadingA4(false);
+    }
+  }
+
   async function decide(id, action) {
     setBusyId(id);
     setError(null);
@@ -216,17 +273,31 @@ export default function AdminByoRequests() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="byoreq__qr-download"
-            onClick={handleDownload}
-            disabled={!qrDataUrl || downloading}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {downloading ? 'Preparing…' : 'Download PNG'}
-          </button>
+          <div className="byoreq__qr-downloads">
+            <button
+              type="button"
+              className="byoreq__qr-download"
+              onClick={handleDownload}
+              disabled={!qrDataUrl || downloading}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {downloading ? 'Preparing…' : 'Download PNG'}
+            </button>
+            <button
+              type="button"
+              className="byoreq__qr-download byoreq__qr-download--a4"
+              onClick={handleDownloadA4}
+              disabled={!qrDataUrl || downloadingA4}
+              title="An A4 sheet of 12 codes (3 × 4), each 6 cm — print and cut apart"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="3" width="14" height="18" rx="2" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="9" y1="12" x2="15" y2="12" />
+              </svg>
+              {downloadingA4 ? 'Preparing…' : 'Download A4 (×12)'}
+            </button>
+          </div>
         </div>
 
         <div className="byoreq__qr-info">

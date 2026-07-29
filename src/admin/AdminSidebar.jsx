@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProfileMenu from './auth/ProfileMenu';
 import OrgSwitcher from './context/OrgSwitcher';
 import { useOrg } from './context/OrgContext';
+import { getPendingCounts } from './lib/adminApi';
 import { logAction } from './auth/actionLog';
 import './AdminSidebar.css';
+
+// Nav items that show a "Group" chip because they operate on the whole BYO
+// group (one shared customer base across every store), not just this store.
+const GROUP_SCOPED_ITEMS = new Set(['users', 'futurevendors']);
 
 const NAV_ITEMS = [
   {
@@ -31,7 +36,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'appdesign',
-    label: 'App Design',
+    label: 'Design & Copy',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="13.5" cy="6.5" r=".5" />
@@ -154,7 +159,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'reports',
-    label: 'Reports',
+    label: 'Reports & alerts',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 3v18h18" />
@@ -210,8 +215,7 @@ const ROLE_VISIBLE_TABS = {
   checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour']),
 };
 
-export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0, pendingScans = 0, draftState, role, onAddOrg }) {
-  const totalPending = pendingClaims + pendingScans;
+export default function AdminSidebar({ activePage, onNavigate, draftState, role, onAddOrg }) {
   const settings = draftState?.draft?.settings || {};
   const toggleFeature = draftState?.toggleFeature;
 
@@ -221,8 +225,22 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
   // null when closed; { nextValue: true|false } when open.
 
   // Feature/mode gating for the nav (Phase 3).
-  const { activeOrgSharing, activeGroupMode } = useOrg();
+  const { activeOrgId, activeGroupId, activeOrgSharing, activeGroupMode } = useOrg();
   const isByo = activeGroupMode === 'byo';
+
+  // Pending-work signal dots: claims to review, held cup scans, and account-merge
+  // requests. Refetched on org switch + whenever the active page changes (a
+  // lightweight way to keep counts fresh after an admin acts on the queue).
+  const [pending, setPending] = useState({ claims: 0, scans: 0, merges: 0 });
+  useEffect(() => {
+    let alive = true;
+    getPendingCounts().then(c => { if (alive) setPending(c); }).catch(() => {});
+    return () => { alive = false; };
+  }, [activeOrgId, activePage]);
+  const pendingClaims = pending.claims;
+  const pendingScans = pending.scans;
+  const pendingMerges = pending.merges;
+  const totalPending = pendingClaims + pendingScans + pendingMerges;
 
   function confirmMaintenance() {
     if (!maintenanceConfirm) return;
@@ -264,7 +282,11 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
             // case some old saved nav state lands.
             item.id === 'receipts' ? pendingClaims :
             item.id === 'cupscans' ? pendingScans :
+            item.id === 'users'    ? pendingMerges :
             item.id === 'overview' && totalPending > 0 ? totalPending : 0;
+          // "Group" chip on the shared, group-wide tabs (only when this org is
+          // actually part of a group).
+          const showGroupTag = !!activeGroupId && GROUP_SCOPED_ITEMS.has(item.id);
 
           return (
             <button
@@ -274,8 +296,9 @@ export default function AdminSidebar({ activePage, onNavigate, pendingClaims = 0
             >
               <span className="admin-sidebar__item-icon">{item.icon}</span>
               <span className="admin-sidebar__item-label">{item.label}</span>
+              {showGroupTag && <span className="admin-sidebar__tag">Group</span>}
               {badge > 0 && (
-                <span className="admin-sidebar__badge">{badge}</span>
+                <span className="admin-sidebar__badge" title={`${badge} pending`} aria-label={`${badge} pending`} />
               )}
             </button>
           );

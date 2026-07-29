@@ -161,7 +161,7 @@ export default function AdminAppDesign({ draftState }) {
     <div className="aad">
       <header className="aad__header">
         <div>
-          <span className="aad__eyebrow">App Design</span>
+          <span className="aad__eyebrow">Design &amp; Copy</span>
           <h1 className="aad__title">User app appearance</h1>
           <p className="aad__sub">
             Customise the palette, copy and visible sections of the customer-facing

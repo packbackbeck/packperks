@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { applyOrgFilter, getActiveOrgId } from '../context/orgState';
+import { ALL_FAILURE_CODES, getFailureLabel } from './aiVerdictLabels';
 import { fmtDuration } from './behaviourFormat';
 import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
 import { providerForCountry } from '../../lib/payments';
@@ -39,7 +40,7 @@ export async function getAdminStats(orgIds) {
     // panels (device breakdown pie + top-returners leaderboard) — without
     // them every user falls into the "Unknown" device bucket and the
     // leaderboard shows "Anonymous" for everyone.
-    applyOrgFilter(supabase.from('users').select('id, display_name, email, device, created_at, updated_at'), orgIds),
+    applyOrgFilter(supabase.from('users').select('id, identity_id, display_name, email, device, created_at, updated_at'), orgIds),
     applyOrgFilter(supabase.from('cup_balances').select('user_id, balance, lifetime_cups'), orgIds),
     // reward_id is needed by the Overview "Reward Popularity" chart —
     // without it the chart filtered everything out and rendered blank.
@@ -60,8 +61,14 @@ export async function getAdminStats(orgIds) {
 
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
-  const totalUsers   = users.length;
-  const activeUsers  = users.filter(u => new Date(u.updated_at).getTime() > thirtyDaysAgo).length;
+  // Count PEOPLE, not rows: within a BYO group one person has a row per store,
+  // all sharing an identity_id. Deduping keeps grouped-store totals honest
+  // (a single store is unaffected — each identity appears once there).
+  const identityKey = (u) => u.identity_id || `u:${u.id}`;
+  const totalUsers   = new Set(users.map(identityKey)).size;
+  const activeUsers  = new Set(
+    users.filter(u => new Date(u.updated_at).getTime() > thirtyDaysAgo).map(identityKey)
+  ).size;
 
   // ── Retention: % of users who came back at least once.
   // Defined as: count of distinct users who scanned/returned a cup on
@@ -674,6 +681,88 @@ export async function getStatsMetrics({ fromTs = null, toTs = null, orgIds } = {
       firstScan: scans[0]?.scanned_at || null,
       lastScan: scans[scans.length - 1]?.scanned_at || null,
     },
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * AI accuracy — how often the receipt AI's verdict matched the admin's.
+ *
+ * Only claims that were BOTH machine-verified (ai_failure_checks set) AND
+ * given a per-criteria human decision (admin_failure_checks set — approve
+ * writes [], reject writes the failed codes) are comparable.
+ *
+ * We report, over the scope + period:
+ *   • overall agreement — AI's pass/fail matched the admin's approve/reject
+ *   • per criterion — of the times a criterion was "in play" (AI or admin
+ *     flagged it), how often they concurred, split into:
+ *       – aiFalsePos: AI flagged it, admin cleared it (AI too strict)
+ *       – aiFalseNeg: admin flagged it, AI missed it (AI too lax)
+ *   • per store — agreement broken down by org (the group view lists each)
+ *
+ * Scope: pass `orgIds` (the group's member ids) for the group view; omit for
+ * the active org. ───────────────────────────────────────────────────── */
+export async function getAiAccuracy({ orgIds, fromTs, toTs } = {}) {
+  let q = supabase.from('claims')
+    .select('org_id, ai_failure_checks, admin_failure_checks, ai_confidence, status')
+    .eq('type', 'cashback')
+    .not('ai_failure_checks', 'is', null)
+    .not('admin_failure_checks', 'is', null);
+  q = applyOrgFilter(q, orgIds);
+  if (fromTs) q = q.gte('created_at', new Date(fromTs).toISOString());
+  if (toTs) q = q.lte('created_at', new Date(toTs).toISOString());
+  const { data, error } = await q.limit(5000);
+  if (error) throw error;
+  const rows = data || [];
+
+  // Resolve org names for the per-store table.
+  const orgNameMap = {};
+  const oids = [...new Set(rows.map(r => r.org_id).filter(Boolean))];
+  if (oids.length) {
+    const { data: orgs } = await supabase.from('organizations').select('id, name, partner_brand_name').in('id', oids);
+    (orgs || []).forEach(o => { orgNameMap[o.id] = o.partner_brand_name || o.name || 'Store'; });
+  }
+
+  const per = {};
+  ALL_FAILURE_CODES.forEach(c => { per[c] = { code: c, label: getFailureLabel(c), inPlay: 0, agree: 0, aiFalsePos: 0, aiFalseNeg: 0 }; });
+  const perStore = {};
+  let overallAgree = 0;
+  let confSum = 0, confN = 0;
+
+  for (const r of rows) {
+    const ai = new Set(r.ai_failure_checks || []);
+    const adm = new Set(r.admin_failure_checks || []);
+    const overall = (ai.size === 0) === (adm.size === 0);
+    if (overall) overallAgree++;
+    if (typeof r.ai_confidence === 'number') { confSum += r.ai_confidence; confN++; }
+
+    const sid = r.org_id || 'unknown';
+    if (!perStore[sid]) perStore[sid] = { orgId: sid, name: orgNameMap[sid] || 'Store', total: 0, agree: 0 };
+    perStore[sid].total++; if (overall) perStore[sid].agree++;
+
+    for (const c of ALL_FAILURE_CODES) {
+      const a = ai.has(c), m = adm.has(c);
+      if (!a && !m) continue; // criterion wasn't in play for this claim
+      per[c].inPlay++;
+      if (a && m) per[c].agree++;
+      else if (a && !m) per[c].aiFalsePos++;
+      else per[c].aiFalseNeg++;
+    }
+  }
+
+  const total = rows.length;
+  const pct = (n, d) => (d ? Math.round((n / d) * 100) : null);
+  return {
+    total,
+    overallAgree,
+    overallRate: pct(overallAgree, total),
+    avgConfidence: confN ? +(confSum / confN).toFixed(2) : null,
+    perCriterion: ALL_FAILURE_CODES
+      .map(c => ({ ...per[c], rate: pct(per[c].agree, per[c].inPlay) }))
+      .filter(c => c.inPlay > 0)
+      .sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101)),
+    perStore: Object.values(perStore)
+      .map(s => ({ ...s, rate: pct(s.agree, s.total) }))
+      .sort((a, b) => b.total - a.total),
   };
 }
 
@@ -1404,12 +1493,19 @@ export async function listGeneratedReceipts({ limit = 30 } = {}) {
   return data || [];
 }
 
-export async function getAdminUsers() {
+export async function getAdminUsers(orgIds) {
+  // In a BYO group a person has ONE shared account (customer_identities) but a
+  // separate `users` row per store they've visited. When `orgIds` is passed
+  // (the active org's whole group), we fetch across all member stores and
+  // collapse rows sharing an identity_id into a single account — so every store
+  // in the group shows the same shared customer base, not just its own visitors.
+  const grouped = Array.isArray(orgIds) && orgIds.length > 1;
   const { data: users, error } = await applyOrgFilter(
     supabase
       .from('users')
-      .select('id, display_name, email, device, selected_reward_id, marketing_consent, marketing_consent_at, created_at, updated_at')
-      .order('created_at', { ascending: false })
+      .select('id, identity_id, org_id, display_name, email, device, selected_reward_id, marketing_consent, marketing_consent_at, created_at, updated_at')
+      .order('created_at', { ascending: false }),
+    orgIds
   );
 
   if (error) throw error;
@@ -1417,7 +1513,8 @@ export async function getAdminUsers() {
   const { data: balances } = await applyOrgFilter(
     supabase
       .from('cup_balances')
-      .select('user_id, balance, lifetime_cups')
+      .select('user_id, balance, lifetime_cups'),
+    orgIds
   );
 
   const balanceMap = Object.fromEntries(
@@ -1427,11 +1524,12 @@ export async function getAdminUsers() {
   // Anyone who ever attempted a scan (even a failed / already-claimed one)
   // counts as a real user — same engagement rule as the behaviour metrics.
   const { data: scanRows } = await applyOrgFilter(
-    supabase.from('cup_scans').select('user_id')
+    supabase.from('cup_scans').select('user_id'),
+    orgIds
   );
   const scanUserIds = new Set((scanRows || []).map(s => s.user_id).filter(Boolean));
 
-  return (users || []).map(u => {
+  const enriched = (users || []).map(u => {
     const cupBalance = balanceMap[u.id]?.balance || 0;
     const lifetimeCups = balanceMap[u.id]?.lifetime || 0;
     // Visitor = only opened the app; becomes a user on any real action
@@ -1444,6 +1542,43 @@ export async function getAdminUsers() {
     );
     return { ...u, cupBalance, lifetimeCups, isVisitor };
   });
+
+  if (!grouped) return enriched;
+
+  // Collapse per-store rows into one account per identity. Balances sum across
+  // the person's stores (their combined cups); the freshest registered row wins
+  // for the display fields; a person is a visitor only if they are one everywhere.
+  const byIdentity = new Map();
+  for (const r of enriched) {
+    const key = r.identity_id || `u:${r.id}`;
+    const cur = byIdentity.get(key);
+    if (!cur) {
+      byIdentity.set(key, { ...r, storeCount: 1 });
+      continue;
+    }
+    cur.cupBalance += r.cupBalance;
+    cur.lifetimeCups += r.lifetimeCups;
+    cur.isVisitor = cur.isVisitor && r.isVisitor;
+    cur.storeCount += 1;
+    // Prefer a row that carries an email (registered), then the most recent one,
+    // for the human-facing fields — the shared profile is the same person.
+    const preferIncoming =
+      (!!r.email && !cur.email) ||
+      (!!r.email === !!cur.email && new Date(r.updated_at || 0) > new Date(cur.updated_at || 0));
+    if (preferIncoming) {
+      cur.id = r.id;
+      cur.display_name = r.display_name || cur.display_name;
+      cur.email = r.email || cur.email;
+      cur.device = r.device || cur.device;
+      cur.selected_reward_id = r.selected_reward_id || cur.selected_reward_id;
+      cur.marketing_consent = r.marketing_consent ?? cur.marketing_consent;
+      cur.updated_at = r.updated_at;
+    } else {
+      cur.email = cur.email || r.email;
+      cur.display_name = cur.display_name || r.display_name;
+    }
+  }
+  return Array.from(byIdentity.values());
 }
 
 export async function getUserActivity(userId) {
@@ -1568,18 +1703,23 @@ export async function getMergeRequests(status = 'pending') {
   if (error) throw error;
   const rows = data || [];
 
-  // Resolve survivor names in one round trip.
+  // Resolve survivor names + the deciding admin's name in one round trip each.
   const ids = [...new Set(rows.map(r => r.survivor_user_id).filter(Boolean))];
+  const adminIds = [...new Set(rows.map(r => r.decided_by).filter(Boolean))];
   const names = {};
-  if (ids.length) {
-    const { data: users } = await supabase.from('users').select('id, display_name, email').in('id', ids);
-    (users || []).forEach(u => { names[u.id] = { name: u.display_name, email: u.email }; });
-  }
+  const deciders = {};
+  const [{ data: users }, { data: admins }] = await Promise.all([
+    ids.length ? supabase.from('users').select('id, display_name, email').in('id', ids) : Promise.resolve({ data: [] }),
+    adminIds.length ? supabase.from('admin_profiles').select('id, display_name, email, color, avatar_url').in('id', adminIds) : Promise.resolve({ data: [] }),
+  ]);
+  (users || []).forEach(u => { names[u.id] = { name: u.display_name, email: u.email }; });
+  (admins || []).forEach(a => { deciders[a.id] = a; });
   return rows.map(r => ({
     ...r,
     survivorName: names[r.survivor_user_id]?.name || null,
     survivorEmail: names[r.survivor_user_id]?.email || r.email || null,
     absorbedCount: Array.isArray(r.absorbed_user_ids) ? r.absorbed_user_ids.length : 0,
+    decider: r.decided_by ? (deciders[r.decided_by] || null) : null,
   }));
 }
 
@@ -1605,6 +1745,22 @@ export async function getMergeRequestDetail(reqId) {
     request: req,
     survivor: byId[req.survivor_user_id] || { id: req.survivor_user_id },
     absorbed: ((req.absorbed_user_ids) || []).map((id) => byId[id] || { id }),
+  };
+}
+
+/* Lightweight pending-work counts for the sidebar signal dots: claims awaiting
+ * review, held cup scans, and account-merge requests. Scoped to the active org
+ * (head counts only — no rows pulled). */
+export async function getPendingCounts() {
+  const [claimsRes, scansRes, mergesRes] = await Promise.all([
+    applyOrgFilter(supabase.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+    applyOrgFilter(supabase.from('cup_scans').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+    applyOrgFilter(supabase.from('merge_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+  ]);
+  return {
+    claims: claimsRes.count || 0,
+    scans: scansRes.count || 0,
+    merges: mergesRes.count || 0,
   };
 }
 
@@ -2813,48 +2969,114 @@ export async function sendAutomatedReportTest(config, toOverride) {
   return data;
 }
 
-/* ── Weekly digest ─────────────────────────────────────────────────────
- * A configurable "nice email letter" that picks any subset of dashboard
- * metrics and mails them on a schedule. Config lives in app_config; the
- * `send-digest` edge function reads it, computes the metrics server-side,
- * renders the branded email and sends it (Brevo). The catalog below is the
- * single source of truth for BOTH the admin picker and the edge function. */
-export const DIGEST_METRICS = [
-  { id: 'new_users',       label: 'New users',              hint: 'Signed up in the period' },
-  { id: 'total_users',     label: 'Total users',            hint: 'All-time' },
-  { id: 'active_users',    label: 'Active users',           hint: 'Any cup activity in the period' },
-  { id: 'cups_period',     label: 'Cups collected',         hint: 'In the period' },
-  { id: 'cups_lifetime',   label: 'Cups collected (all time)', hint: 'Lifetime total' },
-  { id: 'cups_redeemed',   label: 'Cups redeemed',          hint: 'Spent on rewards in the period' },
-  { id: 'cashback_paid',   label: 'Cashback paid',          hint: 'Approved payouts in the period' },
-  { id: 'pending_claims',  label: 'Claims awaiting review', hint: 'Right now' },
-  { id: 'byo_scans',       label: 'BYO cup scans',          hint: 'Counter-QR scans in the period' },
-  { id: 'top_location',    label: 'Busiest location',       hint: 'Most scans in the period' },
-  { id: 'co2_avoided',     label: 'CO₂ avoided',            hint: 'From cups collected in the period' },
+/* ── Scheduled digests (vendor + staff) ────────────────────────────────
+ * Two INDEPENDENT scheduled emails, sent as separate letters:
+ *   • VENDOR digest — behaviour + rewards a store owner cares about
+ *   • STAFF  digest — everything the vendor sees, PLUS full platform totals
+ *     and programme health, for the internal team
+ * Each has its own on/off, recipients, title, intro and metric picks; the
+ * cadence + scope are shared. Config lives in app_config 'weekly_digest'; the
+ * send-digest edge function reads it and mails each enabled audience separately.
+ *
+ * The catalogs are the single source of truth for the pickers + the edge fn.
+ * Pick from a big searchable list; each digest defaults to 4 metrics. */
+export const DIGEST_VENDOR_METRICS = [
+  { id: 'new_users',        label: 'New customers',        hint: 'Signed up in the period' },
+  { id: 'active_users',     label: 'Active customers',     hint: 'Any cup activity in the period' },
+  { id: 'returning_users',  label: 'Returning customers',  hint: 'Came back on ≥2 days' },
+  { id: 'repeat_rate',      label: 'Repeat rate',          hint: 'Returning ÷ active customers' },
+  { id: 'scans_total',      label: 'Cup scans',            hint: 'All successful scans in the period' },
+  { id: 'cups_period',      label: 'Cups collected',       hint: 'In the period' },
+  { id: 'avg_cups_user',    label: 'Avg cups / customer',  hint: 'Cups ÷ active customers' },
+  { id: 'byo_scans',        label: 'BYO cup scans',        hint: 'Counter-QR scans in the period' },
+  { id: 'top_location',     label: 'Busiest location',     hint: 'Most scans in the period' },
+  { id: 'busiest_day',      label: 'Busiest day',          hint: 'Weekday with the most scans' },
+  { id: 'top_reward',       label: 'Most-claimed reward',  hint: 'Top reward in the period' },
+  { id: 'unique_rewards',   label: 'Rewards claimed',      hint: 'Distinct rewards claimed in the period' },
+  { id: 'cups_redeemed',    label: 'Cups redeemed',        hint: 'Spent on rewards in the period' },
+  { id: 'redemption_rate',  label: 'Redemption rate',      hint: 'Cups redeemed ÷ collected' },
+  { id: 'cashback_paid',    label: 'Cashback paid',        hint: 'Approved payouts in the period' },
+  { id: 'avg_cashback',     label: 'Avg cashback / claim', hint: 'Payout ÷ approved claims' },
+  { id: 'co2_avoided',      label: 'CO₂ avoided',          hint: 'From cups collected in the period' },
+];
+// Staff = every vendor metric PLUS platform-wide totals + health.
+export const DIGEST_STAFF_METRICS = [
+  ...DIGEST_VENDOR_METRICS,
+  { id: 'total_users',        label: 'Total customers',          hint: 'All-time, whole scope' },
+  { id: 'total_cups_lifetime',label: 'Cups collected (all time)', hint: 'Lifetime total' },
+  { id: 'cups_redeemed_all',  label: 'Cups redeemed (all time)', hint: 'Lifetime redemptions' },
+  { id: 'total_cashback',     label: 'Cashback paid (all time)', hint: 'All completed payouts' },
+  { id: 'approved_claims',    label: 'Claims approved',          hint: 'All-time completed' },
+  { id: 'failed_claims',      label: 'Claims rejected',          hint: 'All-time failed' },
+  { id: 'pending_claims',     label: 'Claims awaiting review',   hint: 'Right now' },
+  { id: 'rejection_rate',     label: 'Rejection rate',           hint: 'Rejected ÷ decided claims' },
+  { id: 'ai_pass_rate',       label: 'AI auto-pass rate',        hint: 'Verified claims the AI cleared' },
+  { id: 'avg_ai_confidence',  label: 'Avg AI confidence',        hint: 'Across verified claims' },
+  { id: 'pending_merges',     label: 'Merge requests pending',   hint: 'Right now' },
+  { id: 'merges_period',      label: 'Merge requests',           hint: 'Filed in the period' },
+  { id: 'stores_count',       label: 'Stores in scope',          hint: 'Orgs this digest covers' },
+  { id: 'active_stores',      label: 'Active stores',            hint: 'Stores with a scan in the period' },
 ];
 
+const DEFAULT_VENDOR_METRICS = ['new_users', 'cups_period', 'byo_scans', 'cashback_paid'];
+const DEFAULT_STAFF_METRICS = ['total_users', 'total_cups_lifetime', 'total_cashback', 'ai_pass_rate'];
+
 const WEEKLY_DIGEST_KEY = 'weekly_digest';
+export const DIGEST_AUDIENCE_DEFAULT = {
+  vendor: { enabled: true,  recipients: [], title: 'Your PackPerks vendor digest', intro: 'Here’s how your store performed.', metrics: DEFAULT_VENDOR_METRICS },
+  staff:  { enabled: false, recipients: [], title: 'PackPerks staff digest',       intro: 'Programme totals and health across your stores.', metrics: DEFAULT_STAFF_METRICS },
+};
 export const WEEKLY_DIGEST_DEFAULT = {
-  enabled: false,
   org_id: null,                   // the org the digest reports on (set on save)
   frequency: 'weekly',            // 'weekly' | 'monthly'
   dayOfWeek: 'monday',            // used when frequency === 'weekly'
-  recipient: 'beke@packback.network',
-  title: 'Your PackPerks weekly digest',
-  intro: 'Here’s how your reusable-cup programme performed this week.',
-  metrics: ['new_users', 'active_users', 'cups_period', 'cups_redeemed', 'cashback_paid', 'byo_scans', 'top_location'],
   scope: 'org',                   // 'org' | 'group'
+  vendor: { ...DIGEST_AUDIENCE_DEFAULT.vendor },
+  staff:  { ...DIGEST_AUDIENCE_DEFAULT.staff },
 };
+
+// Normalise any saved shape (incl. the earlier single-email / two-block config
+// and the original single-metric-list config) into { vendor, staff }.
+function normalizeDigest(v) {
+  const src = v || {};
+  const audience = (a, fallbackMetrics, legacyEnabled, legacyMetrics) => {
+    const cur = src[a] || {};
+    let recipients = Array.isArray(cur.recipients) ? cur.recipients : [];
+    if (!recipients.length && Array.isArray(src.recipients)) recipients = src.recipients;      // shared list from the 2-block era
+    if (!recipients.length && src.recipient) recipients = [src.recipient];                     // legacy single field
+    let metrics = Array.isArray(cur.metrics) && cur.metrics.length ? cur.metrics : null;
+    if (!metrics && Array.isArray(legacyMetrics) && legacyMetrics.length) metrics = legacyMetrics; // vendorMetrics/adminMetrics
+    if (!metrics && Array.isArray(src.metrics) && src.metrics.length) metrics = src.metrics;   // original single list
+    if (!metrics) metrics = fallbackMetrics;
+    const enabled = typeof cur.enabled === 'boolean' ? cur.enabled : (typeof legacyEnabled === 'boolean' ? legacyEnabled : DIGEST_AUDIENCE_DEFAULT[a].enabled);
+    return {
+      enabled,
+      recipients,
+      title: cur.title || DIGEST_AUDIENCE_DEFAULT[a].title,
+      intro: cur.intro || DIGEST_AUDIENCE_DEFAULT[a].intro,
+      metrics,
+    };
+  };
+  return {
+    ...WEEKLY_DIGEST_DEFAULT,
+    org_id: src.org_id ?? null,
+    frequency: src.frequency || 'weekly',
+    dayOfWeek: src.dayOfWeek || 'monday',
+    scope: src.scope || 'org',
+    vendor: audience('vendor', DEFAULT_VENDOR_METRICS, src.vendorEnabled, src.vendorMetrics),
+    staff: audience('staff', DEFAULT_STAFF_METRICS, src.adminEnabled, src.adminMetrics),
+  };
+}
 
 export async function getWeeklyDigest() {
   const { data } = await supabase
     .from('app_config').select('value').eq('key', WEEKLY_DIGEST_KEY).maybeSingle();
-  return { ...WEEKLY_DIGEST_DEFAULT, ...(data?.value || {}) };
+  return normalizeDigest(data?.value);
 }
 
 export async function saveWeeklyDigest(config) {
   const { data: { user } } = await supabase.auth.getUser();
-  const value = { ...WEEKLY_DIGEST_DEFAULT, ...(config || {}), updated_at: new Date().toISOString(), updated_by: user?.id ?? null };
+  const value = { ...normalizeDigest(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null };
   const { error } = await supabase
     .from('app_config')
     .upsert({ key: WEEKLY_DIGEST_KEY, value, updated_at: new Date().toISOString() });
@@ -2862,13 +3084,12 @@ export async function saveWeeklyDigest(config) {
   return value;
 }
 
-/* Fire a one-off test send of the digest to the configured recipient (or an
- * override). Invokes the send-digest edge function in 'test' mode with the
- * admin's JWT (the function verifies the caller is an admin). */
-export async function sendDigestTest(orgId, toOverride) {
+/* Fire a one-off test of ONE audience's digest ('vendor' | 'staff') to an
+ * address. Invokes send-digest in 'test' mode with the admin's JWT. */
+export async function sendDigestTest(audience, orgId, toOverride) {
   const oid = orgId || getActiveOrgId();
   const { data, error } = await supabase.functions.invoke('send-digest', {
-    body: { mode: 'test', org_id: oid || null, to: toOverride || null },
+    body: { mode: 'test', audience: audience || 'vendor', org_id: oid || null, to: toOverride || null },
   });
   if (error) {
     let payload = null;
@@ -2894,13 +3115,17 @@ const NOTIFICATION_CENTER_KEY = 'notification_center';
 export const NOTIFICATION_CENTER_DEFAULT = {
   enabled: false,
   org_id: null,
-  recipient: 'beke@packback.network',
+  recipients: [],          // multi-recipient; empty → the admin's own email on save
   events: [],
 };
 
 export async function getNotificationCenter() {
   const { data } = await supabase.from('app_config').select('value').eq('key', NOTIFICATION_CENTER_KEY).maybeSingle();
-  return { ...NOTIFICATION_CENTER_DEFAULT, ...(data?.value || {}) };
+  const cfg = { ...NOTIFICATION_CENTER_DEFAULT, ...(data?.value || {}) };
+  // Back-compat: fold the legacy single `recipient` into the recipients list.
+  if (!Array.isArray(cfg.recipients)) cfg.recipients = [];
+  if (!cfg.recipients.length && data?.value?.recipient) cfg.recipients = [data.value.recipient];
+  return cfg;
 }
 
 export async function saveNotificationCenter(config) {

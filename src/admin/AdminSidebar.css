@@ -77,18 +77,28 @@
   flex: 1;
 }
 
+/* Plain "pending work" signal dot — presence only, no number. */
 .admin-sidebar__badge {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: var(--pb-orange-warm);
-  color: #FFFFFF;
-  font-size: 10px;
+  box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.18);
+}
+
+/* "Group" chip on shared, group-wide tabs (Users, Future Vendors). */
+.admin-sidebar__tag {
+  flex-shrink: 0;
+  font-size: 8.5px;
   font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6C4CE0;
+  background: rgba(108, 76, 224, 0.12);
+  padding: 2px 6px;
+  border-radius: 5px;
+  line-height: 1.2;
 }
 
 /* Quick Settings Toggles — pinned to bottom of sidebar, does not

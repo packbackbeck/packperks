@@ -52,6 +52,35 @@ const LABELS: Record<string, string> = {
 };
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Per-metric vector icons (inline SVG, no emoji). Metrics map to a category
+// glyph; the stroke takes the audience accent colour.
+const ICON_PATHS: Record<string, string> = {
+  users: "<path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M22 21v-2a4 4 0 0 0-3-3.87'/>",
+  cup: "<path d='M6 3h12l-1.2 15.3A2 2 0 0 1 14.8 20H9.2a2 2 0 0 1-2-1.7L6 3z'/><path d='M5 3h14'/><path d='M9 10h6'/>",
+  money: "<circle cx='12' cy='12' r='9'/><path d='M15 9.5a3 3 0 0 0-3-1.5c-1.7 0-3 1-3 2.2 0 2.8 6 1.4 6 4.1 0 1.3-1.3 2.2-3 2.2a3 3 0 0 1-3-1.5'/>",
+  reward: "<rect x='3' y='8' width='18' height='4' rx='1'/><path d='M12 8v13'/><path d='M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7'/><path d='M12 8S9.5 3 7 4.5 8.5 8 12 8z'/><path d='M12 8s2.5-5 5-3.5S15.5 8 12 8z'/>",
+  claim: "<path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/>",
+  ai: "<path d='M12 3l1.9 4.3L18 9l-4.1 1.7L12 15l-1.9-4.3L6 9l4.1-1.7z'/><path d='M19 14l.8 1.9L22 17l-2.2.9L19 20l-.8-2.1L16 17l2.2-1.1z'/>",
+  location: "<path d='M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/>",
+  calendar: "<rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/>",
+  link: "<path d='M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1'/><path d='M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1'/>",
+  store: "<path d='M3 9l1-5h16l1 5'/><path d='M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9'/><path d='M3 9h18'/>",
+};
+const METRIC_ICON: Record<string, string> = {
+  new_users: 'users', active_users: 'users', returning_users: 'users', repeat_rate: 'users', total_users: 'users',
+  cups_period: 'cup', cups_redeemed: 'cup', cups_redeemed_all: 'cup', total_cups_lifetime: 'cup', avg_cups_user: 'cup', scans_total: 'cup', byo_scans: 'cup', co2_avoided: 'cup',
+  cashback_paid: 'money', avg_cashback: 'money', total_cashback: 'money',
+  top_reward: 'reward', unique_rewards: 'reward', redemption_rate: 'reward',
+  approved_claims: 'claim', failed_claims: 'claim', pending_claims: 'claim', rejection_rate: 'claim',
+  ai_pass_rate: 'ai', avg_ai_confidence: 'ai',
+  top_location: 'location', active_stores: 'store', stores_count: 'store',
+  busiest_day: 'calendar', pending_merges: 'link', merges_period: 'link',
+};
+function iconSvg(id: string, accent: string) {
+  const path = ICON_PATHS[METRIC_ICON[id] || 'cup'] || ICON_PATHS.cup;
+  return `<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='${accent}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;'>${path}</svg>`;
+}
+
 const esc = (s: string) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] || c));
 const fmtCo2 = (g: number) => g >= 1000000 ? `${(g / 1000000).toFixed(g >= 10000000 ? 0 : 1)} t`
   : g >= 1000 ? `${Math.round(g / 1000).toLocaleString()} kg` : `${Math.round(g)} g`;
@@ -209,20 +238,23 @@ async function computeMetrics(orgIds: string[], need: Set<string>, sinceIso: str
   return out;
 }
 
-// A metric card. Three per row → narrower cards fit more numbers per line.
-function metricCard(label: string, display: string) {
+// A metric card with its own vector icon. Three per row → narrower cards fit
+// more numbers per line.
+function metricCard(cell: { id: string; label: string; display: string }, accent: string) {
   return `<td style='padding:6px;' width='33.33%'><div style='background:#FBF7F0;border:1px solid #ECE5D8;border-radius:12px;padding:12px 13px;'>` +
-    `<div style='font-size:10.5px;font-weight:700;color:#8B8577;text-transform:uppercase;letter-spacing:.3px;'>${esc(label)}</div>` +
-    `<div style='font-size:21px;font-weight:800;color:#14100A;margin-top:4px;font-family:Georgia,serif;'>${esc(display)}</div></div></td>`;
+    `<div style='display:flex;align-items:center;gap:6px;'>${iconSvg(cell.id, accent)}` +
+    `<span style='font-size:10.5px;font-weight:700;color:#8B8577;text-transform:uppercase;letter-spacing:.3px;'>${esc(cell.label)}</span></div>` +
+    `<div style='font-size:21px;font-weight:800;color:#14100A;margin-top:4px;font-family:Georgia,serif;'>${esc(cell.display)}</div></div></td>`;
 }
 
-function renderEmail(title: string, intro: string, accent: string, badge: string, orgName: string, periodLabel: string, cells: Array<{ label: string; display: string }>) {
+function renderEmail(title: string, intro: string, accent: string, badge: string, orgName: string, periodLabel: string, cells: Array<{ id: string; label: string; display: string }>) {
   const rows: string[] = [];
+  const empty = `<td width='33.33%'></td>`;
   for (let i = 0; i < cells.length; i += 3) {
     rows.push('<tr>' +
-      metricCard(cells[i].label, cells[i].display) +
-      (cells[i + 1] ? metricCard(cells[i + 1].label, cells[i + 1].display) : `<td width='33.33%'></td>`) +
-      (cells[i + 2] ? metricCard(cells[i + 2].label, cells[i + 2].display) : `<td width='33.33%'></td>`) +
+      metricCard(cells[i], accent) +
+      (cells[i + 1] ? metricCard(cells[i + 1], accent) : empty) +
+      (cells[i + 2] ? metricCard(cells[i + 2], accent) : empty) +
     '</tr>');
   }
   // Wider email shell (680px) so three cards sit comfortably in one row.
@@ -261,12 +293,27 @@ async function sendBrevo(recipients: string[], subject: string, html: string, te
   return resp.ok ? { ok: true } : { ok: false, error: `brevo_${resp.status}` };
 }
 
-type Audience = { enabled?: boolean; recipients?: string[]; recipient?: string; title?: string; intro?: string; metrics?: string[] };
+// Append send results to a rolling log in app_config (last 50), newest last.
+async function appendLog(entries: Array<Record<string, unknown>>) {
+  if (!entries.length) return;
+  try {
+    const { data } = await supabase.from('app_config').select('value').eq('key', 'weekly_digest_log').maybeSingle();
+    const prev = Array.isArray((data?.value as { entries?: unknown[] })?.entries) ? (data!.value as { entries: unknown[] }).entries : [];
+    const next = [...prev, ...entries].slice(-50);
+    await supabase.from('app_config').upsert({ key: 'weekly_digest_log', value: { entries: next }, updated_at: new Date().toISOString() });
+  } catch (_e) { /* logging is best-effort */ }
+}
 
-// Build + send ONE audience's digest. Returns a small status object.
+type Audience = {
+  enabled?: boolean; recipients?: string[]; recipient?: string;
+  title?: string; intro?: string; metrics?: string[];
+  frequency?: string; dayOfWeek?: string; scope?: string;
+};
+
+// Build + send ONE audience's digest, using ITS OWN schedule + scope. Returns a
+// small status object.
 async function sendAudience(
-  key: 'vendor' | 'staff', aud: Audience, orgIds: string[], orgName: string,
-  periodLabel: string, sinceIso: string, toOverride: string | null,
+  key: 'vendor' | 'staff', aud: Audience, orgId: string, orgName: string, toOverride: string | null,
 ) {
   let recipients = Array.isArray(aud.recipients) && aud.recipients.length ? aud.recipients : (aud.recipient ? [aud.recipient] : []);
   if (toOverride) recipients = [toOverride];
@@ -275,8 +322,15 @@ async function sendAudience(
   if (!recipients.length) return { audience: key, sent: false, reason: 'no_recipient' };
   if (!metrics.length) return { audience: key, sent: false, reason: 'no_metrics' };
 
+  const scope = aud.scope || 'org';
+  const freq = aud.frequency === 'monthly' ? 'monthly' : 'weekly';
+  const days = freq === 'monthly' ? 30 : 7;
+  const sinceIso = new Date(Date.now() - days * 86400000).toISOString();
+  const periodLabel = freq === 'monthly' ? 'Last 30 days' : 'Last 7 days';
+  const orgIds = await orgScope(orgId, scope);
+
   const computed = await computeMetrics(orgIds, new Set(metrics), sinceIso);
-  const cells = metrics.map((id) => ({ label: LABELS[id] || id, display: computed[id] ?? '-' }));
+  const cells = metrics.map((id) => ({ id, label: LABELS[id] || id, display: computed[id] ?? '-' }));
   const accent = key === 'staff' ? '#5333A5' : '#C0451F';
   const badge = key === 'staff' ? 'Staff digest' : 'Vendor digest';
   const title = aud.title || (key === 'staff' ? 'PackPerks staff digest' : 'Your PackPerks vendor digest');
@@ -317,43 +371,45 @@ Deno.serve(async (req) => {
     const { data: secRow } = await supabase.from('app_config').select('value').eq('key', 'digest_cron').maybeSingle();
     const cronSecret = (secRow?.value as { secret?: string } | null)?.secret || '';
     if (!cronSecret || req.headers.get('x-digest-secret') !== cronSecret) return json({ error: 'forbidden' }, 403);
-    const now = new Date();
-    const freq = cfg.frequency || 'weekly';
-    const dueToday = freq === 'weekly'
-      ? WEEKDAYS[now.getUTCDay()] === (cfg.dayOfWeek || 'monday')
-      : now.getUTCDate() === 1;
-    if (!dueToday) return json({ status: 'skipped', reason: 'not_today' });
   }
 
   const orgId = (mode === 'test' ? (body.org_id || cfg.org_id) : cfg.org_id) || null;
   if (!orgId) return json({ error: 'no_org_configured' }, 400);
 
-  // Resolve the two audiences, tolerating the earlier config shapes.
+  // Resolve the two audiences, tolerating the earlier config shapes. Each
+  // carries its own schedule + scope now (falling back to the old shared ones).
+  const legacySched = { frequency: cfg.frequency, dayOfWeek: cfg.dayOfWeek, scope: cfg.scope };
   const vendor: Audience = cfg.vendor
-    || { enabled: cfg.vendorEnabled !== false, recipients: cfg.recipients, recipient: cfg.recipient, metrics: cfg.vendorMetrics || cfg.metrics };
+    || { enabled: cfg.vendorEnabled !== false, recipients: cfg.recipients, recipient: cfg.recipient, metrics: cfg.vendorMetrics || cfg.metrics, ...legacySched };
   const staff: Audience = cfg.staff
-    || { enabled: !!cfg.adminEnabled, recipients: cfg.recipients, recipient: cfg.recipient, metrics: cfg.adminMetrics };
+    || { enabled: !!cfg.adminEnabled, recipients: cfg.recipients, recipient: cfg.recipient, metrics: cfg.adminMetrics, ...legacySched };
 
-  const scope = cfg.scope || 'org';
-  const freq = cfg.frequency || 'weekly';
-  const days = freq === 'monthly' ? 30 : 7;
-  const sinceIso = new Date(Date.now() - days * 86400000).toISOString();
-  const periodLabel = freq === 'monthly' ? 'Last 30 days' : 'Last 7 days';
-
-  const orgIds = await orgScope(orgId, scope);
   const { data: orgRow } = await supabase.from('organizations').select('name, partner_brand_name').eq('id', orgId).maybeSingle();
   const orgName = orgRow?.partner_brand_name || orgRow?.name || 'Your store';
+
+  // Per-audience "is it due today?" (each has its own frequency/day).
+  const isDue = (aud: Audience) => {
+    const now = new Date();
+    return (aud.frequency === 'monthly')
+      ? now.getUTCDate() === 1
+      : WEEKDAYS[now.getUTCDay()] === (aud.dayOfWeek || 'monday');
+  };
 
   try {
     const results: unknown[] = [];
     if (mode === 'test') {
       const which = body.audience === 'staff' ? 'staff' : 'vendor';
       const aud = which === 'staff' ? staff : vendor;
-      results.push(await sendAudience(which, aud, orgIds, orgName, periodLabel, sinceIso, body.to || null));
+      results.push(await sendAudience(which, aud, orgId, orgName, body.to || null));
     } else {
-      if (vendor.enabled !== false && (vendor.metrics || []).length) results.push(await sendAudience('vendor', vendor, orgIds, orgName, periodLabel, sinceIso, null));
-      if (staff.enabled && (staff.metrics || []).length) results.push(await sendAudience('staff', staff, orgIds, orgName, periodLabel, sinceIso, null));
+      if (vendor.enabled !== false && (vendor.metrics || []).length && isDue(vendor)) results.push(await sendAudience('vendor', vendor, orgId, orgName, null));
+      if (staff.enabled && (staff.metrics || []).length && isDue(staff)) results.push(await sendAudience('staff', staff, orgId, orgName, null));
     }
+    const at = new Date().toISOString();
+    await appendLog(results.map((r) => {
+      const rr = r as { audience?: string; sent?: boolean; to?: string[]; error?: string };
+      return { at, mode, audience: rr.audience, status: rr.sent ? 'sent' : 'failed', to: rr.to || [], error: rr.error || null };
+    }));
     return json({ status: 'ok', mode, org: orgName, results });
   } catch (e) {
     return json({ error: 'send_failed', detail: String(e) }, 500);

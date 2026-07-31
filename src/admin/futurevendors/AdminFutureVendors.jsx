@@ -79,7 +79,6 @@ export default function AdminFutureVendors() {
     <div className="afv">
       <header className="afv__head">
         <div className="afv__head-main">
-          <span className="afv__eyebrow">Stores</span>
           <h1 className="afv__title">Future vendors</h1>
           <p className="afv__sub">
             Nearby places that aren’t on PackPerks yet. They appear as locked “coming soon” cards and map

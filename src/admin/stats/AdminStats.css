@@ -520,7 +520,7 @@
 .stats-ai__score.is-good { background: #EEF7F0; border-color: #C7E6CF; }
 .stats-ai__score.is-mid  { background: #FFF6E6; border-color: #F1DFB6; }
 .stats-ai__score.is-bad  { background: #FDEEEA; border-color: #F5CFC4; }
-.stats-ai__score-num { font-size: 40px; font-weight: 800; line-height: 1; color: #14100A; font-family: Georgia, serif; }
+.stats-ai__score-num { font-size: 40px; font-weight: 800; line-height: 1; color: #14100A; letter-spacing: -0.02em; }
 .stats-ai__score-lbl { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #6C6259; margin-top: 8px; }
 .stats-ai__score-sub { font-size: 12.5px; color: #7A7166; }
 .stats-ai__hero-meta { display: flex; gap: 12px; flex-wrap: wrap; }

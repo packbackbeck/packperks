@@ -35,6 +35,9 @@ const json = (b: unknown, s = 200) =>
 
 const LABELS: Record<string, string> = {
   claim_created: 'New claim submitted',
+  claim_approved: 'Claim approved',
+  claim_rejected: 'Claim rejected',
+  payout_failed: 'Payout failed',
   account_created: 'New account created',
   cup_scanned: 'Cup scanned',
   byo_request: 'BYO cup request needs review',
@@ -44,6 +47,9 @@ const LABELS: Record<string, string> = {
 // inline SVG or blocked <img> logos.
 const ICONS: Record<string, string> = {
   claim_created: '💶',
+  claim_approved: '✅',
+  claim_rejected: '⛔',
+  payout_failed: '⚠️',
   account_created: '👤',
   cup_scanned: '🥤',
   byo_request: '♻️',
@@ -56,6 +62,9 @@ const ICONS: Record<string, string> = {
 const ADMIN_URL = 'https://perks.packback.network/admin';
 const CTA: Record<string, { label: string; page: string; section?: string }> = {
   claim_created:   { label: 'Review claim',         page: 'claims' },
+  claim_approved:  { label: 'Open claim',           page: 'claims' },
+  claim_rejected:  { label: 'Open claim',           page: 'claims' },
+  payout_failed:   { label: 'Open claim',           page: 'claims' },
   account_created: { label: 'View customer',        page: 'users' },
   cup_scanned:     { label: 'Open cup scans',        page: 'cupscans' },
   byo_request:     { label: 'Review the cup scan',    page: 'cupscans' },
@@ -110,9 +119,9 @@ async function loadDetails(eventType: string, rowId: string | null): Promise<{ r
         if (u.device) rows.push(['Device', String(u.device)]);
         const w = fmtWhen(u.created_at); if (w) rows.push(['When', w]);
       }
-    } else if (eventType === 'claim_created') {
+    } else if (eventType === 'claim_created' || eventType === 'claim_approved' || eventType === 'claim_rejected' || eventType === 'payout_failed') {
       const { data: c } = await supabase.from('claims')
-        .select('user_id, org_id, type, reward_id, cups_redeemed, payout_amount, created_at').eq('id', rowId).maybeSingle();
+        .select('user_id, org_id, type, reward_id, cups_redeemed, payout_amount, status, payout_status, created_at').eq('id', rowId).maybeSingle();
       if (c) {
         orgId = c.org_id;
         const who = await nameOf(c.user_id);
@@ -121,6 +130,9 @@ async function loadDetails(eventType: string, rowId: string | null): Promise<{ r
         if (c.reward_id) rows.push(['Reward', String(c.reward_id)]);
         if (c.cups_redeemed != null) rows.push(['Cups spent', String(c.cups_redeemed)]);
         if (c.payout_amount != null) rows.push(['Cashback', 'EUR ' + Number(c.payout_amount).toFixed(2)]);
+        if (eventType === 'claim_approved') rows.push(['Decision', 'Approved']);
+        if (eventType === 'claim_rejected') rows.push(['Decision', 'Rejected']);
+        if (eventType === 'payout_failed') rows.push(['Payout', 'Failed to mint']);
         const w = fmtWhen(c.created_at); if (w) rows.push(['When', w]);
       }
     } else if (eventType === 'byo_request') {

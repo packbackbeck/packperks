@@ -71,6 +71,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  margin: 0;
 }
 
 /* Admin-uploaded images (http(s) URLs) — fit and center, don't crop. */
@@ -79,6 +80,7 @@
   object-position: center;
   padding: 10px;
   box-sizing: border-box;
+  margin: 0;
 }
 
 .featured-reward__info {

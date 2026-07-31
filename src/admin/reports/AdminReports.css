@@ -622,3 +622,39 @@
 .rep-tags__chip:hover { border-color: #CDBFA5; }
 .rep-tags__chip.is-on { border-color: var(--pb-green, #1A8737); background: #EEF7F0; color: #14602F; padding-right: 6px; }
 .rep-tags__plus { font-weight: 800; color: #8B8577; }
+
+/* Two digest blocks side by side (2 columns, 1 row); the log spans below. */
+.rep-digest-wrap { display: flex; flex-direction: column; }
+.rep-digest-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.rep-digest-cols .rep-auto { margin-top: 22px; }
+@media (max-width: 1000px) { .rep-digest-cols { grid-template-columns: 1fr; } }
+/* Colour-key by audience via the header icon only (no top stroke). */
+.rep-digest--vendor .rep-auto__title svg { color: #C0451F; }
+.rep-digest--admin  .rep-auto__title svg { color: #5333A5; }
+
+/* Digest activity log — collapsible + inner-scrollable. */
+.rep-digest-logs { padding: 0; overflow: hidden; }
+.rep-logs__head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 16px 20px; background: none; border: none; cursor: pointer; font-family: inherit; text-align: left;
+}
+.rep-logs__chev { color: #8B8577; transition: transform 0.15s ease; flex-shrink: 0; }
+.rep-logs__chev.is-open { transform: rotate(90deg); }
+.rep-logs__hint { margin-left: auto; font-size: 12px; color: #8B8577; }
+.rep-logs__body { border-top: 1px solid #F0EAE0; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+.rep-logs__empty { padding: 22px 20px; font-size: 13px; color: #8B8577; text-align: center; }
+.rep-logs__list { list-style: none; margin: 0; padding: 6px 0; }
+.rep-logs__row {
+  display: grid; grid-template-columns: 62px 110px 84px 1fr auto; align-items: center; gap: 12px;
+  padding: 9px 20px; font-size: 12.5px; color: #3A342B; border-bottom: 1px solid #F5F0E6;
+}
+.rep-logs__row:last-child { border-bottom: none; }
+.rep-logs__pill { justify-self: start; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; }
+.rep-logs__pill--ok { background: #E4F6E9; color: #1A8737; }
+.rep-logs__pill--fail { background: #FCE4E0; color: #C0392B; }
+.rep-logs__aud { font-weight: 700; }
+.rep-logs__row--staff .rep-logs__aud { color: #5333A5; }
+.rep-logs__row--vendor .rep-logs__aud { color: #C0451F; }
+.rep-logs__mode { color: #8B8577; }
+.rep-logs__to { color: #6E665A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rep-logs__when { color: #9A9186; white-space: nowrap; }

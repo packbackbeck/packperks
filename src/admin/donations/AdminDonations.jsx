@@ -107,7 +107,6 @@ export default function AdminDonations({ onNavigate, draftState }) {
       {/* Header */}
       <header className="ad-header">
         <div className="ad-header__text">
-          <span className="ad-header__eyebrow">Donations</span>
           <h1 className="ad-header__title">Charity transfers</h1>
           <p className="ad-header__sub">
             Customers turn cups into donations via the "Donate" button on the user app.

@@ -276,6 +276,7 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
           return true;
         }).map(item => {
           const isActive = activePage === item.id;
+          // Per-tab pending count (Overview intentionally has NO indicator).
           const badge =
             item.id === 'claims'   ? pendingClaims :
             // 'receipts' merged into 'claims' — kept here as a noop in
@@ -283,7 +284,7 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
             item.id === 'receipts' ? pendingClaims :
             item.id === 'cupscans' ? pendingScans :
             item.id === 'users'    ? pendingMerges :
-            item.id === 'overview' && totalPending > 0 ? totalPending : 0;
+            0;
           // "Group" chip on the shared, group-wide tabs (only when this org is
           // actually part of a group).
           const showGroupTag = !!activeGroupId && GROUP_SCOPED_ITEMS.has(item.id);
@@ -298,7 +299,7 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
               <span className="admin-sidebar__item-label">{item.label}</span>
               {showGroupTag && <span className="admin-sidebar__tag">Group</span>}
               {badge > 0 && (
-                <span className="admin-sidebar__badge" title={`${badge} pending`} aria-label={`${badge} pending`} />
+                <span className="admin-sidebar__badge" title={`${badge} pending`}>{badge}</span>
               )}
             </button>
           );

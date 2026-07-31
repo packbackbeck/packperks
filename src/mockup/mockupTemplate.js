@@ -58,10 +58,16 @@ export function cloneConfig(c) {
     ...base,
     palette: { ...DEFAULT_PALETTE, ...(base.palette || {}) },
     sections: { ...DEFAULT_CONFIG.sections, ...(base.sections || {}) },
-    rewards: (base.rewards && base.rewards.length ? base.rewards : DEFAULT_CONFIG.rewards)
-      .slice(0, 3)
-      .map((r, i) => ({ ...blankReward(i), ...r })),
-    selectedIndex: Math.min(2, Math.max(0, Number(base.selectedIndex) || 0)),
+    rewards: (() => {
+      const rw = (base.rewards && base.rewards.length ? base.rewards : DEFAULT_CONFIG.rewards)
+        .slice(0, 30)                       // was 3 — templates can showcase many rewards
+        .map((r, i) => ({ ...blankReward(i), ...r }));
+      return rw;
+    })(),
+    selectedIndex: (() => {
+      const n = (base.rewards && base.rewards.length ? base.rewards : DEFAULT_CONFIG.rewards).length;
+      return Math.min(Math.max(0, n - 1), Math.max(0, Number(base.selectedIndex) || 0));
+    })(),
   };
 }
 
@@ -76,6 +82,66 @@ export function cloneConfig(c) {
  * packaging → earn cashback), never any "bring your own cup" wording.
  */
 export const STARTER_MOCKUPS = [
+  {
+    id: 'starter-rotterdam-coffee-fest',
+    name: 'Rotterdam Coffee Fest — festival (25 rewards)',
+    config: {
+      orgName: 'Rotterdam Coffee Fest',
+      partnerBrandName: '',
+      logoUrl: '',
+      logoWidth: '',
+      brandColor: '#C82D8F',              // magenta accent from the brand kit
+      palette: {
+        background: '#7A3E97',            // festival purple
+        primary:    '#C82D8F',            // magenta headline / primary
+        accent:     '#DCE84F',            // lime
+        accentDeep: '#A8236F',            // deep magenta
+        surface:    '#8A56A6',            // lighter purple card surface
+        text:       '#F4EFA6',            // light lime text on purple
+        textMuted:  '#D8C7E6',            // soft lilac
+        success:    '#DCE84F',            // lime = unlocked
+      },
+      heroHeadline: 'Turn festival cups into rewards',
+      heroSubtext: 'Sip your way through Rotterdam Coffee Fest — collect cups at every stand and turn them into coffee, gear, tastings and limited-edition merch.',
+      cupsCollected: 9,
+      sections: { showPackbackLogo: true, showBrandLogo: true },
+      // 5 rewards from each of 5 categories (tagged by category). No photos —
+      // the coloured brand tiles carry each one.
+      rewards: [
+        // 1 · Coffee products
+        { name: 'Coffee samples — A Matter of Concrete', image: '', cupsNeeded: 4,  euros: '', bgColor: '#C82D8F', tags: 'COFFEE' },
+        { name: 'Coffee bags — Giraffe Coffee Roasters', image: '', cupsNeeded: 8,  euros: '', bgColor: '#5E2E7A', tags: 'COFFEE' },
+        { name: 'Coffee samples — Grounded',             image: '', cupsNeeded: 4,  euros: '', bgColor: '#2B2B2B', tags: 'COFFEE' },
+        { name: 'Coffee bags — Evermore',                image: '', cupsNeeded: 8,  euros: '', bgColor: '#A8236F', tags: 'COFFEE' },
+        { name: 'Coffee products — Contributor Coffee',  image: '', cupsNeeded: 7,  euros: '', bgColor: '#6E3A8C', tags: 'COFFEE' },
+        // 2 · Coffee equipment & accessories
+        { name: 'Brewing accessories — Hario Europe',            image: '', cupsNeeded: 10, euros: '', bgColor: '#5E2E7A', tags: 'EQUIPMENT' },
+        { name: 'Barista accessories — Espresso Service West',   image: '', cupsNeeded: 10, euros: '', bgColor: '#C82D8F', tags: 'EQUIPMENT' },
+        { name: 'Reusable bottles & filters — BRITA Nederland',  image: '', cupsNeeded: 9,  euros: '', bgColor: '#2B2B2B', tags: 'EQUIPMENT' },
+        { name: 'Coffee tools — A Matter of Concrete',           image: '', cupsNeeded: 11, euros: '', bgColor: '#A8236F', tags: 'EQUIPMENT' },
+        { name: 'ZeroCup accessories — UBITE',                   image: '', cupsNeeded: 12, euros: '', bgColor: '#6E3A8C', tags: 'EQUIPMENT' },
+        // 3 · Tea & alternative drinks
+        { name: 'Chai samples — Nomadschai',                     image: '', cupsNeeded: 4,  euros: '', bgColor: '#C82D8F', tags: 'TEA' },
+        { name: 'Oat drink products — Oatly',                    image: '', cupsNeeded: 5,  euros: '', bgColor: '#5E2E7A', tags: 'TEA' },
+        { name: 'Chai concentrate — Nomadschai',                 image: '', cupsNeeded: 6,  euros: '', bgColor: '#2B2B2B', tags: 'TEA' },
+        { name: 'Oatly barista products',                        image: '', cupsNeeded: 6,  euros: '', bgColor: '#A8236F', tags: 'TEA' },
+        { name: 'Non-coffee tasting — festival exhibitors',      image: '', cupsNeeded: 5,  euros: '', bgColor: '#6E3A8C', tags: 'TEA' },
+        // 4 · Workshops & experiences
+        { name: 'Coffee cupping — A Matter of Concrete',         image: '', cupsNeeded: 12, euros: '', bgColor: '#5E2E7A', tags: 'WORKSHOP' },
+        { name: 'Coffee tasting — Giraffe Coffee Roasters',      image: '', cupsNeeded: 12, euros: '', bgColor: '#C82D8F', tags: 'WORKSHOP' },
+        { name: 'Brewing workshop — Hario Europe',               image: '', cupsNeeded: 14, euros: '', bgColor: '#2B2B2B', tags: 'WORKSHOP' },
+        { name: 'Espresso demo — Espresso Service West',         image: '', cupsNeeded: 13, euros: '', bgColor: '#A8236F', tags: 'WORKSHOP' },
+        { name: 'Water-for-coffee tasting — BRITA Nederland',    image: '', cupsNeeded: 11, euros: '', bgColor: '#6E3A8C', tags: 'WORKSHOP' },
+        // 5 · Merchandise & premium rewards
+        { name: 'Limited-edition ZeroCup — UBITE',               image: '', cupsNeeded: 16, euros: '', bgColor: '#C82D8F', tags: 'PREMIUM' },
+        { name: 'HOKA cap or running socks',                     image: '', cupsNeeded: 14, euros: '', bgColor: '#5E2E7A', tags: 'PREMIUM' },
+        { name: 'Rotterdam Coffee Fest × UBITE cup',             image: '', cupsNeeded: 15, euros: '', bgColor: '#2B2B2B', tags: 'PREMIUM' },
+        { name: 'Giraffe Coffee Roasters merch',                 image: '', cupsNeeded: 12, euros: '', bgColor: '#A8236F', tags: 'PREMIUM' },
+        { name: 'A Matter of Concrete accessories',              image: '', cupsNeeded: 13, euros: '', bgColor: '#6E3A8C', tags: 'PREMIUM' },
+      ],
+      selectedIndex: 22,                   // feature the Rotterdam Coffee Fest × UBITE cup
+    },
+  },
   {
     id: 'starter-stanfordo',
     name: 'Stanfordo — trattoria (deposit)',

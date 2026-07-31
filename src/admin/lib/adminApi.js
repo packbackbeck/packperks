@@ -3022,15 +3022,13 @@ const DEFAULT_VENDOR_METRICS = ['new_users', 'cups_period', 'byo_scans', 'cashba
 const DEFAULT_STAFF_METRICS = ['total_users', 'total_cups_lifetime', 'total_cashback', 'ai_pass_rate'];
 
 const WEEKLY_DIGEST_KEY = 'weekly_digest';
+// Each audience is a fully independent digest: its own schedule + scope too.
 export const DIGEST_AUDIENCE_DEFAULT = {
-  vendor: { enabled: true,  recipients: [], title: 'Your PackPerks vendor digest', intro: 'Here’s how your store performed.', metrics: DEFAULT_VENDOR_METRICS },
-  staff:  { enabled: false, recipients: [], title: 'PackPerks staff digest',       intro: 'Programme totals and health across your stores.', metrics: DEFAULT_STAFF_METRICS },
+  vendor: { enabled: true,  recipients: [], title: 'Your PackPerks vendor digest', intro: 'Here’s how your store performed.', metrics: DEFAULT_VENDOR_METRICS, frequency: 'weekly', dayOfWeek: 'monday', scope: 'org' },
+  staff:  { enabled: false, recipients: [], title: 'PackPerks staff digest',       intro: 'Programme totals and health across your stores.', metrics: DEFAULT_STAFF_METRICS, frequency: 'weekly', dayOfWeek: 'monday', scope: 'org' },
 };
 export const WEEKLY_DIGEST_DEFAULT = {
   org_id: null,                   // the org the digest reports on (set on save)
-  frequency: 'weekly',            // 'weekly' | 'monthly'
-  dayOfWeek: 'monday',            // used when frequency === 'weekly'
-  scope: 'org',                   // 'org' | 'group'
   vendor: { ...DIGEST_AUDIENCE_DEFAULT.vendor },
   staff:  { ...DIGEST_AUDIENCE_DEFAULT.staff },
 };
@@ -3055,14 +3053,14 @@ function normalizeDigest(v) {
       title: cur.title || DIGEST_AUDIENCE_DEFAULT[a].title,
       intro: cur.intro || DIGEST_AUDIENCE_DEFAULT[a].intro,
       metrics,
+      // Per-audience schedule; fall back to the old shared top-level fields.
+      frequency: cur.frequency || src.frequency || 'weekly',
+      dayOfWeek: cur.dayOfWeek || src.dayOfWeek || 'monday',
+      scope: cur.scope || src.scope || 'org',
     };
   };
   return {
-    ...WEEKLY_DIGEST_DEFAULT,
     org_id: src.org_id ?? null,
-    frequency: src.frequency || 'weekly',
-    dayOfWeek: src.dayOfWeek || 'monday',
-    scope: src.scope || 'org',
     vendor: audience('vendor', DEFAULT_VENDOR_METRICS, src.vendorEnabled, src.vendorMetrics),
     staff: audience('staff', DEFAULT_STAFF_METRICS, src.adminEnabled, src.adminMetrics),
   };
@@ -3082,6 +3080,14 @@ export async function saveWeeklyDigest(config) {
     .upsert({ key: WEEKLY_DIGEST_KEY, value, updated_at: new Date().toISOString() });
   if (error) throw error;
   return value;
+}
+
+/* Recent digest sends (scheduled + tests), newest first. The send-digest edge
+ * function appends each send to app_config 'weekly_digest_log'. */
+export async function getDigestLog() {
+  const { data } = await supabase.from('app_config').select('value').eq('key', 'weekly_digest_log').maybeSingle();
+  const entries = Array.isArray(data?.value?.entries) ? data.value.entries : [];
+  return entries.slice().reverse();
 }
 
 /* Fire a one-off test of ONE audience's digest ('vendor' | 'staff') to an
@@ -3104,7 +3110,10 @@ export async function sendDigestTest(audience, orgId, toOverride) {
  * notify-event edge fn when a matching row is inserted. Config in app_config
  * 'notification_center'. The event ids MUST match the trigger TG_ARGV values. */
 export const NOTIFICATION_EVENTS = [
-  { id: 'claim_created',   label: 'New claim',        hint: 'A user submits a cashback/refund claim' },
+  { id: 'claim_created',   label: 'New claim (AI-passed)', hint: 'A cashback/refund claim clears the AI check' },
+  { id: 'claim_approved',  label: 'Claim approved',   hint: 'An admin approves a claim' },
+  { id: 'claim_rejected',  label: 'Claim rejected',   hint: 'An admin rejects a claim' },
+  { id: 'payout_failed',   label: 'Payout failed',    hint: 'A cashback payout could not be minted' },
   { id: 'account_created', label: 'New account',      hint: 'A new customer account is created' },
   { id: 'cup_scanned',     label: 'Cup scanned',      hint: 'A cup is collected (high volume — one email each)' },
   { id: 'byo_request',     label: 'BYO cup request',  hint: 'An over-cap cup scan is held for review' },

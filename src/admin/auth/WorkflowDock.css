@@ -74,11 +74,11 @@
 /* ── Publish (highlighted primary) ───────────────────────────────── */
 .wd-publish {
   padding: 0 14px;
-  background: var(--pb-purple-600); /* PackBack purple */
+  background: #14100A; /* dark black — stands out on the purple top bar */
   color: #FFFFFF;
   position: relative;
 }
-.wd-publish:hover { background: var(--pb-purple-700); }
+.wd-publish:hover { background: #000000; }
 
 /* Tiny pending-pulse dot when there are auto-saved-but-not-yet-published
  * changes. Sits at the top-right corner of the Publish button. */

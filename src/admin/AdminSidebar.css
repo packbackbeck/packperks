@@ -58,13 +58,14 @@
 }
 
 .admin-sidebar__item--active {
-  background: rgba(210, 84, 43, 0.12);
-  color: #C0451F;
-  font-weight: 600;
+  background: rgba(253, 111, 70, 0.18);
+  color: #FD6F46;
+  font-weight: 700;
 }
+.admin-sidebar__item--active .admin-sidebar__item-icon { color: #FD6F46; }
 
 .admin-sidebar__item--active:hover {
-  background: rgba(210, 84, 43, 0.18);
+  background: rgba(253, 111, 70, 0.26);
 }
 
 .admin-sidebar__item-icon {
@@ -77,14 +78,20 @@
   flex: 1;
 }
 
-/* Plain "pending work" signal dot — presence only, no number. */
+/* Pending-work count badge — a small numbered pill (Overview has none). */
 .admin-sidebar__badge {
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
   background: var(--pb-orange-warm);
-  box-shadow: 0 0 0 3px rgba(253, 111, 70, 0.18);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
 }
 
 /* "Group" chip on shared, group-wide tabs (Users, Future Vendors). */
@@ -156,18 +163,19 @@
 }
 
 .admin-sidebar__rates {
-  background: #F3EEE4;
+  background: var(--pb-orange-warm);
   border-radius: 8px;
   padding: 7px 8px;
   margin-bottom: 4px;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.12s, filter 0.12s;
   display: flex;
   gap: 6px;
 }
 
 .admin-sidebar__rates:hover {
-  background: #EBE4D7;
+  background: var(--pb-orange-warm);
+  filter: brightness(1.06) saturate(1.1);
 }
 
 .admin-sidebar__rate-item {
@@ -180,15 +188,15 @@
 .admin-sidebar__rate-label {
   font-size: 9px;
   font-weight: 700;
-  color: #8A8175;
+  color: rgba(255, 255, 255, 0.82);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .admin-sidebar__rate-val {
   font-size: 12px;
-  font-weight: 700;
-  color: #A85320;
+  font-weight: 800;
+  color: #FFFFFF;
 }
 
 .admin-sidebar__toggle-row {

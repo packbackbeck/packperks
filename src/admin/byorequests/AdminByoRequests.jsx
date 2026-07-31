@@ -157,31 +157,27 @@ export default function AdminByoRequests() {
     }
   }
 
-  // Print sheet: an A4 PNG that tiles this counter QR at exactly 6cm × 6cm,
-  // 3 across × 4 down (12 total), so a store can print one page and cut them
-  // apart. Rendered at 300 DPI for crisp printing; the QR itself is re-generated
-  // at high resolution so it isn't upscaled from the on-screen preview.
+  // Print sheet: an A4 PNG that tiles the BRANDED card (logo + store name + QR)
+  // at exactly 6cm × 6cm, 3 across × 4 down (12 total), with dashed cut lines
+  // around each so a store can print one page and cut them apart. Rendered at
+  // 300 DPI; the card itself is captured once at high resolution.
   async function handleDownloadA4() {
-    if (!byoUrl) return;
+    if (!qrCardRef.current || !qrDataUrl) return;
     setDownloadingA4(true);
     try {
+      // Capture the branded card node (same node the single PNG exports) once.
+      const cardPng = await toPng(qrCardRef.current, { pixelRatio: 4, backgroundColor: '#FFFFFF', cacheBust: true });
+      const img = new Image();
+      img.src = cardPng;
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+
       const DPI = 300;
       const mm = (v) => Math.round((v / 25.4) * DPI);
       const W = mm(210), H = mm(297);       // A4 portrait
-      const QR = mm(60);                     // 6cm
+      const TILE = mm(60);                   // 6cm branded card
       const cols = 3, rows = 4;
-      const gapX = (W - cols * QR) / (cols + 1);
-      const gapY = (H - rows * QR) / (rows + 1);
-
-      // Crisp, print-resolution QR (a little larger than one cell so downscaling
-      // keeps the modules sharp).
-      const hiResQr = await QRCode.toDataURL(byoUrl, {
-        width: 760, margin: 1, errorCorrectionLevel: 'M',
-        color: { dark: '#0F0F0F', light: '#FFFFFF' },
-      });
-      const img = new Image();
-      img.src = hiResQr;
-      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+      const gapX = (W - cols * TILE) / (cols + 1);
+      const gapY = (H - rows * TILE) / (rows + 1);
 
       const canvas = document.createElement('canvas');
       canvas.width = W; canvas.height = H;
@@ -190,13 +186,21 @@ export default function AdminByoRequests() {
       ctx.fillRect(0, 0, W, H);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
+
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          const x = Math.round(gapX + c * (QR + gapX));
-          const y = Math.round(gapY + r * (QR + gapY));
-          ctx.drawImage(img, x, y, QR, QR);
+          const x = Math.round(gapX + c * (TILE + gapX));
+          const y = Math.round(gapY + r * (TILE + gapY));
+          ctx.drawImage(img, x, y, TILE, TILE);
+          // Dashed cut boundary just outside the card.
+          const pad = mm(2);
+          ctx.strokeStyle = '#B9AF9A';
+          ctx.lineWidth = Math.max(1, mm(0.25));
+          ctx.setLineDash([mm(2.5), mm(1.8)]);
+          ctx.strokeRect(x - pad, y - pad, TILE + pad * 2, TILE + pad * 2);
         }
       }
+      ctx.setLineDash([]);
 
       const locSlug = selectedLocation
         ? '-' + (selectedLocation.name || 'location').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -207,7 +211,7 @@ export default function AdminByoRequests() {
       a.click();
     } catch (e) {
       console.error('A4 QR sheet failed:', e);
-      setError('Could not build the A4 sheet. Please try again.');
+      setError('Could not build the A4 sheet. If your logo is hosted elsewhere it may block the export — try again or remove the logo.');
     } finally {
       setDownloadingA4(false);
     }

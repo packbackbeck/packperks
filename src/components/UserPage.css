@@ -543,6 +543,39 @@
 
 /* ── Cups ⇄ value box (mirrors the refund-sheet compare box) ── */
 /* ── Visitor nudge (S1): shown until the first cup / any real action ── */
+.user-page__merge-pending {
+  width: 330px;
+  box-sizing: border-box;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fff7ed;
+  border: 1.5px solid #fdba74;
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  color: #7c2d12;
+  box-shadow: var(--shadow-screen);
+}
+.user-page__merge-pending-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #ea580c;
+}
+.user-page__merge-pending-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.user-page__merge-pending-text strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+.user-page__merge-pending-text span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #9a3412;
+}
+
 .user-page__visitor {
   width: 330px;
   background: var(--white);

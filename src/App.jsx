@@ -68,6 +68,7 @@ import {
   propagateProfileToGroup,
   getGroupActivity,
   mintByoCup,
+  getMergeStatus,
 } from './lib/api';
 import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, getGroupBySlug } from './lib/groups';
 import BudgetPausedModal from './components/BudgetPausedModal';
@@ -274,6 +275,15 @@ export default function App({ consentReady = true } = {}) {
   // Phase 3: when the account page is opened FROM the Stores hub it shows a
   // combined view — summed balance + activity across every store.
   const [accountCombined, setAccountCombined] = useState(false);
+  // An account-merge is filed but still WAITING for admin review (the weekly
+  // merge limit held it). While pending, the user must see ONLY their current
+  // account + current balance — never the merged total — and the account page
+  // shows a "merge requested" banner. Seeded from a flag SignInSheet sets the
+  // moment a merge is held, so the view is correct on the very next render even
+  // before the server round-trip confirms it.
+  const [mergePending, setMergePending] = useState(() => {
+    try { return localStorage.getItem('pp_merge_pending') === '1'; } catch { return false; }
+  });
   // Where "add a cup" was launched from, so the cup-scan back button returns
   // there (e.g. the combined Stores account) instead of always a store home.
   const [cupScanReturn, setCupScanReturn] = useState(null);
@@ -665,6 +675,12 @@ export default function App({ consentReady = true } = {}) {
         if (!org) { window.location.replace('/'); return; }
         setActiveOrg(org);
         if (hubRoute) setPage('stores'); // /<groupSlug> lands on the Stores hub
+        // Returning from a full-page detour (e.g. the /support form set this
+        // flag before it navigated away) — restore the page they left from.
+        try {
+          const back = sessionStorage.getItem('pp_open_page');
+          if (back) { sessionStorage.removeItem('pp_open_page'); setPage(back); }
+        } catch { /* ignore */ }
 
         const user = await getOrCreateUser(org?.id);
 
@@ -677,8 +693,28 @@ export default function App({ consentReady = true } = {}) {
         setGroupCtx(gctx);
         const byoGroup = gctx?.mode === 'byo';
         byoGroupRef.current = byoGroup;
+
+        // Is an account-merge still waiting for admin review? If so we must NOT
+        // adopt the shared identity — adoption re-points this row and would
+        // reveal the merged total before it's approved. The user stays on their
+        // current account + balance until the request clears. Seed from the
+        // local flag, then confirm with the server when signed in.
+        let mergeIsPending = false;
+        try { mergeIsPending = localStorage.getItem('pp_merge_pending') === '1'; } catch { /* ignore */ }
+        if (user.auth_user_id) {
+          const st = await getMergeStatus().catch(() => null);
+          if (st) {
+            mergeIsPending = !!st.pending;
+            try {
+              if (st.pending) localStorage.setItem('pp_merge_pending', '1');
+              else localStorage.removeItem('pp_merge_pending');
+            } catch { /* ignore */ }
+          }
+        }
+        setMergePending(mergeIsPending);
+
         let identity = null;
-        if (gctx) {
+        if (gctx && !mergeIsPending) {
           try {
             // Profile consistency across stores is a BYO-only behaviour
             // (syncProfile). Deposit groups still get an identity for the
@@ -1021,6 +1057,39 @@ export default function App({ consentReady = true } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, profile?.marketingConsent]);
 
+  /* Adopt the person's shared (cross-store) identity onto the current row and
+   * surface the merged view: reconcile name/avatar and pull the group's
+   * per-store balances. Called only when NO merge is pending — while a merge is
+   * held for review the user must stay on their current account. Returns the
+   * resolved identity (or null for ungrouped orgs). */
+  const adoptGroupIdentity = async (refreshed, authUid, fallbackEmail) => {
+    let identity = null;
+    const gctx = await getGroupContext(activeOrgIdRef.current).catch(() => null);
+    const isByo = gctx?.mode === 'byo';
+    if (gctx) {
+      identity = await ensureIdentityForUser(refreshed, {
+        deviceId: refreshed.device_id,
+        authUid: authUid || refreshed.auth_user_id,
+        authEmail: refreshed.email,
+        syncProfile: isByo,
+      }).catch(() => null);
+      identityIdRef.current = identity?.id || null;
+    }
+    setProfile(p => p ? {
+      ...p,
+      email: refreshed.email || fallbackEmail || p.email,
+      displayName: (isByo && identity?.display_name) || refreshed.display_name || p.displayName,
+      animalIndex: (isByo && identity?.animal_index != null) ? identity.animal_index
+        : (refreshed.animal_index != null ? refreshed.animal_index : p.animalIndex),
+    } : p);
+    // Refresh per-store balances so the newly-linked store's cups appear.
+    if (identity?.id && Array.isArray(gctx?.members) && gctx.members.length) {
+      getGroupBalances(identity.id, gctx.members.map(m => m.id))
+        .then(setGroupBalances).catch(() => {});
+    }
+    return identity;
+  };
+
   /* ── Auth-state listener (email magic link flow) ──
    * Fires when:
    *   • the page loads with a pending magic-link code in the URL —
@@ -1051,7 +1120,31 @@ export default function App({ consentReady = true } = {}) {
         try {
           const refreshed = await getOrCreateUser(activeOrgIdRef.current);
           setUserId(refreshed.id);
+          // Always surface the newly-linked email, even when adoption is deferred.
           setProfile(p => p ? { ...p, email: refreshed.email || nextEmail || p.email } : p);
+
+          // A merge may be mid-flight in the SignInSheet: it verifies the OTP —
+          // which fires THIS event — before it knows whether the merge is allowed
+          // or will be held for review. Don't adopt the shared identity yet; the
+          // sheet's own onLinked / onMergeHeld callbacks will, once the guard
+          // has decided. (Adoption re-points DB rows, so we must NOT run it for a
+          // merge that turns out to be held.)
+          let inflight = false;
+          try { inflight = localStorage.getItem('pp_merge_inflight') === '1'; } catch { /* ignore */ }
+          if (inflight) return;
+
+          // Not mid-flight: ask the server whether a merge is still pending review.
+          // If so, stay on the current account only (no adoption, no merged
+          // balance). If not, adopt the shared identity + merged view.
+          const status = await getMergeStatus().catch(() => null);
+          if (status?.pending) {
+            try { localStorage.setItem('pp_merge_pending', '1'); } catch { /* ignore */ }
+            if (!cancelled) setMergePending(true);
+            return;
+          }
+          try { localStorage.removeItem('pp_merge_pending'); } catch { /* ignore */ }
+          if (!cancelled) setMergePending(false);
+          await adoptGroupIdentity(refreshed, session?.user?.id, nextEmail);
         } catch (err) {
           console.error('post-signin user refresh failed:', err);
         }
@@ -1775,10 +1868,43 @@ export default function App({ consentReady = true } = {}) {
     <SignInSheet
       open={showSignIn}
       onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); }}
-      onLinked={async () => {
+      onLinked={async (opts) => {
         try {
           const refreshed = await getOrCreateUser(activeOrg?.id);
           setUserId(refreshed.id);
+          // Sign-out: back to anonymous device-only mode — don't run merge/adopt.
+          if (opts?.signedOut) { identityIdRef.current = null; return; }
+          // Fires after the SignInSheet's merge guard has resolved. If a merge is
+          // still pending review, keep the user on their current account only;
+          // otherwise adopt the shared identity + merged view. (The SIGNED_IN
+          // handler deferred to us because the merge was in-flight at OTP time.)
+          const status = await getMergeStatus().catch(() => null);
+          if (status?.pending) {
+            try { localStorage.setItem('pp_merge_pending', '1'); } catch { /* ignore */ }
+            setMergePending(true);
+            return;
+          }
+          try {
+            localStorage.removeItem('pp_merge_pending');
+            localStorage.removeItem('pp_merge_inflight');
+          } catch { /* ignore */ }
+          setMergePending(false);
+          await adoptGroupIdentity(refreshed, refreshed.auth_user_id, refreshed.email);
+        } catch (e) { console.error(e); }
+      }}
+      /* Fired when a merge is HELD by the weekly limit (filed for admin review).
+         Keep the user on their CURRENT account + balance and flag the pending
+         state so the account page shows the "merge requested" banner. */
+      onMergeHeld={async () => {
+        try {
+          localStorage.setItem('pp_merge_pending', '1');
+          localStorage.removeItem('pp_merge_inflight');
+        } catch { /* ignore */ }
+        setMergePending(true);
+        try {
+          const refreshed = await getOrCreateUser(activeOrg?.id);
+          setUserId(refreshed.id);
+          setProfile(p => p ? { ...p, email: refreshed.email || p.email } : p);
         } catch (e) { console.error(e); }
       }}
       /* Fired the moment the email is verified. If the user was mid-claim
@@ -1825,7 +1951,9 @@ export default function App({ consentReady = true } = {}) {
     const cashbackByRegion = Object.entries(cashbackByRegionMap)
       .map(([region, amount]) => ({ region, amount }));
     const combinedCashback = cashbackByRegion.reduce((s, x) => s + x.amount, 0);
-    const acctCombined = accountCombined && !!groupCtx;
+    // While a merge is pending review the account must show ONLY the current
+    // store — never the combined/merged total.
+    const acctCombined = accountCombined && !!groupCtx && !mergePending;
     // Enrich pending-claim cards with the reward's name + image. A claim can be
     // for any store in the group (combined view), so pool this org's rewards
     // with every group store's rewards, not just the current org's.
@@ -1844,6 +1972,7 @@ export default function App({ consentReady = true } = {}) {
           cashbackByRegion={acctCombined ? cashbackByRegion : undefined}
           history={acctCombined ? combinedHistory : history}
           combined={acctCombined}
+          mergePending={mergePending}
           storeName={acctCombined ? null : (activeOrg?.partner_brand_name || activeOrg?.name)}
           privacyPolicy={liveSettings.privacyPolicyText}
           userClaims={userClaims}

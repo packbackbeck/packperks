@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { sendSupportMessage } from '../lib/api';
 import packperksLogo from '../assets/images/packperks-wordmark.svg';
 import './SupportForm.css';
@@ -29,6 +29,21 @@ export default function SupportForm({ audience = 'user' }) {
 
   const emailValid = EMAIL_RE.test(email.trim());
   const canSend = emailValid && message.trim().length >= 3 && state !== 'sending';
+
+  // Return to the screen the customer came from (the app restores the page
+  // they left via the pp_open_page flag). history.back() reuses the previous
+  // entry so an in-app state (e.g. the account page) is preserved by bfcache.
+  function goBack() {
+    if (window.history.length > 1) window.history.back();
+    else window.location.href = '/';
+  }
+
+  // After a successful send, auto-return after 3 seconds.
+  useEffect(() => {
+    if (state !== 'done') return undefined;
+    const t = setTimeout(goBack, 3000);
+    return () => clearTimeout(t);
+  }, [state]);
 
   async function submit(e) {
     e.preventDefault();
@@ -65,9 +80,17 @@ export default function SupportForm({ audience = 'user' }) {
             </span>
             <h1 className="sf__title">Message sent</h1>
             <p className="sf__sub">Thanks for reaching out. We’ll get back to you at <strong>{email.trim()}</strong> as soon as we can.</p>
+            <button type="button" className="sf__submit" onClick={goBack}>Go back</button>
+            <p className="sf__foot">Taking you back automatically…</p>
           </div>
         ) : (
           <>
+            {!isVendor && (
+              <button type="button" className="sf__back" onClick={goBack}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                Back
+              </button>
+            )}
             <div className="sf__head">
               <h1 className="sf__title">{isVendor ? 'Vendor support' : 'Contact support'}</h1>
               <p className="sf__sub">

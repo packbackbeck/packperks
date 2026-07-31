@@ -234,22 +234,28 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
   try {
     if (!userRow?.id) return null
 
-    // (1) Already linked → return the identity (unless it's dangling).
-    if (userRow.identity_id) {
-      const { data } = await supabase
-        .from('customer_identities').select('*').eq('id', userRow.identity_id).maybeSingle()
-      if (data) return data
-    }
-
     const authUid  = opts.authUid  || userRow.auth_user_id || null
     const deviceId = opts.deviceId || userRow.device_id    || null
 
     let identity = null
 
-    // (2) Match by auth user.
+    // (1) AUTH identity wins. A verified email links ONE canonical identity for
+    //     a person across every device + store. This must take precedence over
+    //     an identity already linked on this row: a device that was reset and
+    //     re-set up at another store mints its own throwaway identity first, and
+    //     if we short-circuited on that we'd never adopt the real account after
+    //     the email is connected (the "different name / lost avatar / 0 balance
+    //     at the second store" bug). Re-pointing below reconciles the row.
     if (authUid) {
       const { data } = await supabase
         .from('customer_identities').select('*').eq('auth_user_id', authUid).maybeSingle()
+      identity = data || null
+    }
+
+    // (2) Already linked on this row.
+    if (!identity && userRow.identity_id) {
+      const { data } = await supabase
+        .from('customer_identities').select('*').eq('id', userRow.identity_id).maybeSingle()
       identity = data || null
     }
 
@@ -532,6 +538,21 @@ export async function mergeGuard(source = 'merge_by_email') {
   }
 }
 
+// Is a merge for the signed-in person still WAITING for admin review? When a
+// merge is held by the weekly limit it's filed as a pending merge_request; until
+// admin approves it the app must keep the user on their current account only
+// (not the merged total). Returns { pending: boolean }. Fails open to false so a
+// transient error never traps the user in the current-account-only view.
+export async function getMergeStatus() {
+  try {
+    const { data, error } = await supabase.functions.invoke('merge-status', { body: {} })
+    if (error) return { pending: false }
+    return data || { pending: false }
+  } catch {
+    return { pending: false }
+  }
+}
+
 export async function mergeByEmail() {
   const { data, error } = await supabase.functions.invoke('merge-by-email', {
     body: { device_id: getDeviceId() },
@@ -557,6 +578,19 @@ export async function sendSupportMessage({ audience = 'user', topic, email, mess
   const { data, error } = await supabase.functions.invoke('send-support', {
     body: { audience, topic, email, message, company, hp },
   })
+  if (error) {
+    let payload = null
+    try { payload = await error.context?.json?.() } catch {}
+    throw Object.assign(new Error(payload?.error || error.message), { detail: payload })
+  }
+  return data
+}
+
+/* Self-service account deletion for a registered customer. Requires a valid
+ * auth session (the edge function verifies the JWT and only ever deletes the
+ * caller's own footprint). */
+export async function deleteMyAccount() {
+  const { data, error } = await supabase.functions.invoke('delete-my-account', { body: {} })
   if (error) {
     let payload = null
     try { payload = await error.context?.json?.() } catch {}

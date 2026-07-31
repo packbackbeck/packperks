@@ -7,7 +7,7 @@ import ActivityDetailModal from './ActivityDetailModal';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import FaqSheet from './FaqSheet';
 import PendingClaims from './PendingClaims';
-import { getGlobalImpact } from '../lib/api';
+import { getGlobalImpact, deleteMyAccount } from '../lib/api';
 import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
 import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
@@ -114,6 +114,10 @@ export default function UserPage({
   // the SUM across every store, history is combined + tagged with a store name.
   combined = false,
   combinedNote,
+  // An account-merge this person requested is still waiting for admin review.
+  // While true, this page shows ONLY the current account + balance and a banner
+  // explaining the merge is pending — never the merged total.
+  mergePending = false,
   // Pre-summed € total for a combined balance, valued per store (orgs can have
   // different €/cup rates). When provided, it overrides cupCount × cashbackRate.
   cashbackTotal,
@@ -350,12 +354,80 @@ export default function UserPage({
     const body = `Please handle the request below for my PackPerks account.\n\nDisplay name: ${profile.displayName}\n${email ? 'Email: ' + email : 'Email: (none saved)'}\n${extra}`;
     window.location.href = `mailto:${DSAR_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
-  const handleExportData = () => dsar('PackPerks: export my data (access request)');
-  const handleDeleteAccount = () => {
-    if (!window.confirm('Delete your account and personal data? This clears your saved email now and requests full erasure. Your cups will be removed. This cannot be undone.')) return;
-    // Best-effort immediate scrub of identifiable data on this account.
-    saveProfile({ email: '' });
-    dsar('PackPerks: delete my account (erasure request)', 'I want my account and all associated personal data deleted.');
+  // Generate a real CSV of everything the app knows about this account and save
+  // it as a file (GDPR access request, self-service).
+  const handleExportData = () => {
+    const esc = (v) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const row = (arr) => arr.map(esc).join(',');
+    const L = [];
+    L.push('PackPerks — my data export');
+    L.push(row(['Generated', new Date().toISOString()]));
+    L.push('');
+    L.push('# Profile');
+    L.push(row(['Field', 'Value']));
+    L.push(row(['Display name', profile?.displayName || '']));
+    L.push(row(['Email', email || '(none saved)']));
+    L.push(row(['Marketing emails', profile?.marketingConsent ? 'Yes' : 'No']));
+    if (profile?.marketingConsentAt) L.push(row(['Marketing consent at', profile.marketingConsentAt]));
+    L.push(row(['Region', region || '']));
+    if (storeName) L.push(row(['Store', storeName]));
+    L.push(row(['Current cups', cupCount ?? 0]));
+    L.push(row(['Lifetime cups', lifetimeCups ?? 0]));
+    L.push('');
+    L.push('# Cashback claims');
+    L.push(row(['Date', 'Type', 'Reward', 'Cups redeemed', 'Amount', 'Status']));
+    (userClaims || []).forEach((c) => L.push(row([
+      c.created_at || '', c.type || '', c.reward_id || '',
+      c.cups_redeemed ?? '', c.payout_amount ?? '', c.status || '',
+    ])));
+    if (!(userClaims || []).length) L.push(row(['(none)']));
+    L.push('');
+    L.push('# Activity history');
+    L.push(row(['Date', 'Type', 'Detail', 'Store']));
+    (history || []).forEach((h) => L.push(row([
+      h.createdAt || h.created_at || '', (h.type || '').replace(/_/g, ' '), h.label || '', h.storeName || '',
+    ])));
+    if (!(history || []).length) L.push(row(['(none)']));
+
+    const blob = new Blob([L.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `packperks-my-data-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const handleDeleteAccount = async () => {
+    // Registered customers (verified email → auth session) can erase themselves
+    // instantly. Without an email there's no session to authenticate a delete,
+    // so we fall back to the email erasure request.
+    if (!email) {
+      if (!window.confirm('You haven’t saved an email, so there’s nothing tied to an account yet. Reset this device to clear local data?')) return;
+      saveProfile({ email: '' });
+      dsar('PackPerks: delete my account (erasure request)', 'I want my account and all associated personal data deleted.');
+      return;
+    }
+    if (!window.confirm('Delete your account and all your data across every store? Your cups and history will be permanently removed. This cannot be undone.')) return;
+    setDeletingAccount(true);
+    try {
+      await deleteMyAccount();
+      try { localStorage.clear(); } catch { /* ignore */ }
+      window.alert('Your account and all associated data have been deleted.');
+      window.location.href = '/';
+    } catch (e) {
+      console.error('account delete failed', e);
+      window.alert('We couldn’t delete your account automatically — we’ll open an email so our team can finish it for you.');
+      saveProfile({ email: '' });
+      dsar('PackPerks: delete my account (erasure request)', 'Automatic deletion failed; please erase my account and all associated personal data.');
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const handleRegenerate = () => {
@@ -431,6 +503,21 @@ export default function UserPage({
           </div>
         </div>
       </div>
+
+      {/* ── Merge-requested banner ── an account merge this person asked for is
+            waiting for the store to review it. Until then they keep seeing only
+            this account + this balance, so we say so up front. */}
+      {mergePending && (
+        <div className="user-page__merge-pending" role="status">
+          <svg className="user-page__merge-pending-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" />
+          </svg>
+          <div className="user-page__merge-pending-text">
+            <strong>Account merge requested</strong>
+            <span>We've sent your request to combine your accounts to the store for review. For now you'll see only this account and its balance — once it's approved, your combined account appears here automatically.</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Visitor nudge ── shown until they bank their first cup (or take
             any real action). Small "Visitor" badge + a big add-first-cup CTA. */}
@@ -732,7 +819,7 @@ export default function UserPage({
         <span className="user-page__section-title">Help</span>
         <div className="user-page__card user-page__card--list">
           {[
-            { label: 'Contact support', on: () => { window.location.href = '/support'; } },
+            { label: 'Contact support', on: () => { try { sessionStorage.setItem('pp_open_page', 'user'); } catch { /* ignore */ } window.location.href = '/support'; } },
             ...(onOpenHowItWorks ? [{ label: 'How does it work?', on: () => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); } }] : []),
             { label: 'FAQ', on: () => setFaqOpen(true) },
           ].map((row, i) => (

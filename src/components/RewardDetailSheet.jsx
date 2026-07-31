@@ -114,14 +114,14 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                 <span className="rds-step__num">2</span>
                 <span className="rds-step__text">
                   {isByo
-                    ? <>Buy your <strong>{reward.name}</strong> at {brand} and keep the printed receipt. <em>Keep it; it can't be added later.</em></>
-                    : <>Buy your <strong>{reward.name}</strong> at any supermarket or grocery store in the Netherlands, and keep the printed receipt. <em>Keep it; it can't be added later.</em></>}
+                    ? <>Buy your <strong>{reward.name}</strong> at {brand} and keep the printed receipt.</>
+                    : <>Buy your <strong>{reward.name}</strong> at any supermarket or grocery store in the Netherlands, and keep the printed receipt.</>}
                 </span>
               </li>
               <li className="rds-step">
                 <span className="rds-step__num">3</span>
                 <span className="rds-step__text">
-                  Upload a <strong>photo of your receipt</strong>. Once it's verified, we'll send your <strong>{money(reward.euros)} cashback</strong> via a {payoutNoun}, usually within a few days.
+                  Upload a <strong>photo of your receipt</strong>. Once it's verified, we'll send your {money(reward.euros)} cashback via a <strong>{payoutNoun}</strong>, usually within a few days.
                 </span>
               </li>
             </ol>

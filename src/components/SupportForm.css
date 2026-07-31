@@ -17,6 +17,12 @@
   box-shadow: 0 12px 40px rgba(60, 42, 20, 0.10);
 }
 .sf__logo { height: 26px; width: auto; display: block; margin: 0 auto 22px; }
+.sf__back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; padding: 0; margin: 0 0 14px;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: #7A7166; cursor: pointer;
+}
+.sf__back:hover { color: #4A4540; }
 
 .sf__head { text-align: center; margin-bottom: 22px; }
 .sf__title { margin: 0 0 6px; font-family: var(--font-primary, inherit); font-size: 24px; font-weight: 800; color: #1A1512; }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { mergeUsers } from '../lib/adminApi';
+import { mergeUsers, mergeGroupAccounts } from '../lib/adminApi';
 import { logAction } from '../auth/actionLog';
 import './MergeUsersModal.css';
 
@@ -30,7 +30,7 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export default function MergeUsersModal({ open, users, onClose, onMerged }) {
+export default function MergeUsersModal({ open, users, onClose, onMerged, grouped = false }) {
   // Default survivor = most recently updated row (most likely the "current"
   // identity). Admin can override.
   const initialSurvivor = useMemo(() => {
@@ -68,15 +68,19 @@ export default function MergeUsersModal({ open, users, onClose, onMerged }) {
   const absorbed = users.filter(u => u.id !== survivor.id);
   const totalBalance = users.reduce((s, u) => s + (u.cupBalance || 0), 0);
   const totalLifetime = users.reduce((s, u) => s + (u.lifetimeCups || 0), 0);
-  // Refuse cross-org merges in the UI too (server is authoritative).
+  // Refuse cross-org merges in the UI ONLY for solo orgs. In a group, merging is
+  // per-group by design (each person keeps one row per store), so a cross-store
+  // merge is exactly what we want — routed through the group-merge RPC.
   const orgIds = new Set(users.map(u => u.org_id).filter(Boolean));
-  const crossOrg = orgIds.size > 1;
+  const crossOrg = !grouped && orgIds.size > 1;
 
   async function handleMerge() {
     setBusy(true);
     setError(null);
     try {
-      const result = await mergeUsers(survivor.id, absorbed.map(a => a.id));
+      const result = grouped
+        ? await mergeGroupAccounts(survivor.id, absorbed.map(a => a.id))
+        : await mergeUsers(survivor.id, absorbed.map(a => a.id));
       logAction({
         action: 'user.merge',
         targetType: 'user',

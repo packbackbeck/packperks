@@ -19,6 +19,14 @@
   gap: 16px;
 }
 
+/* Header actions cluster (Show visitors toggle + Columns picker). */
+.au-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
 /* Visitor / User type tag */
 .au-type {
   display: inline-flex;
@@ -256,6 +264,11 @@
   font-weight: 700;
   border-radius: 6px;
   padding: 0 6px;
+}
+/* Per-store cup counts read a touch quieter than the bold Total. */
+.au-cup-badge--org {
+  background: #F1ECE3;
+  color: #7A7166;
 }
 
 /* Detail panel */

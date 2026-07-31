@@ -94,7 +94,31 @@
   padding: 0 5px;
 }
 
-/* "Group" chip on shared, group-wide tabs (Users, Future Vendors). */
+/* "Per group" section — the shared, group-wide tabs (Users, Future Vendors)
+ * gathered under a labelled header tagged with the group's name. */
+.admin-sidebar__section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #EAE5DB;
+}
+.admin-sidebar__section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 4px;
+}
+.admin-sidebar__section-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #8A8175;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* "Group" chip — also used as the group-name tag in the Per group header. */
 .admin-sidebar__tag {
   flex-shrink: 0;
   font-size: 8.5px;

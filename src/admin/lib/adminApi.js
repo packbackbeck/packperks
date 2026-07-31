@@ -1481,6 +1481,33 @@ export async function deleteRecords(table, ids) {
   return data; // { deleted }
 }
 
+// Per-group delete: erase the WHOLE account for the given user rows — every
+// store row that shares the person's identity PLUS the shared identity itself,
+// not just the single row shown in the grouped users table. Pass every sibling
+// row id you know (memberUserIds); the RPC re-expands defensively.
+export async function deleteGroupAccounts(userIds) {
+  const list = (userIds || []).filter(Boolean);
+  if (list.length === 0) return { deleted_rows: 0 };
+  const { data, error } = await supabase.rpc('admin_purge_users', { p_user_ids: list });
+  if (error) throw new Error(error.message);
+  return data; // { deleted_rows, deleted_identities }
+}
+
+// Per-group merge: combine two or more people into one across EVERY store in the
+// group. Takes the survivor's (winning) row id + the absorbed rows' ids; the RPC
+// re-points all their identities' rows to the survivor's identity and merges any
+// duplicate per-store rows. Returns { survivor_identity, absorbed_identities }.
+export async function mergeGroupAccounts(survivorUserId, absorbedUserIds) {
+  const absorbed = (absorbedUserIds || []).filter(Boolean);
+  if (!survivorUserId || absorbed.length === 0) return null;
+  const { data, error } = await supabase.rpc('admin_merge_identities', {
+    p_survivor_user: survivorUserId,
+    p_absorbed_users: absorbed,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function listGeneratedReceipts({ limit = 30 } = {}) {
   const { data, error } = await applyOrgFilter(
     supabase
@@ -1548,35 +1575,46 @@ export async function getAdminUsers(orgIds) {
   // Collapse per-store rows into one account per identity. Balances sum across
   // the person's stores (their combined cups); the freshest registered row wins
   // for the display fields; a person is a visitor only if they are one everywhere.
+  // We ALSO keep a per-org breakdown (orgBalances) so the admin table can show a
+  // column per store, and every sibling row id (memberUserIds) so a per-group
+  // delete removes the whole account, not just the "winning" store row.
   const byIdentity = new Map();
   for (const r of enriched) {
     const key = r.identity_id || `u:${r.id}`;
-    const cur = byIdentity.get(key);
+    let cur = byIdentity.get(key);
     if (!cur) {
-      byIdentity.set(key, { ...r, storeCount: 1 });
-      continue;
-    }
-    cur.cupBalance += r.cupBalance;
-    cur.lifetimeCups += r.lifetimeCups;
-    cur.isVisitor = cur.isVisitor && r.isVisitor;
-    cur.storeCount += 1;
-    // Prefer a row that carries an email (registered), then the most recent one,
-    // for the human-facing fields — the shared profile is the same person.
-    const preferIncoming =
-      (!!r.email && !cur.email) ||
-      (!!r.email === !!cur.email && new Date(r.updated_at || 0) > new Date(cur.updated_at || 0));
-    if (preferIncoming) {
-      cur.id = r.id;
-      cur.display_name = r.display_name || cur.display_name;
-      cur.email = r.email || cur.email;
-      cur.device = r.device || cur.device;
-      cur.selected_reward_id = r.selected_reward_id || cur.selected_reward_id;
-      cur.marketing_consent = r.marketing_consent ?? cur.marketing_consent;
-      cur.updated_at = r.updated_at;
+      cur = { ...r, storeCount: 0, orgBalances: {}, memberUserIds: [] };
+      byIdentity.set(key, cur);
     } else {
-      cur.email = cur.email || r.email;
-      cur.display_name = cur.display_name || r.display_name;
+      cur.cupBalance += r.cupBalance;
+      cur.lifetimeCups += r.lifetimeCups;
+      cur.isVisitor = cur.isVisitor && r.isVisitor;
+      // Prefer a row that carries an email (registered), then the most recent
+      // one, for the human-facing fields — the shared profile is the same person.
+      const preferIncoming =
+        (!!r.email && !cur.email) ||
+        (!!r.email === !!cur.email && new Date(r.updated_at || 0) > new Date(cur.updated_at || 0));
+      if (preferIncoming) {
+        cur.id = r.id;
+        cur.display_name = r.display_name || cur.display_name;
+        cur.email = r.email || cur.email;
+        cur.device = r.device || cur.device;
+        cur.selected_reward_id = r.selected_reward_id || cur.selected_reward_id;
+        cur.marketing_consent = r.marketing_consent ?? cur.marketing_consent;
+        cur.updated_at = r.updated_at;
+      } else {
+        cur.email = cur.email || r.email;
+        cur.display_name = cur.display_name || r.display_name;
+      }
     }
+    cur.storeCount += 1;
+    cur.memberUserIds.push(r.id);
+    // Per-org balance breakdown (a person can have >1 row in an org after odd
+    // histories, so accumulate).
+    const ob = cur.orgBalances[r.org_id] || { balance: 0, lifetime: 0 };
+    ob.balance += r.cupBalance;
+    ob.lifetime += r.lifetimeCups;
+    cur.orgBalances[r.org_id] = ob;
   }
   return Array.from(byIdentity.values());
 }

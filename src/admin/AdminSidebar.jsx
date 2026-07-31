@@ -225,7 +225,7 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
   // null when closed; { nextValue: true|false } when open.
 
   // Feature/mode gating for the nav (Phase 3).
-  const { activeOrgId, activeGroupId, activeOrgSharing, activeGroupMode } = useOrg();
+  const { activeOrgId, activeGroupId, activeGroup, activeOrgSharing, activeGroupMode } = useOrg();
   const isByo = activeGroupMode === 'byo';
 
   // Pending-work signal dots: claims to review, held cup scans, and account-merge
@@ -261,49 +261,74 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
   return (
     <aside className="admin-sidebar">
       <nav className="admin-sidebar__nav">
-        {NAV_ITEMS.filter(item => {
-          // Hide tabs the current role can't access. Always show Org +
-          // Activity to owner/admin (we'll add those tabs in P7/P8).
-          const visible = ROLE_VISIBLE_TABS[role];
-          if (!(visible === null || !visible || visible.has(item.id))) return false;
-          // Phase 3 gating:
-          //  • Cup Transfers only when cup sharing is on for this org.
-          //  • BYO orgs show BYO Requests and hide the Receipt Generator;
-          //    non-BYO orgs do the reverse.
-          if (item.id === 'transactions' && !activeOrgSharing) return false;
-          if (item.id === 'byorequests' && !isByo) return false;
-          if (item.id === 'cupqr' && isByo) return false;
-          return true;
-        }).map(item => {
-          const isActive = activePage === item.id;
-          // Per-tab pending count (Overview intentionally has NO indicator).
-          const badge =
-            item.id === 'claims'   ? pendingClaims :
-            // 'receipts' merged into 'claims' — kept here as a noop in
-            // case some old saved nav state lands.
-            item.id === 'receipts' ? pendingClaims :
-            item.id === 'cupscans' ? pendingScans :
-            item.id === 'users'    ? pendingMerges :
-            0;
-          // "Group" chip on the shared, group-wide tabs (only when this org is
-          // actually part of a group).
-          const showGroupTag = !!activeGroupId && GROUP_SCOPED_ITEMS.has(item.id);
+        {(() => {
+          const visibleItems = NAV_ITEMS.filter(item => {
+            // Hide tabs the current role can't access.
+            const visible = ROLE_VISIBLE_TABS[role];
+            if (!(visible === null || !visible || visible.has(item.id))) return false;
+            // Phase 3 gating:
+            //  • Cup Transfers only when cup sharing is on for this org.
+            //  • BYO orgs show BYO Requests and hide the Receipt Generator;
+            //    non-BYO orgs do the reverse.
+            if (item.id === 'transactions' && !activeOrgSharing) return false;
+            if (item.id === 'byorequests' && !isByo) return false;
+            if (item.id === 'cupqr' && isByo) return false;
+            return true;
+          });
+
+          const renderItem = (item) => {
+            const isActive = activePage === item.id;
+            // Per-tab pending count (Overview intentionally has NO indicator).
+            const badge =
+              item.id === 'claims'   ? pendingClaims :
+              // 'receipts' merged into 'claims' — kept here as a noop in
+              // case some old saved nav state lands.
+              item.id === 'receipts' ? pendingClaims :
+              item.id === 'cupscans' ? pendingScans :
+              item.id === 'users'    ? pendingMerges :
+              0;
+            return (
+              <button
+                key={item.id}
+                className={`admin-sidebar__item ${isActive ? 'admin-sidebar__item--active' : ''}`}
+                onClick={() => onNavigate(item.id)}
+              >
+                <span className="admin-sidebar__item-icon">{item.icon}</span>
+                <span className="admin-sidebar__item-label">{item.label}</span>
+                {badge > 0 && (
+                  <span className="admin-sidebar__badge" title={`${badge} pending`}>{badge}</span>
+                )}
+              </button>
+            );
+          };
+
+          // When this org is part of a group, the group-wide tabs (Users, Future
+          // Vendors) are ONE shared page across every store in the group — so we
+          // gather them under a labelled "Per group" section tagged with the
+          // group's name. Ungrouped orgs just show them inline in the main list.
+          const inGroup = !!activeGroupId;
+          const mainItems  = visibleItems.filter(i => !(inGroup && GROUP_SCOPED_ITEMS.has(i.id)));
+          const groupItems = inGroup ? visibleItems.filter(i => GROUP_SCOPED_ITEMS.has(i.id)) : [];
 
           return (
-            <button
-              key={item.id}
-              className={`admin-sidebar__item ${isActive ? 'admin-sidebar__item--active' : ''}`}
-              onClick={() => onNavigate(item.id)}
-            >
-              <span className="admin-sidebar__item-icon">{item.icon}</span>
-              <span className="admin-sidebar__item-label">{item.label}</span>
-              {showGroupTag && <span className="admin-sidebar__tag">Group</span>}
-              {badge > 0 && (
-                <span className="admin-sidebar__badge" title={`${badge} pending`}>{badge}</span>
+            <>
+              {mainItems.map(renderItem)}
+              {groupItems.length > 0 && (
+                <div className="admin-sidebar__section">
+                  <div className="admin-sidebar__section-head">
+                    <span className="admin-sidebar__section-label">Per group</span>
+                    {activeGroup?.name && (
+                      <span className="admin-sidebar__tag" title={`Shared across every store in ${activeGroup.name}`}>
+                        {activeGroup.name}
+                      </span>
+                    )}
+                  </div>
+                  {groupItems.map(renderItem)}
+                </div>
               )}
-            </button>
+            </>
           );
-        })}
+        })()}
       </nav>
 
       <div className="admin-sidebar__toggles">

@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
+import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, deleteGroupAccounts, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import PiiMask from '../shared/PiiMask';
 import EmptyState from '../shared/EmptyState';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
+import ColumnPicker from '../shared/ColumnPicker';
 import MergeUsersModal from './MergeUsersModal';
 import MergeRequestModal from './MergeRequestModal';
 import './AdminUsers.css';
@@ -356,7 +357,8 @@ const SORT_KEYS = {
 export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, focusSection, onSectionConsumed }) {
   // Group awareness: within a BYO group, users are one shared account across
   // every store, so we load the whole group's deduped customer base.
-  const { activeOrgId, activeGroupId, groupMemberIds } = useOrg();
+  const { activeOrgId, activeGroupId, groupMemberIds, groupMembers } = useOrg();
+  const grouped = !!activeGroupId && groupMembers.length > 1;
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -365,6 +367,38 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
   const [sortDir, setSortDir] = useState('desc');
   const [showVisitors, setShowVisitors] = useState(true); // default on
   const [mergeOpen, setMergeOpen] = useState(false);
+
+  // Column visibility. In a group the table gains one cup column per store + a
+  // Total column; the DEFAULT visible cup column is the store the admin has
+  // opened (activeOrgId), with the others available via the columns dropdown.
+  // Non-grouped orgs keep the single "Cups" column and no picker.
+  const orgCols = grouped
+    ? groupMembers.map(m => ({ id: `org:${m.id}`, orgId: m.id, label: m.name }))
+    : [];
+  const columnConfig = [
+    { id: 'type', label: 'Type', defaultOn: true },
+    { id: 'email', label: 'Email', defaultOn: true },
+    { id: 'marketing', label: 'Marketing', defaultOn: true },
+    { id: 'device', label: 'Device', defaultOn: true },
+    ...orgCols.map(c => ({ id: c.id, label: `${c.label} cups`, defaultOn: c.orgId === activeOrgId })),
+    ...(grouped ? [{ id: 'total', label: 'Total cups', desc: 'Combined across every store', defaultOn: true }] : []),
+    { id: 'lifetime', label: 'Lifetime', defaultOn: true },
+    { id: 'joined', label: 'Joined', defaultOn: true },
+    { id: 'active', label: 'Last active', defaultOn: true },
+  ];
+  const defaultVisibleCols = () => {
+    const s = new Set(['type', 'email', 'marketing', 'device', 'lifetime', 'joined', 'active']);
+    if (grouped) { s.add('total'); s.add(`org:${activeOrgId}`); }
+    return s;
+  };
+  const [visibleCols, setVisibleCols] = useState(defaultVisibleCols);
+  const isCol = (id) => visibleCols.has(id);
+  // Reset to the opened-store default whenever the store/group changes so the
+  // default cup column always follows the org the admin is looking at.
+  useEffect(() => { setVisibleCols(defaultVisibleCols()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeOrgId, activeGroupId, groupMemberIds.join(',')]);
+  function toggleCol(id) {
+    setVisibleCols(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
 
   const reload = () => {
     setLoading(true);
@@ -452,7 +486,10 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
         (u.id || '').toLowerCase().includes(q)
       );
     }
-    const getter = SORT_KEYS[sortKey] || SORT_KEYS.joined;
+    const getter =
+      sortKey === 'total' ? (u => u.cupBalance) :
+      sortKey.startsWith('org:') ? (u => u.orgBalances?.[sortKey.slice(4)]?.balance || 0) :
+      (SORT_KEYS[sortKey] || SORT_KEYS.joined);
     return [...list].sort((a, b) => {
       const av = getter(a), bv = getter(b);
       if (av < bv) return sortDir === 'asc' ? -1 : 1;
@@ -462,6 +499,14 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
   }, [users, search, sortKey, sortDir, showVisitors]);
 
   const sel = useBulkSelection(filtered);
+
+  // Number of columns actually rendered (checkbox + User + visible value cols),
+  // for the empty-state colSpan.
+  const valueColCount =
+    (isCol('type') ? 1 : 0) + (isCol('email') ? 1 : 0) + (isCol('marketing') ? 1 : 0) + (isCol('device') ? 1 : 0) +
+    (grouped ? orgCols.filter(c => isCol(c.id)).length + (isCol('total') ? 1 : 0) : 1) +
+    (isCol('lifetime') ? 1 : 0) + (isCol('joined') ? 1 : 0) + (isCol('active') ? 1 : 0);
+  const tableColSpan = 2 + valueColCount;
 
   function ThCol({ label, sortKey: sk, style }) {
     return (
@@ -480,16 +525,26 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
             {loading ? 'Loading…' : `${userCount} user${userCount === 1 ? '' : 's'} · ${visitorCount} visitor${visitorCount === 1 ? '' : 's'}`}
           </p>
         </div>
-        <label className="au-visitor-toggle" title="Visitors opened the app but took no action yet">
-          <span>Show visitors</span>
-          <input
-            type="checkbox"
-            className="au-switch-input"
-            checked={showVisitors}
-            onChange={e => setShowVisitors(e.target.checked)}
-          />
-          <span className="au-switch" aria-hidden="true"><span className="au-switch__dot" /></span>
-        </label>
+        <div className="au-header__actions">
+          <label className="au-visitor-toggle" title="Visitors opened the app but took no action yet">
+            <span>Show visitors</span>
+            <input
+              type="checkbox"
+              className="au-switch-input"
+              checked={showVisitors}
+              onChange={e => setShowVisitors(e.target.checked)}
+            />
+            <span className="au-switch" aria-hidden="true"><span className="au-switch__dot" /></span>
+          </label>
+          {grouped && (
+            <ColumnPicker
+              columns={columnConfig}
+              visible={visibleCols}
+              onToggle={toggleCol}
+              onReset={() => setVisibleCols(defaultVisibleCols())}
+            />
+          )}
+        </div>
       </div>
 
       <div
@@ -527,19 +582,28 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                       />
                     </th>
                     <ThCol label="User" sortKey="name" />
-                    <ThCol label="Type" sortKey="type" style={{ width: 110 }} />
-                    <ThCol label="Email" sortKey="email" />
-                    <ThCol label="Marketing" sortKey="marketing" style={{ width: 110 }} />
-                    <ThCol label="Device" sortKey="device" style={{ width: 160 }} />
-                    <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />
-                    <ThCol label="Lifetime" sortKey="lifetime" style={{ width: 90 }} />
-                    <ThCol label="Joined" sortKey="joined" style={{ width: 120 }} />
-                    <ThCol label="Last active" sortKey="active" style={{ width: 120 }} />
+                    {isCol('type') && <ThCol label="Type" sortKey="type" style={{ width: 110 }} />}
+                    {isCol('email') && <ThCol label="Email" sortKey="email" />}
+                    {isCol('marketing') && <ThCol label="Marketing" sortKey="marketing" style={{ width: 110 }} />}
+                    {isCol('device') && <ThCol label="Device" sortKey="device" style={{ width: 160 }} />}
+                    {grouped
+                      ? (
+                        <>
+                          {orgCols.map(c => isCol(c.id) && (
+                            <ThCol key={c.id} label={c.label} sortKey={c.id} style={{ width: 92 }} />
+                          ))}
+                          {isCol('total') && <ThCol label="Total" sortKey="total" style={{ width: 80 }} />}
+                        </>
+                      )
+                      : <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />}
+                    {isCol('lifetime') && <ThCol label="Lifetime" sortKey="lifetime" style={{ width: 90 }} />}
+                    {isCol('joined') && <ThCol label="Joined" sortKey="joined" style={{ width: 120 }} />}
+                    {isCol('active') && <ThCol label="Last active" sortKey="active" style={{ width: 120 }} />}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={10} className="au-table__empty">
+                    <tr><td colSpan={tableColSpan} className="au-table__empty">
                       {users.length === 0 ? (
                         <EmptyState
                           icon={
@@ -596,22 +660,39 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                           </div>
                         </div>
                       </td>
-                      <td><TypeTag visitor={user.isVisitor} /></td>
-                      <td className="au-muted" onClick={e => e.stopPropagation()}>
-                        <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
-                      </td>
-                      <td>
-                        {user.marketing_consent
-                          ? <span className="au-consent au-consent--on">Opted in</span>
-                          : <span className="au-consent au-consent--off">—</span>}
-                      </td>
-                      <td className="au-device-cell">
-                        <DeviceBadge device={user.device} />
-                      </td>
-                      <td><span className="au-cup-badge">{user.cupBalance}</span></td>
-                      <td className="au-muted">{user.lifetimeCups || 0}</td>
-                      <td className="au-muted">{formatDate(user.created_at)}</td>
-                      <td className="au-muted">{timeAgo(user.updated_at)}</td>
+                      {isCol('type') && <td><TypeTag visitor={user.isVisitor} /></td>}
+                      {isCol('email') && (
+                        <td className="au-muted" onClick={e => e.stopPropagation()}>
+                          <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
+                        </td>
+                      )}
+                      {isCol('marketing') && (
+                        <td>
+                          {user.marketing_consent
+                            ? <span className="au-consent au-consent--on">Opted in</span>
+                            : <span className="au-consent au-consent--off">—</span>}
+                        </td>
+                      )}
+                      {isCol('device') && (
+                        <td className="au-device-cell">
+                          <DeviceBadge device={user.device} />
+                        </td>
+                      )}
+                      {grouped ? (
+                        <>
+                          {orgCols.map(c => isCol(c.id) && (
+                            <td key={c.id}>
+                              <span className="au-cup-badge au-cup-badge--org">{user.orgBalances?.[c.orgId]?.balance || 0}</span>
+                            </td>
+                          ))}
+                          {isCol('total') && <td><span className="au-cup-badge">{user.cupBalance}</span></td>}
+                        </>
+                      ) : (
+                        <td><span className="au-cup-badge">{user.cupBalance}</span></td>
+                      )}
+                      {isCol('lifetime') && <td className="au-muted">{user.lifetimeCups || 0}</td>}
+                      {isCol('joined') && <td className="au-muted">{formatDate(user.created_at)}</td>}
+                      {isCol('active') && <td className="au-muted">{timeAgo(user.updated_at)}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -649,8 +730,16 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
         noun="users"
         onClear={sel.clear}
         onDelete={async () => {
-          const ids = sel.selectedIds;
-          await deleteRecords('users', ids);
+          const selectedRows = filtered.filter(u => sel.isSelected(u.id));
+          const ids = selectedRows.map(u => u.id);
+          if (grouped) {
+            // Per-group delete: erase the whole account across every store (all
+            // sibling rows that share the person's identity) + the identity.
+            const allRowIds = selectedRows.flatMap(u => (u.memberUserIds && u.memberUserIds.length) ? u.memberUserIds : [u.id]);
+            await deleteGroupAccounts(allRowIds);
+          } else {
+            await deleteRecords('users', ids);
+          }
           if (selectedUser && ids.includes(selectedUser.id)) setSelectedUser(null);
           sel.clear();
           reload();
@@ -665,15 +754,14 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
 
       <MergeUsersModal
         open={mergeOpen}
+        grouped={grouped}
         users={users.filter(u => sel.isSelected(u.id))}
         onClose={() => setMergeOpen(false)}
-        onMerged={(result) => {
-          // Close, clear selection, drop the right-pane if it was an absorbed
-          // user, then reload from the server so balances/profile reflect the
-          // merge.
+        onMerged={() => {
+          // Close, clear selection + the right pane (a merged account may have
+          // vanished), then reload so balances/profile reflect the merge.
           setMergeOpen(false);
-          const absorbed = result?.absorbed_ids || [];
-          if (selectedUser && absorbed.includes(selectedUser.id)) setSelectedUser(null);
+          setSelectedUser(null);
           sel.clear();
           reload();
         }}

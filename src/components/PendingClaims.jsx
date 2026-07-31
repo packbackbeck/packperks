@@ -136,12 +136,6 @@ function ReviewProgress({ claim }) {
 function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRetry }) {
   const money = useMoney();
   const { symbol } = useRegion();
-  const CloseBtn = () => (
-    <button type="button" className="pc-card__close" onClick={() => onDismiss?.(claim)}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      Close
-    </button>
-  );
   const ready = isReady(claim);
   const rejected = isRejected(claim);
   const amount = money(claim.payout_amount);
@@ -151,6 +145,10 @@ function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRet
 
   return (
     <article className={`pc-card pc-card--${state}`}>
+      {/* Corner dismiss — hides this card from the widget (stays in Activity). */}
+      <button type="button" className="pc-card__dismiss" onClick={() => onDismiss?.(claim)} aria-label="Hide this claim">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
       <div className="pc-card__top">
         <div className="pc-card__thumb" style={claim.rewardBg ? { background: claim.rewardBg } : undefined}>
           {claim.rewardImage
@@ -194,39 +192,28 @@ function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRet
           ) : (
             <p className="pc-reject__generic">Your receipt didn’t pass our checks this time.</p>
           )}
-          <div className="pc-card__actions">
-            <button type="button" className="pc-reject__retry" onClick={() => onRetry?.(claim)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Try again
-            </button>
-            <CloseBtn />
-          </div>
+          <button type="button" className="pc-reject__retry" onClick={() => onRetry?.(claim)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Try again
+          </button>
         </div>
       ) : ready ? (
-        /* Once the payout link exists, the review progress is done — the action
-           row is Collect + Close. */
-        <div className="pc-card__actions">
-          <a
-            className="pc-card__collect"
-            href={claim.tikkie_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => onCollect?.(claim)}
-          >
-            {collected ? 'Reopen payout link' : 'Collect'}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-            </svg>
-          </a>
-          <CloseBtn />
-        </div>
+        /* Once the payout link exists, the review progress is done — its block
+           becomes the full-width Collect action. */
+        <a
+          className="pc-card__collect"
+          href={claim.tikkie_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => onCollect?.(claim)}
+        >
+          {collected ? 'Reopen payout link' : 'Collect'}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </a>
       ) : (
-        <>
-          <ReviewProgress claim={claim} />
-          <div className="pc-card__actions pc-card__actions--single">
-            <CloseBtn />
-          </div>
-        </>
+        <ReviewProgress claim={claim} />
       )}
     </article>
   );

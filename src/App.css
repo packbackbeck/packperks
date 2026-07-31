@@ -108,7 +108,7 @@
   padding: 8px 14px 8px 10px;
   background: var(--white, #FFFFFF);
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
   color: var(--pb-brown, #502314);
   font-family: var(--font-primary);

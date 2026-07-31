@@ -267,7 +267,7 @@ function notYetPopupHtml(s, count, threshold, done) {
 /* Real map via Leaflet + OpenStreetMap tiles (free, no API key). Plots a
  * marker at each store's actual coordinates; the marker popup shows the
  * store name, address and cups, with a button to open that store. */
-function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore, requested = new Set(), reqCounts = {}, notYetThreshold = 10, userLoc = null, onLocate, focus = null }) {
+function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequestStore, requested = new Set(), reqCounts = {}, notYetThreshold = 10, userLoc = null, onLocate, focus = null, nearbyActive = false }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -456,18 +456,46 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLoc]);
 
+  // Frame the map on the user AND the nearest venue, so "where am I" always
+  // shows at least one place they can actually collect at (not an empty patch of
+  // map). Falls back to a plain recentre if there are no venues with coordinates.
+  const focusUserWithNearest = (loc) => {
+    const map = mapRef.current;
+    if (!map || !loc || loc.lat == null) return;
+    map.invalidateSize(); // ensure fitBounds computes against the real size
+    showUserMarker(loc);
+    let nearest = null, best = Infinity;
+    [...withCoords, ...notYetCoords].forEach((s) => {
+      const d = distanceKm(loc, s.location);
+      if (d < best) { best = d; nearest = s; }
+    });
+    if (nearest) {
+      map.fitBounds(
+        [[loc.lat, loc.lng], [nearest.location.lat, nearest.location.lng]],
+        { padding: [70, 70], maxZoom: 16, animate: true },
+      );
+    } else {
+      map.setView([loc.lat, loc.lng], 15, { animate: true });
+    }
+  };
+
   // Locate button: get the user's position (asking permission if needed), drop
-  // the marker, and recentre the map on it. Reuses a location already granted.
+  // the marker, and frame the map on them + their nearest venue.
   const handleLocate = async () => {
     setLocating(true);
     let loc = null;
     try { loc = await onLocate?.(); } catch { /* denied / unavailable */ }
     setLocating(false);
-    if (loc && loc.lat != null && mapRef.current) {
-      showUserMarker(loc);
-      mapRef.current.setView([loc.lat, loc.lng], 15, { animate: true });
-    }
+    if (loc && loc.lat != null) focusUserWithNearest(loc);
   };
+
+  // "Nearby" (the toolbar toggle) should also frame the map on the user + the
+  // closest venue — not just re-sort the list. Fires when it's switched on and
+  // a location is available (also on a fresh map mount while already active).
+  useEffect(() => {
+    if (nearbyActive && userLoc && userLoc.lat != null) focusUserWithNearest(userLoc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyActive, userLoc]);
 
   return (
     <div className="stores2__map">
@@ -865,6 +893,7 @@ export default function StoresPage({
           userLoc={userLoc}
           onLocate={requestLocation}
           focus={getRegion(region).map}
+          nearbyActive={nearby}
         />
       ) : (
         <>

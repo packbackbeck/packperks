@@ -118,6 +118,10 @@ export default function UserPage({
   // While true, this page shows ONLY the current account + balance and a banner
   // explaining the merge is pending — never the merged total.
   mergePending = false,
+  // Email deep-link: a claim id whose pending-claim popup should auto-open
+  // (the cashback-approved email links here). Cleared via onClaimOpened.
+  openClaimId = null,
+  onClaimOpened,
   // Pre-summed € total for a combined balance, valued per store (orgs can have
   // different €/cup rates). When provided, it overrides cupCount × cashbackRate.
   cashbackTotal,
@@ -291,6 +295,43 @@ export default function UserPage({
   }, [profile.email, isEditingEmail]);
 
   const [activeActivity, setActiveActivity] = useState(null);
+  // Email deep-link (?claim=<id>): auto-open that claim's detail popup — the one
+  // with the Tikkie "Collect" button — once its claim row has loaded. Guarded so
+  // it only fires once per id (the user can freely close it afterwards).
+  const claimOpenedRef = useRef(null);
+  useEffect(() => {
+    if (!openClaimId || claimOpenedRef.current === openClaimId) return;
+    const claim = enrichedClaims.find(c => c.id === openClaimId && c.type === 'cashback');
+    if (!claim) return; // claims may still be loading — retry when they arrive
+    claimOpenedRef.current = openClaimId;
+    // Prefer the real receipt-submission history row (matched by created_at
+    // proximity, same rule the feed + modal use) so the popup renders its full
+    // context; fall back to a synthetic item that still resolves the claim.
+    const t = new Date(claim.created_at).getTime();
+    let base = null, bd = 60_000;
+    for (const it of history) {
+      if (it.type === 'reward_claimed' && it.createdAt) {
+        const d = Math.abs(new Date(it.createdAt).getTime() - t);
+        if (d < bd) { bd = d; base = it; }
+      }
+    }
+    const view = (claim.status === 'completed' && !!claim.tikkie_url)
+      ? 'approved'
+      : (claim.status === 'failed' ? 'rejected' : 'submitted');
+    const item = base
+      ? { ...base, _view: view }
+      : {
+          type: 'reward_claimed',
+          reward: claim.rewardName,
+          storeName: storeName || null,
+          createdAt: claim.created_at,
+          time: new Date(claim.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+          _view: view,
+        };
+    setActiveActivity(item);
+    onClaimOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openClaimId, userClaims, history]);
   // Impact-detail modal — opens when the customer taps the Your-impact
   // card. Fetches community totals lazily on open so we don't pay the
   // round-trip cost for users who never tap it.

@@ -186,7 +186,7 @@ function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string
         <tr><td align="center" style="padding:20px 40px 0;">
           <p style="margin:0 0 6px;font-size:15px;color:#6B6154;">${hi}</p>
           <h1 style="margin:0 0 10px;font-size:23px;line-height:1.3;font-weight:800;color:#241E16;">Your ${amount} cashback is ready</h1>
-          <p style="margin:0;font-size:15px;line-height:1.55;color:#6B6154;">${rewardLine} Tap below to collect it securely through <strong style="color:#3A342C;">Tikkie</strong>.</p>
+          <p style="margin:0;font-size:15px;line-height:1.55;color:#6B6154;">${rewardLine} Tap below to open it in the PackPerks app, then collect it securely through <strong style="color:#3A342C;">Tikkie</strong>.</p>
         </td></tr>
         <tr><td align="center" style="padding:22px 36px 4px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:320px;background:#EEF8F0;border:1px solid #CDE9D4;border-radius:18px;"><tr>
@@ -199,12 +199,12 @@ function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string
         <tr><td align="center" style="padding:20px 36px 4px;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
             <td style="border-radius:14px;background:#E24400;box-shadow:0 6px 16px rgba(226,68,0,0.28);">
-              <a href="${safeUrl}" target="_blank" style="display:inline-block;padding:16px 36px;font-size:16px;font-weight:800;color:#FFFFFF;text-decoration:none;border-radius:14px;">Collect ${amount} via Tikkie</a>
+              <a href="${safeUrl}" target="_blank" style="display:inline-block;padding:16px 36px;font-size:16px;font-weight:800;color:#FFFFFF;text-decoration:none;border-radius:14px;">Collect ${amount} cashback</a>
             </td>
           </tr></table>
         </td></tr>
         <tr><td align="center" style="padding:18px 40px 0;">
-          <p style="margin:0;font-size:12.5px;line-height:1.55;color:#9A9186;">The link opens in the Tikkie app and is unique to you, so please don&rsquo;t share it. Collect it soon, as cashback links expire.</p>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:#9A9186;">The button opens your cashback in the PackPerks app, where you collect it through Tikkie. It&rsquo;s unique to you, so please don&rsquo;t share it &mdash; and collect it soon, as cashback links expire.</p>
         </td></tr>
         <tr><td style="padding:28px 40px 34px;">
           <div style="border-top:1px solid #F1EADD;padding-top:18px;">
@@ -399,10 +399,23 @@ Deno.serve(async (req) => {
           .select("email, display_name").eq("id", claim.user_id).maybeSingle();
         if (u?.email) {
           const amount = Number(claim.payout_amount) || 0;
-          const html = tikkieReadyEmailHtml({ name: u.display_name, amount, url: cb.url });
+          // Link to the PackPerks app (the customer's account page, which auto-
+          // opens the pending-claim popup that carries the Tikkie collect
+          // button) instead of the raw Tikkie link. This keeps the collect
+          // flow inside the app — matching the in-app "Collect" experience — and
+          // lets us show status/expiry around the payout. Falls back to the raw
+          // Tikkie link if we can't resolve the store slug.
+          const appBase = (Deno.env.get("APP_BASE_URL") || "https://perks.packback.network").replace(/\/+$/, "");
+          let claimUrl = cb.url;
+          try {
+            const { data: org } = await supabase.from("organizations")
+              .select("slug").eq("id", claim.org_id).maybeSingle();
+            if (org?.slug) claimUrl = `${appBase}/${org.slug}/?claim=${claim.id}`;
+          } catch { /* fall back to the Tikkie link */ }
+          const html = tikkieReadyEmailHtml({ name: u.display_name, amount, url: claimUrl });
           const text =
             `${u.display_name ? `Hi ${u.display_name},` : "Hi there,"}\n\n` +
-            `Your €${amount.toFixed(2)} cashback is approved and ready to collect via Tikkie:\n${cb.url}\n\n` +
+            `Your €${amount.toFixed(2)} cashback is approved and ready. Open it in the PackPerks app to collect it through Tikkie:\n${claimUrl}\n\n` +
             `The link is unique to you, so please don't share it, and collect it soon as cashback links expire.\n\nPackPerks`;
           const r = await sendBrevoEmail(u.email, `Your €${amount.toFixed(2)} cashback is ready`, html, text);
           emailSent = r.ok;

@@ -365,6 +365,9 @@ export default function App({ consentReady = true } = {}) {
 
   /* ── Navigation ── */
   const [page, setPage] = useState('home');
+  // A claim id from an email deep-link (?claim=<id>) — the account page opens
+  // its pending-claim popup (the one carrying the Tikkie collect button).
+  const [openClaimId, setOpenClaimId] = useState(null);
   const [shot, setShot] = useState(null); // DEV-only screen-audit preset (?__shot=)
 
   // Behavioural analytics: log which screen the user is on whenever it
@@ -677,9 +680,21 @@ export default function App({ consentReady = true } = {}) {
         if (hubRoute) setPage('stores'); // /<groupSlug> lands on the Stores hub
         // Returning from a full-page detour (e.g. the /support form set this
         // flag before it navigated away) — restore the page they left from.
+        // Otherwise, restore the last durable page so a plain refresh keeps the
+        // user where they were (esp. their account page) instead of snapping
+        // back to the store home.
         try {
           const back = sessionStorage.getItem('pp_open_page');
-          if (back) { sessionStorage.removeItem('pp_open_page'); setPage(back); }
+          if (back) {
+            sessionStorage.removeItem('pp_open_page');
+            setPage(back);
+          } else {
+            const saved = sessionStorage.getItem('pp_page');
+            if (saved === 'user') {
+              if (sessionStorage.getItem('pp_page_combined') === '1') setAccountCombined(true);
+              setPage('user');
+            }
+          }
         } catch { /* ignore */ }
 
         const user = await getOrCreateUser(org?.id);
@@ -852,6 +867,15 @@ export default function App({ consentReady = true } = {}) {
         // with ?batch=<uuid> or ?cups=<uuid,uuid>. Auto-trigger the claim
         // flow so the user doesn't need to open the in-app scanner.
         const sp = new URLSearchParams(window.location.search);
+        // Email deep-link: the cashback-approved email links here with
+        // ?claim=<id>. Open the account page and hand the id to UserPage so it
+        // pops the matching pending-claim card (with the Tikkie collect button).
+        const urlClaim = sp.get('claim');
+        if (urlClaim) {
+          window.history.replaceState({}, '', window.location.pathname);
+          setOpenClaimId(urlClaim);
+          setPage('user');
+        }
         const urlBatch = sp.get('batch');
         const urlCups = sp.get('cups');
         if (urlBatch || urlCups) {
@@ -1152,6 +1176,36 @@ export default function App({ consentReady = true } = {}) {
     });
     return () => { cancelled = true; unsubscribe?.(); };
   }, [isPreviewMode]);
+
+  /* Remember the last "durable" page (account / stores / home) so a plain
+   * browser refresh returns the user to where they were — most importantly
+   * their account page — instead of snapping back to the store home. Transient
+   * flow pages (receipt, verifying, success, cup-scan…) are intentionally not
+   * persisted; a refresh mid-flow should land somewhere sane. Restore happens
+   * in the boot effect. */
+  useEffect(() => {
+    if (isPreviewMode) return;
+    try {
+      if (page === 'user' || page === 'stores' || page === 'home') {
+        sessionStorage.setItem('pp_page', page);
+        sessionStorage.setItem('pp_page_combined', accountCombined ? '1' : '');
+      }
+    } catch { /* ignore */ }
+  }, [page, accountCombined, isPreviewMode]);
+
+  /* After a refresh restored the COMBINED account view, its activity list needs
+   * re-fetching (it isn't persisted). Backfill it once the shared identity +
+   * group members are ready. */
+  useEffect(() => {
+    if (page !== 'user' || !accountCombined) return;
+    if (combinedHistory.length) return;
+    const idId = identityIdRef.current;
+    if (!idId || !groupCtx?.members?.length) return;
+    const nameById = {};
+    groupCtx.members.forEach((m) => { nameById[m.id] = m.name; });
+    getGroupActivity(idId, nameById).then(setCombinedHistory).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, accountCombined, groupCtx]);
 
   /* ── Helpers ── */
   const addHistory = (type, label) => {
@@ -1973,6 +2027,8 @@ export default function App({ consentReady = true } = {}) {
           history={acctCombined ? combinedHistory : history}
           combined={acctCombined}
           mergePending={mergePending}
+          openClaimId={openClaimId}
+          onClaimOpened={() => setOpenClaimId(null)}
           storeName={acctCombined ? null : (activeOrg?.partner_brand_name || activeOrg?.name)}
           privacyPolicy={liveSettings.privacyPolicyText}
           userClaims={userClaims}

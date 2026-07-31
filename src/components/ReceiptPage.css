@@ -210,6 +210,9 @@
   position: relative;
   background: #1D1D1D;
   box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  /* Pinch-to-zoom happens here; stop the browser from panning/zooming the page
+     during the two-finger gesture. */
+  touch-action: none;
 }
 
 .receipt-page__video {
@@ -217,7 +220,38 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  transform-origin: center center;
+  will-change: transform;
 }
+
+/* Still preview of the just-taken shot — contained so the whole receipt shows. */
+.receipt-page__preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #1D1D1D;
+}
+
+/* Pinch hint / live zoom level pill (top-centre of the frame). */
+.receipt-page__zoom-hint,
+.receipt-page__zoom-badge {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+.receipt-page__zoom-hint { opacity: 0.85; font-weight: 600; }
 
 .receipt-page__camera-error {
   display: flex;
@@ -278,22 +312,30 @@
 .receipt-page__corner--bl { bottom: 16px; left: 16px; border-width: 0 0 2.5px 2.5px; border-radius: 0 0 0 4px; }
 .receipt-page__corner--br { bottom: 16px; right: 16px; border-width: 0 2.5px 2.5px 0; border-radius: 0 0 4px 0; }
 
-/* ── Shutter button ── */
+/* ── Shutter button ── now overlaid at the bottom of the viewfinder. */
 .receipt-page__shutter {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
+  z-index: 3;
   transition: transform var(--duration-fast) ease;
 }
-.receipt-page__shutter:active { transform: scale(0.93); }
+.receipt-page__shutter:active { transform: translateX(-50%) scale(0.93); }
 .receipt-page__shutter:disabled { opacity: 0.4; cursor: default; }
 
 .receipt-page__shutter-ring {
   width: 68px;
   height: 68px;
   border-radius: 50%;
-  border: 3px solid var(--pb-brown);
+  /* White on live video for contrast; a translucent fill reads as a real
+     camera shutter and stays legible over any receipt. */
+  border: 3px solid rgba(255,255,255,0.95);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -303,12 +345,46 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--pb-brown);
+  background: #fff;
   transition: background var(--duration-fast) ease;
 }
 .receipt-page__shutter:active .receipt-page__shutter-dot {
-  background: #7a3520;
+  background: #d9d9d9;
 }
+
+/* ── Preview confirm row: Retake / Looks good ── */
+.receipt-page__confirm {
+  display: flex;
+  gap: 12px;
+  width: 330px;
+}
+.receipt-page__confirm-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 15px 12px;
+  border-radius: 16px;
+  font-family: var(--font-primary);
+  font-size: var(--fs-md);
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+  transition: transform var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+.receipt-page__confirm-btn:active { transform: scale(0.97); }
+.receipt-page__confirm-btn--retake {
+  background: var(--white);
+  color: var(--pb-brown);
+  border: 2px solid rgba(74,44,32,0.25);
+}
+.receipt-page__confirm-btn--keep {
+  background: var(--pb-brown);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(74,44,32,0.28);
+}
+.receipt-page__confirm-btn--keep:active { background: #7a3520; }
 
 /* ── Gallery ── */
 .receipt-page__gallery {

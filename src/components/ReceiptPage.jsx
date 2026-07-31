@@ -95,6 +95,15 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
   const [cameraError, setCameraError] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
   const streamRef = useRef(null);
+  // A shot the user just took (data URL). While set, the frame shows a still
+  // preview with "Looks good" / "Retake" instead of the live camera + shutter.
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  // Pinch-to-zoom factor (1 = no zoom). Applied as a CSS scale on the live
+  // video and used to centre-crop the capture so the saved photo matches what
+  // the user framed. Clamped to [1, MAX_ZOOM].
+  const MAX_ZOOM = 4;
+  const [zoom, setZoom] = useState(1);
+  const pinchRef = useRef({ startDist: 0, startZoom: 1 });
   // Two screens: 'rules' (what the receipt must be) → 'camera' (take the shot).
   // The rules screen is only shown the FIRST time someone claims cashback;
   // after that they land straight on the camera and can re-open the rules via
@@ -136,24 +145,58 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
     };
   }, [step]);
 
-  /* Capture from video */
+  /* Reset the zoom whenever we (re)enter the live camera. */
+  useEffect(() => { if (step === 'camera' && !capturedPhoto) setZoom(1); }, [step, capturedPhoto]);
+
+  /* Capture from video into a still preview (NOT submitted yet). Centre-crop by
+   * the current zoom so the saved photo matches what the user framed on screen. */
   const handleCapture = () => {
     const video = videoRef.current;
     if (!video) return;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return;
+    const z = Math.max(1, zoom);
+    const sw = vw / z, sh = vh / z;
+    const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    onSubmit(canvas.toDataURL('image/jpeg', 0.85));
+    canvas.width = sw;
+    canvas.height = sh;
+    canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+    setCapturedPhoto(canvas.toDataURL('image/jpeg', 0.85));
   };
 
-  /* Upload from gallery */
+  /* "Retake" — drop the preview and return to the live camera. */
+  const handleRetake = () => { setCapturedPhoto(null); setZoom(1); };
+
+  /* Upload from gallery → route through the SAME preview/confirm step as the
+   * camera, so every path gets a "Looks good / Retake" check before submitting. */
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => onSubmit(ev.target.result);
+    reader.onload = (ev) => setCapturedPhoto(ev.target.result);
     reader.readAsDataURL(file);
+  };
+
+  /* ── Pinch-to-zoom on the live camera (two fingers) ── */
+  const touchDist = (touches) =>
+    Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  const handleTouchStart = (e) => {
+    if (capturedPhoto) return;
+    if (e.touches.length === 2) {
+      pinchRef.current = { startDist: touchDist(e.touches), startZoom: zoom };
+    }
+  };
+  const handleTouchMove = (e) => {
+    if (capturedPhoto) return;
+    if (e.touches.length === 2 && pinchRef.current.startDist) {
+      const ratio = touchDist(e.touches) / pinchRef.current.startDist;
+      const next = Math.min(MAX_ZOOM, Math.max(1, pinchRef.current.startZoom * ratio));
+      setZoom(next);
+    }
+  };
+  const handleTouchEnd = (e) => {
+    if (e.touches.length < 2) pinchRef.current.startDist = 0;
   };
 
   return (
@@ -205,8 +248,15 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
         <h1 className="receipt-page__title">Take a photo of your store receipt</h1>
       </div>
 
-      {/* ── Camera viewfinder ── */}
-      <div className="receipt-page__viewfinder">
+      {/* ── Camera viewfinder ── the shutter now lives INSIDE the frame, and
+            pinch-to-zoom is handled on this element (touch-action:none keeps the
+            gesture from scrolling/zooming the page). */}
+      <div
+        className="receipt-page__viewfinder"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {cameraError ? (
           <div className="receipt-page__camera-error">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E24400" strokeWidth="1.5" strokeLinecap="round">
@@ -216,6 +266,9 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
             </svg>
             <span>{cameraError}</span>
           </div>
+        ) : capturedPhoto ? (
+          /* Still preview of the shot the user just took. */
+          <img src={capturedPhoto} alt="Your receipt photo" className="receipt-page__preview-img" />
         ) : (
           <>
             <video
@@ -224,6 +277,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
               autoPlay
               playsInline
               muted
+              style={{ transform: `scale(${zoom})` }}
             />
             {!cameraActive && (
               <div className="receipt-page__camera-loading">
@@ -236,49 +290,75 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
             <div className="receipt-page__corner receipt-page__corner--tr" />
             <div className="receipt-page__corner receipt-page__corner--bl" />
             <div className="receipt-page__corner receipt-page__corner--br" />
+            {/* Pinch-to-zoom hint / live level */}
+            {cameraActive && (
+              zoom > 1
+                ? <div className="receipt-page__zoom-badge">{zoom.toFixed(1)}×</div>
+                : <div className="receipt-page__zoom-hint">Pinch to zoom</div>
+            )}
+            {/* Shutter — overlaid at the bottom of the frame */}
+            <button
+              className="receipt-page__shutter"
+              onClick={handleCapture}
+              disabled={!cameraActive}
+              aria-label="Take photo"
+            >
+              <div className="receipt-page__shutter-ring">
+                <div className="receipt-page__shutter-dot" />
+              </div>
+            </button>
           </>
         )}
       </div>
 
-      {/* ── Capture button ── */}
-      {!cameraError && (
-        <button className="receipt-page__shutter" onClick={handleCapture} disabled={!cameraActive} aria-label="Take photo">
-          <div className="receipt-page__shutter-ring">
-            <div className="receipt-page__shutter-dot" />
+      {capturedPhoto ? (
+        /* ── Preview confirm: keep it or retake ── */
+        <div className="receipt-page__confirm">
+          <button className="receipt-page__confirm-btn receipt-page__confirm-btn--retake" onClick={handleRetake}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            Retake
+          </button>
+          <button className="receipt-page__confirm-btn receipt-page__confirm-btn--keep" onClick={() => onSubmit(capturedPhoto)}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            Looks good
+          </button>
+        </div>
+      ) : !cameraError && (
+        <>
+          {/* ── Gallery option ── */}
+          <div className="receipt-page__gallery">
+            <span className="receipt-page__gallery-or">or</span>
+            <button
+              className="receipt-page__gallery-btn"
+              onClick={() => fileRef.current?.click()}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              Upload from gallery
+            </button>
           </div>
-        </button>
+
+          {/* ── Which photos do we accept? → re-opens the rules ── */}
+          <button type="button" className="receipt-page__rules-link" onClick={() => setRulesPopup(true)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            Which photos do we accept?
+          </button>
+
+          {/* Privacy note — kept at the very bottom of the flow. */}
+          <p className="receipt-page__privacy-note">
+            Your photo is checked automatically to verify the purchase (processed by our
+            AI provider in the US, not used to train models) and deleted after review.
+          </p>
+        </>
       )}
 
-      {/* ── Gallery option ── */}
-      <div className="receipt-page__gallery">
-        <span className="receipt-page__gallery-or">or</span>
-        <button
-          className="receipt-page__gallery-btn"
-          onClick={() => fileRef.current?.click()}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21 15 16 10 5 21"/>
-          </svg>
-          Upload from gallery
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" className="receipt-page__file-input" onChange={handleFileChange} />
-      </div>
-
-      {/* ── Which photos do we accept? → re-opens the rules ── */}
-      <button type="button" className="receipt-page__rules-link" onClick={() => setRulesPopup(true)}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-        </svg>
-        Which photos do we accept?
-      </button>
-
-      {/* Privacy note — kept at the very bottom of the flow. */}
-      <p className="receipt-page__privacy-note">
-        Your photo is checked automatically to verify the purchase (processed by our
-        AI provider in the US, not used to train models) and deleted after review.
-      </p>
+      {/* Gallery file input — kept mounted so the ref is always available. */}
+      <input ref={fileRef} type="file" accept="image/*" className="receipt-page__file-input" onChange={handleFileChange} />
       </>
       )}
 

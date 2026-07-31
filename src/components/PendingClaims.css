@@ -156,15 +156,35 @@
 .pc-reject__chip-icon { font-size: 12px; line-height: 1; }
 .pc-reject__generic { margin: 0; font-size: 13px; font-weight: 600; color: #8A2C22; }
 .pc-reject__retry {
-  margin-top: 12px; width: 100%;
+  flex: 1 1 auto;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  height: 42px; border: 1px solid #E0D6C6; border-radius: 12px;
+  height: 44px; border: 1px solid #E0D6C6; border-radius: 14px;
   background: var(--white, #fff); color: #2A2724;
   font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
   transition: background 0.14s ease;
 }
 .pc-reject__retry:hover { background: #F8F4EC; }
 .pc-reject__retry:active { transform: scale(0.99); }
+
+/* Action row: primary (Collect / Try again) + a secondary Close, side by side. */
+.pc-card__actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.pc-card__actions--single { justify-content: flex-end; }
+.pc-card__close {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  align-self: stretch; min-height: 44px; padding: 0 16px;
+  border: 1px solid #E0D6C6; border-radius: 14px;
+  background: var(--white, #fff); color: #6B655C;
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background 0.14s ease;
+}
+.pc-card__close:hover { background: #F8F4EC; }
+.pc-card__close:active { transform: scale(0.98); }
 
 .pc-card__msg {
   margin: 13px 0 0;
@@ -239,9 +259,9 @@
 }
 
 .pc-card__collect {
-  margin-top: 12px;
-  height: 46px;
-  border-radius: 23px;
+  flex: 1 1 auto;
+  height: 44px;
+  border-radius: 14px;
   background: var(--pb-green);
   color: #fff;
   font-size: 15px;

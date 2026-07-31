@@ -31,7 +31,7 @@ function failedCriteria(claim) {
  * A single claim fills the width; several become a swipeable slideshow with
  * pagination dots. A claim disappears from here once its Collect CTA is tapped
  * once (tracked in `collectedIds`) — the record lives on in Activity. */
-export default function PendingClaims({ claims = [], collectedMap = {}, onCollect, partnerBrand, onRetry }) {
+export default function PendingClaims({ claims = [], collectedMap = {}, dismissedSet, onCollect, onDismiss, partnerBrand, onRetry }) {
   const now = Date.now();
   // A collected claim lingers for a 24h grace window, then drops off.
   const collectExpired = (id) => {
@@ -42,10 +42,12 @@ export default function PendingClaims({ claims = [], collectedMap = {}, onCollec
     const t = new Date(c.approved_at || c.verified_at || c.created_at || 0).getTime();
     return Number.isFinite(t) && (now - t) < REJECT_WINDOW_MS;
   };
+  const isDismissed = (id) => dismissedSet && dismissedSet.has && dismissedSet.has(id);
   const active = (claims || []).filter(c =>
     (c.type === 'cashback' || c.type === 'direct_refund') &&
     c.tikkie_status !== 'redeemed' &&
     !collectExpired(c.id) &&
+    !isDismissed(c.id) &&
     (isReady(c) || isUnderReview(c) || (isRejected(c) && rejectedRecent(c))),
   );
   const railRef = useRef(null);
@@ -74,7 +76,7 @@ export default function PendingClaims({ claims = [], collectedMap = {}, onCollec
         <span className="pc__count">{active.length} in progress</span>
       </div>
       <div className={`pc__rail${active.length === 1 ? ' pc__rail--single' : ''}`} ref={railRef} onScroll={onScroll}>
-        {active.map(c => <ClaimCard key={c.id} claim={c} onCollect={onCollect} collected={collectedMap[c.id] != null} partnerBrand={partnerBrand} onRetry={onRetry} />)}
+        {active.map(c => <ClaimCard key={c.id} claim={c} onCollect={onCollect} onDismiss={onDismiss} collected={collectedMap[c.id] != null} partnerBrand={partnerBrand} onRetry={onRetry} />)}
       </div>
       {active.length > 1 && (
         <div className="pc__dots" role="tablist" aria-label="Claims">
@@ -131,9 +133,15 @@ function ReviewProgress({ claim }) {
   );
 }
 
-function ClaimCard({ claim, onCollect, collected, partnerBrand, onRetry }) {
+function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRetry }) {
   const money = useMoney();
-  const { symbol, collectLabel } = useRegion();
+  const { symbol } = useRegion();
+  const CloseBtn = () => (
+    <button type="button" className="pc-card__close" onClick={() => onDismiss?.(claim)}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Close
+    </button>
+  );
   const ready = isReady(claim);
   const rejected = isRejected(claim);
   const amount = money(claim.payout_amount);
@@ -186,29 +194,39 @@ function ClaimCard({ claim, onCollect, collected, partnerBrand, onRetry }) {
           ) : (
             <p className="pc-reject__generic">Your receipt didn’t pass our checks this time.</p>
           )}
-          <button type="button" className="pc-reject__retry" onClick={() => onRetry?.(claim)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Upload a different receipt
-          </button>
+          <div className="pc-card__actions">
+            <button type="button" className="pc-reject__retry" onClick={() => onRetry?.(claim)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Try again
+            </button>
+            <CloseBtn />
+          </div>
         </div>
       ) : ready ? (
-        /* Once the payout link exists, the review progress is done — its block
-           becomes the full-width Collect action. Label is region-aware so the
-           UAE flow doesn't say "Tikkie". */
-        <a
-          className="pc-card__collect"
-          href={claim.tikkie_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => onCollect?.(claim)}
-        >
-          {collected ? 'Reopen payout link' : (collectLabel || 'Collect your cashback')}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-          </svg>
-        </a>
+        /* Once the payout link exists, the review progress is done — the action
+           row is Collect + Close. */
+        <div className="pc-card__actions">
+          <a
+            className="pc-card__collect"
+            href={claim.tikkie_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => onCollect?.(claim)}
+          >
+            {collected ? 'Reopen payout link' : 'Collect'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </a>
+          <CloseBtn />
+        </div>
       ) : (
-        <ReviewProgress claim={claim} />
+        <>
+          <ReviewProgress claim={claim} />
+          <div className="pc-card__actions pc-card__actions--single">
+            <CloseBtn />
+          </div>
+        </>
       )}
     </article>
   );

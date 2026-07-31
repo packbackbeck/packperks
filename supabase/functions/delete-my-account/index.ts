@@ -1,18 +1,20 @@
 // PackPerks - delete-my-account Edge Function
 //
 // Self-service account erasure for a REGISTERED customer (GDPR right to be
-// forgotten). The caller must present their own Supabase auth session (they
-// only have one once they've verified an email), so a person can only ever
-// delete their OWN footprint — never someone else's.
+// forgotten). The caller must present their own Supabase auth session, so a
+// person can only ever delete their OWN footprint.
 //
-// Deletes, for the identity behind the caller's auth user:
-//   • every users row that shares their identity (all stores in a BYO group)
-//   • their activity_history + claims (FK is NO ACTION, so delete first)
-//   • cup_balances + cup_scans cascade automatically with the users rows
-//   • their customer_identities row(s) (payout_details cascade)
-//   • the auth user itself
+// The actual deletion is done by the purge_my_account() Postgres function, which
+// gathers EVERY users row belonging to this person via connected components —
+// by auth_user_id, by their current device_id, AND by any shared identity graph
+// (including tombstones) — then deletes activity/claims/users (cup_balances +
+// cup_scans cascade) and every customer_identity in the set (payout_details
+// cascade). This closes the "account came back after delete" bug, where the old
+// version found identities only by auth_user_id (which was null on the scattered
+// identities) and left rows + identities behind for the device to resurface.
+// Finally we remove the auth user so the email is fully forgotten.
 //
-// Body: none needed. Auth: verify_jwt = true (a real session is required).
+// Body: { device_id?: string }. Auth: verify_jwt = true.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -41,40 +43,22 @@ Deno.serve(async (req) => {
   if (userErr || !user) return json({ error: 'invalid_token' }, 401);
   const authUid = user.id;
 
+  let body: { device_id?: string } = {};
+  try { body = await req.json(); } catch { /* no body is fine */ }
+  const deviceId = (body?.device_id || '').trim() || null;
+
   try {
-    // Identity/identities behind this auth user.
-    const { data: idRows } = await supabase.from('customer_identities').select('id').eq('auth_user_id', authUid);
-    const identityIds = (idRows || []).map((r: { id: string }) => r.id);
+    const { data, error } = await supabase.rpc('purge_my_account', {
+      p_auth: authUid,
+      p_device: deviceId,
+    });
+    if (error) return json({ error: 'delete_failed', detail: error.message }, 500);
 
-    // Every users row belonging to this person: linked by identity OR directly
-    // by auth_user_id (a device row that adopted this auth user).
-    const userIds = new Set<string>();
-    const { data: byAuth } = await supabase.from('users').select('id').eq('auth_user_id', authUid);
-    (byAuth || []).forEach((u: { id: string }) => userIds.add(u.id));
-    if (identityIds.length) {
-      const { data: byId } = await supabase.from('users').select('id').in('identity_id', identityIds);
-      (byId || []).forEach((u: { id: string }) => userIds.add(u.id));
-    }
-    const ids = [...userIds];
-
-    if (ids.length) {
-      // FK delete_rule is NO ACTION for these two — remove them first.
-      await supabase.from('activity_history').delete().in('user_id', ids);
-      await supabase.from('claims').delete().in('user_id', ids);
-      // Deleting the users rows cascades cup_balances + cup_scans, and NULLs the
-      // cups/byo references.
-      const { error: delUsersErr } = await supabase.from('users').delete().in('id', ids);
-      if (delUsersErr) return json({ error: 'delete_failed', detail: delUsersErr.message }, 500);
-    }
-
-    if (identityIds.length) {
-      await supabase.from('customer_identities').delete().in('id', identityIds); // cascades payout_details
-    }
-
-    // Finally remove the auth user so the email is fully forgotten.
+    // Finally remove the auth user so the email is fully forgotten and can't
+    // resurface an account on next load.
     try { await supabase.auth.admin.deleteUser(authUid); } catch (_e) { /* best-effort */ }
 
-    return json({ deleted: true, users: ids.length, identities: identityIds.length });
+    return json({ deleted: true, ...(data as Record<string, unknown>) });
   } catch (e) {
     return json({ error: 'delete_failed', detail: String(e) }, 500);
   }

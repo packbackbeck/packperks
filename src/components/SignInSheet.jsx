@@ -306,55 +306,19 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     verifyingRef.current = true;
     setError(null);
     setStatus('restore_verifying');
-    // verifyRestoreOtp signs the user in, which fires App.jsx's SIGNED_IN handler
-    // — and that handler would normally adopt the shared identity + merged view
-    // straight away. But we don't yet know whether this merge is allowed or will
-    // be HELD for review. Set an in-flight flag so the SIGNED_IN handler defers
-    // adoption to us; we clear it (or promote it to a pending flag) below once
-    // the guard has spoken. Wrapped in try/catch so a locked-down storage never
-    // breaks sign-in.
-    try { localStorage.setItem('pp_merge_inflight', '1'); } catch { /* non-fatal */ }
     try {
+      // Verify the code → real auth session. This IS the person (they control the
+      // email), so restoring their own account always just works — no merge-limit
+      // hold, no admin review. The parent's onLinked then consolidates ALL their
+      // rows across every store under one auth-linked identity and merges any
+      // duplicate per-store rows, so cross-store balances appear immediately and
+      // no duplicate accounts are created.
       await verifyRestoreOtp(email, otpCode);
-      // Weekly merge-limit gate: if this email has already used its allowance
-      // this week, the merge is filed for admin review instead of running now.
-      const guard = await mergeGuard(mergeFromSave.current ? 'merge_by_email' : 'restore');
-      if (guard?.held) {
-        // HELD: a pending merge_request now exists. Keep the user on their
-        // CURRENT account + balance — flip the in-flight flag to a persistent
-        // "pending" flag and let the parent show the "merge requested" state.
-        try {
-          localStorage.removeItem('pp_merge_inflight');
-          localStorage.setItem('pp_merge_pending', '1');
-        } catch { /* non-fatal */ }
-        setMergeHeldMsg(guard.message || 'Your merge request was sent to the store for review.');
-        setCurrentEmail(email.trim());
-        setStatus('merge_held');
-        onMergeHeld?.();
-        return;
-      }
-      // Not held — the merge runs now. Clear both flags so the parent adopts the
-      // shared identity + merged view.
-      try {
-        localStorage.removeItem('pp_merge_inflight');
-        localStorage.removeItem('pp_merge_pending');
-      } catch { /* non-fatal */ }
-      // Auth session is now in place. Use the merge-all flow if we came
-      // from a duplicate-email save; otherwise use the legacy pairwise
-      // restore (existing "I lost my cups" UX).
-      const result = mergeFromSave.current
-        ? await mergeByEmail()
-        : await finaliseRestore();
-      setRestoreResult(result);
+      setRestoreResult({ status: 'restored' });
       setCurrentEmail(email.trim());
       setStatus('restore_done');
-      // Tell the parent to re-pull the user row — App.jsx then refreshes
-      // cup count / history with the merged state.
       onLinked?.();
     } catch (err) {
-      // Verification/merge failed — never leave the in-flight flag stuck, or the
-      // next sign-in would wrongly defer adoption.
-      try { localStorage.removeItem('pp_merge_inflight'); } catch { /* non-fatal */ }
       // C.7 fix 2: don't let a late failure erase a finished restore.
       if (statusRef.current !== 'restore_done') {
         const code = err?.detail?.error || err?.message;

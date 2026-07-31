@@ -68,7 +68,7 @@ import {
   propagateProfileToGroup,
   getGroupActivity,
   mintByoCup,
-  getMergeStatus,
+  consolidateIdentity,
 } from './lib/api';
 import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, getGroupBySlug } from './lib/groups';
 import BudgetPausedModal from './components/BudgetPausedModal';
@@ -275,15 +275,14 @@ export default function App({ consentReady = true } = {}) {
   // Phase 3: when the account page is opened FROM the Stores hub it shows a
   // combined view — summed balance + activity across every store.
   const [accountCombined, setAccountCombined] = useState(false);
-  // An account-merge is filed but still WAITING for admin review (the weekly
-  // merge limit held it). While pending, the user must see ONLY their current
-  // account + current balance — never the merged total — and the account page
-  // shows a "merge requested" banner. Seeded from a flag SignInSheet sets the
-  // moment a merge is held, so the view is correct on the very next render even
-  // before the server round-trip confirms it.
-  const [mergePending, setMergePending] = useState(() => {
-    try { return localStorage.getItem('pp_merge_pending') === '1'; } catch { return false; }
-  });
+  // Legacy "merge held for review" flag. Reconnecting now consolidates your own
+  // account immediately (no admin-review hold), so this stays false; kept only
+  // so the UserPage prop + the (now inert) banner don't need removing. Any stale
+  // pp_merge_pending flag from the old flow is cleared on boot.
+  const [mergePending, setMergePending] = useState(false);
+  useEffect(() => {
+    try { localStorage.removeItem('pp_merge_pending'); localStorage.removeItem('pp_merge_inflight'); } catch { /* ignore */ }
+  }, []);
   // Where "add a cup" was launched from, so the cup-scan back button returns
   // there (e.g. the combined Stores account) instead of always a store home.
   const [cupScanReturn, setCupScanReturn] = useState(null);
@@ -697,7 +696,16 @@ export default function App({ consentReady = true } = {}) {
           }
         } catch { /* ignore */ }
 
-        const user = await getOrCreateUser(org?.id);
+        let user = await getOrCreateUser(org?.id);
+
+        // If this device is signed in, consolidate the whole account FIRST so a
+        // device that was reset and re-set up sees ALL its stores' cups (one
+        // auth-linked identity + merged duplicate per-store rows), not just this
+        // store. Best-effort; re-read the row afterwards to pick up any merge.
+        if (user?.auth_user_id) {
+          await consolidateIdentity().catch(() => {});
+          user = (await getOrCreateUser(org?.id).catch(() => user)) || user;
+        }
 
         // Phase 3: resolve the group + shared identity FIRST, so a store the
         // customer is visiting for the first time inherits the SAME name /
@@ -709,27 +717,8 @@ export default function App({ consentReady = true } = {}) {
         const byoGroup = gctx?.mode === 'byo';
         byoGroupRef.current = byoGroup;
 
-        // Is an account-merge still waiting for admin review? If so we must NOT
-        // adopt the shared identity — adoption re-points this row and would
-        // reveal the merged total before it's approved. The user stays on their
-        // current account + balance until the request clears. Seed from the
-        // local flag, then confirm with the server when signed in.
-        let mergeIsPending = false;
-        try { mergeIsPending = localStorage.getItem('pp_merge_pending') === '1'; } catch { /* ignore */ }
-        if (user.auth_user_id) {
-          const st = await getMergeStatus().catch(() => null);
-          if (st) {
-            mergeIsPending = !!st.pending;
-            try {
-              if (st.pending) localStorage.setItem('pp_merge_pending', '1');
-              else localStorage.removeItem('pp_merge_pending');
-            } catch { /* ignore */ }
-          }
-        }
-        setMergePending(mergeIsPending);
-
         let identity = null;
-        if (gctx && !mergeIsPending) {
+        if (gctx) {
           try {
             // Profile consistency across stores is a BYO-only behaviour
             // (syncProfile). Deposit groups still get an identity for the
@@ -1144,31 +1133,15 @@ export default function App({ consentReady = true } = {}) {
         try {
           const refreshed = await getOrCreateUser(activeOrgIdRef.current);
           setUserId(refreshed.id);
-          // Always surface the newly-linked email, even when adoption is deferred.
           setProfile(p => p ? { ...p, email: refreshed.email || nextEmail || p.email } : p);
 
-          // A merge may be mid-flight in the SignInSheet: it verifies the OTP —
-          // which fires THIS event — before it knows whether the merge is allowed
-          // or will be held for review. Don't adopt the shared identity yet; the
-          // sheet's own onLinked / onMergeHeld callbacks will, once the guard
-          // has decided. (Adoption re-points DB rows, so we must NOT run it for a
-          // merge that turns out to be held.)
-          let inflight = false;
-          try { inflight = localStorage.getItem('pp_merge_inflight') === '1'; } catch { /* ignore */ }
-          if (inflight) return;
-
-          // Not mid-flight: ask the server whether a merge is still pending review.
-          // If so, stay on the current account only (no adoption, no merged
-          // balance). If not, adopt the shared identity + merged view.
-          const status = await getMergeStatus().catch(() => null);
-          if (status?.pending) {
-            try { localStorage.setItem('pp_merge_pending', '1'); } catch { /* ignore */ }
-            if (!cancelled) setMergePending(true);
-            return;
-          }
-          try { localStorage.removeItem('pp_merge_pending'); } catch { /* ignore */ }
-          if (!cancelled) setMergePending(false);
-          await adoptGroupIdentity(refreshed, session?.user?.id, nextEmail);
+          // Consolidate this person's whole account across the group under one
+          // auth-linked identity (+ merge duplicate per-store rows), THEN adopt
+          // the shared profile + refresh per-store balances. This is what makes
+          // all their stores' cups appear after a device reset + reconnect.
+          await consolidateIdentity().catch(() => {});
+          const reRead = await getOrCreateUser(activeOrgIdRef.current).catch(() => refreshed);
+          await adoptGroupIdentity(reRead || refreshed, session?.user?.id, nextEmail);
         } catch (err) {
           console.error('post-signin user refresh failed:', err);
         }
@@ -1924,41 +1897,21 @@ export default function App({ consentReady = true } = {}) {
       onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); }}
       onLinked={async (opts) => {
         try {
-          const refreshed = await getOrCreateUser(activeOrg?.id);
-          setUserId(refreshed.id);
-          // Sign-out: back to anonymous device-only mode — don't run merge/adopt.
-          if (opts?.signedOut) { identityIdRef.current = null; return; }
-          // Fires after the SignInSheet's merge guard has resolved. If a merge is
-          // still pending review, keep the user on their current account only;
-          // otherwise adopt the shared identity + merged view. (The SIGNED_IN
-          // handler deferred to us because the merge was in-flight at OTP time.)
-          const status = await getMergeStatus().catch(() => null);
-          if (status?.pending) {
-            try { localStorage.setItem('pp_merge_pending', '1'); } catch { /* ignore */ }
-            setMergePending(true);
+          // Sign-out: back to anonymous device-only mode — don't consolidate/adopt.
+          if (opts?.signedOut) {
+            const refreshed = await getOrCreateUser(activeOrg?.id);
+            setUserId(refreshed.id);
+            identityIdRef.current = null;
             return;
           }
-          try {
-            localStorage.removeItem('pp_merge_pending');
-            localStorage.removeItem('pp_merge_inflight');
-          } catch { /* ignore */ }
-          setMergePending(false);
-          await adoptGroupIdentity(refreshed, refreshed.auth_user_id, refreshed.email);
-        } catch (e) { console.error(e); }
-      }}
-      /* Fired when a merge is HELD by the weekly limit (filed for admin review).
-         Keep the user on their CURRENT account + balance and flag the pending
-         state so the account page shows the "merge requested" banner. */
-      onMergeHeld={async () => {
-        try {
-          localStorage.setItem('pp_merge_pending', '1');
-          localStorage.removeItem('pp_merge_inflight');
-        } catch { /* ignore */ }
-        setMergePending(true);
-        try {
+          // Signed in / reconnected: unify ALL of this person's rows across the
+          // group under one auth-linked identity and merge any duplicate per-store
+          // rows (the fix for "cross-store cups show 0 after reset"). Then re-read
+          // the row + adopt the shared profile + refresh per-store balances.
+          await consolidateIdentity().catch(() => {});
           const refreshed = await getOrCreateUser(activeOrg?.id);
           setUserId(refreshed.id);
-          setProfile(p => p ? { ...p, email: refreshed.email || p.email } : p);
+          await adoptGroupIdentity(refreshed, refreshed.auth_user_id, refreshed.email);
         } catch (e) { console.error(e); }
       }}
       /* Fired the moment the email is verified. If the user was mid-claim

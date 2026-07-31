@@ -8,7 +8,7 @@ import PrivacyPolicyView from './PrivacyPolicyView';
 import FaqSheet from './FaqSheet';
 import PendingClaims from './PendingClaims';
 import { getGlobalImpact, deleteMyAccount } from '../lib/api';
-import { getCollectedMap, markClaimCollected } from '../lib/collectedClaims';
+import { getCollectedMap, markClaimCollected, getDismissedSet, dismissClaim } from '../lib/collectedClaims';
 import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
 import { usePwaInstall } from '../lib/pwa';
@@ -227,6 +227,14 @@ export default function UserPage({
     if (!claim?.id) return;
     markClaimCollected(claim.id);
     setCollectedClaims({ ...getCollectedMap() });
+  };
+  // "Close" on a pending-claim card removes it from the pending rail for good
+  // (the record stays in Activity below).
+  const [dismissedClaims, setDismissedClaims] = useState(() => getDismissedSet());
+  const handleDismissClaim = (claim) => {
+    if (!claim?.id) return;
+    dismissClaim(claim.id);
+    setDismissedClaims(new Set(getDismissedSet()));
   };
 
   // ── PWA install + reward push-notification preference ──
@@ -676,7 +684,7 @@ export default function UserPage({
         </div>
       </div>
 
-      <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} onCollect={handleCollectClaim} partnerBrand={storeName} onRetry={onRetryClaim} />
+      <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} dismissedSet={dismissedClaims} onCollect={handleCollectClaim} onDismiss={handleDismissClaim} partnerBrand={storeName} onRetry={onRetryClaim} />
 
       {/* ── Info + install section: "How does it work?" plus an "Add to home
            screen" button that installs the app like a native one. The install

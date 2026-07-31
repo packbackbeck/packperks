@@ -304,6 +304,19 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
 
     if (!identity) return null
 
+    // Backfill the identity's auth_user_id when we have one and it's missing.
+    // This is the root fix for the "cross-store cups show 0 after reset" bug:
+    // without it, an identity minted while signed-out (or adopted by a sibling)
+    // never became findable by auth, so each device reset spawned a NEW identity
+    // and cups scattered. The UNIQUE(auth_user_id) constraint means only one
+    // identity can hold it — if another already does, we leave this one alone
+    // (the sign-in consolidation reconciles the rest).
+    if (authUid && !identity.auth_user_id) {
+      const { error: authErr } = await supabase
+        .from('customer_identities').update({ auth_user_id: authUid }).eq('id', identity.id)
+      if (!authErr) identity.auth_user_id = authUid
+    }
+
     // Link the user row to the identity.
     if (userRow.identity_id !== identity.id) {
       await supabase.from('users').update({ identity_id: identity.id }).eq('id', userRow.id)
@@ -589,8 +602,24 @@ export async function sendSupportMessage({ audience = 'user', topic, email, mess
 /* Self-service account deletion for a registered customer. Requires a valid
  * auth session (the edge function verifies the JWT and only ever deletes the
  * caller's own footprint). */
+// Unify the signed-in person's account across the whole group: point every one
+// of their users rows at ONE auth-linked identity and merge duplicate per-store
+// rows. This is what makes cross-store balances actually appear after a device
+// reset + reconnect. Idempotent + best-effort; returns { identity_id } or null.
+export async function consolidateIdentity() {
+  try {
+    const { data, error } = await supabase.functions.invoke('consolidate-identity', {
+      body: { device_id: getDeviceId() },
+    })
+    if (error) return null
+    return data || null
+  } catch {
+    return null
+  }
+}
+
 export async function deleteMyAccount() {
-  const { data, error } = await supabase.functions.invoke('delete-my-account', { body: {} })
+  const { data, error } = await supabase.functions.invoke('delete-my-account', { body: { device_id: getDeviceId() } })
   if (error) {
     let payload = null
     try { payload = await error.context?.json?.() } catch {}

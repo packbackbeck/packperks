@@ -49,3 +49,26 @@ export function markClaimCollected(id) {
   }
   return m;
 }
+
+/* Claims the customer explicitly "closed" from the pending block. Unlike
+ * collecting (a 24h grace window), a dismissed claim leaves the pending rail
+ * immediately and for good — but the record stays in Activity. Stored as a set
+ * of ids. */
+const DISMISS_KEY = 'packperks_dismissed_claims';
+
+export function getDismissedSet() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]');
+    return new Set(Array.isArray(raw) ? raw : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function dismissClaim(id) {
+  if (!id) return getDismissedSet();
+  const s = getDismissedSet();
+  s.add(id);
+  try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...s])); } catch { /* quota / private mode */ }
+  return s;
+}

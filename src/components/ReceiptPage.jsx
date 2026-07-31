@@ -202,16 +202,6 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
   return (
     <div className="receipt-page">
 
-      {/* ── Exit button ── */}
-      {onBack && (
-        <button className="receipt-page__exit" onClick={onBack} aria-label="Cancel and go back">
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-            <path d="M13 4L7 10L13 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Cancel
-        </button>
-      )}
-
       {/* ── Progress stepper ── */}
       <div className="receipt-page__stepper">
         {STEPS.map((step, i) => (
@@ -245,7 +235,7 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
       <>
       {/* ── Screen 2: take the photo ── */}
       <div className="receipt-page__header">
-        <h1 className="receipt-page__title">Take a photo of your store receipt</h1>
+        <h1 className="receipt-page__title receipt-page__title--sm">Take a photo of your receipt<br />with the purchased reward</h1>
       </div>
 
       {/* ── Camera viewfinder ── the shutter now lives INSIDE the frame, and
@@ -323,7 +313,10 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
             Looks good
           </button>
         </div>
-      ) : !cameraError && (
+      ) : (
+        /* Shown for both the live camera AND the camera-denied state — the
+           gallery is the fallback the error message points to, and Go home must
+           always be reachable. */
         <>
           {/* ── Gallery option ── */}
           <div className="receipt-page__gallery">
@@ -348,6 +341,16 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
             </svg>
             Which photos do we accept?
           </button>
+
+          {/* ── Go home — replaces the old top Cancel button ── */}
+          {onBack && (
+            <button type="button" className="receipt-page__gohome" onClick={onBack}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 10.5L12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9 21v-6h6v6" />
+              </svg>
+              Go home
+            </button>
+          )}
 
           {/* Privacy note — kept at the very bottom of the flow. */}
           <p className="receipt-page__privacy-note">

@@ -844,6 +844,18 @@
 }
 .user-page__action-btn:active { transform: scale(0.96); }
 
+/* When "Add more cups" is the ONLY action, drop the tall stacked layout for a
+   single tidy row: + icon then the label, side by side. */
+.user-page__action-btn--solo {
+  flex-direction: row;
+  gap: 9px;
+  min-height: 0;
+  padding: 14px var(--sp-3);
+  font-size: 14px;
+  font-weight: var(--fw-bold);
+}
+.user-page__action-btn--solo svg { width: 20px; height: 20px; }
+
 /* "Next cup for free" — warm orange accent */
 .user-page__action-btn--free {
   background: #FFF3E0;
@@ -1283,9 +1295,11 @@
   align-items: center;
   gap: 10px;
 }
-/* Keep the install button's label + its optional hint left-aligned and tidy. */
-.user-page__howto--install { align-items: flex-start; }
-.user-page__howto--install .user-page__howto-arrow { align-self: center; }
+/* Install button: centre the icon + label together (no trailing chevron), and
+   keep the optional iOS hint centred beneath. */
+.user-page__howto--install { justify-content: center; text-align: center; }
+.user-page__howto--install .user-page__howto-text { flex: 0 1 auto; align-items: center; }
+.user-page__howto--install .user-page__howto-arrow { display: none; }
 .user-page__howto-icon--install {
   background: var(--pb-green-100, #D4EDDA);
   color: var(--pb-green, #1A8737);

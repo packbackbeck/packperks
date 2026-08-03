@@ -649,7 +649,10 @@ export default function UserPage({
           </button>
         )}
 
-        <button className="user-page__action-btn" onClick={onAddCup}>
+        <button
+          className={`user-page__action-btn${(!onOpenShare && !onOpenNextCupFree && !onOpenDonate) ? ' user-page__action-btn--solo' : ''}`}
+          onClick={onAddCup}
+        >
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
             <line x1="10" y1="3" x2="10" y2="17" stroke="black" strokeWidth="2" strokeLinecap="round"/>
             <line x1="3" y1="10" x2="17" y2="10" stroke="black" strokeWidth="2" strokeLinecap="round"/>
@@ -705,7 +708,7 @@ export default function UserPage({
                 </svg>
               </span>
               <span className="user-page__howto-text">
-                <span className="user-page__howto-title">Add to home screen to save</span>
+                <span className="user-page__howto-title">Add to home screen</span>
                 {iosInstallHint && (
                   <span className="user-page__howto-sub">
                     In your browser menu, tap <strong>Share</strong> then <strong>Add to Home Screen</strong>.

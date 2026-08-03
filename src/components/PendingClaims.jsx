@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { COLLECT_WINDOW_MS } from '../lib/collectedClaims';
+import { COLLECT_WINDOW_MS, getDismissedSet, dismissClaim } from '../lib/collectedClaims';
 import { useMoney, useRegion } from '../lib/RegionContext';
 import { getFailureCopy, getFailureLabel } from '../admin/lib/aiVerdictLabels';
 import './PendingClaims.css';
@@ -31,7 +31,7 @@ function failedCriteria(claim) {
  * A single claim fills the width; several become a swipeable slideshow with
  * pagination dots. A claim disappears from here once its Collect CTA is tapped
  * once (tracked in `collectedIds`) — the record lives on in Activity. */
-export default function PendingClaims({ claims = [], collectedMap = {}, dismissedSet, onCollect, onDismiss, partnerBrand, onRetry }) {
+export default function PendingClaims({ claims = [], collectedMap = {}, onCollect, onDismiss, partnerBrand, onRetry }) {
   const now = Date.now();
   // A collected claim lingers for a 24h grace window, then drops off.
   const collectExpired = (id) => {
@@ -42,7 +42,17 @@ export default function PendingClaims({ claims = [], collectedMap = {}, dismisse
     const t = new Date(c.approved_at || c.verified_at || c.created_at || 0).getTime();
     return Number.isFinite(t) && (now - t) < REJECT_WINDOW_MS;
   };
-  const isDismissed = (id) => dismissedSet && dismissedSet.has && dismissedSet.has(id);
+  // Dismissed claims (the corner ✕). Self-managed + localStorage-backed so it
+  // works on EVERY surface this widget appears on (the account page AND the
+  // Stores/market page) and stays hidden across both.
+  const [dismissed, setDismissed] = useState(() => getDismissedSet());
+  const handleDismiss = (claim) => {
+    if (!claim?.id) return;
+    dismissClaim(claim.id);
+    setDismissed(new Set(getDismissedSet()));
+    onDismiss?.(claim);
+  };
+  const isDismissed = (id) => dismissed.has(id);
   const active = (claims || []).filter(c =>
     (c.type === 'cashback' || c.type === 'direct_refund') &&
     c.tikkie_status !== 'redeemed' &&
@@ -76,7 +86,7 @@ export default function PendingClaims({ claims = [], collectedMap = {}, dismisse
         <span className="pc__count">{active.length} in progress</span>
       </div>
       <div className={`pc__rail${active.length === 1 ? ' pc__rail--single' : ''}`} ref={railRef} onScroll={onScroll}>
-        {active.map(c => <ClaimCard key={c.id} claim={c} onCollect={onCollect} onDismiss={onDismiss} collected={collectedMap[c.id] != null} partnerBrand={partnerBrand} onRetry={onRetry} />)}
+        {active.map(c => <ClaimCard key={c.id} claim={c} onCollect={onCollect} onDismiss={handleDismiss} collected={collectedMap[c.id] != null} partnerBrand={partnerBrand} onRetry={onRetry} />)}
       </div>
       {active.length > 1 && (
         <div className="pc__dots" role="tablist" aria-label="Claims">

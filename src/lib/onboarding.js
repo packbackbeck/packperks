@@ -98,18 +98,27 @@ function cityFromArea(area) {
   return parts.length ? parts[parts.length - 1] : '';
 }
 
-/** { drinks: string[], city: string } derived from a store card. */
+/** { drinks: string[], city: string } derived from a store card.
+ * Explicit `store.tags` (curated drink-preference keys, e.g. on a future vendor)
+ * are honoured first, then we still text-mine the name/area/rewards so an
+ * un-tagged store keeps its heuristic tags. */
 export function deriveStoreTags(store) {
   if (!store) return { drinks: [], city: '' };
+  const drinks = [];
+
+  // Curated tags win — keep only keys we recognise from the drink vocabulary.
+  const explicit = Array.isArray(store.tags)
+    ? store.tags.filter(t => Object.prototype.hasOwnProperty.call(DRINK_KEYWORDS, t))
+    : [];
+  for (const t of explicit) if (!drinks.includes(t)) drinks.push(t);
+
   const hay = [
     store.name, store.area, store.location?.city,
     store.featured?.name,
     ...(store.rewards || []).map(r => r?.name),
   ].filter(Boolean).join(' ').toLowerCase();
-
-  const drinks = [];
   for (const [key, words] of Object.entries(DRINK_KEYWORDS)) {
-    if (words.some(w => hay.includes(w))) drinks.push(key);
+    if (!drinks.includes(key) && words.some(w => hay.includes(w))) drinks.push(key);
   }
   const city = (store.location?.city || cityFromArea(store.area) || '').toLowerCase();
   return { drinks, city };

@@ -735,9 +735,11 @@ export default function StoresPage({
       id: v.id || `notyet-${v.region || region}-${(v.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`,
       name: v.name,
       area: v.area,
-      location: { lat: v.lat, lng: v.lng },
+      location: { lat: v.lat, lng: v.lng, city: v.city || null },
       color: v.color || colorForName(v.name),
       logo_url: v.logo_url || null,
+      // Curated drink tags → let the onboarding prefs float matching venues up.
+      tags: Array.isArray(v.tags) ? v.tags : [],
       region: v.region || region,   // which region this coming-soon venue belongs to
       notYet: true,
       balance: 0,

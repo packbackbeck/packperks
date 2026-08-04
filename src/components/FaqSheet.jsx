@@ -2,58 +2,52 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import './FaqSheet.css';
 
-/* Customer FAQ, shown as an accordion popup from the account page.
- * Mirrors the customer section of docs/FAQ.md in plain, reassuring language.
- * Keep answers short; the tone should calm the common worries (lost cups,
- * missing money, privacy). */
+/* Customer FAQ, shown as an accordion popup from the account page. Plain,
+ * reassuring language covering the BYO flow, collecting cups, receipts and
+ * cashback. Some answers carry a bullet list and/or a support link. */
 const FAQ = [
   {
-    q: 'How does it work?',
-    a: `Bring your own cup, scan the QR code on the counter, and collect cups. Once you have enough, you get real cashback. There is no app to download and no points that quietly expire.`,
+    q: 'What is PackPerks BYO and how does it work?',
+    a: `Bring your reusable cup, buy an eligible drink and scan the PackPerks QR code. Collect cups to unlock a cashback reward. After unlocking it, buy the reward item, upload the printed receipt and receive cashback after approval.`,
   },
   {
-    q: 'Do I need an account or an app?',
-    a: `No. It runs in your phone's browser. You can add your email so your cups are saved to you and follow you to a new phone, but you can start collecting straight away without one.`,
+    q: 'Do I need to download an app or create an account?',
+    a: `No app is needed. PackPerks works in your phone’s browser.\nYou can start without an account, but adding your email saves your cups, lets you recover your progress and allows you to claim cashback.`,
   },
   {
-    q: 'I scanned but nothing was added, or it says it is being reviewed. Did I lose the cup?',
-    a: `No, nothing is lost. To keep things fair there is a small daily limit per venue, so an extra scan can be held for a quick check before it is added. If it was a genuine visit it will show up shortly. If a scan ever fails, just try once more.`,
+    q: 'How do I collect cups, and is there a limit?',
+    a: `Buy an eligible drink in your reusable cup and scan once for each drink.\nA collection limit applies. PackPerks will tell you when the limit has been reached.`,
   },
   {
-    q: 'How do I get my cashback?',
-    a: `Three steps: collect enough cups for the reward you want, buy that item at the venue and keep the printed receipt, then upload a photo of the receipt in PackPerks. Once it is checked, we send your cashback by a payout link.`,
+    q: 'I scanned, but my cup did not appear. What should I do?',
+    a: `Refresh the page, check your internet connection and confirm that you scanned the correct QR code.\nScan once more only if no confirmation appeared. Do not scan repeatedly because duplicate scans may be reviewed.`,
   },
   {
-    q: 'My receipt was not approved. Why, and what now?',
-    a: `The screen shows which rule it missed, for example the reward item was not on the receipt, the receipt was too old, or the photo was a screenshot instead of the printed receipt. Your cups stay safe. Fix that point and upload a new receipt with the "Upload a different receipt" button.`,
+    q: 'Why is my cup being reviewed?',
+    a: `A cup may be reviewed if the collection limit was reached, the QR code was scanned several times or the activity appeared unusual.\nA genuine cup may still be added after review.`,
   },
   {
-    q: 'How long until the money arrives?',
-    a: `Usually a few days after your receipt is approved. You get an email the moment it is approved, with the link to collect it.`,
+    q: 'Do I receive the reward for free at the counter?',
+    a: `No. After unlocking the reward, buy the exact reward item normally. Keep the original printed receipt and upload it through PackPerks to claim cashback.`,
   },
   {
-    q: 'Do my cups expire?',
-    a: `No. Your cups stay in your account, so you can collect at your own pace.`,
+    q: 'What receipt is accepted?',
+    a: `Upload a clear photo of the original printed receipt showing:`,
+    bullets: ['The venue', 'Purchase date', 'Reward item', 'Amount paid'],
+    afterBullets: `Screenshots, edited images, copied receipts and previously used receipts are not accepted.`,
   },
   {
-    q: 'I changed phones or cleared my browser. Are my cups gone?',
-    a: `They are safe if you saved your email. Open PackPerks, choose to sign in, enter that email, and your cups come back to the new device.`,
+    q: 'What happens after I upload my receipt?',
+    a: `Your claim will appear as pending while PackPerks reviews it.\nAfter approval, you will receive an email with a secure payout link or payment instructions. Review and payment may take up to seven days.`,
   },
   {
-    q: 'Can I use cups from one location somewhere else?',
-    a: `Yes, as long as it is the same venue or brand. Cups you collect stay with that venue, and you can spend them at any of its locations.`,
+    q: 'Why was my receipt rejected?',
+    a: `A receipt may be rejected if it is unclear, too old, missing the reward item, already used, edited or not an original printed receipt.\nYou may upload another valid receipt when PackPerks shows that option.`,
   },
   {
-    q: 'Do you sell my data?',
-    a: `No. We use only what is needed to run the programme: your cup balance, your claims, and your email if you added one. No ads and no third-party trackers. You can view, export, or delete your data any time from this account page.`,
-  },
-  {
-    q: 'The QR code will not scan.',
-    a: `Hold steady in good light and fill the frame with the code. If your camera is blocked, allow camera access or scan the counter code with your phone's normal camera instead. If it still will not read, let a staff member know so they can check the code.`,
-  },
-  {
-    q: 'Something is wrong and none of this helps.',
-    a: `Use the Contact support option on this page. Tell us what happened and your email, and a real person will reply.`,
+    q: 'Where can I get help?',
+    a: `Use the PackPerks customer support form:`,
+    link: { href: '/support', label: 'Open the support form' },
   },
 ];
 
@@ -99,7 +93,23 @@ export default function FaqSheet({ onClose }) {
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </button>
-                {isOpen && <p className="faq-item__a">{item.a}</p>}
+                {isOpen && (
+                  <div className="faq-item__a">
+                    {item.a.split('\n').map((line, li) => <p key={li} className="faq-item__p">{line}</p>)}
+                    {item.bullets && (
+                      <ul className="faq-item__list">
+                        {item.bullets.map((b, bi) => <li key={bi}>{b}</li>)}
+                      </ul>
+                    )}
+                    {item.afterBullets && <p className="faq-item__p">{item.afterBullets}</p>}
+                    {item.link && (
+                      <a className="faq-item__link" href={item.link.href} target="_blank" rel="noopener noreferrer">
+                        {item.link.label}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

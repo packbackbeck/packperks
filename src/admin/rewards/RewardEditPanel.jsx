@@ -432,7 +432,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
           </div>
           <div className="rep__row">
             <div className="rep__field">
-              <label className="rep__label">Cost to make (€)</label>
+              <label className="rep__label">Cost to make (€) <span className="rep__optional">— optional</span></label>
               {/* COGS — the real cost to produce the product. Admin-only: it
                *  feeds Reward economics and is NEVER shown in the customer app. */}
               <input

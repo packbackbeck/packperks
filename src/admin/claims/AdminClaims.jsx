@@ -324,6 +324,9 @@ function ReceiptChip({ claim, onClick }) {
     is_receipt: 'not a receipt',
     is_authentic_burger_king: 'not real BK',
     contains_required_item: 'wrong item',
+    price_mismatch: 'price differs',
+    is_newer_than_cup_return: 'before unlock',
+    within_claim_window: 'outside window',
     duplicate_receipt: 'duplicate',
   };
   const first = labelMap[failed[0]] || 'Flagged';

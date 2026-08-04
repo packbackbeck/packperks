@@ -194,16 +194,16 @@ const VERIFY_TOOL = {
   },
 };
 
-function buildSystemPrompt(requiredItem: string, requiredQty = 1, venueName = "a participating venue") {
+function buildSystemPrompt(requiredItem: string, requiredQty = 1, venueName = "a participating venue", maxAgeDays = DEFAULT_RECEIPT_MAX_AGE_DAYS) {
   const qtyClause = requiredQty > 1
     ? `
 
 QUANTITY REQUIREMENT: the customer must have bought AT LEAST ${requiredQty} of this item. Add up the qty of every matching line item. PASS only when the total matched quantity is ${requiredQty} or more. If fewer are present, FAIL this check and state how many you found (for example "found 1, requires ${requiredQty}").`
     : "";
-  return _buildSystemPrompt(requiredItem, qtyClause, venueName);
+  return _buildSystemPrompt(requiredItem, qtyClause, venueName, maxAgeDays);
 }
 
-function _buildSystemPrompt(requiredItem: string, qtyClause: string, venueName: string) {
+function _buildSystemPrompt(requiredItem: string, qtyClause: string, venueName: string, maxAgeDays: number) {
   return `You are a receipt verification assistant for PackPerks, a reusable-cup rewards program in the Netherlands. Customers collect cups at a participating venue and submit a purchase receipt to claim a reward.
 
 EXPECTED VENUE: "${venueName}". The receipt should look like it came from this venue (or another real retail venue selling the item). Do not reject a receipt merely because the branding is a different real venue — brand-matching is advisory, authenticity is what matters.
@@ -231,7 +231,7 @@ SHORT-CIRCUIT RULES:
 
 CHECK 1 — is_receipt: Is the image a printed retail receipt of any kind (line items + a total)? PASS: clearly a printed receipt. FAIL: food photo, website screenshot, blank surface, object, person, illegible blur.
 
-CHECK 2 — is_authentic_burger_king: Is it a LEGITIMATE printed retail receipt (real, not fabricated)? PASS requires: recognisable branding/items, numeric prices and a total, and the image looks like a real photo of a printed receipt — NOT AI-generated, NOT a website screenshot, NOT an obvious edit/composite. FAIL if branding missing, fonts look digitally rendered rather than thermal-printed, no paper texture, receipt date more than 30 days old, or too blurred to confirm — fail conservatively. If you suspect AI generation, fail this check and set confidence to 0.3 or lower; add "possible_ai_generated" to warnings.
+CHECK 2 — is_authentic_burger_king: Is it a LEGITIMATE printed retail receipt (real, not fabricated)? PASS requires: recognisable branding/items, numeric prices and a total, and the image looks like a real photo of a printed receipt — NOT AI-generated, NOT a website screenshot, NOT an obvious edit/composite. FAIL if branding missing, fonts look digitally rendered rather than thermal-printed, no paper texture, receipt date more than ${maxAgeDays} days old, or too blurred to confirm — fail conservatively. If you suspect AI generation, fail this check and set confidence to 0.3 or lower; add "possible_ai_generated" to warnings.
 
 CHECK 3 — contains_required_item: The user is claiming a reward for this specific item:
 
@@ -308,16 +308,36 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(bin);
 }
 
-interface RequiredItem { name: string; requiredQty: number }
+interface RequiredItem {
+  name: string;
+  requiredQty: number;
+  // The reward's expected price in € (the reward's `euros`), for the price-match
+  // check. null when unknown.
+  euros: number | null;
+  // Cups needed to unlock the reward, for the unlock-date check. null when unknown.
+  cupsNeeded: number | null;
+  // How many days a receipt stays claimable (purchase → claim). Configurable per
+  // org via settings.receiptMaxAgeDays; defaults to 14.
+  maxAgeDays: number;
+}
+
+const DEFAULT_RECEIPT_MAX_AGE_DAYS = 14;
 
 // Coerce an admin-entered requiredQty into a safe positive integer (>=1).
 function normQty(v: unknown): number {
   const n = Math.floor(Number(v));
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
+function numOrNull(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
 async function lookupRequiredItem(rewardId: string | null, orgId: string | null): Promise<RequiredItem> {
-  if (!rewardId) return { name: "(no specific item — generic claim)", requiredQty: 1 };
+  const base: RequiredItem = {
+    name: "(no specific item — generic claim)", requiredQty: 1,
+    euros: null, cupsNeeded: null, maxAgeDays: DEFAULT_RECEIPT_MAX_AGE_DAYS,
+  };
   try {
     // Per-org config lives under `published:<orgId>`; fall back to the
     // legacy unsuffixed `published` key for the original demo org.
@@ -327,14 +347,28 @@ async function lookupRequiredItem(rewardId: string | null, orgId: string | null)
       .select("value")
       .eq("key", key)
       .maybeSingle();
+    const settings = (data?.value as { settings?: Record<string, unknown> } | null)?.settings || {};
+    const cfgMaxAge = Math.floor(Number(settings.receiptMaxAgeDays));
+    if (Number.isFinite(cfgMaxAge) && cfgMaxAge > 0) base.maxAgeDays = cfgMaxAge;
+
+    if (!rewardId) return base;
     const liveRewards = data?.value?.rewards;
     if (Array.isArray(liveRewards)) {
       const found = liveRewards.find((r: { id?: string }) => r?.id === rewardId);
-      if (found?.name) return { name: String(found.name), requiredQty: normQty(found.requiredQty) };
+      if (found?.name) {
+        return {
+          ...base,
+          name: String(found.name),
+          requiredQty: normQty(found.requiredQty),
+          euros: numOrNull(found.euros),
+          cupsNeeded: numOrNull(found.cupsNeeded),
+        };
+      }
     }
   } catch {
     // fall through to static fallback below
   }
+  if (!rewardId) return base;
   const FALLBACK: Record<string, string> = {
     "chicken-sandwich": "Chicken Sandwich",
     "veggie-nuggets": "Veggie Nuggets (6 stuks)",
@@ -342,7 +376,7 @@ async function lookupRequiredItem(rewardId: string | null, orgId: string | null)
     "veggie-hamburger": "Veggie Hamburger",
     "oreo-king-fusion": "Oreo King Fusion",
   };
-  return { name: FALLBACK[rewardId] ?? `Reward "${rewardId}"`, requiredQty: 1 };
+  return { ...base, name: FALLBACK[rewardId] ?? `Reward "${rewardId}"`, requiredQty: 1 };
 }
 
 // The venue the receipt is expected to be from — used in the prompt instead of
@@ -396,6 +430,25 @@ function matchedItemQty(items: unknown, requiredItem: string): number {
   return total;
 }
 
+// Per-unit price (€) of the receipt line item that matches the required item, or
+// null if not found. If a line lists a total for qty>1, divide back to per-unit.
+function matchedItemPrice(items: unknown, requiredItem: string): number | null {
+  if (!Array.isArray(items)) return null;
+  const req = requiredItem.toLowerCase();
+  for (const it of items) {
+    const name = String((it as { name?: string })?.name || "").toLowerCase();
+    if (!name) continue;
+    if (name.includes(req) || req.includes(name)) {
+      const price = Number((it as { price_eur?: number })?.price_eur);
+      if (!Number.isFinite(price) || price <= 0) return null;
+      const qty = Number((it as { qty?: number })?.qty);
+      const n = Number.isFinite(qty) && qty > 1 ? qty : 1;
+      return Math.round((price / n) * 100) / 100;
+    }
+  }
+  return null;
+}
+
 async function rateLimit(key: string, windowSecs: number, maxCalls: number): Promise<boolean> {
   const { data: count, error } = await supabase.rpc("check_rate_limit", {
     p_key: key, p_window_seconds: windowSecs, p_max_calls: maxCalls,
@@ -441,7 +494,7 @@ Deno.serve(async (req) => {
   if (!userOk)
     return jsonResponse({ error: "rate_limited", detail: "Too many receipt verifications today. Try again tomorrow." }, 429);
 
-  const { name: requiredItem, requiredQty } = await lookupRequiredItem(claim.reward_id, claim.org_id);
+  const { name: requiredItem, requiredQty, euros: rewardEuros, cupsNeeded: rewardCupsNeeded, maxAgeDays: receiptMaxAgeDays } = await lookupRequiredItem(claim.reward_id, claim.org_id);
   const [venueName, byo] = await Promise.all([
     lookupVenueName(claim.org_id),
     isByoOrg(claim.org_id),
@@ -523,7 +576,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 1024,
-        system: buildSystemPrompt(requiredItem, requiredQty, venueName),
+        system: buildSystemPrompt(requiredItem, requiredQty, venueName, receiptMaxAgeDays),
         tools: [VERIFY_TOOL],
         tool_choice: { type: "tool", name: "record_receipt_verdict" },
         messages: [
@@ -649,35 +702,73 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── Price-match guard: compare the reward's expected price (our system) to the
+  //    receipt price for the claimed item. Flag for admin review when they differ,
+  //    and record BY HOW MUCH. Only when the item was actually found.
+  if (
+    !packperksTest && status !== "failed" &&
+    typeof rewardEuros === "number" && rewardEuros > 0 &&
+    verdict.check_contains_required_item?.passed === true
+  ) {
+    const itemPrice = matchedItemPrice(verdict.items, requiredItem);
+    const receiptPrice = itemPrice ?? (typeof verdict.total_eur === "number" ? verdict.total_eur : null);
+    if (receiptPrice != null) {
+      const diff = Math.round((receiptPrice - rewardEuros) * 100) / 100;
+      (verdict as Record<string, unknown>).price_check = { expected: rewardEuros, receipt: receiptPrice, diff };
+      if (Math.abs(diff) > 0.05) { // a couple of cents of rounding/promo noise is fine
+        failureChecks = ["price_mismatch", ...failureChecks];
+        const detail = `Receipt price €${receiptPrice.toFixed(2)} vs our price €${rewardEuros.toFixed(2)} (${diff > 0 ? "+" : "−"}€${Math.abs(diff).toFixed(2)}).`;
+        postAiReason = postAiReason ? `${postAiReason} ${detail}` : detail;
+      }
+    }
+  }
+
+  // ── Receipt-date guard: the receipt must be dated AFTER the reward was MOST
+  //    RECENTLY unlocked (running balance last reached cupsNeeded) — not the first
+  //    unlock, not the claim click. Flag only; the admin makes the final call.
+  if (
+    !packperksTest && verdict.datetime_iso && status !== "failed" &&
+    typeof rewardCupsNeeded === "number" && rewardCupsNeeded > 0
+  ) {
+    try {
+      const receiptDate = new Date(verdict.datetime_iso);
+      if (!Number.isNaN(receiptDate.getTime())) {
+        const { data: unlockVal } = await supabase.rpc("reward_unlock_date", {
+          p_user_id: claim.user_id,
+          p_org_id: claim.org_id,
+          p_cups_needed: rewardCupsNeeded,
+          p_exclude_claim: claimId,
+        });
+        const unlockDate = typeof unlockVal === "string" ? new Date(unlockVal) : null;
+        if (unlockDate && !Number.isNaN(unlockDate.getTime()) && receiptDate.getTime() < unlockDate.getTime()) {
+          failureChecks = ["is_newer_than_cup_return", ...failureChecks];
+          const detail =
+            `Receipt dated ${receiptDate.toISOString().slice(0, 10)}, but the reward was last ` +
+            `unlocked ${unlockDate.toISOString().slice(0, 10)}. The receipt must be from after the ` +
+            `reward was unlocked.`;
+          postAiReason = postAiReason ? `${postAiReason} ${detail}` : detail;
+        }
+      }
+    } catch (e) {
+      console.warn("Reward-unlock-date check failed (continuing):", e);
+    }
+  }
+
+  // ── Claim-window guard: purchase → claim must be within receiptMaxAgeDays
+  //    (default 14, configurable in settings). Flag to the admin when it's older.
   if (!packperksTest && verdict.datetime_iso && status !== "failed") {
     try {
       const receiptDate = new Date(verdict.datetime_iso);
       if (!Number.isNaN(receiptDate.getTime())) {
-        const { data: latestScan } = await supabase
-          .from("cup_scans")
-          .select("scanned_at, cups_awarded")
-          .eq("user_id", claim.user_id)
-          .gt("cups_awarded", 0)
-          .order("scanned_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (latestScan?.scanned_at) {
-          const cupReturnDate = new Date(latestScan.scanned_at);
-          if (
-            !Number.isNaN(cupReturnDate.getTime()) &&
-            receiptDate.getTime() < cupReturnDate.getTime()
-          ) {
-            failureChecks = ["is_newer_than_cup_return", ...failureChecks];
-            // Flag only — the admin makes the final call (status stays 'pending').
-            postAiReason =
-              `Receipt is dated ${receiptDate.toISOString()}, but your most recent ` +
-              `cup return was ${cupReturnDate.toISOString()}. The receipt must be ` +
-              `from after you returned the cups.`;
-          }
+        const ageDays = (Date.now() - receiptDate.getTime()) / 86400000;
+        if (ageDays > receiptMaxAgeDays) {
+          failureChecks = ["within_claim_window", ...failureChecks];
+          const detail = `Receipt is ${Math.floor(ageDays)} days old; claims must be made within ${receiptMaxAgeDays} days of purchase.`;
+          postAiReason = postAiReason ? `${postAiReason} ${detail}` : detail;
         }
       }
     } catch (e) {
-      console.warn("Receipt-vs-cup-return timestamp check failed (continuing):", e);
+      console.warn("Claim-window check failed (continuing):", e);
     }
   }
 

@@ -56,7 +56,9 @@ const REVIEW_CRITERIA = [
   'is_receipt',
   'is_authentic_burger_king',
   'contains_required_item',
+  'price_mismatch',
   'is_newer_than_cup_return',
+  'within_claim_window',
   'duplicate_receipt',
 ];
 

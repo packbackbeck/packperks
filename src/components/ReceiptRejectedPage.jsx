@@ -52,7 +52,9 @@ export default function ReceiptRejectedPage({
   const CHECKLIST = [
     { codes: ['is_receipt', 'is_authentic_burger_king'], label: 'A real printed store receipt' },
     { codes: ['contains_required_item'], label: `Lists ${item}` },
-    { codes: ['is_newer_than_cup_return'], label: 'Dated after your cup return' },
+    { codes: ['price_mismatch'], label: 'Price matches the reward' },
+    { codes: ['is_newer_than_cup_return'], label: 'Dated after the reward was unlocked' },
+    { codes: ['within_claim_window'], label: 'Claimed within the allowed window' },
     { codes: ['duplicate_receipt'], label: 'Not claimed before' },
   ];
   // The AI checks the criteria one at a time and STOPS at the first failure,

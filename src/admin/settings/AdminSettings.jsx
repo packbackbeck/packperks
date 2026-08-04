@@ -452,6 +452,21 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               </div>
             </Field>
 
+            <Field label="Receipt claim window" hint="How long a receipt stays claimable after purchase. The AI flags older receipts for review.">
+              <div className="as-input-prefix-wrap">
+                <input
+                  className="as-input"
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="365"
+                  value={settings.receiptMaxAgeDays ?? 14}
+                  onChange={e => updateSetting('receiptMaxAgeDays', parseInt(e.target.value, 10) || 14)}
+                />
+                <span className="as-input-suffix">days</span>
+              </div>
+            </Field>
+
             <div className="as-rate-preview">
               <div className="as-rate-preview__head">
                 <span className="as-rate-preview__title">What customers will see</span>

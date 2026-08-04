@@ -35,6 +35,8 @@ export const DEFAULT_SETTINGS = {
   donationDescription: 'Your return helps fund campaigns against plastic pollution in rivers and oceans.',
   maxCupsPerScan: 1,
   maxCupsToShare: 10,
+  // Receipt is claimable for this many days after purchase (AI flags older ones).
+  receiptMaxAgeDays: 14,
   featureCupSharing: true,
   featureDonations: true,
   featureDirectRefunds: true,

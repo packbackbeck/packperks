@@ -189,6 +189,12 @@
   letter-spacing: 0.4px;
   margin-bottom: 6px;
 }
+.rep__optional {
+  font-weight: 500;
+  color: #A39F96;
+  text-transform: none;
+  letter-spacing: 0;
+}
 
 .rep__input {
   width: 100%;

@@ -46,7 +46,9 @@ const FAILURE_INFO: Record<string, { title: string; hint: string }> = {
   is_receipt:               { title: "That's not a receipt",           hint: "We couldn't find a printed store receipt in the photo." },
   is_authentic_burger_king: { title: 'Not a valid {brand} receipt',    hint: "We couldn't confirm the brand, menu items, and printed total." },
   contains_required_item:   { title: 'Reward item not on the receipt', hint: 'The receipt has to include the item being claimed.' },
-  is_newer_than_cup_return: { title: 'This receipt is too old',        hint: "It's dated before the cups were returned, not after." },
+  price_mismatch:           { title: "Receipt price doesn't match",    hint: 'The price on the receipt differs from the reward price in our system.' },
+  is_newer_than_cup_return: { title: 'Dated before the reward was unlocked', hint: "It's dated before enough cups were collected to unlock this reward." },
+  within_claim_window:      { title: 'Outside the claim window',       hint: 'Claims must be made within the allowed number of days after purchase.' },
   duplicate_receipt:        { title: 'Receipt already used',           hint: 'Each receipt can only be claimed once.' },
   inappropriate_image:      { title: "Couldn't process this photo",    hint: 'Please upload a clear photo of the printed receipt.' },
 };

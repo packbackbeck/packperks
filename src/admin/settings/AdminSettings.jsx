@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useOrg } from '../context/OrgContext';
-import { getRewardBudget, saveRewardBudget } from '../lib/adminApi';
+import { getRewardBudget, saveRewardBudget, getGroupHideLiveVendors, setGroupHideLiveVendors } from '../lib/adminApi';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminSettings.css';
@@ -249,6 +249,35 @@ function RewardBudgetSection() {
 export default function AdminSettings({ draftState, onNavigate, embedded = false }) {
   const { draft, updateDraft, statusLabel, published } = draftState;
   const settings = draft.settings;
+
+  /* "Hide live vendors" lives on the GROUP config (the market page is a
+   * group-scoped hub reading group settings), not the per-org draft — so
+   * it's loaded/saved directly against app_config rather than through the
+   * publish cycle. Shown only when the active org belongs to a group. */
+  const { activeGroupId } = useOrg();
+  const [hideLive, setHideLive] = useState(false);
+  const [hideLiveBusy, setHideLiveBusy] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeGroupId) { setHideLive(false); return; }
+    getGroupHideLiveVendors(activeGroupId)
+      .then(v => { if (!cancelled) setHideLive(!!v); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeGroupId]);
+
+  async function toggleHideLive(next) {
+    if (!activeGroupId || hideLiveBusy) return;
+    setHideLive(next);            // optimistic
+    setHideLiveBusy(true);
+    try {
+      await setGroupHideLiveVendors(activeGroupId, next);
+    } catch {
+      setHideLive(!next);        // roll back on failure
+    } finally {
+      setHideLiveBusy(false);
+    }
+  }
 
   /* Rate-change warning (P-19).
    *
@@ -553,6 +582,25 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                   />
                 </label>
               ))}
+
+              {activeGroupId && (
+                <label className="as-flag-row">
+                  <div className="as-flag-row__info">
+                    <div className="as-flag-row__label">Hide live vendors from the market page</div>
+                    <div className="as-flag-row__desc">
+                      Hides the currently participating venues from the multi-venue market page, so
+                      customers only see the coming-soon (future) vendors. Affects the market page
+                      only — individual store pages are unchanged. Applies to the whole group.
+                    </div>
+                  </div>
+                  <ToggleSwitch
+                    checked={hideLive}
+                    disabled={hideLiveBusy}
+                    onChange={toggleHideLive}
+                    ariaLabel="Hide live vendors from the market page toggle"
+                  />
+                </label>
+              )}
 
               <label className="as-flag-row">
                 <div className="as-flag-row__info">

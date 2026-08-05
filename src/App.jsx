@@ -1811,6 +1811,10 @@ export default function App({ consentReady = true } = {}) {
     // focuses the map; every region's venues still render + stay on the map.
     const storesRegion = focusRegion;
     const showNotYetStores = groupCtx?.groupConfig?.settings?.showNotYetStores !== false;
+    // Admin can hide the LIVE participating venues from the market page so only
+    // the coming-soon (future) vendors show. Market page only — store pages are
+    // unaffected.
+    const hideLiveVendors = groupCtx?.groupConfig?.settings?.hideLiveVendors === true;
     // Coming-soon ("future vendor") venues across ALL regions, each tagged with
     // its region. The group override wins per region (region-keyed { NL:[…],
     // AE:[…] } OR a legacy flat array treated as NL); regions with no override
@@ -1829,7 +1833,7 @@ export default function App({ consentReady = true } = {}) {
         <StoresPage
           group={groupCtx?.group}
           intro={groupCopy?.storesIntro}
-          stores={storeCards}
+          stores={hideLiveVendors ? [] : storeCards}
           personalCups={personalCups}
           region={storesRegion}
           showNotYet={showNotYetStores}

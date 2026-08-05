@@ -3331,6 +3331,32 @@ export async function setGroupNotYetStores(groupId, show) {
   return value;
 }
 
+/* Hide the LIVE participating venues from the customer market (Stores) page, so
+ * only the coming-soon / future vendors show there. Market page only — the store
+ * pages themselves are unaffected. Stored on the group config; the customer app
+ * reads settings.hideLiveVendors (default off). */
+export async function getGroupHideLiveVendors(groupId) {
+  if (!groupId) return false;
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', GROUP_CFG_KEY(groupId)).maybeSingle();
+  return data?.value?.settings?.hideLiveVendors === true;
+}
+export async function setGroupHideLiveVendors(groupId, hide) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { settings: { mode: 'deposit' } };
+  value.settings = value.settings || {};
+  value.settings.hideLiveVendors = !!hide;
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
 /* How many customer "Request it" taps a coming-soon venue needs before it reads
  * as "coming soon" on the Stores page. Stored on the group config (default 10). */
 export async function saveNotYetThreshold(groupId, threshold) {

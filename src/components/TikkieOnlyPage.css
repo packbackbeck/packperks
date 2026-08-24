@@ -1,0 +1,82 @@
+/* TikkieOnlyPage — the entire customer surface of a tikkie_only org.
+ * One centered card: logos, a spinner, then a hard redirect to Tikkie. */
+.tikkie-only {
+  min-height: 100dvh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: linear-gradient(170deg, #F7F3E9 0%, #EFE9DA 100%);
+  font-family: var(--font-primary, system-ui, sans-serif);
+}
+.tikkie-only__card {
+  width: 100%; max-width: 380px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 36px 28px 22px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(40, 30, 10, 0.12);
+}
+.tikkie-only__logos {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin-bottom: 26px;
+}
+.tikkie-only__logo {
+  height: 40px; max-width: 120px; object-fit: contain;
+}
+.tikkie-only__link-arrows { color: #C9C2B4; flex-shrink: 0; }
+/* Tikkie brand chip — their app green, no hotlinked asset. */
+.tikkie-only__tikkie-chip {
+  display: inline-flex; align-items: center;
+  padding: 7px 14px;
+  border-radius: 12px;
+  background: #46BEAA;
+  color: #fff;
+  font-size: 17px; font-weight: 800; letter-spacing: 0.01em;
+}
+.tikkie-only__spinner {
+  width: 42px; height: 42px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 4px solid #EEE8DA;
+  border-top-color: #1A8737;
+  animation: tikkie-only-spin 0.9s linear infinite;
+}
+@keyframes tikkie-only-spin { to { transform: rotate(360deg); } }
+.tikkie-only__check {
+  width: 46px; height: 46px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  animation: tikkie-only-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes tikkie-only-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.tikkie-only__err-icon {
+  width: 46px; height: 46px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #FBEAE5; color: #C4472B;
+}
+.tikkie-only__title {
+  margin: 0 0 8px;
+  font-size: 21px; font-weight: 800; color: #1F1B16;
+}
+.tikkie-only__sub {
+  margin: 0;
+  font-size: 14.5px; line-height: 1.55; color: #6C6259;
+}
+.tikkie-only__amount {
+  font-size: 17px; color: #1F1B16; margin-right: 4px;
+}
+.tikkie-only__btn {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: #46BEAA; color: #fff;
+  font-size: 15px; font-weight: 800; text-decoration: none;
+}
+.tikkie-only__foot {
+  margin: 26px 0 0;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #B4AB9C;
+}

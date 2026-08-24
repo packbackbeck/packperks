@@ -666,3 +666,35 @@
   padding: 2px 7px; border-radius: 999px;
 }
 .toggle-switch--locked { opacity: 0.7; cursor: not-allowed; }
+
+/* ── Org operating mode picker (standard vs Tikkie-only smart bin) ── */
+.as-orgmode {
+  padding: 14px 16px;
+  border: 1px solid #EDE6D8;
+  border-radius: 12px;
+  background: #FBF8F1;
+  margin-bottom: 16px;
+}
+.as-orgmode--tikkie { border-color: #46BEAA; background: #F0FAF8; }
+.as-orgmode__options {
+  display: flex; gap: 8px; margin-top: 10px;
+}
+.as-orgmode__opt {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1.5px solid #E2DACA;
+  background: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  color: #6C6259; cursor: pointer;
+}
+.as-orgmode__opt--on {
+  border-color: #1A8737; background: #1A8737; color: #fff;
+}
+.as-orgmode__opt:disabled { opacity: 0.6; cursor: default; }
+.as-orgmode__note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #E4F5F1;
+  font-size: 12px; line-height: 1.5; color: #23695D;
+}

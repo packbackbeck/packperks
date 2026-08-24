@@ -156,11 +156,22 @@ export function OrgProvider({ children }) {
   // Receipt Generator by mode).
   const [activeOrgSharing, setActiveOrgSharing] = useState(false);
   const [activeGroupMode, setActiveGroupMode] = useState(null);
+  // Org-level operating mode (null | 'tikkie_only') — see orgModes.js. Gates
+  // the whole dashboard, so it lives here next to the group mode.
+  const [activeOrgMode, setActiveOrgMode] = useState(null);
+  // Bumped by the settings mode picker (via the 'pp-org-mode-changed' event)
+  // so the dashboard re-gates immediately without a full reload.
+  const [modeRefresh, setModeRefresh] = useState(0);
+  useEffect(() => {
+    const bump = () => setModeRefresh(n => n + 1);
+    window.addEventListener('pp-org-mode-changed', bump);
+    return () => window.removeEventListener('pp-org-mode-changed', bump);
+  }, []);
   useEffect(() => {
     let alive = true;
     const oid = activeOrg?.id;
     const gid = activeOrg?.group_id;
-    if (!oid) { setActiveOrgSharing(false); setActiveGroupMode(null); return undefined; }
+    if (!oid) { setActiveOrgSharing(false); setActiveGroupMode(null); setActiveOrgMode(null); return undefined; }
     (async () => {
       const keys = [`published:${oid}`];
       if (gid) keys.push(`published:group:${gid}`);
@@ -170,9 +181,10 @@ export function OrgProvider({ children }) {
       const grpCfg = gid ? (data || []).find(r => r.key === `published:group:${gid}`) : null;
       setActiveOrgSharing(orgCfg?.value?.settings?.featureCupSharing === true);
       setActiveGroupMode(grpCfg?.value?.settings?.mode || null);
+      setActiveOrgMode(orgCfg?.value?.settings?.mode || null);
     })();
     return () => { alive = false; };
-  }, [activeOrg?.id, activeOrg?.group_id]);
+  }, [activeOrg?.id, activeOrg?.group_id, modeRefresh]);
 
   /* Switch to a different org. Accepts an id OR a slug. */
   const switchOrg = useCallback((idOrSlug) => {
@@ -225,6 +237,7 @@ export function OrgProvider({ children }) {
     scopeOrgIds,          // org id(s) the analytics pages should query
     activeOrgSharing,     // is cup sharing on for the active org?
     activeGroupMode,      // 'byo' | 'deposit' | null (active org's group)
+    activeOrgMode,        // org-level mode: 'tikkie_only' | null
   };
 
   return <OrgCtx.Provider value={value}>{children}</OrgCtx.Provider>;

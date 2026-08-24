@@ -73,6 +73,7 @@ import {
 import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, getGroupBySlug } from './lib/groups';
 import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
+import TikkieOnlyPage from './components/TikkieOnlyPage';
 import './App.css';
 
 /* Best-effort device fingerprint from the user agent. Falls back to a
@@ -203,6 +204,10 @@ export default function App({ consentReady = true } = {}) {
   const [userClaims, setUserClaims] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [initError, setInitError] = useState(null);
+  /* Tikkie-only orgs (smart-bin cashback) never boot the full app — the
+   * boot effect short-circuits into this state and the render below shows
+   * only the redirect page. { org, batchId } | null. */
+  const [tikkieOnly, setTikkieOnly] = useState(null);
 
   /* ── Onboarding (first-time market visitors + a secret re-open) ── */
   const [onboardingPrefs, setOnboardingPrefs] = useState(() => getOnboarding());
@@ -676,6 +681,24 @@ export default function App({ consentReady = true } = {}) {
         // to the root venue chooser instead.
         if (!org) { window.location.replace('/'); return; }
         setActiveOrg(org);
+
+        // Tikkie-only orgs (smart-bin cashback): stop the boot right here —
+        // no anonymous user row, no rewards, no identity. The render below
+        // swaps in the minimal batch → Tikkie redirect page instead. The
+        // config read happens early (before the one in the Promise.all
+        // below) because the mode must be known BEFORE getOrCreateUser —
+        // a tikkie-only visit may never create an account.
+        {
+          const earlyCfg = await getAppConfig(org?.id).catch(() => null);
+          if (earlyCfg?.settings?.mode === 'tikkie_only') {
+            const sp = new URLSearchParams(window.location.search);
+            // No cookies / tracking on this path — tell ConsentGate to keep
+            // the banner out of the way of the payout.
+            try { window.dispatchEvent(new Event('packperks:suppress-consent')); } catch { /* noop */ }
+            setTikkieOnly({ org, batchId: (sp.get('batch') || '').trim() });
+            return; // finally{} clears isLoading
+          }
+        }
         if (hubRoute) setPage('stores'); // /<groupSlug> lands on the Stores hub
         // Returning from a full-page detour (e.g. the /support form set this
         // flag before it navigated away) — restore the page they left from.
@@ -1650,6 +1673,12 @@ export default function App({ consentReady = true } = {}) {
       handleNudge(cupsRemaining);
     }
   };
+
+  /* Tikkie-only mode: the redirect page IS the whole app for these orgs.
+   * Checked before isLoading so the boot's early return lands here. */
+  if (tikkieOnly) {
+    return <TikkieOnlyPage org={tikkieOnly.org} batchId={tikkieOnly.batchId} />;
+  }
 
   /* ── Loading / error screens ──
    * P-47: skeleton shimmer instead of the bare "🥤 Loading…" spinner.

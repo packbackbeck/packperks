@@ -103,6 +103,18 @@ const NAV_ITEMS = [
     ),
   },
   {
+    // Tikkie-only orgs (smart-bin cashback): the payout log. Hidden for
+    // every other mode — see the filter block below.
+    id: 'tikkielog',
+    label: 'Tikkie payouts',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="12" y1="1" x2="12" y2="23" />
+        <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+      </svg>
+    ),
+  },
+  {
     id: 'cupqr',
     // "Receipt Generator" hosts two tabs: the QR cup-receipt batch
     // generator and the rewards test-receipt image generator.
@@ -211,8 +223,8 @@ const ROLE_VISIBLE_TABS = {
   // Manager + Checker also see the Org tab (read-only) so they know
   // where they work; the editing controls inside are gated by
   // PermissionGate so they're disabled.
-  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'futurevendors', 'reports', 'stats', 'behaviour']),
-  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour']),
+  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'futurevendors', 'reports', 'stats', 'behaviour', 'tikkielog']),
+  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour', 'tikkielog']),
 };
 
 export default function AdminSidebar({ activePage, onNavigate, draftState, role, onAddOrg }) {
@@ -225,8 +237,9 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
   // null when closed; { nextValue: true|false } when open.
 
   // Feature/mode gating for the nav (Phase 3).
-  const { activeOrgId, activeGroupId, activeGroup, activeOrgSharing, activeGroupMode } = useOrg();
+  const { activeOrgId, activeGroupId, activeGroup, activeOrgSharing, activeGroupMode, activeOrgMode } = useOrg();
   const isByo = activeGroupMode === 'byo';
+  const isTikkieOnly = activeOrgMode === 'tikkie_only';
 
   // Pending-work signal dots: claims to review, held cup scans, and account-merge
   // requests. Refetched on org switch + whenever the active page changes (a
@@ -266,6 +279,13 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
             // Hide tabs the current role can't access.
             const visible = ROLE_VISIBLE_TABS[role];
             if (!(visible === null || !visible || visible.has(item.id))) return false;
+            // Tikkie-only orgs (smart-bin cashback): the dashboard collapses
+            // to the Receipt Generator + the payout log. Everything else —
+            // rewards, users, claims review, analytics — doesn't exist in
+            // this mode. (Settings/history/support stay reachable via the
+            // top-bar dock; see TIKKIE_ONLY_PAGES.)
+            if (isTikkieOnly) return item.id === 'tikkielog' || item.id === 'cupqr';
+            if (item.id === 'tikkielog') return false;
             // Phase 3 gating:
             //  • Cup Transfers only when cup sharing is on for this org.
             //  • BYO orgs show BYO Requests and hide the Receipt Generator;

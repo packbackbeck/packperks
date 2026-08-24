@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useOrg } from '../context/OrgContext';
+import { TIKKIE_ONLY_PAGES } from '../lib/orgModes';
 import './FeatureSearch.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -270,16 +272,25 @@ export default function FeatureSearch({ onNavigate }) {
   const inputRef = useRef(null);
   const listRef  = useRef(null);
 
+  // Tikkie-only orgs: the palette must not resurface pages the sidebar and
+  // router hide — searching is the classic bypass, so filter at the source.
+  const { activeOrgMode } = useOrg();
+  const searchable = useMemo(() => (
+    activeOrgMode === 'tikkie_only'
+      ? FEATURES.filter(f => TIKKIE_ONLY_PAGES.has(f.page))
+      : FEATURES
+  ), [activeOrgMode]);
+
   // Filter + rank.
   const results = useMemo(() => {
-    if (!query.trim()) return FEATURES.slice(0, 8);
-    return FEATURES
+    if (!query.trim()) return searchable.slice(0, 8);
+    return searchable
       .map(f => ({ f, s: scoreFeature(f, query.trim()) }))
       .filter(x => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 12)
       .map(x => x.f);
-  }, [query]);
+  }, [query, searchable]);
 
   // Group consecutive items by `group` for the dropdown headers.
   const grouped = useMemo(() => {

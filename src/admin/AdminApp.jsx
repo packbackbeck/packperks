@@ -24,6 +24,8 @@ import AdminDonations from './donations/AdminDonations';
 import AdminByoRequests from './byorequests/AdminByoRequests';
 import AdminFutureVendors from './futurevendors/AdminFutureVendors';
 import AdminAppDesign from './appdesign/AdminAppDesign';
+import AdminTikkieLog from './tikkielog/AdminTikkieLog';
+import { TIKKIE_ONLY_PAGES } from './lib/orgModes';
 import { useAdminDraft } from './hooks/useAdminDraft';
 import './AdminApp.css';
 
@@ -78,7 +80,7 @@ export default function AdminApp() {
 const VALID_PAGES = new Set([
   'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
   'transactions', 'donations', 'byorequests', 'futurevendors', 'org', 'organizations', 'settings',
-  'history', 'reports', 'stats', 'behaviour', 'support',
+  'history', 'reports', 'stats', 'behaviour', 'support', 'tikkielog',
 ]);
 const DEFAULT_PAGE = 'overview';
 
@@ -107,7 +109,7 @@ function AdminShell() {
   const [page, setPageState] = useState(readHashPage);
   const draftState = useAdminDraft();
   const { profile } = useAuthRole();
-  const { activeOrgId, activeOrgSlug } = useOrg();
+  const { activeOrgId, activeOrgSlug, activeOrgMode } = useOrg();
   const [wizardOpen, setWizardOpen] = useState(false);
   /* When another page (e.g. Cup Scans) wants to hand off to the Users
    * page with a specific customer opened, it calls onNavigate('users',
@@ -161,6 +163,18 @@ function AdminShell() {
     }
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  /* Tikkie-only orgs: hiding sidebar items alone doesn't block a route —
+   * hash edits, bookmarks and the command palette all bypass it. This
+   * effect is the actual gate: any page outside the tikkie-only set snaps
+   * to the payout log. (Mode loads async, so it also catches the case
+   * where the page rendered before the mode arrived.) */
+  useEffect(() => {
+    if (activeOrgMode === 'tikkie_only' && !TIKKIE_ONLY_PAGES.has(page)) {
+      setPage('tikkielog');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrgMode, page]);
 
   function handlePreview() {
     // Multi-org: open the active org's user app slug so the preview
@@ -242,6 +256,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="futurevendors" activeId={page} visited={visited}>
             <AdminFutureVendors onNavigate={setPage} />
+          </KeepAlive>
+          <KeepAlive id="tikkielog" activeId={page} visited={visited}>
+            <AdminTikkieLog onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="support" activeId={page} visited={visited}>
             <AdminSupport onNavigate={setPage} />

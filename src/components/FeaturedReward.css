@@ -78,7 +78,7 @@
 .featured-reward__image--uploaded {
   object-fit: contain;
   object-position: center;
-  padding: 10px;
+  padding: 0;
   box-sizing: border-box;
   margin: 0;
 }

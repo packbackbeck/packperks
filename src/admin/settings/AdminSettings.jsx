@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useOrg } from '../context/OrgContext';
-import { getRewardBudget, saveRewardBudget, getGroupHideLiveVendors, setGroupHideLiveVendors } from '../lib/adminApi';
+import { getRewardBudget, saveRewardBudget, getGroupHideLiveVendors, setGroupHideLiveVendors, getOrgMode, setOrgMode } from '../lib/adminApi';
+import { ORG_MODE_META } from '../lib/orgModes';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminSettings.css';
@@ -254,9 +255,36 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
    * group-scoped hub reading group settings), not the per-org draft — so
    * it's loaded/saved directly against app_config rather than through the
    * publish cycle. Shown only when the active org belongs to a group. */
-  const { activeGroupId } = useOrg();
+  const { activeGroupId, activeOrgId } = useOrg();
   const [hideLive, setHideLive] = useState(false);
   const [hideLiveBusy, setHideLiveBusy] = useState(false);
+
+  /* Org operating mode (standard vs tikkie_only) — written straight to the
+   * published config, like the group toggles above. */
+  const [orgMode, setOrgModeState] = useState(null);
+  const [orgModeBusy, setOrgModeBusy] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeOrgId) { setOrgModeState(null); return; }
+    getOrgMode(activeOrgId)
+      .then(m => { if (!cancelled) setOrgModeState(m); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeOrgId]);
+
+  async function changeOrgMode(next) {
+    if (!activeOrgId || orgModeBusy || (orgMode || null) === next) return;
+    const prev = orgMode;
+    setOrgModeState(next);           // optimistic
+    setOrgModeBusy(true);
+    try {
+      await setOrgMode(activeOrgId, next);
+    } catch {
+      setOrgModeState(prev);         // roll back on failure
+    } finally {
+      setOrgModeBusy(false);
+    }
+  }
   useEffect(() => {
     let cancelled = false;
     if (!activeGroupId) { setHideLive(false); return; }
@@ -568,6 +596,45 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
 
           {/* ── Feature flags ── */}
           <SectionCard section={SECTIONS[3]}>
+            {/* Org operating mode — standard app vs Tikkie-only (smart bin).
+                Group members keep their group's deposit/BYO mode, so the
+                picker only shows for ungrouped orgs. Written straight to the
+                published config (no draft cycle): the customer redirect and
+                the bin-tikkie edge function read it live. */}
+            {!activeGroupId && (
+              <div className={`as-orgmode${orgMode === 'tikkie_only' ? ' as-orgmode--tikkie' : ''}`}>
+                <div className="as-flag-row__info">
+                  <div className="as-flag-row__label">Operating mode</div>
+                  <div className="as-flag-row__desc">
+                    {ORG_MODE_META[orgMode === 'tikkie_only' ? 'tikkie_only' : 'standard'].blurb}
+                  </div>
+                </div>
+                <div className="as-orgmode__options" role="radiogroup" aria-label="Operating mode">
+                  {['standard', 'tikkie_only'].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      role="radio"
+                      aria-checked={(orgMode === 'tikkie_only' ? 'tikkie_only' : 'standard') === m}
+                      className={`as-orgmode__opt${(orgMode === 'tikkie_only' ? 'tikkie_only' : 'standard') === m ? ' as-orgmode__opt--on' : ''}`}
+                      disabled={orgModeBusy}
+                      onClick={() => changeOrgMode(m === 'standard' ? null : m)}
+                    >
+                      {ORG_MODE_META[m].label}
+                    </button>
+                  ))}
+                </div>
+                {orgMode === 'tikkie_only' && (
+                  <div className="as-orgmode__note">
+                    Customers scanning a bin receipt go straight to a Tikkie link — the app,
+                    rewards and accounts are all bypassed. The payout per cup is the
+                    “Cashback rate” in the Rates section above. The dashboard shows only the
+                    Receipt Generator and the Tikkie payouts log.
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="as-flag-list">
               {FEATURE_FLAGS.map(f => (
                 <label key={f.key} className="as-flag-row">

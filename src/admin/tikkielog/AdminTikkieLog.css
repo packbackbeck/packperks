@@ -1,0 +1,73 @@
+/* AdminTikkieLog — flat payout log for tikkie-only (smart-bin) orgs. */
+.admin-tikkielog { padding: 28px 32px 60px; max-width: 1100px; }
+
+.atl-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  margin-bottom: 22px;
+}
+.atl-title { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: #1F1B16; }
+.atl-sub { margin: 0; font-size: 13px; line-height: 1.5; color: #7A7166; max-width: 560px; }
+.atl-refresh {
+  flex-shrink: 0;
+  padding: 9px 18px; border-radius: 999px; border: 1.5px solid #E2DACA;
+  background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700;
+  color: #4A443C; cursor: pointer;
+}
+.atl-refresh:hover { background: #F7F3E9; }
+.atl-refresh:disabled { opacity: 0.6; cursor: default; }
+
+.atl-tiles {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.atl-tile {
+  background: #fff; border: 1px solid #EDE6D8; border-radius: 14px;
+  padding: 16px 18px;
+}
+.atl-tile__num { font-size: 22px; font-weight: 800; color: #1F1B16; }
+.atl-tile__sm { font-size: 13px; font-weight: 700; color: #7A7166; }
+.atl-tile__label { margin-top: 3px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #9A9186; }
+
+.atl-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.atl-chip {
+  padding: 7px 14px; border-radius: 999px; border: 1.5px solid #E2DACA;
+  background: #fff; font-family: inherit; font-size: 12px; font-weight: 700;
+  color: #6C6259; cursor: pointer;
+}
+.atl-chip--on { border-color: #1A8737; background: #1A8737; color: #fff; }
+
+.atl-error {
+  margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
+  background: #FBEAE5; color: #A03A22; font-size: 13px;
+}
+.atl-empty {
+  padding: 44px 20px; text-align: center; color: #9A9186; font-size: 13.5px;
+  background: #fff; border: 1px dashed #E2DACA; border-radius: 14px;
+}
+
+.atl-table-wrap {
+  overflow-x: auto;
+  background: #fff; border: 1px solid #EDE6D8; border-radius: 14px;
+}
+.atl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.atl-table th {
+  text-align: left; padding: 12px 14px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #9A9186; border-bottom: 1px solid #F2EBDE; white-space: nowrap;
+}
+.atl-table td { padding: 11px 14px; border-bottom: 1px solid #F7F2E8; color: #3E3831; white-space: nowrap; }
+.atl-table tbody tr:last-child td { border-bottom: none; }
+.atl-amount { font-weight: 800; }
+.atl-batch { font-family: ui-monospace, monospace; font-size: 12px; color: #7A7166; }
+.atl-link { font-weight: 700; color: #1A8737; text-decoration: none; }
+.atl-link:hover { text-decoration: underline; }
+
+.atl-badge {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800;
+}
+.atl-badge--ok    { background: #E7F2FC; color: #22629E; }
+.atl-badge--good  { background: #E4F5E9; color: #1A8737; }
+.atl-badge--muted { background: #F0EBE1; color: #8A8175; }
+.atl-badge--busy  { background: #FCF2D6; color: #9A6E12; }
+.atl-badge--bad   { background: #FBEAE5; color: #A03A22; }

@@ -20,6 +20,16 @@ export default function ConsentGate({ children }) {
     window.addEventListener('packperks:open-consent', onOpen);
     return () => window.removeEventListener('packperks:open-consent', onOpen);
   }, []);
+  // Tikkie-only orgs (smart-bin cashback): the redirect page sets no cookies,
+  // creates no account and tracks nothing, so the banner would be pure
+  // friction between the customer and their payout. App fires this event
+  // when it resolves a tikkie_only org; we simply don't show the banner.
+  const [suppressed, setSuppressed] = useState(false);
+  useEffect(() => {
+    const onSuppress = () => setSuppressed(true);
+    window.addEventListener('packperks:suppress-consent', onSuppress);
+    return () => window.removeEventListener('packperks:suppress-consent', onSuppress);
+  }, []);
 
   // Simple choices (Accept all / Essential only) and the granular Customize save
   // both funnel through the consent store; setLocal reads back the DERIVED level
@@ -48,7 +58,7 @@ export default function ConsentGate({ children }) {
   return (
     <>
       {gatedChildren}
-      {(!consent || reopen) && (
+      {!suppressed && (!consent || reopen) && (
         <CookieConsent
           onChoose={choose}
           onCustomize={customize}

@@ -3357,6 +3357,52 @@ export async function setGroupHideLiveVendors(groupId, hide) {
   return value;
 }
 
+/* ── Org operating mode (tikkie-only smart-bin cashback) ─────────────────
+ * Stored on the ORG's published config (published:<orgId>.settings.mode) —
+ * unlike the deposit/byo copy modes, which are group-level. Written directly
+ * (no draft/publish cycle): the customer redirect path and the bin-tikkie
+ * edge function read the published value, so it must take effect at once. */
+export async function getOrgMode(orgId) {
+  if (!orgId) return null;
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', `published:${orgId}`).maybeSingle();
+  return data?.value?.settings?.mode || null;
+}
+export async function setOrgMode(orgId, mode) {
+  if (!orgId) throw new Error('setOrgMode: no org');
+  const key = `published:${orgId}`;
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { rewards: [], settings: {} };
+  value.settings = value.settings || {};
+  if (mode) value.settings.mode = mode;
+  else delete value.settings.mode;
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  // Let OrgContext (and with it the sidebar/router gating) re-read the mode.
+  try { window.dispatchEvent(new Event('pp-org-mode-changed')); } catch { /* SSR/tests */ }
+  return value;
+}
+
+/* Tikkie-only payout log: every bin receipt that was converted to a Tikkie
+ * link is one claims row keyed by batch_id. Newest first. */
+export async function listBinTikkiePayouts(orgId, { limit = 300 } = {}) {
+  if (!orgId) return [];
+  const { data, error } = await supabase
+    .from('claims')
+    .select('id, created_at, cups_redeemed, payout_amount, batch_id, tikkie_url, tikkie_status, tikkie_expires_at, tikkie_redeemed_at, tikkie_last_error, payout_status')
+    .eq('org_id', orgId)
+    .not('batch_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
 /* How many customer "Request it" taps a coming-soon venue needs before it reads
  * as "coming soon" on the Stores page. Stored on the group config (default 10). */
 export async function saveNotYetThreshold(groupId, threshold) {

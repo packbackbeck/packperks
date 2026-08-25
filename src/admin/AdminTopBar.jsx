@@ -3,6 +3,7 @@ import WorkflowDock from './auth/WorkflowDock';
 import packperksLogoDark from '../assets/images/packperks-logo-dark.svg';
 import burgerKingLogo from '../assets/images/burger-king-logo.png';
 import { useOrg } from './context/OrgContext';
+import { ORG_MODE_META, resolveEffectiveMode } from './lib/orgModes';
 import './AdminTopBar.css';
 
 /* Resolve the brand-mark for the right side of the "PackPerks × ___"
@@ -48,7 +49,15 @@ function OrgMark({ org }) {
  *   • publish-error bar at the very top when a publish fails (rare) */
 export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenSupport }) {
   const { publishError, clearPublishError } = draftState || {};
-  const { activeOrg } = useOrg();
+  const { activeOrg, activeOrgMode, activeGroupMode } = useOrg();
+  // Which programme model this org runs — always visible so an admin
+  // switching between orgs never has to guess which dashboard shape
+  // they're looking at.
+  const effMode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
+  const modeMeta = ORG_MODE_META[effMode] || ORG_MODE_META.standard;
+  // Maintenance mode = the customer app is offline. That state must be
+  // impossible to miss, so the whole bar goes orange with a pause mark.
+  const maintenance = !!draftState?.draft?.settings?.maintenanceMode;
 
   return (
     <>
@@ -67,13 +76,28 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenS
         </div>
       )}
 
-      <header className="admin-topbar">
+      <header className={`admin-topbar${maintenance ? ' admin-topbar--maintenance' : ''}`}>
         <div className="admin-topbar__left">
           <div className="admin-topbar__brand">
             <img src={packperksLogoDark} alt="PackPerks" className="admin-topbar__brand-pp" />
             <span className="admin-topbar__brand-x">×</span>
             <OrgMark org={activeOrg} />
           </div>
+          <span
+            className={`admin-topbar__mode admin-topbar__mode--${effMode}`}
+            title={modeMeta.blurb}
+          >
+            {modeMeta.label}
+          </span>
+          {maintenance && (
+            <span className="admin-topbar__maint" title="Maintenance mode is ON — the customer app is showing the maintenance banner and blocking new scans and claims. Turn it off in Settings → Feature flags.">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+              Maintenance
+            </span>
+          )}
         </div>
 
         <div className="admin-topbar__center">

@@ -16,15 +16,31 @@ export const ORG_MODE_TIKKIE_ONLY = 'tikkie_only';
 export const ORG_MODE_META = {
   standard: {
     key: 'standard',
-    label: 'Standard app',
-    blurb: 'The full customer app: rewards, cup balance, accounts and receipt claims.',
+    label: 'Deposit Rewards',
+    blurb: 'The full customer app: rewards, cup balance, accounts, direct refunds and receipt claims.',
+  },
+  byo: {
+    key: 'byo',
+    label: 'Bring Your Own',
+    blurb: 'Customers bring a reusable cup and scan the counter QR toward a reward. Requires a group — picking this creates one (or flips the org\u2019s existing group to BYO).',
   },
   tikkie_only: {
     key: ORG_MODE_TIKKIE_ONLY,
-    label: 'Tikkie only (smart bin)',
+    label: 'Redirect Refund',
     blurb: 'Scanning a bin receipt QR goes straight to a Tikkie cashback link. No accounts, no rewards — the dashboard shows only the Receipt Generator and the payout log.',
   },
 };
+
+/* Resolve the org's EFFECTIVE mode from the two places a mode can live:
+ * the org's own published settings (tikkie_only) and its group's config
+ * (byo / deposit). Deposit Rewards is the default when nothing says
+ * otherwise. This is the one to use for chrome (top bar, sidebar,
+ * settings shape) — activeOrgMode alone misses grouped BYO orgs. */
+export function resolveEffectiveMode(orgMode, groupMode) {
+  if (orgMode === ORG_MODE_TIKKIE_ONLY) return ORG_MODE_TIKKIE_ONLY;
+  if (groupMode === 'byo') return 'byo';
+  return 'standard';
+}
 
 /* Admin pages that still make sense for a tikkie-only org. Everything else
  * (rewards, claims review, users, analytics…) is hidden from the sidebar,

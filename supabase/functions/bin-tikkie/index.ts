@@ -92,6 +92,33 @@ async function readTikkieError(resp: Response): Promise<{ code?: string; message
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Per-IP rate limit — this endpoint spends real money, so brute-forcing
+// batch UUIDs must stay expensive. 30/hour is far above any legitimate use
+// (one person scans a handful of receipts) while capping abuse. Uses the
+// shared rate_limits table; fails OPEN on db errors so a hiccup never
+// blocks a genuine payout.
+const RL_WINDOW_MS = 60 * 60 * 1000;
+const RL_MAX = 30;
+async function rateLimited(req: Request): Promise<boolean> {
+  try {
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+    const key = `bin-tikkie:${ip}`;
+    const now = Date.now();
+    const { data } = await supabase.from("rate_limits")
+      .select("count, window_start").eq("key", key).maybeSingle();
+    if (!data || now - new Date(data.window_start).getTime() > RL_WINDOW_MS) {
+      await supabase.from("rate_limits")
+        .upsert({ key, count: 1, window_start: new Date().toISOString() });
+      return false;
+    }
+    if ((data.count ?? 0) >= RL_MAX) return true;
+    await supabase.from("rate_limits").update({ count: (data.count ?? 0) + 1 }).eq("key", key);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 interface ClaimRow {
   id: string;
   cups_redeemed: number | null;
@@ -200,6 +227,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* fall through to validation */ }
   const batchId = String(body.batch_id || "").trim().toLowerCase();
   if (!UUID_RE.test(batchId)) return json({ error: "invalid_batch" }, 400);
+  if (await rateLimited(req)) return json({ error: "rate_limited" }, 429);
 
   // Fast path: the batch was already converted — hand back the same link.
   const existing = await claimForBatch(batchId);
@@ -262,7 +290,11 @@ Deno.serve(async (req) => {
     return json({ error: "already_claimed" }, 409);
   }
 
-  const amount = Math.min(MAX_TOTAL_EUR, Math.round(count * rate * 100) / 100);
+  // Per-receipt ceiling: the admin's settings.tikkieMaxPerReceipt if set,
+  // never above the hard server cap.
+  const cfgMax = Number(settings.tikkieMaxPerReceipt);
+  const maxTotal = Math.min(MAX_TOTAL_EUR, Number.isFinite(cfgMax) && cfgMax > 0 ? cfgMax : MAX_TOTAL_EUR);
+  const amount = Math.min(maxTotal, Math.round(count * rate * 100) / 100);
 
   // One claim per batch — the unique index arbitrates concurrent scans.
   const { data: inserted, error: insErr } = await supabase.from("claims")

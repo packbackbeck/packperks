@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminOrg from '../organization/AdminOrg';
 import AdminSettings, { settingsSectionsForMode } from './AdminSettings';
 import { useOrg } from '../context/OrgContext';
+import { resolveEffectiveMode } from '../lib/orgModes';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminWorkspace.css';
 
@@ -56,8 +57,8 @@ const ORG_SECTIONS = [
 export default function AdminWorkspace({ draftState, onNavigate }) {
   // The settings half of the TOC depends on the org mode — a tikkie-only org
   // drops the sections that only describe app/reward machinery.
-  const { activeOrgMode } = useOrg();
-  const tocSections = [...ORG_SECTIONS, ...settingsSectionsForMode(activeOrgMode)];
+  const { activeOrgMode, activeGroupMode } = useOrg();
+  const tocSections = [...ORG_SECTIONS, ...settingsSectionsForMode(resolveEffectiveMode(activeOrgMode, activeGroupMode))];
   const [activeId, setActiveId] = useState('org-profile');
 
   // Tabs: show ONLY the active section. Both children render every section in

@@ -352,15 +352,30 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
       </nav>
 
       <div className="admin-sidebar__toggles">
+        {/* Quick-rates card — shaped by the org's programme model:
+             · Deposit Rewards → both rates (cashback vs direct refund)
+             · Bring Your Own  → cashback (+ refund only if that flag is on)
+             · Redirect Refund → the single refund rate, per bin receipt */}
         <div className="admin-sidebar__rates" onClick={() => onNavigate('settings')}>
-          <div className="admin-sidebar__rate-item">
-            <span className="admin-sidebar__rate-label">Cashback</span>
-            <span className="admin-sidebar__rate-val">€{(settings.cashbackRatePerCup || 1.25).toFixed(2)}/cup</span>
-          </div>
-          <div className="admin-sidebar__rate-item">
-            <span className="admin-sidebar__rate-label">Refund</span>
-            <span className="admin-sidebar__rate-val">€{(settings.refundRatePerCup || 1.00).toFixed(2)}/cup</span>
-          </div>
+          {isTikkieOnly ? (
+            <div className="admin-sidebar__rate-item">
+              <span className="admin-sidebar__rate-label">Refund</span>
+              <span className="admin-sidebar__rate-val">€{(settings.refundRatePerCup || 0.10).toFixed(2)}/cup</span>
+            </div>
+          ) : (
+            <>
+              <div className="admin-sidebar__rate-item">
+                <span className="admin-sidebar__rate-label">Cashback</span>
+                <span className="admin-sidebar__rate-val">€{(settings.cashbackRatePerCup || 1.25).toFixed(2)}/cup</span>
+              </div>
+              {(!isByo || settings.featureDirectRefunds) && (
+                <div className="admin-sidebar__rate-item">
+                  <span className="admin-sidebar__rate-label">Refund</span>
+                  <span className="admin-sidebar__rate-val">€{(settings.refundRatePerCup || 1.00).toFixed(2)}/cup</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 

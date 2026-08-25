@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useOrg } from '../context/OrgContext';
-import { getRewardBudget, saveRewardBudget, getGroupHideLiveVendors, setGroupHideLiveVendors, getOrgMode, setOrgMode } from '../lib/adminApi';
-import { ORG_MODE_META } from '../lib/orgModes';
+import { getRewardBudget, saveRewardBudget, getGroupHideLiveVendors, setGroupHideLiveVendors, getOrgMode, setOrgMode, createOrgGroup, setOrgGroupMembership, setOrgGroupMode, getByoCap, saveByoCap } from '../lib/adminApi';
+import { ORG_MODE_META, resolveEffectiveMode } from '../lib/orgModes';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminSettings.css';
@@ -95,12 +95,14 @@ export const SECTIONS = [
   },
 ];
 
-/* Which settings sections apply to an org mode. A tikkie-only org has no
- * app, no cup balance and no rewards, so App copy, Cup rules and Limits &
- * caps have nothing left to configure — every field in them describes
- * machinery that mode doesn't run. Rates and Feature flags stay: rates
- * carries the single payout rate, flags carries the mode picker itself
- * plus maintenance mode. */
+/* Which settings sections apply to an EFFECTIVE org mode (see
+ * resolveEffectiveMode). Deposit Rewards and Bring Your Own both run the
+ * full app so they keep all five sections — the FIELDS inside adapt (BYO
+ * swaps bin-batch scan rules for its daily auto-credit cap). Redirect
+ * Refund (tikkie-only) has no app, no cup balance and no rewards, so App
+ * copy, Cup rules and Limits & caps disappear entirely: rates carries the
+ * single refund rate + per-receipt cap, flags carries the mode picker and
+ * maintenance mode. */
 export function settingsSectionsForMode(mode) {
   if (mode !== 'tikkie_only') return SECTIONS;
   return SECTIONS.filter(s => s.id === 'rates' || s.id === 'flags');
@@ -266,11 +268,32 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
    * group-scoped hub reading group settings), not the per-org draft — so
    * it's loaded/saved directly against app_config rather than through the
    * publish cycle. Shown only when the active org belongs to a group. */
-  const { activeGroupId, activeOrgId, activeOrgMode } = useOrg();
-  // Tikkie-only: no app, no cup balance, no rewards. Sections and fields
-  // that only describe those are hidden rather than left to mislead.
-  const isTikkieOnly = activeOrgMode === 'tikkie_only';
-  const visibleSections = settingsSectionsForMode(activeOrgMode);
+  const { activeGroupId, activeOrgId, activeOrgMode, activeGroupMode, activeOrg, groupMembers, refresh } = useOrg();
+  // The org's EFFECTIVE programme model: tikkie_only lives on the org
+  // config, byo/deposit on the group config. Everything below — which
+  // sections render, which rate fields show — keys off this one value.
+  const effMode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
+  const isTikkieOnly = effMode === 'tikkie_only';
+  const isByo = effMode === 'byo';
+  const visibleSections = settingsSectionsForMode(effMode);
+
+  /* BYO daily auto-credit cap — its own app_config row (byo:cap:<orgId>),
+   * read live by the byo-mint edge function, so it saves directly. */
+  const [byoCap, setByoCap] = useState(2);
+  const [byoCapBusy, setByoCapBusy] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!isByo || !activeOrgId) return undefined;
+    getByoCap(activeOrgId).then(v => { if (!cancelled) setByoCap(v ?? 2); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isByo, activeOrgId]);
+  async function changeByoCap(n) {
+    const v = Math.max(1, Math.min(50, parseInt(n, 10) || 1));
+    setByoCap(v);
+    setByoCapBusy(true);
+    try { await saveByoCap(activeOrgId, v); } catch { /* keep local; retry on next edit */ }
+    setByoCapBusy(false);
+  }
   const [hideLive, setHideLive] = useState(false);
   const [hideLiveBusy, setHideLiveBusy] = useState(false);
 
@@ -287,24 +310,48 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
     return () => { cancelled = true; };
   }, [activeOrgId]);
 
+  /* Switch the org between the three programme models.
+   *
+   *   standard    → clear the org-level mode; a grouped org's group flips
+   *                 to 'deposit' (mind: that affects every member).
+   *   byo         → needs a group (byo-mint refuses groupless orgs). A
+   *                 grouped org flips its group to 'byo'; an ungrouped one
+   *                 gets a fresh single-member group named after it.
+   *   tikkie_only → org-level flag; only offered while ungrouped.
+   */
   async function changeOrgMode(next) {
-    if (!activeOrgId || orgModeBusy || (orgMode || null) === next) return;
-    const prev = orgMode;
-    setOrgModeState(next);           // optimistic
+    const target = next || 'standard';
+    if (!activeOrgId || orgModeBusy || effMode === target) return;
     setOrgModeBusy(true);
     try {
-      await setOrgMode(activeOrgId, next);
-      /* Keep the DRAFT in sync too. setOrgMode writes the published config
-       * directly, but Publish later pushes draft.settings wholesale — so a
-       * draft that never learned the mode would silently revert the org on
-       * the next publish. */
+      if (target === 'byo') {
+        await setOrgMode(activeOrgId, null); // clear any tikkie flag first
+        if (activeGroupId) {
+          await setOrgGroupMode(activeGroupId, 'byo');
+        } else {
+          const grp = await createOrgGroup({ name: activeOrg?.name || 'New group', mode: 'byo' });
+          await setOrgGroupMembership(activeOrgId, grp.id);
+        }
+      } else if (target === 'tikkie_only') {
+        await setOrgMode(activeOrgId, 'tikkie_only');
+      } else {
+        await setOrgMode(activeOrgId, null);
+        if (activeGroupId) await setOrgGroupMode(activeGroupId, 'deposit');
+      }
+      setOrgModeState(target === 'tikkie_only' ? 'tikkie_only' : null);
+      /* Keep the DRAFT in sync too — Publish pushes draft.settings
+       * wholesale, so a draft that never learned the mode would silently
+       * revert the org on the next publish. */
       updateDraft(d => {
         const settings = { ...d.settings };
-        if (next) settings.mode = next; else delete settings.mode;
+        if (target === 'tikkie_only') settings.mode = 'tikkie_only'; else delete settings.mode;
         return { ...d, settings };
       });
-    } catch {
-      setOrgModeState(prev);         // roll back on failure
+      // Group membership / group mode changed → the whole context re-reads.
+      await refresh?.(activeOrgId);
+      try { window.dispatchEvent(new Event('pp-org-mode-changed')); } catch { /* noop */ }
+    } catch (e) {
+      console.error('changeOrgMode failed:', e);
     } finally {
       setOrgModeBusy(false);
     }
@@ -519,6 +566,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             </Field>
             )}
 
+            {(!isByo || settings.featureDirectRefunds) && (
             <Field
               label={isTikkieOnly ? 'Refund rate' : 'Direct refund rate'}
               hint={isTikkieOnly
@@ -539,6 +587,25 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 <span className="as-input-suffix">per cup</span>
               </div>
             </Field>
+            )}
+
+            {isTikkieOnly && (
+            <Field
+              label="Max payout per receipt"
+              hint="Safety ceiling for one bin receipt, whatever the cup count. The server enforces a hard €25 maximum on top of this."
+            >
+              <div className="as-input-prefix-wrap">
+                <span className="as-input-prefix">€</span>
+                <input
+                  className="as-input as-input--prefix"
+                  type="number" step="0.50" min="1" max="25"
+                  value={settings.tikkieMaxPerReceipt ?? 25}
+                  onChange={e => updateSetting('tikkieMaxPerReceipt', Math.min(25, Math.max(1, parseFloat(e.target.value) || 25)), 'per-receipt cap')}
+                />
+                <span className="as-input-suffix">per receipt</span>
+              </div>
+            </Field>
+            )}
 
             {!isTikkieOnly && (
             <Field label="Receipt claim window" hint="How long a receipt stays claimable after purchase. The AI flags older receipts for review.">
@@ -621,14 +688,28 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
           {!isTikkieOnly && (
           <SectionCard section={SECTIONS[2]}>
             <div className="as-field-row">
-              <Field label="Cups awarded per scan" hint="Most bins emit one cup per scan.">
-                <input
-                  className="as-input as-input--short"
-                  type="number" min="1" max="10"
-                  value={settings.maxCupsPerScan}
-                  onChange={e => updateSetting('maxCupsPerScan', parseInt(e.target.value) || 1)}
-                />
-              </Field>
+              {isByo ? (
+                <Field
+                  label="Daily auto-credit cap"
+                  hint={`Counter-QR scans credited automatically per customer per rolling 24h. Scans above it are held for review on the BYO QR Codes page.${byoCapBusy ? ' Saving…' : ''}`}
+                >
+                  <input
+                    className="as-input as-input--short"
+                    type="number" min="1" max="50"
+                    value={byoCap}
+                    onChange={e => changeByoCap(e.target.value)}
+                  />
+                </Field>
+              ) : (
+                <Field label="Cups awarded per scan" hint="Most bins emit one cup per scan.">
+                  <input
+                    className="as-input as-input--short"
+                    type="number" min="1" max="10"
+                    value={settings.maxCupsPerScan}
+                    onChange={e => updateSetting('maxCupsPerScan', parseInt(e.target.value) || 1)}
+                  />
+                </Field>
+              )}
 
               <Field label="Max cups per share" hint="Upper bound on a peer-to-peer transfer.">
                 <input
@@ -644,44 +725,52 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
 
           {/* ── Feature flags ── */}
           <SectionCard section={SECTIONS[3]}>
-            {/* Org operating mode — standard app vs Tikkie-only (smart bin).
-                Group members keep their group's deposit/BYO mode, so the
-                picker only shows for ungrouped orgs. Written straight to the
-                published config (no draft cycle): the customer redirect and
-                the bin-tikkie edge function read it live. */}
-            {!activeGroupId && (
-              <div className={`as-orgmode${orgMode === 'tikkie_only' ? ' as-orgmode--tikkie' : ''}`}>
-                <div className="as-flag-row__info">
-                  <div className="as-flag-row__label">Operating mode</div>
-                  <div className="as-flag-row__desc">
-                    {ORG_MODE_META[orgMode === 'tikkie_only' ? 'tikkie_only' : 'standard'].blurb}
-                  </div>
+            {/* Operating mode — the org's programme model. Written straight
+                to the published/group config (no draft cycle): the customer
+                app, byo-mint and bin-tikkie all read it live. */}
+            <div className={`as-orgmode${isTikkieOnly ? ' as-orgmode--tikkie' : ''}`}>
+              <div className="as-flag-row__info">
+                <div className="as-flag-row__label">Operating mode</div>
+                <div className="as-flag-row__desc">
+                  {ORG_MODE_META[effMode === 'standard' ? 'standard' : effMode].blurb}
                 </div>
-                <div className="as-orgmode__options" role="radiogroup" aria-label="Operating mode">
-                  {['standard', 'tikkie_only'].map(m => (
+              </div>
+              <div className="as-orgmode__options" role="radiogroup" aria-label="Operating mode">
+                {['standard', 'byo', 'tikkie_only'].map(m => {
+                  // Redirect Refund needs a standalone org — there's no app
+                  // or market hub for a grouped venue to redirect from.
+                  const blocked = m === 'tikkie_only' && !!activeGroupId;
+                  return (
                     <button
                       key={m}
                       type="button"
                       role="radio"
-                      aria-checked={(orgMode === 'tikkie_only' ? 'tikkie_only' : 'standard') === m}
-                      className={`as-orgmode__opt${(orgMode === 'tikkie_only' ? 'tikkie_only' : 'standard') === m ? ' as-orgmode__opt--on' : ''}`}
-                      disabled={orgModeBusy}
+                      aria-checked={effMode === m}
+                      className={`as-orgmode__opt${effMode === m ? ' as-orgmode__opt--on' : ''}`}
+                      disabled={orgModeBusy || blocked}
+                      title={blocked ? 'Redirect Refund needs a standalone org — remove it from its group first (Organisations → Store groups).' : undefined}
                       onClick={() => changeOrgMode(m === 'standard' ? null : m)}
                     >
                       {ORG_MODE_META[m].label}
                     </button>
-                  ))}
-                </div>
-                {orgMode === 'tikkie_only' && (
-                  <div className="as-orgmode__note">
-                    Customers scanning a bin receipt go straight to a Tikkie link — the app,
-                    rewards and accounts are all bypassed. The payout per cup is the
-                    “Cashback rate” in the Rates section above. The dashboard shows only the
-                    Receipt Generator and the Tikkie payouts log.
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            )}
+              {isByo && activeGroupId && groupMembers.length > 1 && (
+                <div className="as-orgmode__note">
+                  This org shares its group with {groupMembers.length - 1} other venue{groupMembers.length === 2 ? '' : 's'} —
+                  the operating mode is a group setting, so switching it here changes every venue in the group.
+                </div>
+              )}
+              {isTikkieOnly && (
+                <div className="as-orgmode__note">
+                  Customers scanning a bin receipt go straight to a Tikkie link — the app,
+                  rewards and accounts are all bypassed. The payout per cup is the
+                  “Refund rate” in the Rates section above. The dashboard shows only the
+                  Receipt Generator and the Tikkie payouts log.
+                </div>
+              )}
+            </div>
 
             <div className="as-flag-list">
               {/* Sharing, donations and direct refunds all act on a cup

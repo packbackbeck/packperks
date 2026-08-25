@@ -348,3 +348,107 @@
   border-color: #D6CFC2;
 }
 .oow-btn--ghost:hover:not(:disabled) { background: #F4EFE5; color: #0F0F0F; }
+
+/* ── Model picker (step 1) ───────────────────────────────────────── */
+.oow-models { display: flex; flex-direction: column; gap: 12px; }
+.oow-model {
+  width: 100%; text-align: left;
+  padding: 16px 18px;
+  border: 1.5px solid #E4DCCC; border-radius: 14px;
+  background: #fff; cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.oow-model:hover { border-color: #C9BFA9; background: #FDFBF6; }
+.oow-model--on { border-color: #1A8737; background: #F4FAF5; }
+.oow-model__head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.oow-model__label { font-size: 15px; font-weight: 800; color: #1F1B16; }
+.oow-model__tag {
+  padding: 3px 9px; border-radius: 999px;
+  background: #F0EBE1; color: #7A7166;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
+}
+.oow-model--on .oow-model__tag { background: #DCF0E2; color: #1A6B33; }
+.oow-model__check {
+  margin-left: auto; flex-shrink: 0;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #1A8737; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.oow-model__body { margin: 0 0 5px; font-size: 12.5px; line-height: 1.55; color: #5F584F; }
+.oow-model__body strong { color: #3E3831; font-weight: 700; }
+.oow-model__foot {
+  margin-top: 9px; padding-top: 9px; border-top: 1px solid #F2ECE0;
+  font-size: 11.5px; font-weight: 700; color: #9A9186;
+}
+
+/* ── Choice rows (group placement) ───────────────────────────────── */
+.oow-choices { display: flex; flex-direction: column; gap: 9px; }
+.oow-choice { border: 1.5px solid #E4DCCC; border-radius: 12px; background: #fff; overflow: hidden; }
+.oow-choice--on { border-color: #1A8737; background: #F4FAF5; }
+.oow-choice__btn {
+  width: 100%; display: flex; align-items: flex-start; gap: 11px;
+  padding: 13px 15px; border: none; background: none; cursor: pointer;
+  font-family: inherit; text-align: left;
+}
+.oow-choice__radio {
+  flex-shrink: 0; margin-top: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid #C9BFA9; background: #fff;
+}
+.oow-choice__radio--on { border-color: #1A8737; border-width: 5px; }
+.oow-choice__title { display: block; font-size: 13.5px; font-weight: 700; color: #1F1B16; }
+.oow-choice__hint { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: #7A7166; }
+.oow-choice__extra { padding: 0 15px 14px 42px; }
+
+/* ── Notes / warnings ────────────────────────────────────────────── */
+.oow-note {
+  margin: 14px 0 0; padding: 11px 13px;
+  border-radius: 9px; background: #F3EFE5;
+  font-size: 12px; line-height: 1.55; color: #6C6259;
+}
+.oow-warn {
+  margin: 14px 0 0; padding: 11px 13px;
+  border-radius: 9px; background: #FCF2D6; border: 1px solid #EEDFA8;
+  font-size: 12px; line-height: 1.55; color: #7A5B12;
+}
+
+/* ── Economics preview ───────────────────────────────────────────── */
+.oow-econ-preview {
+  margin-top: 6px; padding: 13px 15px;
+  border: 1px solid #EDE6D8; border-radius: 12px; background: #FBF8F1;
+}
+.oow-econ-preview__head {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #9A9186; margin-bottom: 8px;
+}
+.oow-econ-preview__row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 0; font-size: 13px; color: #5F584F;
+}
+.oow-econ-preview__row strong { font-size: 14px; color: #1F1B16; }
+
+/* ── Header chip + optional-step badge ───────────────────────────── */
+.oow-eyebrow__chip {
+  display: inline-block; margin-left: 8px; padding: 2px 8px;
+  border-radius: 999px; background: #E4F0E7; color: #1A6B33;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.02em; text-transform: none;
+}
+.oow-title__opt {
+  margin-left: 9px; padding: 3px 9px;
+  border-radius: 999px; background: #F0EBE1; color: #8A8175;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* ── Inline slug validation ──────────────────────────────────────── */
+.oow-input--bad { border-color: #D9694A !important; }
+.oow-inline-bad { display: block; margin-top: 5px; font-size: 11.5px; font-weight: 700; color: #C4472B; }
+.oow-inline-ok  { display: block; margin-top: 5px; font-size: 11.5px; font-weight: 700; color: #1A8737; }
+
+/* ── Featured-reward badge ───────────────────────────────────────── */
+.oow-reward-card__badge {
+  margin-left: 8px; padding: 2px 8px;
+  border-radius: 999px; background: #FCF2D6; color: #9A6E12;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
+}

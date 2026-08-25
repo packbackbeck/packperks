@@ -2618,6 +2618,10 @@ export async function getOrgBundle() {
  */
 export async function createOrganization(payload) {
   const { data: { user } } = await supabase.auth.getUser();
+  // Programme model ('deposit' | 'byo' | 'tikkie_only') + group placement,
+  // both chosen up-front in the onboarding wizard. See admin/lib/orgModes.js.
+  const model = payload.model || 'deposit';
+  const group = payload.group || { choice: 'none' };
   const brand   = payload.brand    || {};
   const legal   = payload.legal    || {};
   const location = payload.location || null;
@@ -2655,6 +2659,34 @@ export async function createOrganization(payload) {
   if (orgErr) throw orgErr;
   const newOrgId = orgRow.id;
 
+  // 1b. Group placement. The group's config is what actually carries the
+  // deposit/BYO copy mode, and byo-mint refuses to mint for an org whose
+  // group isn't mode 'byo' — so for BYO this step is load-bearing, not
+  // cosmetic. Tikkie-only orgs are never grouped.
+  let groupRow = null;
+  if (model !== 'tikkie_only' && group.choice && group.choice !== 'none') {
+    try {
+      if (group.choice === 'new' && group.name) {
+        groupRow = await createOrgGroup({ name: group.name, mode: model });
+      } else if (group.choice === 'existing' && group.id) {
+        groupRow = { id: group.id };
+      }
+      if (groupRow?.id) {
+        const { error: gErr } = await supabase
+          .from('organizations')
+          .update({ group_id: groupRow.id, group_active: true, updated_at: new Date().toISOString() })
+          .eq('id', newOrgId);
+        if (gErr) throw gErr;
+        orgRow.group_id = groupRow.id;
+        orgRow.group_active = true;
+      }
+    } catch (e) {
+      // Don't strand a half-created org: surface the failure but keep the
+      // org, which can be moved into a group from Organisations later.
+      console.warn('createOrganization: group placement failed', e);
+    }
+  }
+
   // 2. First location (optional).
   if (location && location.name) {
     const { error: locErr } = await supabase.from('locations').insert({
@@ -2687,6 +2719,10 @@ export async function createOrganization(payload) {
     termsUrl:   copy.termsUrl   || '',
     cookieUrl:  copy.cookieUrl  || '',
   };
+  // The org-level mode marker. Only tikkie_only is stored here — deposit and
+  // BYO live on the GROUP config, which is where the customer app and
+  // byo-mint read them from.
+  if (model === 'tikkie_only') settings.mode = 'tikkie_only';
   const liveRewards = (wizardRewards || []).map((r, i) => ({
     id: r.id || `reward-${i+1}-${Date.now().toString(36)}`,
     name: r.name,
@@ -2733,7 +2769,20 @@ export async function createOrganization(payload) {
     }
   }
 
-  return { org: orgRow, inviteResults };
+  return { org: orgRow, group: groupRow, model, inviteResults };
+}
+
+/* Is this org slug free? The wizard checks live so a collision surfaces on
+ * the brand step instead of as a raw unique-violation after the final
+ * "Create organisation" click. Includes soft-deleted orgs — their slug is
+ * still occupied. */
+export async function isOrgSlugAvailable(slug) {
+  const clean = (slug || '').trim().toLowerCase();
+  if (!clean) return false;
+  const { data, error } = await supabase
+    .from('organizations').select('id').eq('slug', clean).maybeSingle();
+  if (error) return true; // don't block creation on a check that failed
+  return !data;
 }
 
 /* ─────────────────────────────────────────────────────────────────────

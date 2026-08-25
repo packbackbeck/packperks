@@ -38,3 +38,76 @@ export const TIKKIE_ONLY_PAGES = new Set([
   'history',      // audit log
   'support',      // support inbox
 ]);
+
+/* ── The three programme models a new org can be created as ──────────
+ *
+ * These are the plain-language choices PackPerks staff actually make in
+ * the onboarding wizard. Each maps onto the storage the rest of the
+ * system already reads:
+ *
+ *   deposit     → group copy mode 'deposit' (copyPresets.js). Full app.
+ *   byo         → group copy mode 'byo'. REQUIRES a group: byo-mint
+ *                 rejects any org whose group config isn't mode 'byo'
+ *                 (`not_grouped` / `not_byo`), so a groupless BYO org
+ *                 physically cannot mint a cup.
+ *   tikkie_only → org-level settings.mode = 'tikkie_only'. Never grouped:
+ *                 there is no app, no market hub and no shared profile
+ *                 to belong to.
+ *
+ * `group` is the rule the wizard enforces at the group step.
+ */
+export const ORG_MODELS = {
+  deposit: {
+    key: 'deposit',
+    label: 'Direct refund + rewards',
+    tagline: 'The full SmartBin programme',
+    customer: 'Customers drop their packaging in the SmartBin, scan the printed receipt, and choose: cash out straight away, or save cups toward a menu reward.',
+    dashboard: 'The whole dashboard — rewards, claims review, users, cup scans and analytics.',
+    group: 'optional',
+    steps: { rewards: true, copy: true, features: true },
+    defaults: {
+      cashbackRatePerCup: 1.25,
+      refundRatePerCup: 1.00,
+      featureCupSharing: true,
+      featureDonations: true,
+      featureDirectRefunds: true,
+    },
+  },
+  byo: {
+    key: 'byo',
+    label: 'Rewards only',
+    tagline: 'Bring your own cup',
+    customer: 'Customers bring a reusable cup, scan the QR on the counter, and collect cups toward a reward. No deposit and no direct cash-out.',
+    dashboard: 'Rewards, claims review, users and the BYO QR codes page.',
+    group: 'required',
+    steps: { rewards: true, copy: true, features: true },
+    defaults: {
+      cashbackRatePerCup: 1.25,
+      refundRatePerCup: 1.00,
+      featureCupSharing: true,
+      featureDonations: true,
+      // "Rewards only" is the whole point — cashing out would bypass it.
+      featureDirectRefunds: false,
+    },
+  },
+  tikkie_only: {
+    key: 'tikkie_only',
+    label: 'Direct refund only',
+    tagline: 'Smart bin → Tikkie',
+    customer: 'Scanning the bin receipt goes straight to a Tikkie cashback link. No app, no account, no rewards — the customer never sees a PackPerks screen beyond a one-second redirect.',
+    dashboard: 'Just two pages: the Receipt Generator and the Tikkie payouts log.',
+    group: 'never',
+    steps: { rewards: false, copy: false, features: false },
+    defaults: {
+      // Per-cup payout. Each Tikkie mint carries a transaction fee, so this
+      // starts low and deliberately conservative.
+      cashbackRatePerCup: 0.10,
+      refundRatePerCup: 0.10,
+      featureCupSharing: false,
+      featureDonations: false,
+      featureDirectRefunds: false,
+    },
+  },
+};
+
+export const ORG_MODEL_ORDER = ['deposit', 'byo', 'tikkie_only'];

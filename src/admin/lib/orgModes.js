@@ -111,3 +111,26 @@ export const ORG_MODELS = {
 };
 
 export const ORG_MODEL_ORDER = ['deposit', 'byo', 'tikkie_only'];
+
+/* Settings keys that only describe app / reward / cup-balance machinery.
+ * A tikkie-only org runs none of it, so these are stripped on publish —
+ * otherwise the published config keeps advertising rewards, donations and
+ * sharing that mode can't deliver. */
+const TIKKIE_ONLY_STRIP_KEYS = [
+  'cashbackRatePerCup',            // one rate only: refundRatePerCup
+  'heroHeadline', 'heroSubtext',
+  'donationRecipient', 'donationDescription',
+  'maxCupsPerScan', 'maxCupsToShare', 'receiptMaxAgeDays',
+  'featureCupSharing', 'featureDonations', 'featureDirectRefunds',
+  'maxHoldBalance', 'holdCapMessage',
+  'maxCupsPerDay', 'dailyCapMessage',
+  'balanceResetDays', 'resetWarningMessage',
+  'budgetPausedTitle', 'budgetPausedBody',
+];
+
+export function stripSettingsForMode(settings) {
+  if (!settings || settings.mode !== ORG_MODE_TIKKIE_ONLY) return settings;
+  const out = { ...settings };
+  for (const k of TIKKIE_ONLY_STRIP_KEYS) delete out[k];
+  return out;
+}

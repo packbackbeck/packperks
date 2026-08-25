@@ -734,7 +734,8 @@ const TIKKIE_FEE_EUR = 0.50;
 
 function StepEconomics({ data, modelKey, features, onChange }) {
   const isTikkie = modelKey === 'tikkie_only';
-  const rate = Number(data.cashbackRatePerCup) || 0;
+  // Tikkie-only settles on ONE rate — the refund rate. bin-tikkie reads it.
+  const rate = Number(isTikkie ? data.refundRatePerCup : data.cashbackRatePerCup) || 0;
 
   if (isTikkie) {
     // One number matters here: what a returned cup is worth. Every receipt
@@ -747,15 +748,11 @@ function StepEconomics({ data, modelKey, features, onChange }) {
           A bin receipt is paid out as one Tikkie link: cups on the receipt × the rate below.
           Nothing else on this screen applies — there's no app, no sharing and no reward goals.
         </p>
-        <Field label="Payout per cup (€)" hint="The customer receives this for every cup on the receipt.">
+        <Field label="Refund per cup (€)" hint="The customer receives this for every cup on the receipt.">
           <input
             type="number" step="0.05" min="0"
-            value={data.cashbackRatePerCup}
-            onChange={e => {
-              const v = parseFloat(e.target.value) || 0;
-              // Keep the refund rate in lockstep — this model has one rate.
-              onChange({ cashbackRatePerCup: v, refundRatePerCup: v });
-            }}
+            value={data.refundRatePerCup}
+            onChange={e => onChange({ refundRatePerCup: parseFloat(e.target.value) || 0 })}
             autoFocus
           />
         </Field>
@@ -1005,7 +1002,7 @@ function StepReview({ data, model, groups, steps }) {
     ['Legal name', data.legal.legal_name || '(not set)'],
     ['First location', data.location.skipped || !data.location.name ? '(skipped)' : data.location.name],
     isTikkie
-      ? ['Payout', `€${Number(data.economics.cashbackRatePerCup).toFixed(2)} per cup`]
+      ? ['Refund', `€${Number(data.economics.refundRatePerCup).toFixed(2)} per cup`]
       : ['Cashback / refund', `€${Number(data.economics.cashbackRatePerCup).toFixed(2)} / €${Number(data.economics.refundRatePerCup).toFixed(2)} per cup`],
     ...(steps.some(s => s.id === 'rewards')
       ? [['Starter rewards', data.rewards.length === 0 ? '(none)' : `${data.rewards.length} reward(s)`]]

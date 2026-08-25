@@ -2722,7 +2722,12 @@ export async function createOrganization(payload) {
   // The org-level mode marker. Only tikkie_only is stored here — deposit and
   // BYO live on the GROUP config, which is where the customer app and
   // byo-mint read them from.
-  if (model === 'tikkie_only') settings.mode = 'tikkie_only';
+  if (model === 'tikkie_only') {
+    settings.mode = 'tikkie_only';
+    // One rate only. There's no reward to redeem, so a cashback rate would
+    // be a second number nobody sets and bin-tikkie never reads.
+    delete settings.cashbackRatePerCup;
+  }
   const liveRewards = (wizardRewards || []).map((r, i) => ({
     id: r.id || `reward-${i+1}-${Date.now().toString(36)}`,
     name: r.name,

@@ -64,8 +64,14 @@
   margin: 0;
   font-size: 14.5px; line-height: 1.55; color: #6C6259;
 }
+.tikkie-only__payout { margin: 2px 0 14px; }
 .tikkie-only__amount {
-  font-size: 17px; color: #1F1B16; margin-right: 4px;
+  font-size: 44px; font-weight: 800; line-height: 1.05; color: #1F1B16;
+  letter-spacing: -0.02em;
+}
+.tikkie-only__cups {
+  margin-top: 6px;
+  font-size: 14px; font-weight: 700; color: #6C6259;
 }
 .tikkie-only__btn {
   display: inline-block;

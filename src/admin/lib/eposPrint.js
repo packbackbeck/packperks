@@ -25,6 +25,7 @@
  * ───────────────────────────────────────────────────────────────────── */
 
 import logoUrl from '../../assets/images/packback-print-logo.svg';
+import { getReceiptCopy } from '../cupqr/receiptCopy';
 
 const DEFAULT_PRINTER_IP = '192.168.192.168';
 const IP_STORAGE_KEY = 'packperks_printer_ip';
@@ -151,9 +152,10 @@ function drawFeatureIcon(ctx, idx, cx, cy) {
 
 /* Render the static top of the receipt (logo, headline, intro, 3 icon
  * cards, "Scan to start") to a mono <image>. Cached after first render. */
-let _headerImgCache; // undefined=not tried, ''=failed, string=ready
-async function renderHeaderImage() {
-  if (_headerImgCache !== undefined) return _headerImgCache;
+const _headerImgCache = {}; // variant -> ''=failed | string=ready
+async function renderHeaderImage(variant = 'standard') {
+  if (_headerImgCache[variant] !== undefined) return _headerImgCache[variant];
+  const copy = getReceiptCopy(variant);
   try {
     if (typeof document === 'undefined') throw new Error('no DOM');
     const W = PRINT_WIDTH;
@@ -178,12 +180,12 @@ async function renderHeaderImage() {
 
     // Headline
     ctx.font = 'bold 42px Arial, sans-serif';
-    ctx.fillText('GET YOUR REFUND', W / 2, y + 38); y += 48;
-    ctx.fillText('AND REWARDS', W / 2, y + 38); y += 60;
+    for (const ln of copy.titleLines) { ctx.fillText(ln, W / 2, y + 38); y += 48; }
+    y += 12;
 
     // Intro
     ctx.font = '23px Arial, sans-serif';
-    for (const ln of wrapText(ctx, 'Use PackPerks to access your deposit, track returns, and unlock extra rewards.', W - 64)) {
+    for (const ln of wrapText(ctx, copy.lede, W - 64)) {
       ctx.fillText(ln, W / 2, y + 22); y += 32;
     }
     y += 22;
@@ -192,12 +194,12 @@ async function renderHeaderImage() {
     const m = 18, gap = 14;
     const boxW = (W - 2 * m - 2 * gap) / 3;
     const boxH = 128;
-    const labels = [['Access your', 'deposit'], ['Earn more from', 'repeat returns'], ['Keep track of', 'your progress']];
+    const labels = copy.features.map(f => f.lines);
     for (let c = 0; c < 3; c++) {
       const x = m + c * (boxW + gap);
       ctx.lineWidth = 2;
       strokeRoundRect(ctx, x, y, boxW, boxH, 14);
-      drawFeatureIcon(ctx, c, x + boxW / 2, y + 38);
+      drawFeatureIcon(ctx, copy.features[c].icon, x + boxW / 2, y + 38);
       ctx.fillStyle = '#000'; ctx.font = 'bold 19px Arial, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
       let ty = y + 82;
@@ -207,7 +209,7 @@ async function renderHeaderImage() {
 
     // Scan CTA
     ctx.font = 'bold 30px Arial, sans-serif';
-    ctx.fillText('Scan to start with PackPerks', W / 2, y + 28); y += 40;
+    ctx.fillText(copy.cta, W / 2, y + 28); y += 40;
 
     // Trim to used height
     const trimmed = document.createElement('canvas');
@@ -216,12 +218,12 @@ async function renderHeaderImage() {
     tctx.fillStyle = '#FFFFFF'; tctx.fillRect(0, 0, W, y);
     tctx.drawImage(canvas, 0, 0);
 
-    _headerImgCache = canvasToEposImage(trimmed);
+    _headerImgCache[variant] = canvasToEposImage(trimmed);
   } catch (e) {
     console.warn('Header image render failed; using text layout:', e);
-    _headerImgCache = '';
+    _headerImgCache[variant] = '';
   }
-  return _headerImgCache;
+  return _headerImgCache[variant];
 }
 
 /* Logo-only raster, used only by the text fallback layout. Cached. */
@@ -248,7 +250,8 @@ async function getLogoImageXml() {
 
 /* Build the ePOS-Print XML. Prefers the rendered header image (matches the
  * dashboard preview). Falls back to a text layout if rendering failed. */
-export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, sessionId, cups, logo = getLogoKeys(), headerImageXml = '', logoImageXml = '' }) {
+export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, sessionId, cups, variant = 'standard', logo = getLogoKeys(), headerImageXml = '', logoImageXml = '' }) {
+  const copy = getReceiptCopy(variant);
   const when = generatedAt
     ? new Date(generatedAt).toLocaleString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -272,14 +275,14 @@ export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, 
     }
     top = [
       brand,
-      `<text dw="true" dh="true" em="true">GET YOUR REFUND${NL}AND REWARDS${NL}</text>`,
+      `<text dw="true" dh="true" em="true">${copy.titleLines.map(xmlEscape).join(NL)}${NL}</text>`,
       '<text dw="false" dh="false" em="false"/>',
       '<feed line="1"/>',
-      `<text>Use PackPerks to access your deposit,${NL}track returns, and unlock extra rewards.${NL}</text>`,
+      `<text>${xmlEscape(copy.lede)}${NL}</text>`,
       '<feed line="1"/>',
-      `<text>Access your deposit${NL}Earn more from repeat returns${NL}Keep track of your progress${NL}</text>`,
+      `<text>${copy.features.map(f => xmlEscape(f.lines.join(' '))).join(NL)}${NL}</text>`,
       '<feed line="1"/>',
-      `<text em="true">Scan to start with PackPerks${NL}</text><text em="false"/>`,
+      `<text em="true">${xmlEscape(copy.cta)}${NL}</text><text em="false"/>`,
       '<feed line="1"/>',
     ].join('');
   }
@@ -299,11 +302,12 @@ export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, 
       : '',
     `<symbol type="qrcode_model_2" level="level_m" width="6" height="6">${xmlEscape(url)}</symbol>`,
     '<feed line="2"/>',
-    `<text em="true">No app and no registration needed.${NL}Fast and secure.${NL}</text>`,
+    `<text em="true">${copy.assureLines.map(xmlEscape).join(NL)}${NL}</text>`,
     '<text em="false"/>',
     '<feed line="1"/>',
-    `<text>You can still directly refund in the same${NL}app by tapping the user icon top-right.${NL}</text>`,
-    '<feed line="2"/>',
+    copy.noteEscPos.length
+      ? `<text>${copy.noteEscPos.map(xmlEscape).join(NL)}${NL}</text><feed line="2"/>`
+      : '<feed line="1"/>',
     `<text>${DASH}${NL}</text>`,
     '<text align="left"/>',
     `<text>Time:          ${xmlEscape(when)}${NL}</text>`,
@@ -328,7 +332,7 @@ export async function printCupReceipt(data, ip = getPrinterIp()) {
   let headerImageXml = '';
   let logoImageXml = '';
   if (!getLogoKeys()) {
-    headerImageXml = await renderHeaderImage();
+    headerImageXml = await renderHeaderImage(data?.variant || 'standard');
     if (!headerImageXml) logoImageXml = await getLogoImageXml();
   }
   const xml = buildCupReceiptXml({ ...data, headerImageXml, logoImageXml });

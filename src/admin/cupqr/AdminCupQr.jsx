@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches, deleteCupBatches } from '../lib/adminApi';
 import { printCupReceipt, getPrinterIp, setPrinterIp, getLogoKeys, setLogoKeys } from '../lib/eposPrint';
 import { useOrg } from '../context/OrgContext';
+import { getReceiptCopy } from './receiptCopy';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import QuickLinks from '../shared/QuickLinks';
@@ -53,7 +54,12 @@ const PROD_URL = APP_URL;
  * the QR on screen is scannable directly.
  * ───────────────────────────────────────────────────────────────────── */
 export default function AdminCupQr({ onNavigate }) {
-  const { activeOrg } = useOrg();
+  const { activeOrg, activeOrgMode, activeOrgSettings } = useOrg();
+  // Tikkie-only orgs print a receipt that pays out on scan — no app, no
+  // rewards — so the wording and the payout figure both change.
+  const isTikkieOnly = activeOrgMode === 'tikkie_only';
+  const receiptVariant = isTikkieOnly ? 'tikkie' : 'standard';
+  const copy = getReceiptCopy(receiptVariant);
   const [count, setCount] = useState(1);
   const [restaurant, setRestaurant] = useState(
     activeOrg ? `${activeOrg.partner_brand_name || activeOrg.name} — Location` : 'Location 1'
@@ -233,6 +239,7 @@ export default function AdminCupQr({ onNavigate }) {
         generatedAt: batch.generatedAt,
         totalAmount: refundAmount,
         sessionId,
+        variant: receiptVariant,
         // Real minted count (not the form's `count`) — this is exactly what
         // the QR will credit on scan, so the printed number can't disagree
         // with reality and the two receipts are never confused.
@@ -282,9 +289,10 @@ export default function AdminCupQr({ onNavigate }) {
         url,
         restaurant,
         generatedAt: newBatch.generatedAt,
-        totalAmount: (n * 1.0).toFixed(2),
+        totalAmount: (n * ratePerCup).toFixed(2),
         sessionId: res.batch_id.slice(0, 8).toUpperCase(),
         cups: res.cup_ids?.length ?? n,
+        variant: receiptVariant,
       }, printerIp);
 
       // Printed OK → commit it to the records.
@@ -384,7 +392,13 @@ export default function AdminCupQr({ onNavigate }) {
     navigator.clipboard?.writeText(batch.url).catch(() => {});
   }
 
-  const refundAmount = (count * 1.0).toFixed(2);
+  /* Per-cup payout. Was hardcoded at €1.00, which printed a figure no org
+   * actually pays; read the live published rate instead. Tikkie-only orgs
+   * pay the refund rate — it's the single rate bin-tikkie settles on. */
+  const ratePerCup = Number(
+    activeOrgSettings?.refundRatePerCup ?? activeOrgSettings?.cashbackRatePerCup ?? 1,
+  ) || 0;
+  const refundAmount = (count * ratePerCup).toFixed(2);
   const sessionId = batch?.batch_id?.slice(0, 8).toUpperCase() ?? '———';
   const generatedAt = batch?.generatedAt ?? new Date();
 
@@ -646,25 +660,22 @@ export default function AdminCupQr({ onNavigate }) {
               <img src={packbackLogo} alt="PackBack" />
             </header>
 
-            <h2 className="acq-receipt__title">GET YOUR REFUND<br/>AND REWARDS</h2>
+            <h2 className="acq-receipt__title">
+              {copy.titleLines.map((ln, i) => (
+                <span key={ln}>{i > 0 && <br />}{ln}</span>
+              ))}
+            </h2>
             <p className="acq-receipt__lede">
-              Use <strong>PackPerks</strong> to access your deposit, track returns,
-              and unlock extra rewards.
+              {copy.ledeJsx[0]}<strong>{copy.ledeJsx[1]}</strong>{copy.ledeJsx[2]}
             </p>
 
             <ul className="acq-receipt__features">
-              <li>
-                <span className="acq-receipt__feature-icon" aria-hidden>💸</span>
-                <span>Access your deposit</span>
-              </li>
-              <li>
-                <span className="acq-receipt__feature-icon" aria-hidden>🎁</span>
-                <span>Earn more from repeat returns</span>
-              </li>
-              <li>
-                <span className="acq-receipt__feature-icon" aria-hidden>🌍</span>
-                <span>Keep track of your progress</span>
-              </li>
+              {copy.features.map(f => (
+                <li key={f.lines.join(' ')}>
+                  <span className="acq-receipt__feature-icon" aria-hidden>{f.emoji}</span>
+                  <span>{f.lines.join(' ')}</span>
+                </li>
+              ))}
             </ul>
 
             <div className="acq-receipt__cupcount">
@@ -672,7 +683,7 @@ export default function AdminCupQr({ onNavigate }) {
               <span className="acq-receipt__cupcount-label">{(batch?.cup_ids?.length ?? count) === 1 ? 'CUP' : 'CUPS'}</span>
             </div>
 
-            <h3 className="acq-receipt__cta">Scan to start with PackPerks</h3>
+            <h3 className="acq-receipt__cta">{copy.cta}</h3>
 
             <div className="acq-receipt__qr">
               {batch ? (
@@ -689,10 +700,7 @@ export default function AdminCupQr({ onNavigate }) {
               <br />Fast and secure.
             </p>
 
-            <p className="acq-receipt__note">
-              You can still directly refund in the same app by clicking on the
-              user icon top-right.
-            </p>
+            {copy.note && <p className="acq-receipt__note">{copy.note}</p>}
 
             <div className="acq-receipt__dashed" />
 

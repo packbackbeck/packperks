@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { saveAppConfig, getAppConfig } from '../../lib/api';
 import { useOrg } from '../context/OrgContext';
+import { stripSettingsForMode } from '../lib/orgModes';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Multi-org note (Phase 2): the admin draft (working copy of rewards +
@@ -310,7 +311,13 @@ export function useAdminDraft() {
       setPublishError('Draft is still loading. Wait a moment and try publishing again.');
       return;
     }
-    saveAppConfig({ rewards: draft.rewards, settings: draft.settings }, activeOrgId).catch(err => {
+    // Tikkie-only orgs publish a lean config: the reward/app keys the draft
+    // still carries (they're in DEFAULT_SETTINGS for every org) describe
+    // machinery this mode doesn't run, and rewards are never shown.
+    const isTikkieOnly = draft.settings?.mode === 'tikkie_only';
+    const outSettings = stripSettingsForMode(draft.settings);
+    const outRewards = isTikkieOnly ? [] : draft.rewards;
+    saveAppConfig({ rewards: outRewards, settings: outSettings }, activeOrgId).catch(err => {
       console.error('saveAppConfig failed:', err);
       setPublishError(err?.message || 'Could not save to Supabase. Check app_config table + RLS policies.');
     });

@@ -95,6 +95,17 @@ export const SECTIONS = [
   },
 ];
 
+/* Which settings sections apply to an org mode. A tikkie-only org has no
+ * app, no cup balance and no rewards, so App copy, Cup rules and Limits &
+ * caps have nothing left to configure — every field in them describes
+ * machinery that mode doesn't run. Rates and Feature flags stay: rates
+ * carries the single payout rate, flags carries the mode picker itself
+ * plus maintenance mode. */
+export function settingsSectionsForMode(mode) {
+  if (mode !== 'tikkie_only') return SECTIONS;
+  return SECTIONS.filter(s => s.id === 'rates' || s.id === 'flags');
+}
+
 const FEATURE_FLAGS = [
   { key: 'featureCupSharing',    label: 'Cup sharing',     desc: 'Customers can share cups with friends via QR.' },
   { key: 'featureDonations',     label: 'Donations',       desc: 'Customers can donate cups to a charity partner.' },
@@ -255,7 +266,11 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
    * group-scoped hub reading group settings), not the per-org draft — so
    * it's loaded/saved directly against app_config rather than through the
    * publish cycle. Shown only when the active org belongs to a group. */
-  const { activeGroupId, activeOrgId } = useOrg();
+  const { activeGroupId, activeOrgId, activeOrgMode } = useOrg();
+  // Tikkie-only: no app, no cup balance, no rewards. Sections and fields
+  // that only describe those are hidden rather than left to mislead.
+  const isTikkieOnly = activeOrgMode === 'tikkie_only';
+  const visibleSections = settingsSectionsForMode(activeOrgMode);
   const [hideLive, setHideLive] = useState(false);
   const [hideLiveBusy, setHideLiveBusy] = useState(false);
 
@@ -279,6 +294,15 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
     setOrgModeBusy(true);
     try {
       await setOrgMode(activeOrgId, next);
+      /* Keep the DRAFT in sync too. setOrgMode writes the published config
+       * directly, but Publish later pushes draft.settings wholesale — so a
+       * draft that never learned the mode would silently revert the org on
+       * the next publish. */
+      updateDraft(d => {
+        const settings = { ...d.settings };
+        if (next) settings.mode = next; else delete settings.mode;
+        return { ...d, settings };
+      });
     } catch {
       setOrgModeState(prev);         // roll back on failure
     } finally {
@@ -426,7 +450,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             provides a shared horizontal table of contents instead. */}
         {!embedded && (
         <nav className="as-toc" aria-label="Settings sections">
-          {SECTIONS.map(s => (
+          {visibleSections.map(s => (
             <button
               key={s.id}
               type="button"
@@ -444,7 +468,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
         <div className="as-content">
           {/* ── Payout rates ── */}
           <SectionCard section={SECTIONS[0]}>
-            {ratesChanged && (
+            {ratesChanged && !isTikkieOnly && (
               <div className="as-rate-warn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -477,6 +501,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               </div>
             )}
 
+            {!isTikkieOnly && (
             <Field label="Cashback rate" hint="Paid when a customer redeems for a food reward.">
               <div className="as-input-prefix-wrap">
                 <span className="as-input-prefix">€</span>
@@ -492,8 +517,14 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 <span className="as-input-suffix">per cup</span>
               </div>
             </Field>
+            )}
 
-            <Field label="Direct refund rate" hint="Paid when a customer cashes out instead of choosing a reward.">
+            <Field
+              label={isTikkieOnly ? 'Refund rate' : 'Direct refund rate'}
+              hint={isTikkieOnly
+                ? 'The rate every bin receipt is paid out at: cups on the receipt × this amount.'
+                : 'Paid when a customer cashes out instead of choosing a reward.'}
+            >
               <div className="as-input-prefix-wrap">
                 <span className="as-input-prefix">€</span>
                 <input
@@ -509,6 +540,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               </div>
             </Field>
 
+            {!isTikkieOnly && (
             <Field label="Receipt claim window" hint="How long a receipt stays claimable after purchase. The AI flags older receipts for review.">
               <div className="as-input-prefix-wrap">
                 <input
@@ -523,6 +555,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 <span className="as-input-suffix">days</span>
               </div>
             </Field>
+            )}
 
             <div className="as-rate-preview">
               <div className="as-rate-preview__head">
@@ -530,29 +563,41 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 <span className="as-rate-preview__hint">Auto-updates as you edit above.</span>
               </div>
               <div className="as-rate-preview__grid">
-                <div className="as-rate-preview__cell">
-                  <span className="as-rate-preview__cell-label">3 cups · cashback</span>
-                  <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 3).toFixed(2)}</span>
-                </div>
-                <div className="as-rate-preview__cell">
-                  <span className="as-rate-preview__cell-label">6 cups · cashback</span>
-                  <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 6).toFixed(2)}</span>
-                </div>
-                <div className="as-rate-preview__cell as-rate-preview__cell--muted">
-                  <span className="as-rate-preview__cell-label">3 cups · direct refund</span>
-                  <span className="as-rate-preview__cell-val">€{(settings.refundRatePerCup * 3).toFixed(2)}</span>
-                </div>
-                <div className="as-rate-preview__cell as-rate-preview__cell--accent">
-                  <span className="as-rate-preview__cell-label">Cashback uplift</span>
-                  <span className="as-rate-preview__cell-val">
-                    +€{((settings.cashbackRatePerCup - settings.refundRatePerCup)).toFixed(2)}/cup
-                  </span>
-                </div>
+                {isTikkieOnly ? (
+                  [1, 3, 6, 10].map(n => (
+                    <div key={n} className="as-rate-preview__cell">
+                      <span className="as-rate-preview__cell-label">{n} cup{n === 1 ? '' : 's'} returned</span>
+                      <span className="as-rate-preview__cell-val">€{(settings.refundRatePerCup * n).toFixed(2)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div className="as-rate-preview__cell">
+                      <span className="as-rate-preview__cell-label">3 cups · cashback</span>
+                      <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 3).toFixed(2)}</span>
+                    </div>
+                    <div className="as-rate-preview__cell">
+                      <span className="as-rate-preview__cell-label">6 cups · cashback</span>
+                      <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 6).toFixed(2)}</span>
+                    </div>
+                    <div className="as-rate-preview__cell as-rate-preview__cell--muted">
+                      <span className="as-rate-preview__cell-label">3 cups · direct refund</span>
+                      <span className="as-rate-preview__cell-val">€{(settings.refundRatePerCup * 3).toFixed(2)}</span>
+                    </div>
+                    <div className="as-rate-preview__cell as-rate-preview__cell--accent">
+                      <span className="as-rate-preview__cell-label">Cashback uplift</span>
+                      <span className="as-rate-preview__cell-val">
+                        +€{((settings.cashbackRatePerCup - settings.refundRatePerCup)).toFixed(2)}/cup
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </SectionCard>
 
           {/* ── App copy ── */}
+          {!isTikkieOnly && (
           <SectionCard section={SECTIONS[1]}>
             <Field label="Hero headline" hint="Top of the user app homepage.">
               <input className="as-input" value={settings.heroHeadline} onChange={e => updateSetting('heroHeadline', e.target.value)} placeholder="Collect Cups & Get Rewards" />
@@ -570,8 +615,10 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               <textarea className="as-input as-input--textarea" rows={3} value={settings.donationDescription} onChange={e => updateSetting('donationDescription', e.target.value)} />
             </Field>
           </SectionCard>
+          )}
 
           {/* ── Cup rules ── */}
+          {!isTikkieOnly && (
           <SectionCard section={SECTIONS[2]}>
             <div className="as-field-row">
               <Field label="Cups awarded per scan" hint="Most bins emit one cup per scan.">
@@ -593,6 +640,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               </Field>
             </div>
           </SectionCard>
+          )}
 
           {/* ── Feature flags ── */}
           <SectionCard section={SECTIONS[3]}>
@@ -636,7 +684,11 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             )}
 
             <div className="as-flag-list">
-              {FEATURE_FLAGS.map(f => (
+              {/* Sharing, donations and direct refunds all act on a cup
+                  balance inside the app — none of which a tikkie-only org
+                  has. The mode picker above and maintenance mode below are
+                  the only switches that still mean anything. */}
+              {(isTikkieOnly ? [] : FEATURE_FLAGS).map(f => (
                 <label key={f.key} className="as-flag-row">
                   <div className="as-flag-row__info">
                     <div className="as-flag-row__label">{f.label}</div>
@@ -669,6 +721,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 </label>
               )}
 
+              {!isTikkieOnly && (
               <label className="as-flag-row">
                 <div className="as-flag-row__info">
                   <div className="as-flag-row__label">Require email verification <span className="as-flag-row__lock">Always on</span></div>
@@ -684,6 +737,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                   ariaLabel="Require email verification (always on)"
                 />
               </label>
+              )}
             </div>
 
             {/* Maintenance mode lives in its own block — disruptive switch. */}
@@ -717,6 +771,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
           </SectionCard>
 
           {/* ── Limits & caps ── */}
+          {!isTikkieOnly && (
           <SectionCard section={SECTIONS[4]}>
             {/* Max balance a customer may hold before they must redeem. */}
             <div className="as-limit-block">
@@ -849,6 +904,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               </ul>
             </div>
           </SectionCard>
+          )}
         </div>
       </div>
 

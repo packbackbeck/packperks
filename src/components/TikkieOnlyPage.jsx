@@ -65,8 +65,10 @@ export default function TikkieOnlyPage({ org, batchId }) {
       if (data?.url) {
         setPayout({ cups: data.cups, amount: data.amount, url: data.url });
         setPhase('redirecting');
-        // A beat so the user sees what's happening, then straight to Tikkie.
-        setTimeout(() => { window.location.replace(data.url); }, 900);
+        // Long enough to actually read the amount before Tikkie takes over.
+        // At the old 900ms the payout flashed past unread, which is the one
+        // thing the customer came here to see.
+        setTimeout(() => { window.location.replace(data.url); }, 2400);
         return;
       }
       if (data?.status === 'in_progress') {
@@ -114,15 +116,19 @@ export default function TikkieOnlyPage({ org, batchId }) {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <h1 className="tikkie-only__title">
-              {payout?.cups ? `${payout.cups} cup${payout.cups === 1 ? '' : 's'} returned` : 'All set!'}
-            </h1>
-            <p className="tikkie-only__sub">
-              {payout?.amount != null && (
-                <strong className="tikkie-only__amount">&euro;{Number(payout.amount).toFixed(2)}</strong>
+            {/* The payout is the headline: what they get, and for how many
+                cups, both readable at a glance before the redirect fires. */}
+            <div className="tikkie-only__payout">
+              <div className="tikkie-only__amount">
+                €{Number(payout?.amount ?? 0).toFixed(2)}
+              </div>
+              {payout?.cups != null && (
+                <div className="tikkie-only__cups">
+                  for {payout.cups} cup{payout.cups === 1 ? '' : 's'} returned
+                </div>
               )}
-              {' '}Redirecting you to Tikkie…
-            </p>
+            </div>
+            <p className="tikkie-only__sub">Redirecting you to Tikkie…</p>
             {/* Fallback if the auto-redirect is blocked. */}
             {payout?.url && (
               <a className="tikkie-only__btn" href={payout.url}>Open Tikkie</a>

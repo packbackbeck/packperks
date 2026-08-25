@@ -159,6 +159,10 @@ export function OrgProvider({ children }) {
   // Org-level operating mode (null | 'tikkie_only') — see orgModes.js. Gates
   // the whole dashboard, so it lives here next to the group mode.
   const [activeOrgMode, setActiveOrgMode] = useState(null);
+  // The org's PUBLISHED settings blob — what customers and the edge
+  // functions actually see. Pages that must reflect live behaviour (the
+  // receipt generator's payout figure) read this, not the admin draft.
+  const [activeOrgSettings, setActiveOrgSettings] = useState(null);
   // Bumped by the settings mode picker (via the 'pp-org-mode-changed' event)
   // so the dashboard re-gates immediately without a full reload.
   const [modeRefresh, setModeRefresh] = useState(0);
@@ -171,7 +175,11 @@ export function OrgProvider({ children }) {
     let alive = true;
     const oid = activeOrg?.id;
     const gid = activeOrg?.group_id;
-    if (!oid) { setActiveOrgSharing(false); setActiveGroupMode(null); setActiveOrgMode(null); return undefined; }
+    if (!oid) {
+      setActiveOrgSharing(false); setActiveGroupMode(null);
+      setActiveOrgMode(null); setActiveOrgSettings(null);
+      return undefined;
+    }
     (async () => {
       const keys = [`published:${oid}`];
       if (gid) keys.push(`published:group:${gid}`);
@@ -182,6 +190,7 @@ export function OrgProvider({ children }) {
       setActiveOrgSharing(orgCfg?.value?.settings?.featureCupSharing === true);
       setActiveGroupMode(grpCfg?.value?.settings?.mode || null);
       setActiveOrgMode(orgCfg?.value?.settings?.mode || null);
+      setActiveOrgSettings(orgCfg?.value?.settings || null);
     })();
     return () => { alive = false; };
   }, [activeOrg?.id, activeOrg?.group_id, modeRefresh]);
@@ -238,6 +247,7 @@ export function OrgProvider({ children }) {
     activeOrgSharing,     // is cup sharing on for the active org?
     activeGroupMode,      // 'byo' | 'deposit' | null (active org's group)
     activeOrgMode,        // org-level mode: 'tikkie_only' | null
+    activeOrgSettings,    // the org's published settings blob (or null)
   };
 
   return <OrgCtx.Provider value={value}>{children}</OrgCtx.Provider>;

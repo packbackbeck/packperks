@@ -225,7 +225,11 @@ Deno.serve(async (req) => {
   const settings = (cfgRow?.value as { settings?: Record<string, unknown> } | null)?.settings || {};
   if (settings.mode !== "tikkie_only") return json({ error: "wrong_mode" }, 409);
 
-  const rawRate = Number(settings.cashbackRatePerCup);
+  // Tikkie-only orgs settle on a SINGLE rate: the refund rate. (There is no
+  // reward to redeem, so a separate cashback rate would be a second number
+  // nobody sets. cashbackRatePerCup is read only as a fallback for orgs
+  // created before the rates were merged.)
+  const rawRate = Number(settings.refundRatePerCup ?? settings.cashbackRatePerCup);
   const rate = Math.min(
     MAX_RATE_EUR,
     Number.isFinite(rawRate) && rawRate > 0 ? rawRate : DEFAULT_RATE_EUR,

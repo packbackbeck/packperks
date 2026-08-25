@@ -111,7 +111,9 @@ export default function TikkieOnlyPage({ org, batchId }) {
 
         {phase === 'redirecting' && (
           <>
-            <div className="tikkie-only__check" style={{ background: brandColor }} aria-hidden="true">
+            {/* Success is always green — the org's brand colour (often warm
+                orange/red) reads as an error on a confirmation tick. */}
+            <div className="tikkie-only__check" aria-hidden="true">
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>

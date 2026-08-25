@@ -45,6 +45,7 @@
   width: 46px; height: 46px;
   margin: 0 auto 18px;
   border-radius: 50%;
+  background: #1A8737;
   display: flex; align-items: center; justify-content: center;
   animation: tikkie-only-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }

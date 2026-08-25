@@ -967,24 +967,28 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
   const totalUsers = users.length;
   const withEmail  = users.filter(u => u.email && String(u.email).trim()).length;
 
-  // ── Visitor vs. user (S1) ──
-  // A "visitor" only opened the app. The moment someone adds a cup, tries a
-  // scan (even an already-claimed one), sets an email, picks a reward,
-  // or edits/regenerates their name, they're a real user. Derived from
-  // persisted state + scan rows + action events so it survives reloads.
-  const scanUserIds = new Set(scans.map(s => s.user_id).filter(Boolean));
-  const ENGAGE_EVENTS = new Set([
-    'reward_selected', 'name_edit_opened', 'name_regenerated', 'email_saved',
-    'reward_claim_attempted', 'withdraw_all_cups', 'direct_refund_opened', 'share_cup',
-  ]);
-  const eventEngagedIds = new Set(ev.filter(e => ENGAGE_EVENTS.has(e.event) && e.user_id).map(e => e.user_id));
-  const isEngagedUser = (u) =>
-    !!(u.email && String(u.email).trim()) ||
-    !!u.selected_reward_id ||
-    scanUserIds.has(u.id) ||
-    eventEngagedIds.has(u.id);
+  // ── Visitor vs. active user ──
+  // There are exactly TWO ways to stop being a visitor: land a first cup, or
+  // leave an email. Everything else someone can do in the app (tapping into
+  // a reward card, renaming themselves, a scan that failed or was already
+  // claimed) leaves no lasting trace and no way to reach them, so it no
+  // longer counts — it was inflating this number with people who never
+  // actually got anything.
+  const cupUserIds = new Set(
+    scans
+      .filter(s => (s.status === 'success' || s.status === 'partial') && (Number(s.cups_awarded) || 0) > 0)
+      .map(s => s.user_id)
+      .filter(Boolean),
+  );
+  const hasEmail = (u) => !!(u.email && String(u.email).trim());
+  const isEngagedUser = (u) => hasEmail(u) || cupUserIds.has(u.id);
   const engagedUsers = users.filter(isEngagedUser).length;
   const visitorUsers = Math.max(0, totalUsers - engagedUsers);
+  // Email capture measured against the population that could realistically
+  // leave one — someone who bounced off the landing screen never had a
+  // reason to. (Every user with an email is active by definition, so this
+  // numerator is a strict subset of engagedUsers.)
+  const activeWithEmail = users.filter(u => isEngagedUser(u) && hasEmail(u)).length;
 
   // ── Behavioural events (client_events) ──
   const visitorSessions = new Set(ev.filter(e => e.event === 'app_loaded' && e.session_id).map(e => e.session_id)).size;
@@ -1122,19 +1126,23 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
         numLabel: 'Cups spent', denLabel: 'Cups registered',
         desc: 'Cups spent on claims out of all cups customers actually scanned in (not just generated).' }),
     M({ id: 'rewards_claim', group: 'primary', label: 'Rewards claim rate',
-        numerator: usersWithClaim, denominator: totalUsers,
-        numLabel: 'Users who claimed', denLabel: 'Total users',
-        desc: 'Users who made at least one claim, out of everyone who used the app.' }),
+        numerator: usersWithClaim, denominator: engagedUsers,
+        numLabel: 'Users who claimed', denLabel: 'Active users',
+        desc: 'Active users who made at least one claim. Measured against active users, not all profiles — someone who only opened the app and left never had a cup to claim with, so counting them would understate this.' }),
     M({ id: 'active_users', group: 'primary', label: 'Active users (not just visitors)',
         numerator: engagedUsers, denominator: totalUsers,
         numLabel: 'Active users', denLabel: 'All profiles',
-        desc: 'Profiles that did something real — added a cup, tried a scan (even an already-claimed one), set an email, picked a reward, or edited their name. The rest are visitors who only opened the app (e.g. via a shared/poster link), which inflates the raw user count.' }),
+        desc: 'A profile becomes an active user in one of two ways: it collects a first cup, or it leaves an email. Nothing else counts — a failed or already-claimed scan, opening a reward card or renaming yourself all leave the person with nothing and us with no way to reach them. The rest are visitors who only opened the app (e.g. via a shared or poster link), which inflates the raw profile count.' }),
 
     // ── Secondary ──
-    M({ id: 'emails_input', group: 'secondary', label: 'Emails input rate',
+    M({ id: 'emails_active', group: 'primary', label: 'Email rate (active users)',
+        numerator: activeWithEmail, denominator: engagedUsers,
+        numLabel: 'Active users with an email', denLabel: 'Active users',
+        desc: 'Of the people who actually got a cup or left an email, how many we can reach. This is the honest email-capture number: visitors who bounced off the landing screen never had a reason to leave one, so they are excluded.' }),
+    M({ id: 'emails_input', group: 'secondary', label: 'Emails input rate (all profiles)',
         numerator: withEmail, denominator: totalUsers,
-        numLabel: 'Emails collected', denLabel: 'Total users',
-        desc: 'Customers who linked an email to their balance.' }),
+        numLabel: 'Emails collected', denLabel: 'All profiles',
+        desc: 'Customers who linked an email, measured against every profile ever created — visitors included. Kept for continuity; "Email rate (active users)" is the number to steer on.' }),
     M({ id: 'changed_rewards', group: 'secondary', label: 'Changed rewards rate',
         numerator: rewardChangeSessions, denominator: visitorSessions,
         numLabel: 'Visits with a reward change', denLabel: 'Total visits',
@@ -1199,7 +1207,7 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
     M({ id: 'visitor_rate', group: 'optional', label: 'Visitor rate',
         numerator: visitorUsers, denominator: totalUsers,
         numLabel: 'Visitors (opened only)', denLabel: 'All profiles',
-        desc: 'Share of profiles that only ever opened the app and never took an action — created by a shared/poster link or an in-app browser. This is the slice of the raw user count that is not a real user.' }),
+        desc: 'Share of profiles that never collected a cup and never left an email — created by a shared or poster link, or an in-app browser. This is the slice of the raw profile count that is not a real user.' }),
     { measurable: true, id: 'audience_split', group: 'optional', label: 'Audience split',
         valueType: 'count', value: null, rawValue: totalUsers, valueText: totalUsers.toLocaleString(),
         numerator: totalUsers, numLabel: 'Total profiles', denominator: null, denLabel: null,
@@ -1208,7 +1216,7 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
           { key: 'visitor', label: 'Visitors', count: visitorUsers },
         ],
         breakdownTitle: 'Active users vs visitors', breakdownNoun: 'profiles',
-        desc: 'Every profile split into active users (did something) vs visitors (only opened the app).' },
+        desc: 'Every profile split into active users (collected a cup or left an email) vs visitors (neither).' },
     (screenSessions > 0
       ? { measurable: true, id: 'last_screen', group: 'optional', label: 'Most common last screen',
           valueType: 'count', value: null, rawValue: topScreenCount, valueText: topScreen,

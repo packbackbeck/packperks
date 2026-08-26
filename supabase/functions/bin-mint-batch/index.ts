@@ -2,9 +2,11 @@
 // bin-mint-batch — the smart bin's only call into PackPerks.
 //
 // The bin runs a session per customer, counts the cups they deposit, then
-// calls this endpoint ONCE at the end of the session with exactly two
-// values: how many cups, and its own session id (UUID v4). We mint a batch
-// of cup tokens and return a URL:
+// calls this endpoint ONCE at the end of the session with: how many cups,
+// its own session id (UUID v4), and — for Redirect Refund orgs — the UUID
+// v4 it minted for each individual cup. Those cup ids are stored verbatim
+// as the primary keys in `cups`, so the bin and PackPerks refer to the
+// same cup by the same id. We return a URL:
 //
 //     https://perks.packback.network/<orgSlug>/?batch=<uuid>
 //
@@ -89,22 +91,27 @@ async function rateLimited(machineId: string): Promise<boolean> {
   }
 }
 
-/* What this many cups is worth at the org's live published rate, clamped by
- * the same caps bin-tikkie enforces when it actually mints the Tikkie link.
- * Returned so the bin can print the amount on the receipt. */
-async function previewAmount(orgId: string, cups: number): Promise<number | null> {
+/* The org's published settings — the mode (which decides whether cup ids
+ * are required) and the payout rate come from the same row, so read it once. */
+async function orgSettings(orgId: string): Promise<Record<string, unknown>> {
   try {
     const { data } = await admin.from("app_config")
       .select("value").eq("key", `published:${orgId}`).maybeSingle();
-    const s = (data?.value as { settings?: Record<string, unknown> } | null)?.settings || {};
-    const raw = Number(s.refundRatePerCup ?? s.cashbackRatePerCup);
-    const rate = Math.min(MAX_RATE_EUR, Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RATE_EUR);
-    const cfgMax = Number(s.tikkieMaxPerReceipt);
-    const maxTotal = Math.min(MAX_TOTAL_EUR, Number.isFinite(cfgMax) && cfgMax > 0 ? cfgMax : MAX_TOTAL_EUR);
-    return Math.min(maxTotal, Math.round(cups * rate * 100) / 100);
+    return (data?.value as { settings?: Record<string, unknown> } | null)?.settings || {};
   } catch {
-    return null;
+    return {};
   }
+}
+
+/* What this many cups is worth at the org's live published rate, clamped by
+ * the same caps bin-tikkie enforces when it actually mints the Tikkie link.
+ * Returned so the bin can print the amount on the receipt. */
+function previewAmount(s: Record<string, unknown>, cups: number): number {
+  const raw = Number(s.refundRatePerCup ?? s.cashbackRatePerCup);
+  const rate = Math.min(MAX_RATE_EUR, Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RATE_EUR);
+  const cfgMax = Number(s.tikkieMaxPerReceipt);
+  const maxTotal = Math.min(MAX_TOTAL_EUR, Number.isFinite(cfgMax) && cfgMax > 0 ? cfgMax : MAX_TOTAL_EUR);
+  return Math.min(maxTotal, Math.round(cups * rate * 100) / 100);
 }
 
 Deno.serve(async (req) => {
@@ -125,15 +132,20 @@ Deno.serve(async (req) => {
   const machineId = keyRow.machine_id || "unknown";
   if (await rateLimited(machineId)) return json({ error: "rate_limited" }, 429);
 
-  // Body: exactly { cups, session_id }. (`count` is still tolerated as an
+  // Body: { cups, session_id, cup_uuids }. (`count` is still tolerated as an
   // alias for `cups` so a half-updated bin isn't bricked mid-rollout.)
   let cups = NaN;
   let sessionId = "";
+  let cupUuids: string[] | null = null;
   try {
     const b = await req.json();
     const raw = b?.cups ?? b?.count;
     if (raw != null && String(raw).trim() !== "") cups = parseInt(String(raw), 10);
     if (b?.session_id != null) sessionId = String(b.session_id).trim();
+    if (b?.cup_uuids != null) {
+      if (!Array.isArray(b.cup_uuids)) return json({ error: "invalid_cup_uuids", detail: "cup_uuids must be an array of UUID v4 strings" }, 400);
+      cupUuids = b.cup_uuids.map((u: unknown) => String(u).trim().toLowerCase());
+    }
   } catch { /* falls through to the validation below */ }
 
   if (!Number.isFinite(cups) || cups < 1 || cups > MAX_CUPS_PER_SESSION) {
@@ -150,6 +162,30 @@ Deno.serve(async (req) => {
     .from("organizations").select("slug, name").eq("id", keyRow.org_id).maybeSingle();
   const slug = org?.slug ?? "";
   const buildUrl = (batchId: string) => `${PROD_URL}${slug ? slug + "/" : ""}?batch=${batchId}`;
+
+  const settings = await orgSettings(keyRow.org_id);
+  const isTikkieOnly = settings.mode === "tikkie_only";
+
+  /* Cup ids.
+   *
+   * A Redirect Refund bin mints a UUID v4 per physical cup and we store it
+   * verbatim as the cup's primary key, so the bin and PackPerks name the
+   * same cup the same way — which is what makes a bin-side record
+   * reconcilable against ours. Other bins have no such id and we generate
+   * our own, as before. */
+  if (isTikkieOnly && !cupUuids) {
+    return json({ error: "missing_cup_uuids", detail: "cup_uuids (one UUID v4 per cup) is required for this bin" }, 400);
+  }
+  if (cupUuids) {
+    if (cupUuids.length !== cups) {
+      return json({ error: "cup_uuids_mismatch", detail: `cup_uuids has ${cupUuids.length} entries but cups is ${cups}` }, 400);
+    }
+    const bad = cupUuids.find((u) => !UUID_V4_RE.test(u));
+    if (bad) return json({ error: "invalid_cup_uuids", detail: `not a UUID v4: ${bad}` }, 400);
+    if (new Set(cupUuids).size !== cupUuids.length) {
+      return json({ error: "duplicate_cup_uuids", detail: "cup_uuids contains the same id more than once" }, 400);
+    }
+  }
 
   // ── Idempotency: has this session already been minted? ──
   const { data: prior } = await admin
@@ -170,10 +206,42 @@ Deno.serve(async (req) => {
     });
   }
 
+  /* Bin-supplied ids are a SECOND idempotency key. If the bin retried with
+   * a fresh session_id but the same cup ids (a plausible firmware bug), a
+   * blind insert would either violate the primary key or, worse, mint a
+   * parallel batch for cups that already exist. Look first: if these exact
+   * ids are already one batch of ours, hand that batch back instead. */
+  if (cupUuids) {
+    const { data: existing } = await admin
+      .from("cups").select("id, batch_id").in("id", cupUuids);
+    if (existing && existing.length > 0) {
+      const batches = [...new Set(existing.map((r) => r.batch_id))];
+      if (batches.length === 1 && existing.length === cupUuids.length) {
+        const priorBatch = batches[0] as string;
+        const { data: ps } = await admin
+          .from("bin_sessions").select("cups, amount_eur").eq("batch_id", priorBatch).maybeSingle();
+        return json({
+          batch_id: priorBatch,
+          url: buildUrl(priorBatch),
+          cups: ps?.cups ?? existing.length,
+          count: ps?.cups ?? existing.length,
+          amount_eur: ps?.amount_eur ?? previewAmount(settings, existing.length),
+          currency: "EUR",
+          slug,
+          reused: true,
+        });
+      }
+      return json({
+        error: "cup_uuids_conflict",
+        detail: `${existing.length} of the supplied cup ids already exist under a different batch`,
+      }, 409);
+    }
+  }
+
   // ── Mint the batch ──
   const batchId = crypto.randomUUID();
-  const rows = Array.from({ length: cups }, () => ({
-    id: crypto.randomUUID(),
+  const rows = Array.from({ length: cups }, (_v, i) => ({
+    id: cupUuids ? cupUuids[i] : crypto.randomUUID(),
     batch_id: batchId,
     source: "admin_batch",   // same shape claim-cups / bin-tikkie already accept
     status: "available",
@@ -183,7 +251,7 @@ Deno.serve(async (req) => {
   if (insErr) return json({ error: "mint_failed", detail: insErr.message }, 500);
 
   const minted = inserted?.length ?? cups;
-  const amount = await previewAmount(keyRow.org_id, minted);
+  const amount = previewAmount(settings, minted);
 
   // Record the session AFTER the mint. If this insert loses a race with a
   // concurrent retry, the batch still stands — we just return ours; the

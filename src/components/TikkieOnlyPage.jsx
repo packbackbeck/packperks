@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import packperksLogo from '../assets/images/packperks-logo.svg';
+import packbackLogo from '../assets/images/packback-logo.svg';
+import tikkieLogo from '../assets/images/tikkie-logo.svg';
 import './TikkieOnlyPage.css';
 
 /* Tikkie-only mode (smart-bin cashback): the whole customer experience.
@@ -106,14 +107,14 @@ export default function TikkieOnlyPage({ org, batchId }) {
     <div className="tikkie-only">
       <div className="tikkie-only__card">
         <div className="tikkie-only__logos">
-          <img className="tikkie-only__logo" src={org?.logo_url || packperksLogo} alt={org?.name || 'PackPerks'} />
+          {/* PackBack, matching the printed receipt the customer just
+              scanned — an org logo still wins when one is set. */}
+          <img className="tikkie-only__logo" src={org?.logo_url || packbackLogo} alt={org?.name || 'PackBack'} />
           <svg className="tikkie-only__link-arrows" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="5" y1="12" x2="19" y2="12" />
             <polyline points="13 6 19 12 13 18" />
           </svg>
-          {/* Tikkie doesn't ship a hotlinkable logo — a wordmark chip keeps
-              the page self-contained and unmistakable. */}
-          <span className="tikkie-only__tikkie-chip">Tikkie</span>
+          <img className="tikkie-only__tikkie-logo" src={tikkieLogo} alt="Tikkie" />
         </div>
 
         {phase === 'working' && (
@@ -177,9 +178,8 @@ export default function TikkieOnlyPage({ org, batchId }) {
               )}
             </p>
             <div className="tikkie-only__note">
-              <strong>If you already entered your bank details on this link, the money is on its way —
-              don’t enter them again.</strong> A cashback link only pays out once, so a second attempt
-              won’t send you anything.
+              <strong>Already entered your bank details? The money is on its way.</strong> Don’t enter
+              them again: a cashback link only pays out once.
             </div>
             {payout?.amount != null && (
               <p className="tikkie-only__sub tikkie-only__sub--small">

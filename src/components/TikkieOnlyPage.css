@@ -23,14 +23,13 @@
   height: 40px; max-width: 120px; object-fit: contain;
 }
 .tikkie-only__link-arrows { color: #C9C2B4; flex-shrink: 0; }
-/* Tikkie brand chip — their app green, no hotlinked asset. */
-.tikkie-only__tikkie-chip {
-  display: inline-flex; align-items: center;
-  padding: 7px 14px;
-  border-radius: 12px;
-  background: #46BEAA;
-  color: #fff;
-  font-size: 17px; font-weight: 800; letter-spacing: 0.01em;
+/* Tikkie's own logo. Sized against the PackBack mark opposite it rather
+   than to its own bounding box, so the two read as an even pair. */
+.tikkie-only__tikkie-logo {
+  /* Taller than the PackBack mark's box on purpose: Tikkie's artwork
+     carries a lot of internal padding, so matching box heights would
+     leave it looking the smaller of the two. */
+  height: 46px; width: auto; flex-shrink: 0;
 }
 .tikkie-only__spinner {
   width: 42px; height: 42px;

@@ -17,16 +17,19 @@ export const ORG_MODE_META = {
   standard: {
     key: 'standard',
     label: 'Deposit Rewards',
+    short: 'DR',
     blurb: 'The full customer app: rewards, cup balance, accounts, direct refunds and receipt claims.',
   },
   byo: {
     key: 'byo',
     label: 'Bring Your Own',
+    short: 'BYO',
     blurb: 'Customers bring a reusable cup and scan the counter QR toward a reward. Requires a group — picking this creates one (or flips the org\u2019s existing group to BYO).',
   },
   tikkie_only: {
     key: ORG_MODE_TIKKIE_ONLY,
     label: 'Redirect Refund',
+    short: 'RR',
     blurb: 'Scanning a bin receipt QR goes straight to a Tikkie cashback link. No accounts, no rewards — the dashboard shows only the Receipt Generator and the payout log.',
   },
 };

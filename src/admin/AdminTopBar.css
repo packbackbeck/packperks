@@ -77,7 +77,11 @@
 .admin-topbar .wd-preview:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.6); color: #FFFFFF; }
 
 .admin-topbar__left {
-  flex: 0 0 220px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .admin-topbar__logo {
@@ -437,13 +441,17 @@
   .admin-topbar__tz { display: none; }
 }
 
-/* ── Programme-mode chip (Deposit Rewards / Bring Your Own / Redirect Refund) ── */
+/* ── Programme-mode chip: glyph + initials (DR / BYO / RR) ──
+   Compact on purpose — it sits beside the brand lockup all day, so it
+   reads as a status pip rather than a label competing with the logo.
+   The full mode name and description live in the tooltip. */
 .admin-topbar__mode {
-  display: inline-flex; align-items: center;
-  margin-left: 14px; padding: 4px 11px;
+  display: inline-flex; align-items: center; gap: 5px;
+  flex: 0 0 auto;
+  padding: 4px 9px;
   border-radius: 999px;
-  font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
-  white-space: nowrap; cursor: default;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em;
+  line-height: 1; white-space: nowrap; cursor: default;
   background: rgba(255, 255, 255, 0.12); color: #E9E2D4;
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
@@ -455,10 +463,12 @@
   background: linear-gradient(180deg, #C05A1E 0%, #A84E18 100%) !important;
 }
 .admin-topbar__maint {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-left: 10px; padding: 4px 11px;
+  display: inline-flex; align-items: center; gap: 5px;
+  flex: 0 0 auto;
+  padding: 4px 9px;
   border-radius: 999px;
-  font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em;
+  line-height: 1; white-space: nowrap;
   background: rgba(255, 255, 255, 0.92); color: #A84E18;
   animation: admin-maint-pulse 2.2s ease-in-out infinite;
 }

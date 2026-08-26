@@ -31,6 +31,41 @@ function OrgMark({ org }) {
   );
 }
 
+/* One glyph per programme model, so the chip is scannable before the
+ * initials are even read: a bin for deposit, a cup for bring-your-own, an
+ * arrow into a coin for the Tikkie redirect. */
+function MODE_ICONS({ effMode }) {
+  const common = {
+    width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 2.4,
+    strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+  };
+  if (effMode === 'byo') {
+    return (
+      <svg {...common}>
+        <path d="M6 3h12l-1.2 15.3A2 2 0 0 1 14.8 20H9.2a2 2 0 0 1-2-1.7L6 3z" />
+        <path d="M5 3h14" />
+      </svg>
+    );
+  }
+  if (effMode === 'tikkie_only') {
+    return (
+      <svg {...common}>
+        <line x1="4" y1="12" x2="16" y2="12" />
+        <polyline points="12 7 17 12 12 17" />
+        <circle cx="20" cy="12" r="1.6" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <polyline points="4 7 5.5 20.5 18.5 20.5 20 7" />
+      <line x1="3" y1="7" x2="21" y2="7" />
+      <path d="M9 4h6" />
+    </svg>
+  );
+}
+
 /* Stripped-down admin top bar.
  *
  * The Preview / Save / Publish / Version History controls and the
@@ -85,17 +120,21 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenS
           </div>
           <span
             className={`admin-topbar__mode admin-topbar__mode--${effMode}`}
-            title={modeMeta.blurb}
+            title={`${modeMeta.label} — ${modeMeta.blurb}`}
           >
-            {modeMeta.label}
+            <MODE_ICONS effMode={effMode} />
+            {modeMeta.short}
           </span>
           {maintenance && (
-            <span className="admin-topbar__maint" title="Maintenance mode is ON — the customer app is showing the maintenance banner and blocking new scans and claims. Turn it off in Settings → Feature flags.">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <span
+              className="admin-topbar__maint"
+              title="Maintenance mode is ON — the customer app is showing the maintenance banner and blocking new scans and claims. Turn it off in Settings → Feature flags."
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <rect x="6" y="4" width="4" height="16" rx="1" />
                 <rect x="14" y="4" width="4" height="16" rx="1" />
               </svg>
-              Maintenance
+              Paused
             </span>
           )}
         </div>

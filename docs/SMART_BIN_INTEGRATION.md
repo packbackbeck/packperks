@@ -3,11 +3,16 @@
 How a physical smart bin turns a customer's deposit session into a printed
 QR receipt that pays out.
 
-The bin makes **one HTTP call per customer session**. Everything else —
-which organisation the cups belong to, what they're worth, whether the QR
-pays out via Tikkie or opens the app — is decided server-side. The bin
-never needs to know, and never needs a firmware change when any of it
-changes.
+The bin makes **one HTTP call per customer session**, sending exactly two
+values: the cup count and a session UUID. Everything else — which
+organisation the cups belong to, what they're worth, whether the QR pays
+out via Tikkie or opens the app — is decided server-side. The bin never
+needs to know, and never needs a firmware change when any of it changes.
+
+> **Changed 26 Aug 2026:** `session_id` is now **required** and must be a
+> **UUID v4**. Calls without it, or with a free-text id, are rejected with
+> `400`. Earlier integration tests that sent a plain string (or no session
+> at all) need updating before they will mint.
 
 ---
 
@@ -18,13 +23,14 @@ customer deposits cups
         │
         ▼
   bin session ends  ──POST /bin-mint-batch──▶  PackPerks
-   (cups = 4)         X-Bin-Key: <secret>       · mints 4 cup tokens
-                      {cups, session_id}        · creates one batch UUID
+   cups        = 4     X-Bin-Key: <secret>       · mints 4 cup tokens
+   session_id  = UUID  {cups, session_id}        · creates one batch UUID
         ◀──────────── {url, amount_eur} ────────┘
         │
         ▼
-  bin prints QR of `url`   ← the QR is valid from this moment
-        │
+  bin encodes `url` as a QR code and prints it
+        │                    ↑ the bin draws the QR; we return only the
+        │                      string to encode, never an image
         ▼
   customer scans it → https://perks.packback.network/t3/?batch=<uuid>
         │
@@ -32,6 +38,8 @@ customer deposits cups
   Redirect Refund org → Tikkie cashback link (bin-tikkie)
   Deposit org         → the PackPerks app (claim-cups)
 ```
+
+The QR is valid from the moment the response comes back.
 
 ---
 
@@ -53,17 +61,24 @@ authentication, and it is also what maps the bin to an organisation.
 
 ### Request body
 
+Exactly two properties:
+
 ```json
 {
   "cups": 4,
-  "session_id": "bin7-2026-08-25T14:03:11Z-0042"
+  "session_id": "e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14"
 }
 ```
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `cups` | integer 1–50 | yes | Cups counted in this session. (`count` is accepted as a legacy alias.) |
-| `session_id` | string ≤128 chars | **strongly recommended** | The bin's own session identifier. Makes retries safe — see below. |
+| `cups` | integer 1–50 | **yes** | Cups counted in this session. |
+| `session_id` | **UUID v4** | **yes** | The bin's own id for this customer session. Generate a fresh one when the session opens. Makes retries safe — see below. |
+
+`session_id` must be a real UUID v4 (the version nibble is checked, so a v1
+UUID is rejected). Anything else is refused rather than accepted quietly:
+this field is the only thing standing between a retried request and a
+second payout for the same cups.
 
 ### Response `200`
 
@@ -79,9 +94,11 @@ authentication, and it is also what maps the bin to an organisation.
 }
 ```
 
-**Print `url` as the QR code.** Do not build the URL yourself — the slug
-changes when a bin is pointed at a different organisation, and the server
-already knows the current one.
+**Encode `url` as a QR code and print it.** The bin draws the QR itself;
+we return only the string to put inside it, never an image.
+
+Do not build the URL yourself — the slug changes when a bin is pointed at
+a different organisation, and the server already knows the current one.
 
 `amount_eur` is what the customer will actually receive, computed with the
 same rate and the same caps the payout applies. Print it on the receipt if
@@ -98,6 +115,8 @@ getting the original batch back (see below).
 | `401` | `{"error":"missing_bin_key"}` | No `X-Bin-Key` header |
 | `401` | `{"error":"invalid_bin_key"}` | Unknown key, or the bin has been deactivated |
 | `400` | `{"error":"invalid_cups"}` | `cups` missing or outside 1–50 |
+| `400` | `{"error":"missing_session_id"}` | No `session_id` in the body |
+| `400` | `{"error":"invalid_session_id"}` | `session_id` is not a UUID v4 |
 | `429` | `{"error":"rate_limited"}` | More than 120 mints/hour from one bin |
 | `500` | `{"error":"mint_failed"}` | Database write failed — safe to retry |
 
@@ -116,10 +135,10 @@ minted twice.
 
 Rules for `session_id`:
 
-- Unique per customer session on that machine (a timestamp plus a counter
-  is fine). Never reuse one for a different session.
-- Keep it stable across retries of the *same* session — that's the point.
-- Generate it before the first attempt, not per attempt.
+- A fresh **UUID v4** per customer session, generated when the session
+  opens — before the first attempt, not per attempt.
+- Keep it stable across retries of the *same* session. That is the point.
+- Never reuse one for a different session.
 
 Recommended client behaviour: retry on network error / `5xx` / `429` with
 backoff, using the same `session_id`, and only print once you have a `url`.
@@ -165,7 +184,7 @@ the Redirect Refund org `t3` — with no change to the bin.
 
 ---
 
-## Current wiring (as of 2026-08-25)
+## Current wiring (as of 2026-08-26)
 
 | Machine | Organisation | Mode | Prints |
 |---|---|---|---|
@@ -183,16 +202,17 @@ so single-cup receipts cost more to pay out than they pay.
 Not the bin's problem, but useful context when debugging a receipt:
 
 1. The QR opens `/<slug>/?batch=<uuid>` in the phone's browser.
-2. For a **Redirect Refund** org the app shows a one-second redirect screen
-   and calls `bin-tikkie`, which atomically claims the batch's cups,
-   creates one anonymous claim, mints a Tikkie cashback link, and redirects.
-   Re-scanning the same receipt always returns the **same** link — never a
-   second payout.
+2. For a **Redirect Refund** org the app shows a short redirect screen and
+   calls `bin-tikkie`, which atomically claims the batch's cups, creates
+   one anonymous claim, mints a Tikkie cashback link, and redirects.
 3. For a **Deposit Rewards** org the app boots normally and `claim-cups`
    credits the cups to the customer's balance.
 
-A receipt can therefore be scanned safely more than once, and a customer
-who closes the tab can re-scan to get their link back.
+A receipt can be scanned more than once without minting a second payout —
+the same link comes back every time. On a re-scan the Redirect Refund
+screen stops instead of redirecting, checks the live status with Tikkie,
+and tells the customer the link has most likely already been used (and
+that entering bank details a second time will not pay out again).
 
 ---
 
@@ -208,7 +228,7 @@ To exercise the endpoint itself:
 curl -X POST https://ozvcpbthnauitaphosfb.supabase.co/functions/v1/bin-mint-batch \
   -H "X-Bin-Key: <bin key>" \
   -H "Content-Type: application/json" \
-  -d '{"cups":4,"session_id":"manual-test-1"}'
+  -d '{"cups":4,"session_id":"e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14"}'
 ```
 
 Send the same `session_id` twice — the second response must come back with

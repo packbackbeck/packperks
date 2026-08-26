@@ -39,6 +39,9 @@ export const DEFAULT_SETTINGS = {
   // Receipt is claimable for this many days after purchase (AI flags older ones).
   receiptMaxAgeDays: 14,
   featureCupSharing: true,
+  // Opt-in: changes which reward each customer is shown, so an org turns it
+  // on deliberately rather than inheriting it.
+  featureSmartSorting: false,
   featureDonations: true,
   featureDirectRefunds: true,
   maintenanceMode: false,

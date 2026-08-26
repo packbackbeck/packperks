@@ -112,6 +112,11 @@ const FEATURE_FLAGS = [
   { key: 'featureCupSharing',    label: 'Cup sharing',     desc: 'Customers can share cups with friends via QR.' },
   { key: 'featureDonations',     label: 'Donations',       desc: 'Customers can donate cups to a charity partner.' },
   { key: 'featureDirectRefunds', label: 'Direct refunds',  desc: 'Customers can withdraw cups as cash at the lower rate.' },
+  {
+    key: 'featureSmartSorting',
+    label: 'Smart sorting',
+    desc: 'Feature the reward closest to the customer\u2019s cup balance instead of the same flagship reward for everyone \u2014 ideally one they are a single cup away from. A first-timer holding one cup sees a goal they can finish on their next visit, not a distant one. Customers who pick a reward themselves keep it.',
+  },
 ];
 
 /* ── Reusable form atoms ─────────────────────────────────────────── */
@@ -333,6 +338,11 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
           await setOrgGroupMembership(activeOrgId, grp.id);
         }
       } else if (target === 'tikkie_only') {
+        // Redirect Refund is never grouped — there's no app or market hub for
+        // a grouped venue to redirect from. Detach first, otherwise an org
+        // that passed through Bring Your Own is stuck in a group with no way
+        // back to this mode.
+        if (activeGroupId) await setOrgGroupMembership(activeOrgId, null);
         await setOrgMode(activeOrgId, 'tikkie_only');
       } else {
         await setOrgMode(activeOrgId, null);
@@ -736,30 +746,33 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 </div>
               </div>
               <div className="as-orgmode__options" role="radiogroup" aria-label="Operating mode">
-                {['standard', 'byo', 'tikkie_only'].map(m => {
-                  // Redirect Refund needs a standalone org — there's no app
-                  // or market hub for a grouped venue to redirect from.
-                  const blocked = m === 'tikkie_only' && !!activeGroupId;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      role="radio"
-                      aria-checked={effMode === m}
-                      className={`as-orgmode__opt${effMode === m ? ' as-orgmode__opt--on' : ''}`}
-                      disabled={orgModeBusy || blocked}
-                      title={blocked ? 'Redirect Refund needs a standalone org — remove it from its group first (Organisations → Store groups).' : undefined}
-                      onClick={() => changeOrgMode(m === 'standard' ? null : m)}
-                    >
-                      {ORG_MODE_META[m].label}
-                    </button>
-                  );
-                })}
+                {['standard', 'byo', 'tikkie_only'].map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={effMode === m}
+                    className={`as-orgmode__opt${effMode === m ? ' as-orgmode__opt--on' : ''}`}
+                    disabled={orgModeBusy}
+                    title={m === 'tikkie_only' && activeGroupId
+                      ? 'Redirect Refund is always standalone — picking it takes this org out of its group.'
+                      : undefined}
+                    onClick={() => changeOrgMode(m === 'standard' ? null : m)}
+                  >
+                    {ORG_MODE_META[m].label}
+                  </button>
+                ))}
               </div>
               {isByo && activeGroupId && groupMembers.length > 1 && (
                 <div className="as-orgmode__note">
                   This org shares its group with {groupMembers.length - 1} other venue{groupMembers.length === 2 ? '' : 's'} —
                   the operating mode is a group setting, so switching it here changes every venue in the group.
+                </div>
+              )}
+              {!isTikkieOnly && activeGroupId && (
+                <div className="as-orgmode__note">
+                  Switching to Redirect Refund will also take this org out of its group —
+                  that mode has no app or market hub to belong to.
                 </div>
               )}
               {isTikkieOnly && (

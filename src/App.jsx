@@ -74,6 +74,7 @@ import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, ge
 import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
 import TikkieOnlyPage from './components/TikkieOnlyPage';
+import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
 
 /* Best-effort device fingerprint from the user agent. Falls back to a
@@ -357,6 +358,28 @@ export default function App({ consentReady = true } = {}) {
     }
     prevRewardIdsRef.current = idSet;
   }, [liveRewards, selectedRewardId]);
+
+  /* Smart sorting (opt-in per org).
+   *
+   * Feature the goal nearest to what this customer already holds, rather
+   * than the admin's flagship reward. A first-timer with one cup shown a
+   * 6-cup goal has no reason to come back for a second — and the Titaan 2
+   * data is blunt about it: nobody who stopped at one cup ever left an
+   * email. See lib/smartSorting.js for the full priority order.
+   *
+   * Two hard rules:
+   *   • Never override a customer who picked a reward themselves.
+   *   • Never run before the profile has loaded, or we'd stomp the pick
+   *     restored from the database a moment later.
+   */
+  const [pickedRewardSelf, setPickedRewardSelf] = useState(false);
+  useEffect(() => {
+    if (isLoading || pickedRewardSelf) return;
+    if (!liveSettings.featureSmartSorting) return;
+    if (!liveRewards.length) return;
+    const pick = pickSmartReward(liveRewards, cupCount);
+    if (pick && pick.id !== selectedRewardId) setSelectedRewardId(pick.id);
+  }, [isLoading, pickedRewardSelf, liveSettings.featureSmartSorting, liveRewards, cupCount, selectedRewardId, setSelectedRewardId]);
   const [claimed, setClaimed] = usePersistedState('claimed', false); // transient UI flag, localStorage is fine
   // S1: a "visitor" only opened the app. This flips true the moment they do
   // anything real this session (scan attempt, name/email edit, reward
@@ -434,7 +457,10 @@ export default function App({ consentReady = true } = {}) {
   // `selectedReward.*` access safe instead of crashing on undefined; the real
   // reward replaces it as soon as the published config arrives.
   const selectedReward = liveRewards.find((r) => r.id === selectedRewardId) || liveRewards[0] || EMPTY_REWARD;
-  const otherRewards = liveRewards.filter((r) => r.id !== selectedRewardId);
+  const otherRewardsRaw = liveRewards.filter((r) => r.id !== selectedRewardId);
+  const otherRewards = liveSettings.featureSmartSorting
+    ? sortRewardsByReach(otherRewardsRaw, cupCount)
+    : otherRewardsRaw;
   const isUnlocked = cupCount >= selectedReward.cupsNeeded;
   const cupsRemaining = Math.max(0, selectedReward.cupsNeeded - cupCount);
 
@@ -506,7 +532,7 @@ export default function App({ consentReady = true } = {}) {
     async function init(attempt = 0) {
       try {
         // DEV-ONLY screen-audit harness. ?__shot=<preset> renders one screen +
-        // state deterministically INSIDE the real BYO group (byonl) — it
+        // state deterministically INSIDE the real BYO group (/byo) — it
         // resolves the real org/group/config (authentic BYO copy, venues,
         // rewards, Stores hub) then applies preset overrides. No user writes.
         // Stripped from prod via import.meta.env.DEV.
@@ -517,7 +543,7 @@ export default function App({ consentReady = true } = {}) {
             setShot(preset);
             if (preset.hold) return; // keep the loading skeleton up
 
-            // Resolve the REAL org + group from the URL (/byonl or /byonl/<store>).
+            // Resolve the REAL org + group from the URL (/byo or /byo/<store>).
             const segs = (window.location.pathname || '/').split('/').filter(Boolean);
             const grp = segs[0] ? await getGroupBySlug(segs[0]) : null;
             let org = null, hubRoute = false;
@@ -794,7 +820,13 @@ export default function App({ consentReady = true } = {}) {
           phone: device,
           marketingConsent: !!user.marketing_consent,
         });
-        if (user.selected_reward_id) setSelectedRewardId(user.selected_reward_id);
+        // A stored reward id only ever comes from the customer tapping one
+        // (the auto-default never persists), so it marks an explicit choice
+        // that smart sorting must leave alone.
+        if (user.selected_reward_id) {
+          setSelectedRewardId(user.selected_reward_id);
+          setPickedRewardSelf(true);
+        }
 
         const [balance, hist, config, claims] = await Promise.all([
           getCupBalance(user.id),
@@ -1235,6 +1267,7 @@ export default function App({ consentReady = true } = {}) {
     const reward = liveRewards.find((r) => r.id === id);
     track(EVENTS.REWARD_SELECTED, { reward_id: id, reward_name: reward?.name, cup_count: cupCount });
     setDidEngage(true); // actively picking a reward = a real user, not a visitor
+    setPickedRewardSelf(true); // their choice now outranks smart sorting
     setSelectedRewardId(id);
     setClaimed(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });

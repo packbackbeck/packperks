@@ -1,6 +1,6 @@
 // DEV-ONLY screen-audit harness. Maps a ?__shot=<name> preset to customer-app
 // state so the audit script (screen-audit/_capture.mjs) can force every screen
-// + variation deterministically. Rendered INSIDE the real BYO group (byonl):
+// + variation deterministically. Rendered INSIDE the real BYO group (/byo):
 // the App shot block resolves the real org/group/config (authentic BYO copy,
 // venues, rewards, Stores hub) and then applies these overrides on top.
 // Reward-linked fields (featured reward, claims) are resolved against the
@@ -19,6 +19,15 @@ export const SHOT_PRESETS = {
   'home-partial':   { page: 'home', cupCount: 6,  profile: visitorProfile, lifetimeCups: 6 },
   'home-full':      { page: 'home', cupCount: 12, profile: memberProfile, authEmail: memberProfile.email, lifetimeCups: 12 },
   'home-member':    { page: 'home', cupCount: 7,  profile: memberProfile, authEmail: memberProfile.email, lifetimeCups: 26, claims: 'pending' },
+
+  // Smart sorting (la-place rewards: 1, 1, 5, 8, 9, 9, 10 cups).
+  // Off, 6 cups → the admin's featured 5-cup reward. On, 6 cups → nothing
+  // at 7, nothing at 6, so the nearest goal ahead: the 8-cup one.
+  'smart-off':      { page: 'home', cupCount: 6, profile: visitorProfile, lifetimeCups: 6, settings: { featureSmartSorting: false } },
+  'smart-on':       { page: 'home', cupCount: 6, profile: visitorProfile, lifetimeCups: 6, settings: { featureSmartSorting: true } },
+  // First-scan case the feature exists for: 1 cup in hand, so the goal
+  // becomes a 1-cup reward they've already reached rather than a distant one.
+  'smart-first':    { page: 'home', cupCount: 1, profile: visitorProfile, lifetimeCups: 1, settings: { featureSmartSorting: true } },
 
   // ── Reward exploration + info overlays (over home) ──
   'reward-detail':  { page: 'home', cupCount: 6,  profile: memberProfile, detailIdx: 3 },

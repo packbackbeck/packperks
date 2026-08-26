@@ -5,6 +5,7 @@ import { getRewardBudget, saveRewardBudget, getGroupHideLiveVendors, setGroupHid
 import { ORG_MODE_META, resolveEffectiveMode } from '../lib/orgModes';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import QuickLinks from '../shared/QuickLinks';
+import TypedConfirmModal from '../shared/TypedConfirmModal';
 import './AdminSettings.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -324,9 +325,15 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
    *                 gets a fresh single-member group named after it.
    *   tikkie_only → org-level flag; only offered while ungrouped.
    */
+  /* A grouped org can't change mode on its own: the mode lives on the
+   * group config and applies to every venue in it. Requesting a switch
+   * opens the explainer; nothing changes until the admin types the word. */
+  const [modeConfirm, setModeConfirm] = useState(null); // target key | null
+
   async function changeOrgMode(next) {
     const target = next || 'standard';
     if (!activeOrgId || orgModeBusy || effMode === target) return;
+    if (activeGroupId) return; // guarded in the UI too; belt and braces
     setOrgModeBusy(true);
     try {
       if (target === 'byo') {
@@ -364,6 +371,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
       console.error('changeOrgMode failed:', e);
     } finally {
       setOrgModeBusy(false);
+      setModeConfirm(null);
     }
   }
   useEffect(() => {
@@ -753,26 +761,23 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                     role="radio"
                     aria-checked={effMode === m}
                     className={`as-orgmode__opt${effMode === m ? ' as-orgmode__opt--on' : ''}`}
-                    disabled={orgModeBusy}
-                    title={m === 'tikkie_only' && activeGroupId
-                      ? 'Redirect Refund is always standalone — picking it takes this org out of its group.'
+                    disabled={orgModeBusy || !!activeGroupId}
+                    title={activeGroupId
+                      ? 'The mode belongs to the group, not this org — take it out of the group first.'
                       : undefined}
-                    onClick={() => changeOrgMode(m === 'standard' ? null : m)}
+                    onClick={() => setModeConfirm(m === 'standard' ? 'standard' : m)}
                   >
                     {ORG_MODE_META[m].label}
                   </button>
                 ))}
               </div>
-              {isByo && activeGroupId && groupMembers.length > 1 && (
+              {activeGroupId && (
                 <div className="as-orgmode__note">
-                  This org shares its group with {groupMembers.length - 1} other venue{groupMembers.length === 2 ? '' : 's'} —
-                  the operating mode is a group setting, so switching it here changes every venue in the group.
-                </div>
-              )}
-              {!isTikkieOnly && activeGroupId && (
-                <div className="as-orgmode__note">
-                  Switching to Redirect Refund will also take this org out of its group —
-                  that mode has no app or market hub to belong to.
+                  <strong>This org is in a group, so its mode is locked here.</strong> A group runs one
+                  mode across every venue in it{groupMembers.length > 1 ? ` — ${groupMembers.length - 1} other venue${groupMembers.length === 2 ? '' : 's'} would be affected` : ''},
+                  so it can't be changed for one org on its own. To give this org its own mode, first
+                  take it out of the group in <strong>Organisations → Store groups</strong>, then come
+                  back here. To change the mode for the whole group, change it on the group itself.
                 </div>
               )}
               {isTikkieOnly && (
@@ -1009,6 +1014,59 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
           )}
         </div>
       </div>
+
+      {modeConfirm && (
+        <TypedConfirmModal
+          title="Change the operating mode?"
+          intro="The mode decides what customers see and what the dashboard shows. Nothing is deleted, but the customer-facing app changes immediately."
+          word="switch"
+          confirmLabel={`Switch to ${ORG_MODE_META[modeConfirm].label}`}
+          busy={orgModeBusy}
+          onCancel={() => setModeConfirm(null)}
+          onConfirm={() => changeOrgMode(modeConfirm === 'standard' ? null : modeConfirm)}
+        >
+          <div className="tcm-modes">
+            {['standard', 'byo', 'tikkie_only'].map(m => (
+              <div key={m} className={`tcm-mode${modeConfirm === m ? ' tcm-mode--on' : ''}`}>
+                <div className="tcm-mode__head">
+                  <span className="tcm-mode__name">{ORG_MODE_META[m].label}</span>
+                  {effMode === m && <span className="tcm-mode__tag">Now</span>}
+                  {modeConfirm === m && effMode !== m && <span className="tcm-mode__tag">New</span>}
+                </div>
+                <p className="tcm-mode__desc">{ORG_MODE_META[m].blurb}</p>
+              </div>
+            ))}
+          </div>
+          <ul className="tcm-list">
+            <li>Customer copy, the reward screens and the dashboard sections all change to match the new mode.</li>
+            <li><strong>Cups, balances, claims and payouts are kept</strong> — nothing is deleted or reset.</li>
+            {modeConfirm === 'byo' && (
+              <li className="tcm-bad">
+                Bring Your Own only works inside a group, so this org will be <strong>put into a new group of its own</strong>.
+                After that its mode is locked to the group until you take it out again.
+              </li>
+            )}
+            {modeConfirm === 'tikkie_only' && (
+              <li className="tcm-bad">
+                The customer app stops opening entirely for this org — bin receipts go straight to Tikkie.
+                Rewards, accounts and the reward list become unreachable for customers.
+              </li>
+            )}
+            {effMode === 'tikkie_only' && modeConfirm !== 'tikkie_only' && (
+              <li className="tcm-bad">
+                Bin receipts stop paying out via Tikkie. Any receipt printed from now on will open the
+                normal app instead, and <strong>already-printed receipts will change behaviour too</strong>.
+              </li>
+            )}
+            {effMode === 'byo' && (
+              <li className="tcm-bad">
+                Counter QR codes stop minting cups the moment this org leaves BYO —
+                <strong> printed counter QRs will stop working</strong>.
+              </li>
+            )}
+          </ul>
+        </TypedConfirmModal>
+      )}
 
       {!embedded && <QuickLinks currentPage="settings" onNavigate={onNavigate} />}
 

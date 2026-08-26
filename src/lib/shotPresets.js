@@ -28,6 +28,9 @@ export const SHOT_PRESETS = {
   // First-scan case the feature exists for: 1 cup in hand, so the goal
   // becomes a 1-cup reward they've already reached rather than a distant one.
   'smart-first':    { page: 'home', cupCount: 1, profile: visitorProfile, lifetimeCups: 1, settings: { featureSmartSorting: true } },
+  // Same customer later, holding 6 cups. The goal must still be whatever
+  // their FIRST batch decided — it must not re-point at a 6-cup ladder.
+  'smart-later':    { page: 'home', cupCount: 6, profile: visitorProfile, lifetimeCups: 6, settings: { featureSmartSorting: true } },
 
   // ── Reward exploration + info overlays (over home) ──
   'reward-detail':  { page: 'home', cupCount: 6,  profile: memberProfile, detailIdx: 3 },

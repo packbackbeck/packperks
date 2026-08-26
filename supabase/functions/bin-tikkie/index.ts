@@ -130,14 +130,46 @@ interface ClaimRow {
 
 const CLAIM_COLS = "id, cups_redeemed, payout_amount, tikkie_url, tikkie_cashback_id, tikkie_status";
 
-function claimReply(claim: ClaimRow, status: string) {
+function claimReply(claim: ClaimRow, status: string, liveStatus?: string | null) {
   return json({
     status,
     url: claim.tikkie_url,
     cups: claim.cups_redeemed,
     amount: claim.payout_amount,
-    tikkie_status: claim.tikkie_status,
+    tikkie_status: liveStatus ?? claim.tikkie_status,
   });
+}
+
+/* Ask Tikkie what actually happened to this cashback.
+ *
+ * Our stored tikkie_status only moves when the redemption webhook fires,
+ * and that subscription has never been registered — so every link in the
+ * database still reads "created" even after someone has collected it.
+ * On a RE-SCAN (and only then, so we don't add a call to the happy path)
+ * we ask Tikkie directly, which is the only way to honestly tell a
+ * customer "this receipt has already been used". Best-effort: if the
+ * lookup fails we fall back to the stored value. */
+async function liveTikkieStatus(cashbackId: string | null): Promise<string | null> {
+  if (!cashbackId) return null;
+  try {
+    const { campaignBase } = resolveCampaign();
+    const resp = await fetch(`${campaignBase}/cashbacks/${cashbackId}`, { headers: tikkieHeaders() });
+    if (!resp.ok) return null;
+    const cb = await resp.json() as { status?: string; redeemedDateTime?: string; expiryDateTime?: string };
+    const st = String(cb.status || "").toLowerCase() || null;
+    if (st) {
+      // Keep our copy in sync while we're here — free backfill for the
+      // dashboard's payout log.
+      await supabase.from("claims").update({
+        tikkie_status: st,
+        tikkie_redeemed_at: cb.redeemedDateTime ?? null,
+        tikkie_expires_at: cb.expiryDateTime ?? null,
+      }).eq("tikkie_cashback_id", cashbackId);
+    }
+    return st;
+  } catch {
+    return null;
+  }
 }
 
 async function claimForBatch(batchId: string): Promise<ClaimRow | null> {
@@ -232,7 +264,10 @@ Deno.serve(async (req) => {
   // Fast path: the batch was already converted — hand back the same link.
   const existing = await claimForBatch(batchId);
   if (existing) {
-    if (existing.tikkie_url) return claimReply(existing, "exists");
+    if (existing.tikkie_url) {
+      const live = await liveTikkieStatus(existing.tikkie_cashback_id);
+      return claimReply(existing, "exists", live);
+    }
     if (existing.tikkie_status === "minting") return json({ status: "in_progress" }, 202);
     return mintForClaim(existing); // earlier mint failed — resume it
   }

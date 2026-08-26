@@ -13,6 +13,7 @@ import {
 } from '../lib/adminApi';
 import { MODE_META, getCopyPreset, COPY_MODES } from '../../lib/copyPresets';
 import { regionForCountry } from '../../lib/regions';
+import TypedConfirmModal from '../shared/TypedConfirmModal';
 
 /* Merge a group's saved copy overrides (config.settings.copy) over its mode
  * preset → the full effective bundle. Mirrors the customer app's
@@ -359,17 +360,32 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
     });
   }
 
-  function handleAdd(groupId) {
+  /* Moving an org in or out of a group rewrites what its customers see and
+   * can silently kill printed QR codes, so both directions go through a
+   * consequence list the admin has to type past. See membershipConfirm. */
+  const [membershipConfirm, setMembershipConfirm] = useState(null);
+  // { action: 'join'|'leave', orgId, groupId, org, group }
+
+  function askAdd(groupId) {
     const orgId = addSel[groupId];
     if (!orgId) return;
-    run(async () => {
-      await setOrgGroupMembership(orgId, groupId);
-      setAddSel(s => ({ ...s, [groupId]: '' }));
-    });
+    const org = orgs.find(o => o.id === orgId);
+    const group = groups.find(g => g.id === groupId);
+    setMembershipConfirm({ action: 'join', orgId, groupId, org, group });
   }
 
-  function handleRemove(orgId) {
-    run(() => setOrgGroupMembership(orgId, null));
+  function askRemove(org, group) {
+    setMembershipConfirm({ action: 'leave', orgId: org.id, groupId: group?.id, org, group });
+  }
+
+  function confirmMembership() {
+    const c = membershipConfirm;
+    if (!c) return;
+    run(async () => {
+      await setOrgGroupMembership(c.orgId, c.action === 'join' ? c.groupId : null);
+      if (c.action === 'join') setAddSel(s => ({ ...s, [c.groupId]: '' }));
+      setMembershipConfirm(null);
+    });
   }
 
   function handleToggleActive(org) {
@@ -592,7 +608,7 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
                                 <span className="og-toggle__track"><span className="og-toggle__thumb" /></span>
                                 <span className="og-toggle__label">{m.group_active ? 'In Stores list' : 'Hidden'}</span>
                               </label>
-                              <button className="og-remove" onClick={() => handleRemove(m.id)} disabled={busy} title="Remove from group">
+                              <button className="og-remove" onClick={() => askRemove(m, group)} disabled={busy} title="Remove from group">
                                 Remove
                               </button>
                             </li>
@@ -613,7 +629,7 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
                             <option key={o.id} value={o.id}>{o.name} (/{o.slug}/)</option>
                           ))}
                         </select>
-                        <button className="ao-btn ao-btn--ghost" onClick={() => handleAdd(group.id)} disabled={busy || !addSel[group.id]}>
+                        <button className="ao-btn ao-btn--ghost" onClick={() => askAdd(group.id)} disabled={busy || !addSel[group.id]}>
                           Add
                         </button>
                       </div>
@@ -667,6 +683,80 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
       )}
 
       {/* ── Delete confirm ── */}
+      {membershipConfirm && (() => {
+        const c = membershipConfirm;
+        const joining = c.action === 'join';
+        const gmode = c.group?.mode || 'deposit';
+        const gname = c.group?.name || 'the group';
+        const oname = c.org?.name || 'this org';
+        const others = Math.max(0, (c.group?.members || []).length - (joining ? 0 : 1));
+        return (
+          <TypedConfirmModal
+            title={joining ? `Move ${oname} into ${gname}?` : `Take ${oname} out of ${gname}?`}
+            intro={joining
+              ? 'A group is one shared programme: one mode, one customer identity, one market page. This changes what this venue\u2019s customers see straight away.'
+              : 'The venue keeps working on its own, but everything it inherited from the group goes away.'}
+            word={joining ? 'join' : 'leave'}
+            confirmLabel={joining ? 'Move into group' : 'Take out of group'}
+            tone={joining ? 'warn' : 'danger'}
+            busy={busy}
+            onCancel={() => setMembershipConfirm(null)}
+            onConfirm={confirmMembership}
+          >
+            <ul className="tcm-list">
+              {joining ? (
+                <>
+                  <li>
+                    <strong>The group\u2019s mode takes over.</strong> {oname} will run as{' '}
+                    <strong>{MODE_META[gmode]?.label || gmode}</strong>, and its customer copy will be
+                    replaced by the group\u2019s. Its own mode can no longer be changed on its own.
+                  </li>
+                  <li>
+                    <strong>Customers get one shared profile</strong> across the group — the name and
+                    email they set at one venue follow them to the others.
+                  </li>
+                  <li>
+                    <strong>Cup balances stay per venue.</strong> Nothing is merged: cups collected here
+                    stay here, and cups at other venues stay there.
+                  </li>
+                  <li>{oname} starts appearing on the group\u2019s market page at <code>/{c.group?.slug || 'group'}/</code>.</li>
+                  {gmode === 'byo' && (
+                    <li>Counter QR codes start working for this venue, because BYO minting needs a BYO group.</li>
+                  )}
+                  {gmode !== 'byo' && (
+                    <li className="tcm-bad">
+                      This group is not a Bring Your Own group, so counter QR codes will <strong>not</strong> mint
+                      cups for this venue.
+                    </li>
+                  )}
+                </>
+              ) : (
+                <>
+                  <li>
+                    <strong>{oname} goes back to its own copy and its own mode</strong>, which you can then
+                    change independently. The group keeps running for {others} other venue{others === 1 ? '' : 's'}.
+                  </li>
+                  {gmode === 'byo' && (
+                    <li className="tcm-bad">
+                      <strong>Its counter QR codes stop minting cups immediately.</strong> BYO scanning
+                      requires membership of a BYO group, so every QR already printed and stuck to a
+                      counter at this venue stops working the moment you confirm.
+                    </li>
+                  )}
+                  <li className="tcm-bad">
+                    <strong>The shared customer profile is broken for this venue.</strong> Customers keep
+                    their cups and their account here, but their name and email no longer follow them
+                    between this venue and the rest of the group.
+                  </li>
+                  <li>It disappears from the group\u2019s market page; its own <code>/{c.org?.slug || 'slug'}/</code> URL keeps working.</li>
+                  <li><strong>No cups, claims or payouts are deleted.</strong> Balances stay exactly as they are.</li>
+                </>
+              )}
+            </ul>
+          </TypedConfirmModal>
+        );
+      })()}
+
       {confirmDelete && (
         <div className="ao-modal-backdrop" onClick={() => setConfirmDelete(null)}>
           <div className="ao-modal" onClick={e => e.stopPropagation()}>

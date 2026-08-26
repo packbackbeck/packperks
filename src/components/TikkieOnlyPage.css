@@ -87,3 +87,23 @@
   font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
   color: #B4AB9C;
 }
+
+/* Re-opened receipt: the link was very likely already collected. */
+.tikkie-only__warn-icon {
+  width: 46px; height: 46px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #FCF2D6; color: #9A6E12;
+}
+.tikkie-only__note {
+  margin: 16px 0 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #FBEAE5;
+  font-size: 13px; line-height: 1.55; color: #8A3A22;
+  text-align: left;
+}
+.tikkie-only__note strong { color: #6E2B18; }
+.tikkie-only__sub--small { font-size: 13px; margin-top: 10px; }
+.tikkie-only__btn--muted { background: #B4AB9C; }

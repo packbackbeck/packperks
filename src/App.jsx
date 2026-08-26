@@ -373,13 +373,33 @@ export default function App({ consentReady = true } = {}) {
    *     restored from the database a moment later.
    */
   const [pickedRewardSelf, setPickedRewardSelf] = useState(false);
+  /* The cup count from the customer's FIRST batch — the number smart
+   * sorting decides on. Persisted, because the decision is meant to be
+   * made once and then stand: a goal that silently re-pointed every time
+   * the balance moved would be a moving target, and the reward list
+   * underneath would reshuffle on every visit. Null until the first cups
+   * land. */
+  const [smartFirstBatch, setSmartFirstBatch] = usePersistedState('smart_first_batch', null);
   useEffect(() => {
-    if (isLoading || pickedRewardSelf) return;
+    if (isLoading) return;
     if (!liveSettings.featureSmartSorting) return;
     if (!liveRewards.length) return;
-    const pick = pickSmartReward(liveRewards, cupCount);
-    if (pick && pick.id !== selectedRewardId) setSelectedRewardId(pick.id);
-  }, [isLoading, pickedRewardSelf, liveSettings.featureSmartSorting, liveRewards, cupCount, selectedRewardId, setSelectedRewardId]);
+    // Already decided — by the customer picking a reward, or by this
+    // effect on an earlier visit. Either way it never fires again.
+    if (pickedRewardSelf || smartFirstBatch != null) return;
+    // Nothing to decide on until they actually hold cups.
+    const firstBatch = cupCount || 0;
+    if (firstBatch <= 0) return;
+
+    setSmartFirstBatch(firstBatch);
+    const pick = pickSmartReward(liveRewards, firstBatch);
+    if (pick) {
+      setSelectedRewardId(pick.id);
+      // Persist so the goal survives a reload and a different device, and
+      // so this decision is never recomputed against a later balance.
+      if (userId) persist(updateUserProfile(userId, { selectedRewardId: pick.id }));
+    }
+  }, [isLoading, pickedRewardSelf, smartFirstBatch, liveSettings.featureSmartSorting, liveRewards, cupCount, userId, setSelectedRewardId, setSmartFirstBatch]);
   const [claimed, setClaimed] = usePersistedState('claimed', false); // transient UI flag, localStorage is fine
   // S1: a "visitor" only opened the app. This flips true the moment they do
   // anything real this session (scan attempt, name/email edit, reward
@@ -458,8 +478,12 @@ export default function App({ consentReady = true } = {}) {
   // reward replaces it as soon as the published config arrives.
   const selectedReward = liveRewards.find((r) => r.id === selectedRewardId) || liveRewards[0] || EMPTY_REWARD;
   const otherRewardsRaw = liveRewards.filter((r) => r.id !== selectedRewardId);
-  const otherRewards = liveSettings.featureSmartSorting
-    ? sortRewardsByReach(otherRewardsRaw, cupCount)
+  /* Ordered against the FIRST-batch count, not the live balance, so the
+   * list keeps the order the customer first saw instead of reshuffling
+   * under them every time they collect a cup. Before that first batch
+   * (and for orgs with the feature off) the admin's own order stands. */
+  const otherRewards = (liveSettings.featureSmartSorting && smartFirstBatch != null)
+    ? sortRewardsByReach(otherRewardsRaw, smartFirstBatch)
     : otherRewardsRaw;
   const isUnlocked = cupCount >= selectedReward.cupsNeeded;
   const cupsRemaining = Math.max(0, selectedReward.cupsNeeded - cupCount);

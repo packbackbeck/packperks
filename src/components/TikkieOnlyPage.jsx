@@ -25,9 +25,9 @@ const FRIENDLY = {
 const MAX_POLLS = 8;
 
 export default function TikkieOnlyPage({ org, batchId }) {
-  const [phase, setPhase] = useState('working'); // working | redirecting | error
+  const [phase, setPhase] = useState('working'); // working | redirecting | reopened | error
   const [error, setError] = useState(null);      // friendly message
-  const [payout, setPayout] = useState(null);    // { cups, amount, url }
+  const [payout, setPayout] = useState(null);    // { cups, amount, url, reused, tikkieStatus }
   const pollsRef = useRef(0);
   const startedRef = useRef(false);
 
@@ -63,7 +63,22 @@ export default function TikkieOnlyPage({ org, batchId }) {
       }
 
       if (data?.url) {
-        setPayout({ cups: data.cups, amount: data.amount, url: data.url });
+        const reused = data.status === 'exists';
+        setPayout({
+          cups: data.cups,
+          amount: data.amount,
+          url: data.url,
+          reused,
+          tikkieStatus: data.tikkie_status || null,
+        });
+        if (reused) {
+          // Second (or fifth) time on the same receipt. Sending them
+          // straight back to a link they may already have collected is how
+          // someone ends up entering their IBAN twice and getting nothing,
+          // so this path stops and explains instead of redirecting.
+          setPhase('reopened');
+          return;
+        }
         setPhase('redirecting');
         // Long enough to actually read the amount before Tikkie takes over.
         // At the old 900ms the payout flashed past unread, which is the one
@@ -130,10 +145,52 @@ export default function TikkieOnlyPage({ org, batchId }) {
                 </div>
               )}
             </div>
-            <p className="tikkie-only__sub">Redirecting you to Tikkie…</p>
-            {/* Fallback if the auto-redirect is blocked. */}
+            <p className="tikkie-only__sub">
+              You’ll be taken to Tikkie automatically — or open it yourself below.
+            </p>
             {payout?.url && (
               <a className="tikkie-only__btn" href={payout.url}>Open Tikkie</a>
+            )}
+          </>
+        )}
+
+        {phase === 'reopened' && (
+          <>
+            <div className="tikkie-only__warn-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h1 className="tikkie-only__title">
+              {payout?.tikkieStatus === 'redeemed'
+                ? 'Already collected'
+                : 'You’ve opened this receipt before'}
+            </h1>
+            <p className="tikkie-only__sub">
+              {payout?.tikkieStatus === 'redeemed' ? (
+                <>This cashback has already been collected, so the link below won’t pay out again.</>
+              ) : payout?.tikkieStatus === 'expired' ? (
+                <>This cashback link has expired, so it can no longer be collected.</>
+              ) : (
+                <>This receipt was scanned before, so its Tikkie link has most likely been used already.</>
+              )}
+            </p>
+            <div className="tikkie-only__note">
+              <strong>If you already entered your bank details on this link, the money is on its way —
+              don’t enter them again.</strong> A cashback link only pays out once, so a second attempt
+              won’t send you anything.
+            </div>
+            {payout?.amount != null && (
+              <p className="tikkie-only__sub tikkie-only__sub--small">
+                This receipt was worth €{Number(payout.amount).toFixed(2)}
+                {payout?.cups != null && <> for {payout.cups} cup{payout.cups === 1 ? '' : 's'}</>}.
+              </p>
+            )}
+            {payout?.url && (
+              <a className="tikkie-only__btn tikkie-only__btn--muted" href={payout.url}>
+                Open the link anyway
+              </a>
             )}
           </>
         )}

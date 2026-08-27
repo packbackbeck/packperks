@@ -154,3 +154,28 @@
   background: #FBF8F1; border: 1px dashed #E2DACA; border-radius: 12px;
 }
 .abc-foot { margin-top: 18px; font-size: 12px; line-height: 1.6; color: #9A9186; max-width: 640px; }
+
+/* Master switch — the one control on this page that changes whether money
+   moves, so it states the consequence rather than just naming itself. */
+.abc-master {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 13px 15px; margin-bottom: 14px;
+  border: 1px solid #DDE9DF; border-radius: 12px; background: #F4FAF5;
+}
+.abc-master--off { border-color: #F0D9D2; background: #FDF3F0; }
+.abc-master__label { font-size: 13.5px; font-weight: 800; color: #1F1B16; }
+.abc-master__note { margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: #6C6259; max-width: 520px; }
+
+.abc-toggle {
+  flex-shrink: 0; position: relative;
+  width: 46px; height: 26px; border-radius: 999px; border: none;
+  background: #C9BFA9; cursor: pointer; transition: background 0.16s ease;
+}
+.abc-toggle--on { background: #1A8737; }
+.abc-toggle:disabled { opacity: 0.5; cursor: default; }
+.abc-toggle__dot {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  transition: transform 0.16s ease;
+}
+.abc-toggle--on .abc-toggle__dot { transform: translateX(20px); }

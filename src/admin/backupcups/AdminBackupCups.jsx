@@ -5,6 +5,7 @@ import {
   listBackupCupUses,
   getBackupAlertConfig,
   saveBackupAlertConfig,
+  setBackupCupsActive,
   BACKUP_ALERT_DEFAULTS,
 } from '../lib/adminApi';
 import './AdminBackupCups.css';
@@ -85,6 +86,7 @@ export default function AdminBackupCups() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [recipientDraft, setRecipientDraft] = useState('');
+  const [togglingSet, setTogglingSet] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeOrgId) return;
@@ -142,6 +144,23 @@ export default function AdminBackupCups() {
   }, [uses]);
 
   const allIds = cups.map(c => c.id).join('\n');
+  // "On" means at least one code still pays out. The bin keeps printing
+  // them either way — this only decides whether a scan is honoured.
+  const setLive = cups.some(c => c.active);
+
+  async function toggleSet(next) {
+    if (togglingSet) return;
+    setTogglingSet(true);
+    setCups(cs => cs.map(c => ({ ...c, active: next })));  // optimistic
+    try {
+      await setBackupCupsActive(activeOrgId, next);
+    } catch (e) {
+      setError(e.message || 'Could not change the backup cups.');
+      await load();
+    } finally {
+      setTogglingSet(false);
+    }
+  }
   const recentlyUsed = stats.lastUsed &&
     Date.now() - new Date(stats.lastUsed).getTime() < 24 * 60 * 60 * 1000;
 
@@ -237,6 +256,30 @@ export default function AdminBackupCups() {
           </div>
           <CopyButton value={allIds} label="Copy all 10" />
         </header>
+
+        <div className={`abc-master${setLive ? '' : ' abc-master--off'}`}>
+          <div>
+            <div className="abc-master__label">
+              {setLive ? 'Backup cups are accepted' : 'Backup cups are switched off'}
+            </div>
+            <div className="abc-master__note">
+              {setLive
+                ? 'A scanned backup code pays out. Switch off to retire the fallback entirely.'
+                : 'A scanned backup code pays nothing — the customer sees “this receipt is no longer valid”. The bin will keep printing them until its config is updated.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={setLive}
+            aria-label="Accept backup cups"
+            className={`abc-toggle${setLive ? ' abc-toggle--on' : ''}`}
+            disabled={togglingSet || cups.length === 0}
+            onClick={() => toggleSet(!setLive)}
+          >
+            <span className="abc-toggle__dot" />
+          </button>
+        </div>
 
         {loading && cups.length === 0 ? (
           <div className="abc-empty">Loading…</div>

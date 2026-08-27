@@ -3477,6 +3477,23 @@ export async function listBackupCupUses(orgId, { limit = 200 } = {}) {
   return data || [];
 }
 
+/* Turn the whole backup set on or off.
+ *
+ * This writes the `active` column the redemption path already checks, so
+ * switching off takes effect on the very next scan with no deploy: the
+ * bin keeps printing the codes, but they stop paying and the customer
+ * sees the ordinary "no longer valid" message. That is the honest
+ * behaviour for a fallback you have deliberately retired. */
+export async function setBackupCupsActive(orgId, active) {
+  if (!orgId) throw new Error('setBackupCupsActive: no org');
+  const { error } = await supabase
+    .from('backup_cups')
+    .update({ active: !!active })
+    .eq('org_id', orgId);
+  if (error) throw error;
+  return !!active;
+}
+
 /* Alert config lives in its own app_config row so it saves instantly and
  * never rides the publish cycle — an alert you edited should be live now,
  * not after the next Publish. */

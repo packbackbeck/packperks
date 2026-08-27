@@ -61,3 +61,11 @@ insert into public.backup_cups (id, org_id, label) values
   ('d840400d-2d42-4491-9190-474ed7c2c4e4', 'da6f18cc-7493-4547-b54e-4987de2606b4', 'Backup 09'),
   ('e0a88bad-f30b-47df-b2da-f71e206c3c6d', 'da6f18cc-7493-4547-b54e-4987de2606b4', 'Backup 10')
 on conflict (id) do nothing;
+
+-- The Backup Cups page switches the whole set off (and back on) via the
+-- `active` column, which bin-tikkie already refuses on. Reading was
+-- admin-only; writing must be too.
+drop policy if exists "backup_cups: admins update" on public.backup_cups;
+create policy "backup_cups: admins update" on public.backup_cups
+  for update using ((current_admin()).id is not null)
+  with check ((current_admin()).id is not null);

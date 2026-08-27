@@ -21,11 +21,16 @@ const FRIENDLY = {
   batch_not_found: 'We couldn’t recognise this QR code. Please use the receipt printed by the bin.',
   invalid_batch:   'We couldn’t recognise this QR code. Please use the receipt printed by the bin.',
   wrong_mode:      'This QR code belongs to a different PackPerks programme.',
+  // Backup-cup guards. Deliberately vague: the customer has no idea their
+  // receipt came from the bin's offline fallback, and telling them would
+  // only invite retries.
+  backup_cooldown:  'This receipt was just used. Please wait a moment and scan again.',
+  backup_daily_cap: 'We can’t process this receipt right now. Please ask a member of staff.',
 };
 
 const MAX_POLLS = 8;
 
-export default function TikkieOnlyPage({ org, batchId }) {
+export default function TikkieOnlyPage({ org, batchId, cupIds = [] }) {
   const [phase, setPhase] = useState('working'); // working | redirecting | reopened | error
   const [error, setError] = useState(null);      // friendly message
   const [payout, setPayout] = useState(null);    // { cups, amount, url, reused, tikkieStatus }
@@ -41,7 +46,11 @@ export default function TikkieOnlyPage({ org, batchId }) {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    if (!batchId) {
+    // Either a normal batch receipt or an offline one carrying reserved
+    // cup ids. Both render identically — nothing on this screen reveals
+    // which path paid the customer.
+    const hasBackup = cupIds.length > 0;
+    if (!batchId && !hasBackup) {
       setError(FRIENDLY.batch_not_found);
       setPhase('error');
       return;
@@ -51,7 +60,7 @@ export default function TikkieOnlyPage({ org, batchId }) {
       let data = null;
       try {
         const res = await supabase.functions.invoke('bin-tikkie', {
-          body: { batch_id: batchId },
+          body: hasBackup ? { cup_ids: cupIds } : { batch_id: batchId },
         });
         // supabase-js surfaces non-2xx as error with a Response attached —
         // read the JSON body either way so we get the structured code.
@@ -99,7 +108,8 @@ export default function TikkieOnlyPage({ org, batchId }) {
     }
 
     redeem();
-  }, [batchId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchId, cupIds.join(',')]);
 
   const brandColor = org?.brand_color || '#1A8737';
 

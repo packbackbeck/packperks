@@ -115,6 +115,18 @@ const NAV_ITEMS = [
     ),
   },
   {
+    // Redirect Refund orgs only: the bin's offline fallback codes + the
+    // alarm that fires when one gets used.
+    id: 'backupcups',
+    label: 'Backup Cups',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
     id: 'cupqr',
     // "Receipt Generator" hosts two tabs: the QR cup-receipt batch
     // generator and the rewards test-receipt image generator.
@@ -223,8 +235,8 @@ const ROLE_VISIBLE_TABS = {
   // Manager + Checker also see the Org tab (read-only) so they know
   // where they work; the editing controls inside are gated by
   // PermissionGate so they're disabled.
-  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'futurevendors', 'reports', 'stats', 'behaviour', 'tikkielog']),
-  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour', 'tikkielog']),
+  manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'futurevendors', 'reports', 'stats', 'behaviour', 'tikkielog', 'backupcups']),
+  checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour', 'tikkielog', 'backupcups']),
 };
 
 export default function AdminSidebar({ activePage, onNavigate, draftState, role, onAddOrg }) {
@@ -284,8 +296,8 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
             // rewards, users, claims review, analytics — doesn't exist in
             // this mode. (Settings/history/support stay reachable via the
             // top-bar dock; see TIKKIE_ONLY_PAGES.)
-            if (isTikkieOnly) return item.id === 'tikkielog' || item.id === 'cupqr';
-            if (item.id === 'tikkielog') return false;
+            if (isTikkieOnly) return ['tikkielog', 'cupqr', 'backupcups'].includes(item.id);
+            if (item.id === 'tikkielog' || item.id === 'backupcups') return false;
             // Phase 3 gating:
             //  • Cup Transfers only when cup sharing is on for this org.
             //  • BYO orgs show BYO Requests and hide the Receipt Generator;

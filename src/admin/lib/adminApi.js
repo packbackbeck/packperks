@@ -3450,6 +3450,69 @@ export async function setOrgMode(orgId, mode) {
   return value;
 }
 
+/* ── Backup cups (Redirect Refund offline fallback) ────────────────────
+ * The reserved cup ids burned into the bin's config, plus the log of every
+ * time one was scanned. A use means the bin was offline when it printed
+ * that receipt, so the log doubles as an outage record. */
+export async function listBackupCups(orgId) {
+  if (!orgId) return [];
+  const { data, error } = await supabase
+    .from('backup_cups')
+    .select('id, label, active, created_at')
+    .eq('org_id', orgId)
+    .order('label');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listBackupCupUses(orgId, { limit = 200 } = {}) {
+  if (!orgId) return [];
+  const { data, error } = await supabase
+    .from('backup_cup_uses')
+    .select('id, backup_cup_id, claim_id, amount_eur, cups_in_scan, used_at')
+    .eq('org_id', orgId)
+    .order('used_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+/* Alert config lives in its own app_config row so it saves instantly and
+ * never rides the publish cycle — an alert you edited should be live now,
+ * not after the next Publish. */
+const BACKUP_ALERT_KEY = (orgId) => `backup_alerts:${orgId}`;
+
+export const BACKUP_ALERT_DEFAULTS = {
+  enabled: true,
+  recipients: [],
+  subject: 'Backup cup used at {{org}}',
+  body:
+    'A backup cup was scanned, which means the smart bin could not reach PackPerks.\n\n' +
+    'Cup: {{cup_label}}\nCups in scan: {{cups}}\nPaid out: €{{amount}}\nWhen: {{when}}\n\n' +
+    "Check the bin's connection.",
+};
+
+export async function getBackupAlertConfig(orgId) {
+  if (!orgId) return { ...BACKUP_ALERT_DEFAULTS };
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', BACKUP_ALERT_KEY(orgId)).maybeSingle();
+  return { ...BACKUP_ALERT_DEFAULTS, ...(data?.value || {}) };
+}
+
+export async function saveBackupAlertConfig(orgId, cfg) {
+  if (!orgId) throw new Error('saveBackupAlertConfig: no org');
+  const value = {
+    enabled: cfg.enabled !== false,
+    recipients: (cfg.recipients || []).map(e => String(e).trim()).filter(e => e.includes('@')),
+    subject: String(cfg.subject || BACKUP_ALERT_DEFAULTS.subject).slice(0, 200),
+    body: String(cfg.body || BACKUP_ALERT_DEFAULTS.body).slice(0, 4000),
+  };
+  const { error } = await supabase.from('app_config')
+    .upsert({ key: BACKUP_ALERT_KEY(orgId), value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
 /* Tikkie-only payout log: every bin receipt that was converted to a Tikkie
  * link is one claims row keyed by batch_id. Newest first. */
 export async function listBinTikkiePayouts(orgId, { limit = 300 } = {}) {

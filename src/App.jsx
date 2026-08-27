@@ -745,7 +745,17 @@ export default function App({ consentReady = true } = {}) {
             // No cookies / tracking on this path — tell ConsentGate to keep
             // the banner out of the way of the payout.
             try { window.dispatchEvent(new Event('packperks:suppress-consent')); } catch { /* noop */ }
-            setTikkieOnly({ org, batchId: (sp.get('batch') || '').trim() });
+            // `?batch=` is the normal receipt. `?cups=` is what the bin
+            // prints when it couldn't reach us and fell back to its
+            // reserved cup ids — same screen, same wording; the customer
+            // is never shown any difference.
+            const cupIds = (sp.get('cups') || '')
+              .split(',').map(c => c.trim()).filter(Boolean);
+            setTikkieOnly({
+              org,
+              batchId: (sp.get('batch') || '').trim(),
+              cupIds,
+            });
             return; // finally{} clears isLoading
           }
         }
@@ -1734,7 +1744,7 @@ export default function App({ consentReady = true } = {}) {
   /* Tikkie-only mode: the redirect page IS the whole app for these orgs.
    * Checked before isLoading so the boot's early return lands here. */
   if (tikkieOnly) {
-    return <TikkieOnlyPage org={tikkieOnly.org} batchId={tikkieOnly.batchId} />;
+    return <TikkieOnlyPage org={tikkieOnly.org} batchId={tikkieOnly.batchId} cupIds={tikkieOnly.cupIds} />;
   }
 
   /* ── Loading / error screens ──

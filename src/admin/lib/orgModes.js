@@ -51,6 +51,7 @@ export function resolveEffectiveMode(orgMode, groupMode) {
 export const TIKKIE_ONLY_PAGES = new Set([
   'cupqr',        // Receipt Generator — mints the same batches the bin does
   'tikkielog',    // the payout log
+  'backupcups',   // the bin's offline fallback codes + outage alarm
   'settings',     // rate config + org profile + team
   'org',          // legacy alias that redirects to settings
   'organizations',// org switcher / management (PackPerks staff)

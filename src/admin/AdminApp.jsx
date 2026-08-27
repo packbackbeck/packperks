@@ -25,6 +25,7 @@ import AdminByoRequests from './byorequests/AdminByoRequests';
 import AdminFutureVendors from './futurevendors/AdminFutureVendors';
 import AdminAppDesign from './appdesign/AdminAppDesign';
 import AdminTikkieLog from './tikkielog/AdminTikkieLog';
+import AdminBackupCups from './backupcups/AdminBackupCups';
 import { TIKKIE_ONLY_PAGES } from './lib/orgModes';
 import { useAdminDraft } from './hooks/useAdminDraft';
 import './AdminApp.css';
@@ -80,7 +81,7 @@ export default function AdminApp() {
 const VALID_PAGES = new Set([
   'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
   'transactions', 'donations', 'byorequests', 'futurevendors', 'org', 'organizations', 'settings',
-  'history', 'reports', 'stats', 'behaviour', 'support', 'tikkielog',
+  'history', 'reports', 'stats', 'behaviour', 'support', 'tikkielog', 'backupcups',
 ]);
 const DEFAULT_PAGE = 'overview';
 
@@ -259,6 +260,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="tikkielog" activeId={page} visited={visited}>
             <AdminTikkieLog onNavigate={setPage} />
+          </KeepAlive>
+          <KeepAlive id="backupcups" activeId={page} visited={visited}>
+            <AdminBackupCups onNavigate={setPage} />
           </KeepAlive>
           <KeepAlive id="support" activeId={page} visited={visited}>
             <AdminSupport onNavigate={setPage} />

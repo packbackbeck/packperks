@@ -176,6 +176,36 @@ UUID is not valid and would show the customer an error.
 
 ---
 
+## Backup cups (Redirect Refund bins)
+
+The bin always prints a receipt — including when it can't reach us. For
+that case it holds a short list of **reserved cup ids** in its own config
+and prints one (or several) instead of calling the API.
+
+Nothing needs configuring on our side and there is no separate endpoint:
+the bin just puts the ids in the QR as a comma-separated `cups` parameter
+instead of a `batch`:
+
+```
+https://perks.packback.network/t3/?cups=<uuid>[,<uuid>…]
+```
+
+These ids never expire and mint a **new** Tikkie link on every scan —
+they have to, because the same list is handed to many customers over the
+bin's life. The customer sees exactly the same screen as a normal
+receipt and is never told it came from the fallback.
+
+Because they keep paying, they are fenced on our side: a per-cup cooldown,
+a daily ceiling per venue, a full use log, and an **email alert on every
+single use** — a backup scan means the bin was offline, which is worth
+knowing immediately. All of that lives in the dashboard under
+**Backup Cups**, which is also where the current list of ids is shown for
+copying into the bin.
+
+Ask a PackPerks admin for the list; it is deliberately not reproduced here.
+
+---
+
 ## Provisioning a bin
 
 Each bin has a row in the `smartbin_keys` table:

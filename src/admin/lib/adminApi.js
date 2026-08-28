@@ -1359,6 +1359,244 @@ function sliceBehaviourRows(allRows, fromMs, toMs) {
   return out;
 }
 
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Tikkie-only (Redirect Refund) behaviour metrics.
+ *
+ * The standard funnel above is built from cups, rewards and app sessions,
+ * none of which exist in this mode. Its funnel is: receipt scanned →
+ * Tikkie link issued → collected, with the audience split into ACCOUNTS
+ * (refund accounts created from "save for later") and MAILOS (emails left
+ * on the waiting screen without an account).
+ * ───────────────────────────────────────────────────────────────────── */
+const TIKKIE_TS = {
+  claims:  r => r.created_at,
+  users:   r => r.created_at,
+  pending: r => r.first_seen,
+  backup:  r => r.used_at,
+};
+
+async function fetchTikkieRows(orgIds) {
+  const ids = (Array.isArray(orgIds) ? orgIds : [orgIds]).filter(Boolean);
+  const [claimsRes, usersRes, pendingRes, backupRes] = await Promise.all([
+    applyOrgFilter(
+      supabase.from('claims')
+        .select('id, org_id, user_id, created_at, cups_redeemed, payout_amount, tikkie_status, tikkie_url')
+        .not('batch_id', 'is', null),
+      orgIds
+    ),
+    applyOrgFilter(
+      supabase.from('users').select('id, org_id, email, created_at').is('merged_into', null),
+      orgIds
+    ),
+    // Pending rows with no org yet (the bin hasn't confirmed) can't be
+    // org-filtered — include them: in practice they belong to this mode.
+    supabase.from('pending_batches')
+      .select('batch_id, org_id, email, user_id, first_seen, resolved_at, notified_at')
+      .or(ids.length ? `org_id.is.null,org_id.in.(${ids.join(',')})` : 'org_id.is.null'),
+    applyOrgFilter(
+      supabase.from('backup_cup_uses').select('id, org_id, claim_id, used_at'),
+      orgIds
+    ),
+  ]);
+  return {
+    claims:  claimsRes.data  || [],
+    users:   usersRes.data   || [],
+    pending: pendingRes.data || [],
+    backup:  backupRes.data  || [],
+  };
+}
+
+function tikkieWindow(allRows, range) {
+  let minMs = Infinity, maxMs = -Infinity;
+  for (const key of Object.keys(allRows)) {
+    for (const r of allRows[key]) {
+      const t = toMsOrNull(TIKKIE_TS[key](r));
+      if (t == null) continue;
+      if (t < minMs) minMs = t;
+      if (t > maxMs) maxMs = t;
+    }
+  }
+  const hasData = minMs !== Infinity;
+  const minDate = hasData ? minMs : Date.now();
+  const maxDate = hasData ? maxMs : Date.now();
+  const reqFrom = range && range.from ? toMsOrNull(range.from) : null;
+  const reqTo   = range && range.to   ? toMsOrNull(range.to)   : null;
+  return {
+    minDate, maxDate, hasData,
+    effFrom: reqFrom != null ? reqFrom : minDate,
+    effTo:   reqTo   != null ? reqTo   : maxDate,
+  };
+}
+
+function sliceTikkieRows(allRows, fromMs, toMs) {
+  const out = {};
+  for (const key of Object.keys(allRows)) {
+    out[key] = allRows[key].filter(r => {
+      const t = toMsOrNull(TIKKIE_TS[key](r));
+      return t != null && t >= fromMs && t <= toMs;
+    });
+  }
+  return out;
+}
+
+function computeTikkieMetrics({ claims, users, pending, backup }) {
+  const pctOf = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
+  const M = (o) => {
+    const value = pctOf(o.numerator, o.denominator);
+    return { measurable: true, valueType: 'percent', ...o, value, rawValue: value };
+  };
+
+  const receipts     = claims.length;
+  const links        = claims.filter(c => c.tikkie_url).length;
+  const redeemed     = claims.filter(c => c.tikkie_status === 'redeemed').length;
+  const expired      = claims.filter(c => c.tikkie_status === 'expired').length;
+  const attached     = claims.filter(c => c.user_id).length;
+  const accounts     = users.length;
+  const mailos       = pending.filter(p => p.email && !p.user_id).length;
+  const reachable    = accounts + mailos;
+  const pendingAll   = pending.length;
+  const pendingDone  = pending.filter(p => p.resolved_at).length;
+  const backupClaims = new Set(backup.map(b => b.claim_id).filter(Boolean)).size;
+  const totalPaid    = claims.reduce((s, c) => s + Number(c.payout_amount || 0), 0);
+  const totalCups    = claims.reduce((s, c) => s + Number(c.cups_redeemed || 0), 0);
+  const avgPayout    = receipts > 0 ? totalPaid / receipts : null;
+  const avgCups      = receipts > 0 ? totalCups / receipts : null;
+
+  return [
+    // ── Primary ──
+    M({ id: 'tk_collect', group: 'primary', label: 'Link collect rate',
+        numerator: redeemed, denominator: links,
+        numLabel: 'Links collected', denLabel: 'Links issued',
+        desc: 'Tikkie links whose money was actually collected (IBAN entered), out of every link issued. Statuses refresh when a receipt is re-scanned, so this lags a little behind Tikkie itself.' }),
+    M({ id: 'tk_email_capture', group: 'primary', label: 'Email capture rate',
+        numerator: reachable, denominator: receipts,
+        numLabel: 'Emails captured (accounts + mailos)', denLabel: 'Receipts scanned',
+        desc: 'How often a scanned receipt turns into someone we can reach: a refund account or a mailo (email only).' }),
+    { measurable: true, id: 'tk_audience', group: 'primary', label: 'Mailos vs accounts',
+        valueType: 'count', value: null, rawValue: reachable, valueText: reachable.toLocaleString(),
+        numerator: reachable, numLabel: 'People reachable by email', denominator: null, denLabel: null,
+        breakdown: [
+          { key: 'accounts', label: 'Accounts', count: accounts },
+          { key: 'mailos',   label: 'Mailos',   count: mailos },
+        ],
+        breakdownTitle: 'Mailos vs accounts', breakdownNoun: 'people',
+        desc: 'Accounts are refund accounts (created via "save for later" or the account toggle). Mailos left only an email on the waiting screen: we can notify them, but they have no account.' },
+    M({ id: 'tk_account_conv', group: 'primary', label: 'Account conversion',
+        numerator: accounts, denominator: reachable,
+        numLabel: 'Accounts', denLabel: 'Accounts + mailos',
+        desc: 'Of everyone who left an email, how many opted into a PackPerks refund account.' }),
+
+    // ── Secondary ──
+    M({ id: 'tk_attached', group: 'secondary', label: 'Refunds on accounts',
+        numerator: attached, denominator: receipts,
+        numLabel: 'Refunds attached to an account', denLabel: 'Receipts scanned',
+        desc: 'Receipts whose payout is attached to a refund account (visible in that customer\'s history), rather than anonymous.' }),
+    M({ id: 'tk_pending_resolved', group: 'secondary', label: 'Pending receipts resolved',
+        numerator: pendingDone, denominator: pendingAll,
+        numLabel: 'Resolved', denLabel: 'Pending sightings',
+        desc: 'Receipts scanned before the bin\'s confirmation arrived (print-first), and how many the bin has since confirmed. A low rate means sessions are getting lost on the bin side.' }),
+    M({ id: 'tk_backup_share', group: 'secondary', label: 'Backup receipt share',
+        numerator: backupClaims, denominator: receipts,
+        numLabel: 'Backup-cup payouts', denLabel: 'Receipts scanned',
+        desc: 'Payouts that came from the bin\'s reserved offline codes. Anything above zero means the bin was offline at some point.' }),
+    M({ id: 'tk_expired', group: 'secondary', label: 'Expired link share',
+        numerator: expired, denominator: links,
+        numLabel: 'Expired links', denLabel: 'Links issued',
+        desc: 'Links that expired before the customer entered their IBAN. Money left on the table.' }),
+
+    // ── Optional ──
+    { measurable: avgPayout != null, id: 'tk_avg_payout', group: 'optional', label: 'Avg payout per receipt',
+        valueType: 'count', value: null, rawValue: avgPayout,
+        valueText: avgPayout != null ? `€${avgPayout.toFixed(2)}` : null,
+        numerator: receipts, numLabel: 'Receipts', denominator: null, denLabel: null,
+        desc: 'Average euro value of a receipt. Each Tikkie link also carries a fixed transaction fee, so small receipts cost more to pay out than they pay.',
+        ...(avgPayout == null ? { note: 'No receipts scanned yet.' } : {}) },
+    { measurable: avgCups != null, id: 'tk_avg_cups', group: 'optional', label: 'Avg cups per receipt',
+        valueType: 'count', value: null, rawValue: avgCups,
+        valueText: avgCups != null ? avgCups.toFixed(1) : null,
+        numerator: receipts, numLabel: 'Receipts', denominator: null, denLabel: null,
+        desc: 'Average number of cups per deposited batch.',
+        ...(avgCups == null ? { note: 'No receipts scanned yet.' } : {}) },
+  ];
+}
+
+async function getTikkieBehaviourStats(range, orgIds) {
+  const allRows = await fetchTikkieRows(orgIds);
+  const { minDate, maxDate, hasData, effFrom, effTo } = tikkieWindow(allRows, range);
+  const metrics = computeTikkieMetrics(sliceTikkieRows(allRows, effFrom, effTo));
+
+  const buckets = makeBuckets(effFrom, effTo);
+  const seriesById = new Map(metrics.map(m => [m.id, []]));
+  for (const b of buckets) {
+    const bm = computeTikkieMetrics(sliceTikkieRows(allRows, effFrom, b.endMs));
+    for (const m of bm) {
+      const arr = seriesById.get(m.id);
+      if (arr) arr.push({ t: b.endMs, label: b.label, v: m.rawValue == null ? null : m.rawValue });
+    }
+  }
+  for (const m of metrics) m.series = seriesById.get(m.id) || [];
+
+  return {
+    metrics,
+    meta: {
+      from: new Date(effFrom).toISOString(),
+      to: new Date(effTo).toISOString(),
+      minDate: new Date(minDate).toISOString(),
+      maxDate: new Date(maxDate).toISOString(),
+      hasData,
+    },
+  };
+}
+
+async function getTikkieBehaviourDailyHistory(range, orgIds) {
+  const allRows = await fetchTikkieRows(orgIds);
+  const { effFrom, effTo, hasData } = tikkieWindow(allRows, range);
+  const base = computeTikkieMetrics(sliceTikkieRows(allRows, effFrom, effTo));
+  const meta = base.map(m => ({ id: m.id, label: m.label, group: m.group, valueType: m.valueType }));
+  const valuesById = new Map(meta.map(m => [m.id, []]));
+  const buckets = makeDailyBuckets(effFrom, effTo);
+  for (const b of buckets) {
+    const byId = new Map(computeTikkieMetrics(sliceTikkieRows(allRows, effFrom, b.endMs)).map(m => [m.id, m.rawValue]));
+    for (const m of meta) {
+      const v = byId.has(m.id) ? byId.get(m.id) : null;
+      valuesById.get(m.id).push(v == null ? null : v);
+    }
+  }
+  return {
+    hasData,
+    dates: buckets.map(b => ({ label: b.label, iso: new Date(b.endMs).toISOString() })),
+    metrics: meta.map(m => ({ ...m, values: valuesById.get(m.id) })),
+  };
+}
+
+/* The Redirect Refund Users page: refund accounts, their attached
+ * refunds, and the mailos (waiting-screen emails without an account). */
+export async function getTikkieAudience(orgId) {
+  if (!orgId) return { accounts: [], claims: [], pending: [] };
+  const [usersRes, claimsRes, pendingRes] = await Promise.all([
+    supabase.from('users')
+      .select('id, display_name, email, marketing_consent, created_at, updated_at')
+      .eq('org_id', orgId).is('merged_into', null)
+      .order('created_at', { ascending: false }),
+    supabase.from('claims')
+      .select('id, user_id, created_at, cups_redeemed, payout_amount, batch_id, tikkie_url, tikkie_status')
+      .eq('org_id', orgId).not('batch_id', 'is', null)
+      .order('created_at', { ascending: false }),
+    supabase.from('pending_batches')
+      .select('batch_id, org_id, email, user_id, first_seen, resolved_at, notified_at')
+      .or(`org_id.is.null,org_id.eq.${orgId}`)
+      .order('first_seen', { ascending: false }),
+  ]);
+  if (usersRes.error) throw usersRes.error;
+  if (claimsRes.error) throw claimsRes.error;
+  return {
+    accounts: usersRes.data || [],
+    claims: claimsRes.data || [],
+    pending: pendingRes.data || [],
+  };
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * getUserBehaviourStats — behavioural metrics for the active org,
  * optionally scoped to a time window, each carrying a cumulative series.
@@ -1369,7 +1607,10 @@ function sliceBehaviourRows(allRows, fromMs, toMs) {
  * the applied window plus the data's true min/max dates so the UI can build
  * a date picker and default it to the full period.
  * ───────────────────────────────────────────────────────────────────── */
-export async function getUserBehaviourStats(range = null, orgIds) {
+export async function getUserBehaviourStats(range = null, orgIds, mode = null) {
+  // Redirect Refund orgs get their own funnel — the standard one is built
+  // from cups and rewards, which this mode doesn't have.
+  if (mode === 'tikkie_only') return getTikkieBehaviourStats(range, orgIds);
   const allRows = await fetchBehaviourRows(orgIds);
   const { minDate, maxDate, hasData, effFrom, effTo } = behaviourWindow(allRows, range);
 
@@ -1408,7 +1649,8 @@ export async function getUserBehaviourStats(range = null, orgIds) {
  * aligned dates + each metric's value array (null where there's no data
  * for that day yet).
  * ───────────────────────────────────────────────────────────────────── */
-export async function getUserBehaviourDailyHistory(range = null, orgIds) {
+export async function getUserBehaviourDailyHistory(range = null, orgIds, mode = null) {
+  if (mode === 'tikkie_only') return getTikkieBehaviourDailyHistory(range, orgIds);
   const allRows = await fetchBehaviourRows(orgIds);
   const { effFrom, effTo, hasData } = behaviourWindow(allRows, range);
 

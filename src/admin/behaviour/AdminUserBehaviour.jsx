@@ -202,7 +202,7 @@ function BehaviourCard({ m, onOpen }) {
 }
 
 export default function AdminUserBehaviour({ onNavigate }) {
-  const { activeOrg, scopeOrgIds, statsScope } = useOrg();
+  const { activeOrg, scopeOrgIds, statsScope, activeOrgMode } = useOrg();
   const [metrics, setMetrics] = useState(null);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -231,7 +231,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getUserBehaviourStats(r || { from: null, to: null }, scopeOrgIds);
+      const data = await getUserBehaviourStats(r || { from: null, to: null }, scopeOrgIds, activeOrgMode);
       setMetrics(data.metrics);
       setMeta(data.meta);
     } catch (e) {
@@ -295,7 +295,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
 
       // Optional second table: each selected metric's value, day by day.
       if (includeHistory) {
-        const hist = await getUserBehaviourDailyHistory(range, scopeOrgIds);
+        const hist = await getUserBehaviourDailyHistory(range, scopeOrgIds, activeOrgMode);
         content += '\n\n' + buildHistoryCsv(hist, selectedIds, fmt.id);
       }
 

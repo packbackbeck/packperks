@@ -1,19 +1,15 @@
 /* TikkieOnlyPage — the entire customer surface of a tikkie_only org.
- * One centered card: logos, a spinner, then a hard redirect to Tikkie. */
+ * Full-screen page (no floating card): the receipt IS the page. */
 .tikkie-only {
   min-height: 100dvh;
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-  background: linear-gradient(170deg, #F7F3E9 0%, #EFE9DA 100%);
+  background: #fff;
   font-family: var(--font-primary, system-ui, sans-serif);
 }
-.tikkie-only__card {
-  width: 100%; max-width: 380px;
-  background: #fff;
-  border-radius: 24px;
-  padding: 36px 28px 22px;
+.tikkie-only__inner {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 30px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
   text-align: center;
-  box-shadow: 0 18px 50px rgba(40, 30, 10, 0.12);
 }
 .tikkie-only__logos {
   display: flex; align-items: center; justify-content: center; gap: 14px;
@@ -26,9 +22,6 @@
 /* Tikkie's own logo. Sized against the PackBack mark opposite it rather
    than to its own bounding box, so the two read as an even pair. */
 .tikkie-only__tikkie-logo {
-  /* Taller than the PackBack mark's box on purpose: Tikkie's artwork
-     carries a lot of internal padding, so matching box heights would
-     leave it looking the smaller of the two. */
   height: 46px; width: auto; flex-shrink: 0;
 }
 .tikkie-only__spinner {
@@ -58,15 +51,15 @@
 }
 .tikkie-only__title {
   margin: 0 0 8px;
-  font-size: 21px; font-weight: 800; color: #1F1B16;
+  font-size: 22px; font-weight: 800; color: #1F1B16;
 }
 .tikkie-only__sub {
   margin: 0;
   font-size: 14.5px; line-height: 1.55; color: #6C6259;
 }
-.tikkie-only__payout { margin: 2px 0 14px; }
+.tikkie-only__payout { margin: 2px 0 16px; }
 .tikkie-only__amount {
-  font-size: 44px; font-weight: 800; line-height: 1.05; color: #1F1B16;
+  font-size: 46px; font-weight: 800; line-height: 1.05; color: #1F1B16;
   letter-spacing: -0.02em;
 }
 .tikkie-only__cups {
@@ -76,15 +69,141 @@
 .tikkie-only__btn {
   display: inline-block;
   margin-top: 18px;
-  padding: 12px 26px;
+  padding: 14px 30px;
   border-radius: 999px;
   background: #46BEAA; color: #fff;
-  font-size: 15px; font-weight: 800; text-decoration: none;
+  font-size: 16px; font-weight: 800; text-decoration: none;
 }
 .tikkie-only__foot {
-  margin: 26px 0 0;
+  margin: 28px 0 0;
   font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
   color: #B4AB9C;
+}
+
+/* ── The explainer: ONE block. Text on the left, a phone showing the
+   Tikkie page on the right. This block is the point of the page. ── */
+.tikkie-only__explain {
+  display: flex; align-items: center; gap: 16px;
+  margin: 4px 0 6px;
+  padding: 18px 16px;
+  background: #F7F4EC;
+  border-radius: 16px;
+  text-align: left;
+}
+.tikkie-only__explain-text { flex: 1; min-width: 0; }
+.tikkie-only__explain-text h2 {
+  margin: 0 0 8px;
+  font-size: 15px; font-weight: 800; color: #1F1B16;
+}
+.tikkie-only__explain-text ul {
+  margin: 0; padding: 0 0 0 16px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tikkie-only__explain-text li {
+  font-size: 13px; line-height: 1.45; color: #5F584F;
+}
+.tikkie-only__explain-text strong { color: #1F1B16; }
+
+/* The phone: a slim CSS mockup of Tikkie's claim screen — logo, amount,
+   IBAN + last-name fields, the pay button. No bitmap needed. */
+.tikkie-only__phone {
+  flex-shrink: 0;
+  width: 118px;
+  border: 5px solid #2B2622;
+  border-radius: 20px;
+  background: #2B2622;
+  position: relative;
+}
+.tikkie-only__phone-notch {
+  position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+  width: 34px; height: 5px; border-radius: 3px;
+  background: #2B2622; z-index: 2;
+}
+.tikkie-only__phone-screen {
+  border-radius: 13px;
+  background: #fff;
+  padding: 16px 9px 12px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 7px;
+}
+.tikkie-only__phone-logo {
+  height: 18px; width: auto; align-self: center;
+}
+.tikkie-only__phone-amount {
+  text-align: center;
+  font-size: 11px; font-weight: 800; color: #1F1B16;
+}
+.tikkie-only__phone-field {
+  border: 1.2px solid #D9D2C4; border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 8px; font-weight: 700; color: #8A8175;
+  white-space: nowrap; overflow: hidden;
+}
+.tikkie-only__phone-field--mono {
+  font-family: ui-monospace, monospace; font-size: 7.5px; color: #47478A;
+  border-color: #47478A;
+}
+.tikkie-only__phone-btn {
+  margin-top: 2px;
+  border-radius: 999px;
+  background: #46BEAA; color: #fff;
+  text-align: center;
+  padding: 6px 0;
+  font-size: 9px; font-weight: 800;
+}
+
+/* "or" divider between Open Tikkie and save-for-later */
+.tikkie-only__or {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 0 4px; color: #B4AB9C; font-size: 12px; font-weight: 700;
+}
+.tikkie-only__or::before, .tikkie-only__or::after {
+  content: ''; flex: 1; height: 1px; background: #EDE6D8;
+}
+
+/* Email capture (save-for-later / pending notify) */
+.tikkie-only__form { margin-top: 8px; text-align: left; }
+.tikkie-only__form-copy {
+  margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: #6C6259;
+  text-align: center;
+}
+.tikkie-only__input {
+  width: 100%; padding: 13px 14px;
+  border: 1.5px solid #E2DACA; border-radius: 11px;
+  font-family: inherit; font-size: 15px; color: #1F1B16; background: #fff;
+}
+.tikkie-only__input:focus { outline: none; border-color: #1A8737; }
+.tikkie-only__consent {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 12px 2px 0; cursor: pointer;
+  font-size: 12.5px; line-height: 1.5; color: #6C6259;
+}
+.tikkie-only__consent input { margin-top: 2px; accent-color: #1A8737; }
+.tikkie-only__consent em { color: #9A9186; font-style: normal; }
+/* The privacy link opens the same in-app policy sheet the rest of
+   PackPerks uses — a button styled as a link, never a plain href. */
+.tikkie-only__policy-link {
+  border: none; background: none; padding: 0;
+  font-family: inherit; font-size: inherit; font-weight: 700;
+  color: #1A8737; text-decoration: underline; cursor: pointer;
+}
+.tikkie-only__form-err { margin: 9px 0 0; font-size: 12.5px; color: #C4472B; text-align: center; }
+.tikkie-only__form .tikkie-only__btn--secondary { width: 100%; margin-top: 12px; }
+
+.tikkie-only__btn--secondary {
+  display: inline-block;
+  padding: 13px 26px; border-radius: 999px; border: 1.5px solid #1A8737;
+  background: #fff; color: #1A8737;
+  font-family: inherit; font-size: 15px; font-weight: 800;
+  text-decoration: none; cursor: pointer;
+}
+.tikkie-only__btn--secondary:disabled { opacity: 0.5; cursor: default; }
+.tikkie-only__btn + .tikkie-only__btn--secondary { margin-top: 10px; }
+
+.tikkie-only__pending-icon {
+  width: 46px; height: 46px; margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #FCF2D6; color: #9A6E12;
 }
 
 /* Re-opened receipt: the link was very likely already collected. */
@@ -106,82 +225,3 @@
 .tikkie-only__note strong { color: #6E2B18; }
 .tikkie-only__sub--small { font-size: 13px; margin-top: 10px; }
 .tikkie-only__btn--muted { background: #B4AB9C; }
-
-/* ── The Tikkie explainer — the reason this page exists ── */
-.tikkie-only__steps {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-  margin: 18px 0 20px;
-}
-.tikkie-only__step {
-  position: relative;
-  border: 1px solid #EDE6D8; border-radius: 14px;
-  padding: 22px 10px 12px;
-  background: #FBF8F1;
-  display: flex; flex-direction: column; align-items: center; gap: 7px;
-}
-.tikkie-only__step p { margin: 0; font-size: 11.5px; line-height: 1.4; color: #5F584F; }
-.tikkie-only__step strong { color: #1F1B16; }
-.tikkie-only__step-num {
-  position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
-  width: 20px; height: 20px; border-radius: 50%;
-  background: #47478A; color: #fff;
-  font-size: 11px; font-weight: 800; line-height: 20px;
-}
-.tikkie-only__step-logo { height: 20px; width: auto; }
-.tikkie-only__step-icon { width: 22px; height: 22px; color: #47478A; }
-.tikkie-only__iban {
-  font-family: ui-monospace, monospace; font-size: 9.5px; font-weight: 700;
-  color: #47478A; border: 1.5px solid #47478A; border-radius: 7px;
-  padding: 4px 6px; letter-spacing: 0.02em; white-space: nowrap;
-}
-.tikkie-only__step-warn {
-  font-size: 10px !important; font-weight: 700; color: #C98A12 !important;
-}
-
-/* "or" divider between Open Tikkie and save-for-later */
-.tikkie-only__or {
-  display: flex; align-items: center; gap: 10px;
-  margin: 16px 0 4px; color: #B4AB9C; font-size: 12px; font-weight: 700;
-}
-.tikkie-only__or::before, .tikkie-only__or::after {
-  content: ''; flex: 1; height: 1px; background: #EDE6D8;
-}
-
-/* Email capture (save-for-later / pending notify) */
-.tikkie-only__form { margin-top: 8px; text-align: left; }
-.tikkie-only__form-copy {
-  margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: #6C6259;
-  text-align: center;
-}
-.tikkie-only__input {
-  width: 100%; padding: 12px 14px;
-  border: 1.5px solid #E2DACA; border-radius: 11px;
-  font-family: inherit; font-size: 15px; color: #1F1B16; background: #fff;
-}
-.tikkie-only__input:focus { outline: none; border-color: #1A8737; }
-.tikkie-only__consent {
-  display: flex; align-items: flex-start; gap: 9px;
-  margin: 11px 2px 0; cursor: pointer;
-  font-size: 12.5px; line-height: 1.5; color: #6C6259;
-}
-.tikkie-only__consent input { margin-top: 2px; accent-color: #1A8737; }
-.tikkie-only__consent a { color: #1A8737; font-weight: 700; }
-.tikkie-only__form-err { margin: 9px 0 0; font-size: 12.5px; color: #C4472B; text-align: center; }
-.tikkie-only__form .tikkie-only__btn--secondary { width: 100%; margin-top: 12px; }
-
-.tikkie-only__btn--secondary {
-  display: inline-block;
-  padding: 12px 26px; border-radius: 999px; border: 1.5px solid #1A8737;
-  background: #fff; color: #1A8737;
-  font-family: inherit; font-size: 15px; font-weight: 800;
-  text-decoration: none; cursor: pointer;
-}
-.tikkie-only__btn--secondary:disabled { opacity: 0.5; cursor: default; }
-.tikkie-only__btn + .tikkie-only__btn--secondary { margin-top: 10px; }
-
-.tikkie-only__pending-icon {
-  width: 46px; height: 46px; margin: 0 auto 18px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: #FCF2D6; color: #9A6E12;
-}

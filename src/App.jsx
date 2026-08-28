@@ -743,9 +743,19 @@ export default function App({ consentReady = true } = {}) {
           const earlyCfg = await getAppConfig(org?.id).catch(() => null);
           if (earlyCfg?.settings?.mode === 'tikkie_only') {
             const sp = new URLSearchParams(window.location.search);
-            // No cookies / tracking on this path — tell ConsentGate to keep
-            // the banner out of the way of the payout.
-            try { window.dispatchEvent(new Event('packperks:suppress-consent')); } catch { /* noop */ }
+            // Receipt scans (batch/cups in the URL) set no cookies and must
+            // not put a banner between the customer and their payout — but a
+            // BARE visit is the refunds HOME, which behaves like the normal
+            // app (accounts, localStorage), so there the banner shows.
+            if (sp.get('batch') || sp.get('cups')) {
+              // Flag + event: the flag survives StrictMode's remount of
+              // ConsentGate (which would otherwise miss an already-fired
+              // event and pop the banner over a receipt).
+              try {
+                window.__ppkSuppressConsent = true;
+                window.dispatchEvent(new Event('packperks:suppress-consent'));
+              } catch { /* noop */ }
+            }
             // `?batch=` is the normal receipt. `?cups=` is what the bin
             // prints when it couldn't reach us and fell back to its
             // reserved cup ids — same screen, same wording; the customer

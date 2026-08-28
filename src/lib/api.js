@@ -1144,6 +1144,17 @@ export async function getMyClaims(userIds) {
   return data || []
 }
 
+// Redirect Refund home: the customer's own "in process" receipts — batches
+// scanned before the smart bin's confirmation reached PackPerks. Same RPC
+// trust model as get_customer_claims (keyed by the device's account ids).
+export async function getMyPending(userIds) {
+  const ids = (Array.isArray(userIds) ? userIds : [userIds]).filter(Boolean)
+  if (!ids.length) return []
+  const { data, error } = await supabase.rpc('get_my_pending', { p_user_ids: ids })
+  if (error) throw error
+  return data || []
+}
+
 // Record the customer's notify-channel choice for a claim (set on the verdict
 // screen). Anon can't UPDATE claims, so this goes through a security-definer RPC.
 export async function setClaimNotifyPrefs(claimId, { email = false, push = false } = {}) {

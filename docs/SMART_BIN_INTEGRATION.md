@@ -217,8 +217,14 @@ Print-first means a customer can scan a receipt PackPerks has never heard
 of. That scan is treated as **not validated yet**, never as invalid:
 
 - The page says we're checking the receipt (it can take up to ~30
-  minutes) and offers an email field — "email me when it's ready" — with
-  a privacy-policy consent.
+  minutes) and offers an email field — "email me when it's ready" — plus
+  an OPTIONAL "also create a PackPerks account" toggle (which carries the
+  privacy-policy consent). Email without the toggle is stored as a
+  notification-only contact; with it, a refund account is created and the
+  customer lands on their refunds home immediately.
+- While the customer stays on the screen, the page quietly polls; the
+  moment the bin's session lands, it switches to the normal refund page
+  by itself — no re-scan needed.
 - The unknown batch id is recorded server-side as a *pending* sighting.
 - The moment the bin's `/bin-mint-batch` call arrives with that
   `session_id`, the batch mints as normal, the pending sighting is

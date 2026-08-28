@@ -56,7 +56,7 @@ function OrgMark({ org }) {
  * (per the design brief) — they're two visual entry points to the
  * same destination. The middle tile triggers the add-more-cups scan
  * flow without taking the user off the home screen first. */
-export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, claimStatus }) {
+export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, claimStatus, showAdd = true, showCups = true }) {
   const cupTileRef = useRef(null);
   const prevCount = useRef(cupCount);
 
@@ -92,8 +92,10 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
       )}
 
       <div className="header__tiles" role="group" aria-label="Account actions">
-        {/* Tile 1 — Plus button. Triggers the scan / add-more-cups flow. */}
-        <button
+        {/* Tile 1 — Plus button. Triggers the scan / add-more-cups flow.
+            Hidden on the Redirect Refund home: cups go in the smart bin,
+            not through an in-app scan. */}
+        {showAdd && <button
           type="button"
           className="header__tile header__tile--add"
           onClick={() => { track(EVENTS.ADD_CUPS_OPENED); onAddCup?.(); }}
@@ -103,10 +105,11 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-        </button>
+        </button>}
 
-        {/* Tile 2 — Cup balance. Opens the profile / user-settings page. */}
-        <button
+        {/* Tile 2 — Cup balance. Opens the profile / user-settings page.
+            Hidden on the Redirect Refund home: there is no cup balance. */}
+        {showCups && <button
           ref={cupTileRef}
           type="button"
           className="header__tile header__tile--cups"
@@ -115,7 +118,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
         >
           <span className="header__tile-count">{cupCount}</span>
           <img src={cupIcon} alt="" className="header__tile-icon" aria-hidden="true" />
-        </button>
+        </button>}
 
         {/* Tile 3 — User avatar. Second visual entry to the same profile
             destination as tile 1. Two routes feel intentional (cup

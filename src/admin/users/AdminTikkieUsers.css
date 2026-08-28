@@ -1,0 +1,87 @@
+/* AdminTikkieUsers — accounts vs mailos for a Redirect Refund org.
+   Same visual language as the Backup Cups page. */
+.admin-tikkieusers { padding: 28px 32px 60px; max-width: 1040px; }
+
+.atu-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  margin-bottom: 20px;
+}
+.atu-title { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: #1F1B16; }
+.atu-sub { margin: 0; font-size: 13px; line-height: 1.55; color: #7A7166; max-width: 640px; }
+.atu-sub strong { color: #1F1B16; }
+.atu-refresh {
+  flex-shrink: 0; padding: 9px 18px; border-radius: 999px; border: 1.5px solid #E2DACA;
+  background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700;
+  color: #4A443C; cursor: pointer;
+}
+.atu-refresh:hover { background: #F7F3E9; }
+.atu-refresh:disabled { opacity: 0.6; cursor: default; }
+
+.atu-error {
+  margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
+  background: #FBEAE5; color: #A03A22; font-size: 13px;
+}
+
+.atu-tiles {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.atu-tile { background: #fff; border: 1px solid #EDE6D8; border-radius: 12px; padding: 14px 16px; }
+.atu-tile__num { font-size: 21px; font-weight: 800; color: #1F1B16; font-variant-numeric: tabular-nums; }
+.atu-tile__label {
+  margin-top: 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #9A9186;
+}
+
+.atu-card {
+  background: #fff; border: 1px solid #EDE6D8; border-radius: 14px;
+  padding: 20px 22px; margin-bottom: 16px;
+}
+.atu-card__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  margin-bottom: 12px;
+}
+.atu-card__title { margin: 0 0 4px; font-size: 15.5px; font-weight: 800; color: #1F1B16; }
+.atu-card__sub { margin: 0; font-size: 12.5px; line-height: 1.5; color: #8A8175; max-width: 560px; }
+
+/* Mailos vs accounts split bar */
+.atu-split {
+  height: 14px; border-radius: 999px; overflow: hidden;
+  background: #EEDFA8; /* mailos = amber remainder */
+}
+.atu-split__accounts { height: 100%; background: #1A8737; border-radius: 999px 0 0 999px; }
+.atu-split__pct { font-size: 13px; font-weight: 800; color: #1F1B16; white-space: nowrap; }
+.atu-split__legend {
+  display: flex; gap: 18px; margin-top: 10px;
+  font-size: 12.5px; font-weight: 700; color: #6C6259;
+}
+.atu-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px;
+}
+.atu-dot--accounts { background: #1A8737; }
+.atu-dot--mailos { background: #C98A12; }
+
+.atu-empty { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: #8A8175; }
+
+.atu-tablewrap { overflow-x: auto; }
+.atu-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.atu-table th {
+  text-align: left; padding: 8px 10px; border-bottom: 1.5px solid #EDE6D8;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #9A9186; white-space: nowrap;
+}
+.atu-table td {
+  padding: 9px 10px; border-bottom: 1px solid #F5F0E6; color: #4A443C;
+  white-space: nowrap;
+}
+.atu-table tr:last-child td { border-bottom: none; }
+.atu-td-email { font-weight: 700; color: #1F1B16; }
+.atu-muted { color: #B4AB9C; font-weight: 400; }
+.atu-mono { font-family: ui-monospace, monospace; font-size: 12px; color: #6C6259; }
+
+.atu-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800;
+}
+.atu-badge--ok { background: #E4F5E9; color: #1A8737; }
+.atu-badge--wait { background: #FCF2D6; color: #9A6E12; }

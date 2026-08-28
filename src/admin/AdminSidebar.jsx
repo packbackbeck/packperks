@@ -291,12 +291,14 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
             // Hide tabs the current role can't access.
             const visible = ROLE_VISIBLE_TABS[role];
             if (!(visible === null || !visible || visible.has(item.id))) return false;
-            // Tikkie-only orgs (smart-bin cashback): the dashboard collapses
-            // to the Receipt Generator + the payout log. Everything else —
-            // rewards, users, claims review, analytics — doesn't exist in
-            // this mode. (Settings/history/support stay reachable via the
-            // top-bar dock; see TIKKIE_ONLY_PAGES.)
-            if (isTikkieOnly) return ['tikkielog', 'cupqr', 'backupcups'].includes(item.id);
+            // Tikkie-only orgs (smart-bin cashback): payouts, receipts and
+            // the offline fallback — plus, now that Redirect Refund has a
+            // user base, the audience pages (users, behaviour, health,
+            // reports), each adapted to this mode. (Settings/history/support
+            // stay reachable via the top-bar dock; see TIKKIE_ONLY_PAGES.)
+            if (isTikkieOnly) {
+              return ['tikkielog', 'cupqr', 'backupcups', 'users', 'behaviour', 'stats', 'reports'].includes(item.id);
+            }
             if (item.id === 'tikkielog' || item.id === 'backupcups') return false;
             // Phase 3 gating:
             //  • Cup Transfers only when cup sharing is on for this org.

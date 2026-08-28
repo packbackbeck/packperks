@@ -24,9 +24,12 @@ export default function ConsentGate({ children }) {
   // creates no account and tracks nothing, so the banner would be pure
   // friction between the customer and their payout. App fires this event
   // when it resolves a tikkie_only org; we simply don't show the banner.
-  const [suppressed, setSuppressed] = useState(false);
+  // Initialise from the window flag too: the event alone can be missed if
+  // this component remounts (StrictMode) after App already fired it.
+  const [suppressed, setSuppressed] = useState(() => !!window.__ppkSuppressConsent);
   useEffect(() => {
     const onSuppress = () => setSuppressed(true);
+    if (window.__ppkSuppressConsent) setSuppressed(true);
     window.addEventListener('packperks:suppress-consent', onSuppress);
     return () => window.removeEventListener('packperks:suppress-consent', onSuppress);
   }, []);

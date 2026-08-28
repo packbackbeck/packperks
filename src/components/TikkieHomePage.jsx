@@ -1,21 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { getMyClaims } from '../lib/api';
+import { getMyClaims, getMyPending } from '../lib/api';
 import { readRefundAccount } from './TikkieOnlyPage';
 import UserPage from './UserPage';
-import packbackLogo from '../assets/images/packback-logo.svg';
+import Header from './Header';
 import './TikkieHomePage.css';
 
 /* Redirect Refund home — the account view for a mode that, until now,
  * had no users at all.
  *
- * It deliberately mirrors the shape of the normal store home (hero tile,
- * activity, map) but swaps the vocabulary: no rewards, no cup goals. The
- * hero is the money — total refunded, with the still-uncollected amount
- * as the small number — because for this audience the product IS the
- * refund. History is the claim list, and the map shows where the smart
- * bins stand (static pins for now; there is exactly one live bin).
+ * It reuses the REAL home-page chrome (the `.app` shell and the shared
+ * <Header>, minus the add-cups and cup-balance tiles: cups go in the
+ * smart bin, and there is no balance). Where the normal home shows
+ * rewards, this shows the money:
+ *
+ *   • hero tile — total refunded, with the still-uncollected amount
+ *   • "Ready to collect" — unclaimed Tikkie links, one tap away
+ *   • "In process" — receipts scanned before the bin's confirmation
+ *     reached us; the link appears (and the customer is emailed) the
+ *     moment it does
+ *   • history, and the smart-bin map (same style as the market map)
  *
  * Reached from /<slug>/ with no batch in the URL: either the customer
  * saved a refund for later (account in localStorage) or they typed the
@@ -73,15 +78,25 @@ function BinMap() {
 export default function TikkieHomePage({ org, settings = {} }) {
   const account = useMemo(() => readRefundAccount(org?.id), [org?.id]);
   const [claims, setClaims] = useState([]);
+  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(!!account);
   const [showAccount, setShowAccount] = useState(false);
 
   useEffect(() => {
     let alive = true;
     if (!account?.userId) { setLoading(false); return undefined; }
-    getMyClaims([account.userId])
-      .then(rows => { if (alive) setClaims(rows || []); })
-      .catch(() => {})
+    Promise.all([
+      getMyClaims([account.userId]).catch(() => []),
+      getMyPending([account.userId]).catch(() => []),
+    ])
+      .then(([rows, pend]) => {
+        if (!alive) return;
+        setClaims(rows || []);
+        // "In process": scanned, but the bin's confirmation hasn't reached
+        // us — no link yet. Resolved rows graduate into claims, so only
+        // the unresolved ones show here.
+        setPending((pend || []).filter(p => !p.resolved_at));
+      })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [account?.userId]);
@@ -119,20 +134,21 @@ export default function TikkieHomePage({ org, settings = {} }) {
   }
 
   return (
-    <div className="tikkie-home">
-      <header className="tikkie-home__head">
-        <img className="tikkie-home__logo" src={org?.logo_url || packbackLogo} alt={org?.name || 'PackBack'} />
-        <button
-          type="button"
-          className="tikkie-home__user"
-          onClick={() => setShowAccount(true)}
-          aria-label="My account"
-        >
-          {(account?.email || '?').charAt(0).toUpperCase()}
-        </button>
-      </header>
+    <div className="app tikkie-home">
+      {/* The REAL home header — brand lockup + the account tile. The
+          add-cups and cup-balance tiles are hidden: no balance here. */}
+      <Header
+        cupCount={0}
+        onBadgeClick={() => setShowAccount(true)}
+        onAddCup={() => {}}
+        org={org}
+        design={null}
+        claimStatus={totals.openClaims.length > 0 ? 'ready' : null}
+        showAdd={false}
+        showCups={false}
+      />
 
-      {/* ── The hero is the money ── */}
+      {/* ── The hero is the money — white tile, normal PackPerks colours ── */}
       <section className="tikkie-home__hero">
         <span className="tikkie-home__hero-label">Total refunded</span>
         <div className="tikkie-home__hero-amount">€{totals.total.toFixed(2)}</div>
@@ -143,7 +159,7 @@ export default function TikkieHomePage({ org, settings = {} }) {
               €{totals.available.toFixed(2)} still to collect
             </>
           ) : account ? (
-            'Everything collected — nice.'
+            'Everything collected. Nice.'
           ) : (
             'Scan a receipt from the smart bin to start.'
           )}
@@ -164,6 +180,30 @@ export default function TikkieHomePage({ org, settings = {} }) {
               </div>
               <span className="tikkie-home__open-cta">Open Tikkie</span>
             </a>
+          ))}
+        </section>
+      )}
+
+      {/* ── In process: scanned, waiting for the bin's confirmation.
+           The link is generated the moment it arrives, and we email
+           the customer — nothing for them to do here but wait. ── */}
+      {pending.length > 0 && (
+        <section className="tikkie-home__section">
+          <h2 className="tikkie-home__section-title">In process</h2>
+          {pending.map(p => (
+            <div key={p.batch_id} className="tikkie-home__pending">
+              <span className="tikkie-home__pending-clock" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <polyline points="12 7 12 12 15.5 14" />
+                </svg>
+              </span>
+              <div className="tikkie-home__pending-main">
+                <span className="tikkie-home__pending-title">Receipt scanned {fmtWhen(p.first_seen)}</span>
+                <span className="tikkie-home__pending-note">We’ll email you when your link is ready.</span>
+              </div>
+              <span className="tikkie-home__row-status">In process</span>
+            </div>
           ))}
         </section>
       )}

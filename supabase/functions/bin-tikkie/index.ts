@@ -136,10 +136,15 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // blocks a genuine payout.
 const RL_WINDOW_MS = 60 * 60 * 1000;
 const RL_MAX = 30;
-async function rateLimited(req: Request): Promise<boolean> {
+// The pending screen polls `action:"check"` while it waits for the bin's
+// confirmation. Those calls read two rows and mint nothing, so they get
+// their own, much roomier bucket — polling must never eat the 30/h that
+// real scans depend on.
+const RL_MAX_CHECK = 240;
+async function rateLimited(req: Request, bucket = "bin-tikkie", max = RL_MAX): Promise<boolean> {
   try {
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-    const key = `bin-tikkie:${ip}`;
+    const key = `${bucket}:${ip}`;
     const now = Date.now();
     const { data } = await supabase.from("rate_limits")
       .select("count, window_start").eq("key", key).maybeSingle();
@@ -148,7 +153,7 @@ async function rateLimited(req: Request): Promise<boolean> {
         .upsert({ key, count: 1, window_start: new Date().toISOString() });
       return false;
     }
-    if ((data.count ?? 0) >= RL_MAX) return true;
+    if ((data.count ?? 0) >= max) return true;
     await supabase.from("rate_limits").update({ count: (data.count ?? 0) + 1 }).eq("key", key);
     return false;
   } catch {
@@ -158,6 +163,7 @@ async function rateLimited(req: Request): Promise<boolean> {
 
 interface ClaimRow {
   id: string;
+  batch_id: string | null;
   cups_redeemed: number | null;
   payout_amount: number | null;
   tikkie_url: string | null;
@@ -165,11 +171,12 @@ interface ClaimRow {
   tikkie_status: string | null;
 }
 
-const CLAIM_COLS = "id, cups_redeemed, payout_amount, tikkie_url, tikkie_cashback_id, tikkie_status";
+const CLAIM_COLS = "id, batch_id, cups_redeemed, payout_amount, tikkie_url, tikkie_cashback_id, tikkie_status";
 
 function claimReply(claim: ClaimRow, status: string, liveStatus?: string | null) {
   return json({
     status,
+    batch_id: claim.batch_id,
     url: claim.tikkie_url,
     cups: claim.cups_redeemed,
     amount: claim.payout_amount,
@@ -190,7 +197,13 @@ async function liveTikkieStatus(cashbackId: string | null): Promise<string | nul
   if (!cashbackId) return null;
   try {
     const { campaignBase } = resolveCampaign();
-    const resp = await fetch(`${campaignBase}/cashbacks/${cashbackId}`, { headers: tikkieHeaders() });
+    // Hard 4s cap. ABN AMRO has been observed taking 80+ seconds, and this
+    // lookup sits INSIDE the re-scan response — a customer staring at a
+    // spinner for a minute is worse than a slightly stale status.
+    const resp = await fetch(`${campaignBase}/cashbacks/${cashbackId}`, {
+      headers: tikkieHeaders(),
+      signal: AbortSignal.timeout(4000),
+    });
     if (!resp.ok) return null;
     const cb = await resp.json() as { status?: string; redeemedDateTime?: string; expiryDateTime?: string };
     const st = String(cb.status || "").toLowerCase() || null;
@@ -323,6 +336,7 @@ async function mintForClaim(claim: ClaimRow): Promise<Response> {
 
   return json({
     status: "created",
+    batch_id: claim.batch_id,
     url: cb.url,
     cups: claim.cups_redeemed,
     amount: claim.payout_amount,
@@ -499,6 +513,21 @@ async function findOrCreateUser(orgId: string, deviceId: string, email: string, 
   }
 }
 
+/* The pending screen knows which org's page it is on (the slug in the
+ * printed URL), but the SERVER doesn't yet — the bin hasn't delivered the
+ * session. When the customer opts into an account there, the client sends
+ * that org as a hint. Trust it only after checking it is a real
+ * tikkie_only org: the worst a forged hint can do is create an empty
+ * refund account in the wrong venue, but there's no reason to allow even
+ * that. */
+async function validateTikkieOrg(orgId: string): Promise<boolean> {
+  if (!UUID_RE.test(orgId)) return false;
+  const { data } = await supabase.from("app_config")
+    .select("value").eq("key", `published:${orgId}`).maybeSingle();
+  const settings = (data?.value as { settings?: Record<string, unknown> } | null)?.settings || {};
+  return settings.mode === "tikkie_only";
+}
+
 /* save_email — the "save for later" / "notify me" action from the
  * redirect page. Two situations:
  *   • the batch is KNOWN (claim exists): attach the account to the claim
@@ -511,10 +540,16 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
   const email = String(body.email || "").trim().toLowerCase();
   const deviceId = String(body.device_id || "").trim().slice(0, 64);
   const marketing = body.marketing_consent === true;
+  // create_account defaults to true (the redirect page's "save for later"
+  // always makes an account). The pending screen may send false: the
+  // customer just wants the ready-email. Those rows — email, no account —
+  // are what the dashboard calls "mailos".
+  const createAccount = body.create_account !== false;
   if (!UUID_RE.test(batchId)) return json({ error: "invalid_batch" }, 400);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "invalid_email" }, 400);
   if (!deviceId) return json({ error: "missing_device" }, 400);
-  if (body.privacy_accepted !== true) return json({ error: "privacy_required" }, 400);
+  // Privacy consent gates the ACCOUNT, not the transactional ready-email.
+  if (createAccount && body.privacy_accepted !== true) return json({ error: "privacy_required" }, 400);
 
   const claim = await claimForBatch(batchId);
   if (claim) {
@@ -531,14 +566,43 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
   const { data: pending } = await supabase
     .from("pending_batches").select("batch_id, org_id").eq("batch_id", batchId).maybeSingle();
   if (!pending) return json({ error: "batch_not_found" }, 404);
-  const orgId = (pending.org_id as string) || null;
-  const userId = orgId ? await findOrCreateUser(orgId, deviceId, email, marketing) : null;
+  // The org: the pending row's own (bin confirmed between scan and save),
+  // else the page's validated hint. Without either, the email still lands
+  // on the row — bin-mint-batch attaches everything once the bin calls in.
+  let orgId = (pending.org_id as string) || null;
+  if (!orgId && typeof body.org_id === "string" && await validateTikkieOrg(body.org_id)) {
+    orgId = body.org_id;
+  }
+  const userId = (createAccount && orgId)
+    ? await findOrCreateUser(orgId, deviceId, email, marketing)
+    : null;
   await supabase.from("pending_batches").update({
     email,
     marketing_consent: marketing,
-    user_id: userId,
+    ...(userId ? { user_id: userId } : {}),
+    ...(orgId && !pending.org_id ? { org_id: orgId } : {}),
   }).eq("batch_id", batchId);
   return json({ status: "saved_pending", user_id: userId });
+}
+
+/* action:"check" — the pending screen's poll. Read-only and cheap: is the
+ * batch validated yet? Never mints, never activates cups, never writes —
+ * the client makes ONE real scan call once this says the wait is over. */
+async function checkBatch(body: Record<string, unknown>): Promise<Response> {
+  const batchId = String(body.batch_id || "").trim().toLowerCase();
+  if (!UUID_RE.test(batchId)) return json({ error: "invalid_batch" }, 400);
+
+  const claim = await claimForBatch(batchId);
+  if (claim?.tikkie_url) return claimReply(claim, "exists");
+  if (claim) return json({ status: "validated" });
+
+  const { count } = await supabase.from("cups")
+    .select("id", { count: "exact", head: true }).eq("batch_id", batchId);
+  if ((count ?? 0) > 0) return json({ status: "validated" });
+
+  const { data: p } = await supabase
+    .from("pending_batches").select("email").eq("batch_id", batchId).maybeSingle();
+  return json({ status: "pending_validation", has_email: !!p?.email }, 202);
 }
 
 Deno.serve(async (req) => {
@@ -547,6 +611,16 @@ Deno.serve(async (req) => {
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* fall through to validation */ }
+
+  // The pending screen's poll: read-only, own (roomy) rate bucket so a
+  // waiting customer can't poll themselves out of their actual payout.
+  if (body.action === "check") {
+    if (await rateLimited(req, "bin-tikkie-check", RL_MAX_CHECK)) {
+      return json({ error: "rate_limited" }, 429);
+    }
+    return checkBatch(body);
+  }
+
   if (await rateLimited(req)) return json({ error: "rate_limited" }, 429);
 
   // "Save for later" / pending notification signup.

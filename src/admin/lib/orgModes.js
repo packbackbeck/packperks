@@ -52,6 +52,12 @@ export const TIKKIE_ONLY_PAGES = new Set([
   'cupqr',        // Receipt Generator — mints the same batches the bin does
   'tikkielog',    // the payout log
   'backupcups',   // the bin's offline fallback codes + outage alarm
+  // Redirect Refund grew a user base (refund accounts + mailos), so the
+  // audience pages are back — each one adapts itself to this mode.
+  'users',        // refund accounts + mailos (AdminTikkieUsers)
+  'behaviour',    // tikkie funnel metrics (links, collect rate, audience)
+  'stats',        // System Health — org-scoped ops events, mode-agnostic
+  'reports',      // Reports & alerts + the automated email reports
   'settings',     // rate config + org profile + team
   'org',          // legacy alias that redirects to settings
   'organizations',// org switcher / management (PackPerks staff)

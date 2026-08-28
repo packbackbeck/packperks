@@ -9,6 +9,7 @@ import AdminSidebar from './AdminSidebar';
 import AdminOverview from './overview/AdminOverview';
 import AdminRewards from './rewards/AdminRewards';
 import AdminUsers from './users/AdminUsers';
+import AdminTikkieUsers from './users/AdminTikkieUsers';
 import AdminClaims from './claims/AdminClaims';
 import AdminCupScans from './cupscans/AdminCupScans';
 import AdminWorkspace from './settings/AdminWorkspace';
@@ -217,7 +218,11 @@ function AdminShell() {
             <AdminAppDesign draftState={draftState} />
           </KeepAlive>
           <KeepAlive id="users" activeId={page} visited={visited}>
-            <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} focusSection={page === 'users' ? deepSection : null} onSectionConsumed={() => setDeepSection(null)} />
+            {/* Redirect Refund orgs get their own Users page: refund
+                accounts + mailos, no cup balances or merges. */}
+            {activeOrgMode === 'tikkie_only'
+              ? <AdminTikkieUsers />
+              : <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} focusSection={page === 'users' ? deepSection : null} onSectionConsumed={() => setDeepSection(null)} />}
           </KeepAlive>
           <KeepAlive id="claims" activeId={page} visited={visited}>
             <AdminClaims onNavigate={setPage} draftState={draftState} />

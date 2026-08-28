@@ -58,9 +58,30 @@ const DEFAULT_RATE_EUR = 0.10;
 
 // Backup cups mint a fresh link on EVERY scan by design, which makes them
 // the one QR in the system that keeps paying. These bound the damage if a
-// printed backup receipt is rescanned, or circulated.
-const BACKUP_COOLDOWN_S = 120;   // per cup, between mints
-const BACKUP_DAILY_CAP  = 20;    // mints per org per rolling 24h
+// printed backup receipt is rescanned, or circulated. The daily caps are
+// admin-tunable (Backup Cups page → backup_limits:<orgId>); the values
+// here are the defaults and the cooldown floor.
+const BACKUP_COOLDOWN_S = 120;        // per cup, between mints (fixed)
+const BACKUP_DAILY_CAP_DEFAULT = 20;  // mints per org per rolling 24h
+const BACKUP_DEVICE_DAILY_DEFAULT = 3;// mints per device per rolling 24h
+
+async function backupLimits(orgId: string): Promise<{ dailyCap: number; perDeviceDaily: number }> {
+  try {
+    const { data } = await supabase.from("app_config")
+      .select("value").eq("key", `backup_limits:${orgId}`).maybeSingle();
+    const v = (data?.value ?? {}) as { dailyCap?: number; perDeviceDaily?: number };
+    const clamp = (n: unknown, d: number, max: number) => {
+      const x = Number(n);
+      return Number.isFinite(x) && x >= 1 && x <= max ? Math.floor(x) : d;
+    };
+    return {
+      dailyCap: clamp(v.dailyCap, BACKUP_DAILY_CAP_DEFAULT, 500),
+      perDeviceDaily: clamp(v.perDeviceDaily, BACKUP_DEVICE_DAILY_DEFAULT, 50),
+    };
+  } catch {
+    return { dailyCap: BACKUP_DAILY_CAP_DEFAULT, perDeviceDaily: BACKUP_DEVICE_DAILY_DEFAULT };
+  }
+}
 
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") || "no-reply@packback.network";
@@ -321,7 +342,7 @@ async function mintForClaim(claim: ClaimRow): Promise<Response> {
  * a cooldown per cup, a daily ceiling per org, a row in the use log, and
  * an alert every single time, because a backup scan means the bin was
  * offline and somebody needs to know. */
-async function redeemBackupCups(cupIds: string[]): Promise<Response> {
+async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Response> {
   const { data: cupsRows } = await supabase
     .from("backup_cups").select("id, org_id, label, active").in("id", cupIds);
   if (!cupsRows || cupsRows.length !== cupIds.length) return json({ error: "batch_not_found" }, 404);
@@ -351,13 +372,25 @@ async function redeemBackupCups(cupIds: string[]): Promise<Response> {
     return json({ error: "backup_cooldown" }, 429);
   }
 
-  // Daily ceiling per org — the backstop if a backup receipt gets shared.
+  // Daily ceilings — the backstop if a backup receipt gets shared. Both
+  // admin-tunable from the Backup Cups page.
+  const limits = await backupLimits(orgId);
   const dayAgo = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
   const { count: usesToday } = await supabase
     .from("backup_cup_uses")
     .select("id", { count: "exact", head: true })
     .eq("org_id", orgId).gte("used_at", dayAgo);
-  if ((usesToday ?? 0) >= BACKUP_DAILY_CAP) {
+  if ((usesToday ?? 0) >= limits.dailyCap) {
+    return json({ error: "backup_daily_cap" }, 429);
+  }
+  // Per-device ceiling. A missing device id shares one "unknown" bucket
+  // rather than escaping the limit.
+  const dev = deviceId || "unknown";
+  const { count: devToday } = await supabase
+    .from("backup_cup_uses")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId).eq("device_id", dev).gte("used_at", dayAgo);
+  if ((devToday ?? 0) >= limits.perDeviceDaily) {
     return json({ error: "backup_daily_cap" }, 429);
   }
 
@@ -402,6 +435,7 @@ async function redeemBackupCups(cupIds: string[]): Promise<Response> {
       amount_eur: amount,
       cups_in_scan: count,
       used_at: usedAt,
+      device_id: dev,
     })),
   );
   supabase.from("system_events").insert({
@@ -425,13 +459,98 @@ async function redeemBackupCups(cupIds: string[]): Promise<Response> {
   return minted;
 }
 
+/* ── Accounts ────────────────────────────────────────────────────────────
+ * Redirect Refund now has a (light) user base: a customer may leave their
+ * email to save a refund for later, or to be notified when a pending
+ * receipt is validated. One account per device per org — the same
+ * users_device_org uniqueness the rest of PackPerks relies on. */
+async function findOrCreateUser(orgId: string, deviceId: string, email: string, marketing: boolean): Promise<string | null> {
+  try {
+    const { data: existing } = await supabase
+      .from("users").select("id")
+      .eq("org_id", orgId).eq("device_id", deviceId)
+      .is("merged_into", null)
+      .maybeSingle();
+    if (existing?.id) {
+      await supabase.from("users").update({
+        email,
+        marketing_consent: marketing,
+        marketing_consent_at: marketing ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", existing.id);
+      return existing.id as string;
+    }
+    const { data: created, error } = await supabase.from("users").insert({
+      org_id: orgId,
+      device_id: deviceId,
+      email,
+      display_name: "Refund account",
+      marketing_consent: marketing,
+      marketing_consent_at: marketing ? new Date().toISOString() : null,
+    }).select("id").maybeSingle();
+    if (error) {
+      console.error(`[bin-tikkie] user create failed: ${error.message}`);
+      return null;
+    }
+    return (created?.id as string) ?? null;
+  } catch (e) {
+    console.error(`[bin-tikkie] findOrCreateUser: ${String(e)}`);
+    return null;
+  }
+}
+
+/* save_email — the "save for later" / "notify me" action from the
+ * redirect page. Two situations:
+ *   • the batch is KNOWN (claim exists): attach the account to the claim
+ *     so it shows in their refund history.
+ *   • the batch is PENDING (bin hasn't delivered the session yet): store
+ *     the email on the pending row; bin-mint-batch emails them when the
+ *     session lands, and the claim is attached at creation time. */
+async function saveEmail(body: Record<string, unknown>): Promise<Response> {
+  const batchId = String(body.batch_id || "").trim().toLowerCase();
+  const email = String(body.email || "").trim().toLowerCase();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  const marketing = body.marketing_consent === true;
+  if (!UUID_RE.test(batchId)) return json({ error: "invalid_batch" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "invalid_email" }, 400);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+  if (body.privacy_accepted !== true) return json({ error: "privacy_required" }, 400);
+
+  const claim = await claimForBatch(batchId);
+  if (claim) {
+    const { data: claimRow } = await supabase
+      .from("claims").select("org_id").eq("id", claim.id).maybeSingle();
+    const orgId = (claimRow?.org_id as string) || null;
+    if (!orgId) return json({ error: "batch_not_found" }, 404);
+    const userId = await findOrCreateUser(orgId, deviceId, email, marketing);
+    if (!userId) return json({ error: "account_failed" }, 500);
+    await supabase.from("claims").update({ user_id: userId }).eq("id", claim.id);
+    return json({ status: "saved", user_id: userId });
+  }
+
+  const { data: pending } = await supabase
+    .from("pending_batches").select("batch_id, org_id").eq("batch_id", batchId).maybeSingle();
+  if (!pending) return json({ error: "batch_not_found" }, 404);
+  const orgId = (pending.org_id as string) || null;
+  const userId = orgId ? await findOrCreateUser(orgId, deviceId, email, marketing) : null;
+  await supabase.from("pending_batches").update({
+    email,
+    marketing_consent: marketing,
+    user_id: userId,
+  }).eq("batch_id", batchId);
+  return json({ status: "saved_pending", user_id: userId });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  let body: { batch_id?: string; cup_ids?: unknown } = {};
+  let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* fall through to validation */ }
   if (await rateLimited(req)) return json({ error: "rate_limited" }, 429);
+
+  // "Save for later" / pending notification signup.
+  if (body.action === "save_email") return saveEmail(body);
 
   // The offline receipt carries cup ids rather than a batch.
   if (Array.isArray(body.cup_ids) && body.cup_ids.length) {
@@ -439,7 +558,7 @@ Deno.serve(async (req) => {
     if (ids.length > 50 || ids.some((u) => !UUID_RE.test(u))) {
       return json({ error: "invalid_batch" }, 400);
     }
-    return redeemBackupCups(ids);
+    return redeemBackupCups(ids, String(body.device_id || "").trim().slice(0, 64));
   }
 
   const batchId = String(body.batch_id || "").trim().toLowerCase();
@@ -461,7 +580,19 @@ Deno.serve(async (req) => {
     .select("id, org_id, status, revoked_at, expires_at")
     .eq("batch_id", batchId);
   if (cupsErr) return json({ error: "db_error", detail: cupsErr.message }, 500);
-  if (!cups || cups.length === 0) return json({ error: "batch_not_found" }, 404);
+  if (!cups || cups.length === 0) {
+    /* Print-first: the bin prints the QR from its own session UUID without
+     * waiting for us, so a scan can arrive BEFORE the bin's notification.
+     * An unknown batch is therefore "not validated yet", not "invalid" —
+     * record the sighting and tell the page to show the waiting screen.
+     * (org_id stays null until the bin's call fills it in; the org here is
+     * unknowable from the URL alone and unauthenticated input anyway.) */
+    await supabase.from("pending_batches")
+      .upsert({ batch_id: batchId }, { onConflict: "batch_id", ignoreDuplicates: true });
+    const { data: p } = await supabase
+      .from("pending_batches").select("email").eq("batch_id", batchId).maybeSingle();
+    return json({ status: "pending_validation", has_email: !!p?.email }, 202);
+  }
   const orgId = cups[0].org_id as string | null;
   if (!orgId) return json({ error: "batch_not_found" }, 404);
 
@@ -515,10 +646,32 @@ Deno.serve(async (req) => {
   const maxTotal = Math.min(MAX_TOTAL_EUR, Number.isFinite(cfgMax) && cfgMax > 0 ? cfgMax : MAX_TOTAL_EUR);
   const amount = Math.min(maxTotal, Math.round(count * rate * 100) / 100);
 
+  // If the customer pre-registered on the waiting screen, their account is
+  // on the pending row — the claim is born attached to it. If they left an
+  // email while the org was still unknown (no account could be created
+  // yet), create it now: whoever opens the ready link is the customer, and
+  // their device id has just arrived with this request.
+  let pendingUserId: string | null = null;
+  {
+    const { data: p } = await supabase
+      .from("pending_batches")
+      .select("user_id, email, marketing_consent")
+      .eq("batch_id", batchId).maybeSingle();
+    pendingUserId = (p?.user_id as string) ?? null;
+    const scanDevice = String(body.device_id || "").trim().slice(0, 64);
+    if (!pendingUserId && p?.email && scanDevice) {
+      pendingUserId = await findOrCreateUser(orgId, scanDevice, p.email as string, p.marketing_consent === true);
+      if (pendingUserId) {
+        await supabase.from("pending_batches")
+          .update({ user_id: pendingUserId }).eq("batch_id", batchId);
+      }
+    }
+  }
+
   // One claim per batch — the unique index arbitrates concurrent scans.
   const { data: inserted, error: insErr } = await supabase.from("claims")
     .insert({
-      user_id: null,          // anonymous: no account in tikkie-only mode
+      user_id: pendingUserId, // attached if they pre-registered; else anonymous
       org_id: orgId,
       type: "cashback",
       status: "completed",    // the bin already verified the deposit

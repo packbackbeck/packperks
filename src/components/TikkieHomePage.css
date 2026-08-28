@@ -1,0 +1,112 @@
+/* Redirect Refund home — hero = money, then actionable refunds, history,
+   and the bin map. Mirrors the store home's rhythm without its rewards. */
+.tikkie-home {
+  min-height: 100dvh;
+  background: linear-gradient(170deg, #F7F3E9 0%, #EFE9DA 100%);
+  font-family: var(--font-primary, system-ui, sans-serif);
+  padding: 18px 16px calc(env(safe-area-inset-bottom, 0px) + 28px);
+  max-width: 560px; margin: 0 auto;
+}
+.tikkie-home__head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.tikkie-home__logo { height: 34px; width: auto; }
+.tikkie-home__user {
+  width: 38px; height: 38px; border-radius: 50%; border: none;
+  background: #47478A; color: #fff;
+  font-family: inherit; font-size: 16px; font-weight: 800; cursor: pointer;
+}
+
+.tikkie-home__hero {
+  background: #1A8737; color: #fff;
+  border-radius: 20px; padding: 26px 22px;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(26, 135, 55, 0.25);
+}
+.tikkie-home__hero-label {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase;
+  opacity: 0.85;
+}
+.tikkie-home__hero-amount {
+  font-size: 46px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em;
+  margin: 6px 0 4px;
+}
+.tikkie-home__hero-sub {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13.5px; font-weight: 700; opacity: 0.92;
+}
+.tikkie-home__hero-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #FFD666;
+}
+
+.tikkie-home__section { margin-top: 22px; }
+.tikkie-home__section-title {
+  margin: 0 0 10px; font-size: 13px; font-weight: 800;
+  letter-spacing: 0.05em; text-transform: uppercase; color: #8A8175;
+}
+
+.tikkie-home__open {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #fff; border: 1.5px solid #1A8737; border-radius: 15px;
+  padding: 14px 16px; margin-bottom: 8px;
+  text-decoration: none;
+}
+.tikkie-home__open-amount { font-size: 19px; font-weight: 800; color: #1F1B16; }
+.tikkie-home__open-meta { font-size: 12px; color: #8A8175; margin-top: 1px; }
+.tikkie-home__open-cta {
+  flex-shrink: 0; padding: 9px 16px; border-radius: 999px;
+  background: #52BEB7; color: #fff; font-size: 13px; font-weight: 800;
+}
+
+.tikkie-home__history {
+  list-style: none; margin: 0; padding: 4px 2px;
+  background: #fff; border-radius: 15px; border: 1px solid #EDE6D8;
+}
+.tikkie-home__row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-bottom: 1px solid #F5F0E6;
+}
+.tikkie-home__row:last-child { border-bottom: none; }
+.tikkie-home__row-icon {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #FCF2D6; color: #9A6E12; font-size: 15px; font-weight: 800;
+}
+.tikkie-home__row-icon--done { background: #E4F5E9; color: #1A8737; }
+.tikkie-home__row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tikkie-home__row-title { font-size: 13.5px; font-weight: 700; color: #1F1B16; }
+.tikkie-home__row-date { font-size: 11.5px; color: #9A9186; }
+.tikkie-home__row-right { display: flex; flex-direction: column; align-items: flex-end; }
+.tikkie-home__row-amount { font-size: 14px; font-weight: 800; color: #1F1B16; }
+.tikkie-home__row-status { font-size: 10.5px; font-weight: 800; text-transform: uppercase; color: #C98A12; }
+.tikkie-home__row-status--done { color: #1A8737; }
+
+.tikkie-home__empty {
+  padding: 26px 18px; text-align: center;
+  background: #fff; border: 1px dashed #E2DACA; border-radius: 15px;
+  font-size: 13px; line-height: 1.6; color: #8A8175;
+}
+
+.tikkie-home__map {
+  height: 220px; border-radius: 15px; overflow: hidden;
+  border: 1px solid #EDE6D8; background: #EAE6DB;
+}
+.tikkie-home__map-note {
+  margin: 8px 2px 0; font-size: 12px; font-weight: 700; color: #8A8175;
+}
+.tikkie-home__pin { background: none; border: none; }
+.tikkie-home__pin-dot {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #1A8737; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  border: 3px solid #fff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+
+.tikkie-home__foot {
+  margin: 30px 0 0; text-align: center;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #B4AB9C;
+}

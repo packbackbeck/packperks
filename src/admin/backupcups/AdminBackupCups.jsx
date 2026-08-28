@@ -6,7 +6,10 @@ import {
   getBackupAlertConfig,
   saveBackupAlertConfig,
   setBackupCupsActive,
+  getBackupLimits,
+  saveBackupLimits,
   BACKUP_ALERT_DEFAULTS,
+  BACKUP_LIMIT_DEFAULTS,
 } from '../lib/adminApi';
 import './AdminBackupCups.css';
 
@@ -87,20 +90,25 @@ export default function AdminBackupCups() {
   const [savedAt, setSavedAt] = useState(null);
   const [recipientDraft, setRecipientDraft] = useState('');
   const [togglingSet, setTogglingSet] = useState(false);
+  const [limits, setLimits] = useState(BACKUP_LIMIT_DEFAULTS);
+  const [limitsSaving, setLimitsSaving] = useState(false);
+  const [limitsSaved, setLimitsSaved] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeOrgId) return;
     setLoading(true);
     setError(null);
     try {
-      const [c, u, a] = await Promise.all([
+      const [c, u, a, l] = await Promise.all([
         listBackupCups(activeOrgId),
         listBackupCupUses(activeOrgId),
         getBackupAlertConfig(activeOrgId),
+        getBackupLimits(activeOrgId),
       ]);
       setCups(c);
       setUses(u);
       setAlerts(a);
+      setLimits(l);
     } catch (e) {
       setError(e.message || 'Could not load backup cups.');
     } finally {
@@ -161,6 +169,22 @@ export default function AdminBackupCups() {
       setTogglingSet(false);
     }
   }
+  async function saveLimits(next) {
+    setLimits(next);
+    setLimitsSaving(true);
+    setLimitsSaved(false);
+    try {
+      const saved = await saveBackupLimits(activeOrgId, next);
+      setLimits(saved);
+      setLimitsSaved(true);
+      setTimeout(() => setLimitsSaved(false), 2000);
+    } catch (e) {
+      setError(e.message || 'Could not save the limits.');
+    } finally {
+      setLimitsSaving(false);
+    }
+  }
+
   const recentlyUsed = stats.lastUsed &&
     Date.now() - new Date(stats.lastUsed).getTime() < 24 * 60 * 60 * 1000;
 
@@ -303,6 +327,56 @@ export default function AdminBackupCups() {
             ))}
           </ul>
         )}
+      </section>
+
+      {/* ── Limits ── */}
+      <section className="abc-card">
+        <header className="abc-card__head">
+          <div>
+            <h2 className="abc-card__title">Limits</h2>
+            <p className="abc-card__desc">
+              Backup codes pay out on every scan, so these ceilings are what stand between a
+              shared receipt photo and an open tap. Changes bite on the very next scan.
+            </p>
+          </div>
+          <span className="abc-savebar">{limitsSaving ? 'Saving…' : limitsSaved ? 'Saved' : ''}</span>
+        </header>
+        <div className="abc-limit-grid">
+          <div className="abc-field">
+            <label className="abc-label" htmlFor="abc-lim-day">Payouts per day</label>
+            <input
+              id="abc-lim-day"
+              className="abc-input abc-input--num"
+              type="number" min="1" max="500"
+              value={limits.dailyCap}
+              onChange={e => setLimits({ ...limits, dailyCap: e.target.value })}
+              onBlur={() => saveLimits(limits)}
+            />
+            <p className="abc-field__hint">
+              All backup scans at this venue combined, per rolling 24&nbsp;hours. Beyond it every
+              backup scan is refused until the window moves on.
+            </p>
+          </div>
+          <div className="abc-field">
+            <label className="abc-label" htmlFor="abc-lim-dev">Payouts per device per day</label>
+            <input
+              id="abc-lim-dev"
+              className="abc-input abc-input--num"
+              type="number" min="1" max="50"
+              value={limits.perDeviceDaily}
+              onChange={e => setLimits({ ...limits, perDeviceDaily: e.target.value })}
+              onBlur={() => saveLimits(limits)}
+            />
+            <p className="abc-field__hint">
+              Per phone. One person rescanning their receipt hits this long before the venue
+              ceiling does.
+            </p>
+          </div>
+        </div>
+        <p className="abc-field__hint abc-limit-fixed">
+          A fixed 2-minute cooldown between scans of the same code also applies — that one isn’t
+          configurable.
+        </p>
       </section>
 
       {/* ── Alerts ── */}

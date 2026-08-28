@@ -179,3 +179,12 @@
   transition: transform 0.16s ease;
 }
 .abc-toggle--on .abc-toggle__dot { transform: translateX(20px); }
+
+/* Limits card */
+.abc-limit-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+}
+@media (max-width: 640px) { .abc-limit-grid { grid-template-columns: 1fr; } }
+.abc-input--num { max-width: 130px; font-variant-numeric: tabular-nums; }
+.abc-field__hint { margin: 6px 0 0; font-size: 12px; line-height: 1.55; color: #9A9186; }
+.abc-limit-fixed { margin-top: 4px; border-top: 1px dashed #EDE6D8; padding-top: 10px; }

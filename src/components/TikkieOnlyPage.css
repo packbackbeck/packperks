@@ -106,3 +106,82 @@
 .tikkie-only__note strong { color: #6E2B18; }
 .tikkie-only__sub--small { font-size: 13px; margin-top: 10px; }
 .tikkie-only__btn--muted { background: #B4AB9C; }
+
+/* ── The Tikkie explainer — the reason this page exists ── */
+.tikkie-only__steps {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin: 18px 0 20px;
+}
+.tikkie-only__step {
+  position: relative;
+  border: 1px solid #EDE6D8; border-radius: 14px;
+  padding: 22px 10px 12px;
+  background: #FBF8F1;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+}
+.tikkie-only__step p { margin: 0; font-size: 11.5px; line-height: 1.4; color: #5F584F; }
+.tikkie-only__step strong { color: #1F1B16; }
+.tikkie-only__step-num {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #47478A; color: #fff;
+  font-size: 11px; font-weight: 800; line-height: 20px;
+}
+.tikkie-only__step-logo { height: 20px; width: auto; }
+.tikkie-only__step-icon { width: 22px; height: 22px; color: #47478A; }
+.tikkie-only__iban {
+  font-family: ui-monospace, monospace; font-size: 9.5px; font-weight: 700;
+  color: #47478A; border: 1.5px solid #47478A; border-radius: 7px;
+  padding: 4px 6px; letter-spacing: 0.02em; white-space: nowrap;
+}
+.tikkie-only__step-warn {
+  font-size: 10px !important; font-weight: 700; color: #C98A12 !important;
+}
+
+/* "or" divider between Open Tikkie and save-for-later */
+.tikkie-only__or {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 0 4px; color: #B4AB9C; font-size: 12px; font-weight: 700;
+}
+.tikkie-only__or::before, .tikkie-only__or::after {
+  content: ''; flex: 1; height: 1px; background: #EDE6D8;
+}
+
+/* Email capture (save-for-later / pending notify) */
+.tikkie-only__form { margin-top: 8px; text-align: left; }
+.tikkie-only__form-copy {
+  margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: #6C6259;
+  text-align: center;
+}
+.tikkie-only__input {
+  width: 100%; padding: 12px 14px;
+  border: 1.5px solid #E2DACA; border-radius: 11px;
+  font-family: inherit; font-size: 15px; color: #1F1B16; background: #fff;
+}
+.tikkie-only__input:focus { outline: none; border-color: #1A8737; }
+.tikkie-only__consent {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 11px 2px 0; cursor: pointer;
+  font-size: 12.5px; line-height: 1.5; color: #6C6259;
+}
+.tikkie-only__consent input { margin-top: 2px; accent-color: #1A8737; }
+.tikkie-only__consent a { color: #1A8737; font-weight: 700; }
+.tikkie-only__form-err { margin: 9px 0 0; font-size: 12.5px; color: #C4472B; text-align: center; }
+.tikkie-only__form .tikkie-only__btn--secondary { width: 100%; margin-top: 12px; }
+
+.tikkie-only__btn--secondary {
+  display: inline-block;
+  padding: 12px 26px; border-radius: 999px; border: 1.5px solid #1A8737;
+  background: #fff; color: #1A8737;
+  font-family: inherit; font-size: 15px; font-weight: 800;
+  text-decoration: none; cursor: pointer;
+}
+.tikkie-only__btn--secondary:disabled { opacity: 0.5; cursor: default; }
+.tikkie-only__btn + .tikkie-only__btn--secondary { margin-top: 10px; }
+
+.tikkie-only__pending-icon {
+  width: 46px; height: 46px; margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #FCF2D6; color: #9A6E12;
+}

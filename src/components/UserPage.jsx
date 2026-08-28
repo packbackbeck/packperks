@@ -135,6 +135,10 @@ export default function UserPage({
   privacyPolicy,
   // Secret: tapping the build stamp 3× re-opens the onboarding flow.
   onReopenOnboarding,
+  // Redirect Refund accounts: no cup balance and no in-app activity feed —
+  // hide the cups⇄value box and the history blocks (refund history lives
+  // on the TikkieHomePage instead).
+  tikkieOnly = false,
 }) {
   // Refresh claim status when the user enters this page — admin approvals
   // that happened while the user wasn't looking get pulled in automatically.
@@ -601,7 +605,9 @@ export default function UserPage({
       )}
 
       {/* ── Cups ⇄ value box ── cups on the left, euro equivalent on the
-            right, with a subtle "≈" between (mirrors the refund compare box). */}
+            right, with a subtle "≈" between (mirrors the refund compare box).
+            Hidden for Redirect Refund accounts: there is no cup balance. */}
+      {!tikkieOnly && (
       <div className="user-page__value-box">
         {(combined || storeName) && (
           <p className="user-page__value-note">
@@ -686,6 +692,7 @@ export default function UserPage({
 
         </div>
       </div>
+      )}
 
       <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} dismissedSet={dismissedClaims} onCollect={handleCollectClaim} onDismiss={handleDismissClaim} partnerBrand={storeName} onRetry={onRetryClaim} />
 

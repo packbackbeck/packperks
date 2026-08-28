@@ -320,7 +320,9 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     if (!containerRef.current || mapRef.current) return undefined;
     const map = L.map(containerRef.current, { zoomControl: true, scrollWheelZoom: false });
     // CARTO "Voyager" — a soft, friendly, simplified basemap (free, no key).
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // Carto's keyless CDN now stamps "API KEY REQUIRED" over the tiles —
+    // plain OSM tiles need no key and carry no watermark.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       subdomains: 'abcd',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 20,

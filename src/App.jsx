@@ -74,6 +74,7 @@ import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, ge
 import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
 import TikkieOnlyPage from './components/TikkieOnlyPage';
+import TikkieHomePage from './components/TikkieHomePage';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
 
@@ -755,6 +756,7 @@ export default function App({ consentReady = true } = {}) {
               org,
               batchId: (sp.get('batch') || '').trim(),
               cupIds,
+              settings: earlyCfg.settings || {},
             });
             return; // finally{} clears isLoading
           }
@@ -1744,7 +1746,19 @@ export default function App({ consentReady = true } = {}) {
   /* Tikkie-only mode: the redirect page IS the whole app for these orgs.
    * Checked before isLoading so the boot's early return lands here. */
   if (tikkieOnly) {
-    return <TikkieOnlyPage org={tikkieOnly.org} batchId={tikkieOnly.batchId} cupIds={tikkieOnly.cupIds} />;
+    // A receipt in the URL → the redirect/refund page. A bare visit →
+    // the refunds home (their saved account, or the empty state).
+    if (!tikkieOnly.batchId && !(tikkieOnly.cupIds || []).length) {
+      return <TikkieHomePage org={tikkieOnly.org} settings={tikkieOnly.settings} />;
+    }
+    return (
+      <TikkieOnlyPage
+        org={tikkieOnly.org}
+        batchId={tikkieOnly.batchId}
+        cupIds={tikkieOnly.cupIds}
+        settings={tikkieOnly.settings}
+      />
+    );
   }
 
   /* ── Loading / error screens ──

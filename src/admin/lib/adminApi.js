@@ -3494,6 +3494,36 @@ export async function setBackupCupsActive(orgId, active) {
   return !!active;
 }
 
+/* The two daily ceilings on backup-cup payouts. Same instant-save pattern
+ * as the alerts: bin-tikkie reads the row live, so a change bites on the
+ * very next scan. The 120s per-cup cooldown is fixed in code. */
+const BACKUP_LIMITS_KEY = (orgId) => `backup_limits:${orgId}`;
+
+export const BACKUP_LIMIT_DEFAULTS = { dailyCap: 20, perDeviceDaily: 3 };
+
+export async function getBackupLimits(orgId) {
+  if (!orgId) return { ...BACKUP_LIMIT_DEFAULTS };
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', BACKUP_LIMITS_KEY(orgId)).maybeSingle();
+  return { ...BACKUP_LIMIT_DEFAULTS, ...(data?.value || {}) };
+}
+
+export async function saveBackupLimits(orgId, limits) {
+  if (!orgId) throw new Error('saveBackupLimits: no org');
+  const clamp = (n, d, max) => {
+    const x = parseInt(n, 10);
+    return Number.isFinite(x) && x >= 1 && x <= max ? x : d;
+  };
+  const value = {
+    dailyCap: clamp(limits.dailyCap, BACKUP_LIMIT_DEFAULTS.dailyCap, 500),
+    perDeviceDaily: clamp(limits.perDeviceDaily, BACKUP_LIMIT_DEFAULTS.perDeviceDaily, 50),
+  };
+  const { error } = await supabase.from('app_config')
+    .upsert({ key: BACKUP_LIMITS_KEY(orgId), value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
 /* Alert config lives in its own app_config row so it saves instantly and
  * never rides the publish cycle — an alert you edited should be live now,
  * not after the next Publish. */

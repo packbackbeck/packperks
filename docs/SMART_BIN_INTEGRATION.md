@@ -4,10 +4,24 @@ How a physical smart bin turns a customer's deposit session into a printed
 QR receipt that pays out.
 
 The bin makes **one HTTP call per customer session**, sending the cup
-count, a session UUID, and one UUID per cup. Everything else — which
-organisation the cups belong to, what they're worth, whether the QR pays
-out via Tikkie or opens the app — is decided server-side. The bin never
-needs to know, and never needs a firmware change when any of it changes.
+count, a session UUID, and one UUID per cup — and it **prints the receipt
+immediately, without waiting for the response**: the QR encodes the bin's
+own session UUID, so there is nothing to wait for. The HTTP call registers
+(validates) that session with PackPerks, and may land before or after the
+customer scans. Everything else — which organisation the cups belong to,
+what they're worth, whether the QR pays out via Tikkie or opens the app —
+is decided server-side.
+
+> **Changed 28 Aug 2026 — print-first.** The bin no longer waits for
+> the response before printing. The server now uses the bin's
+> `session_id` **verbatim as the batch id**, so the QR
+> (`?batch=<session_id>`) can be printed the moment the session closes.
+> The API call becomes the **validation**: until it arrives, a scanned
+> receipt shows a "we're checking your receipt" screen where the customer
+> can leave an email; once the call lands the link pays out and anyone
+> who left an email is notified. Build the URL from the bin's configured
+> prefix — see below. The old behaviour (print the `url` from the
+> response) still works unchanged.
 
 > **Changed 26 Aug 2026 — two breaking changes:**
 > 1. `session_id` is now **required** and must be a **UUID v4**.
@@ -25,27 +39,33 @@ needs to know, and never needs a firmware change when any of it changes.
 
 ```
 customer deposits cups
-        │  bin mints a UUID v4 per cup as it counts them
+        │  bin mints a UUID v4 per cup as it counts them,
+        │  plus one session UUID v4 for the whole session
         ▼
-  bin session ends  ──POST /bin-mint-batch──▶  PackPerks
-   cups        = 4     X-Bin-Key: <secret>       · stores those 4 cup ids
-   session_id  = UUID  {cups, session_id,        · creates one batch UUID
-   cup_uuids   = [4]    cup_uuids}
-        ◀──────────── {url, amount_eur} ────────┘
+  bin session ends
         │
-        ▼
-  bin encodes `url` as a QR code and prints it
-        │                    ↑ the bin draws the QR; we return only the
-        │                      string to encode, never an image
-        ▼
-  customer scans it → https://perks.packback.network/t3/?batch=<uuid>
+        ├─▶ print IMMEDIATELY:  QR = <url prefix>?batch=<session_id>
+        │     (no waiting — the session UUID *is* the batch id)
         │
-        ▼
-  Redirect Refund org → Tikkie cashback link (bin-tikkie)
-  Deposit org         → the PackPerks app (claim-cups)
+        └─▶ POST /bin-mint-batch        (send now; queue + retry until it lands)
+              X-Bin-Key: <secret>  {cups, session_id, cup_uuids}
+                   │
+                   ▼
+             PackPerks validates the session:
+              · stores the cup ids      · batch_id = session_id
+              · resolves earlier "pending" scans and emails anyone waiting
+
+  customer scans it → https://perks.packback.network/t3/?batch=<session_id>
+        │
+        ├─ session validated   → Redirect Refund page → Tikkie link (bin-tikkie)
+        │                        Deposit org → the PackPerks app (claim-cups)
+        └─ call not landed yet → "we're checking your receipt" screen
+                                 (customer may leave an email and gets the
+                                  link once the bin's call arrives)
 ```
 
-The QR is valid from the moment the response comes back.
+The receipt can be scanned before the call lands — that scan is *pending*,
+not an error. It pays out from the moment the session is validated.
 
 ---
 
@@ -82,7 +102,7 @@ authentication, and it is also what maps the bin to an organisation.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `cups` | integer 1–50 | **yes** | Cups counted in this session. |
-| `session_id` | **UUID v4** | **yes** | The bin's own id for this customer session. Generate a fresh one when the session opens. Makes retries safe — see below. |
+| `session_id` | **UUID v4** | **yes** | The bin's own id for this customer session. Generate a fresh one when the session opens. Used **verbatim as the batch id**, so the QR you print before calling already contains it. Makes retries safe — see below. |
 | `cup_uuids` | array of **UUID v4** | **yes** for Redirect Refund bins | One id per physical cup, minted by the bin. The array length must equal `cups`, and the ids must be unique. |
 
 Both UUID fields must be real v4 UUIDs — the version nibble is checked, so
@@ -110,11 +130,23 @@ return different ids than the ones you sent.
 }
 ```
 
-**Encode `url` as a QR code and print it.** The bin draws the QR itself;
-we return only the string to put inside it, never an image.
+`batch_id` always equals the `session_id` you sent, and `url` is the same
+string a print-first bin has already put in the QR. A bin that still
+prints after the response (fine for Deposit orgs) should keep encoding
+`url` verbatim.
 
-Do not build the URL yourself — the slug changes when a bin is pointed at
-a different organisation, and the server already knows the current one.
+Print-first bins build the URL themselves:
+
+```
+<url prefix>?batch=<session_id>
+e.g. https://perks.packback.network/t3/?batch=e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14
+```
+
+The prefix — including the org slug — is part of the bin's configuration.
+One caveat the server used to handle for you: when a bin is repointed at a
+different organisation (see **Provisioning**), the configured prefix must
+be updated at the same time, because the server can no longer inject the
+current slug into a receipt it never saw before printing.
 
 `amount_eur` is what the customer will actually receive, computed with the
 same rate and the same caps the payout applies. Print it on the receipt if
@@ -169,18 +201,44 @@ reason. If only *some* of the ids are already known we refuse the call
 outright (`cup_uuids_conflict`) — a half-overlapping batch is a bug worth
 surfacing, not something to guess at.
 
-Recommended client behaviour: retry on network error / `5xx` / `429` with
-backoff, using the same `session_id`, and only print once you have a `url`.
-If you can't reach the server at all, do **not** print a QR — an unminted
-UUID is not valid and would show the customer an error.
+Recommended client behaviour: print immediately, then send the call and
+retry on network error / `5xx` / `429` with backoff, always with the same
+`session_id`. Keep undelivered sessions in a store-and-forward queue that
+survives reboots and drain it whenever connectivity returns — the printed
+receipt only pays out once its call has landed. A session delivered hours
+late is still honoured in full, and anyone who left their email on the
+waiting screen is mailed their link the moment it is.
+
+---
+
+## When the call hasn't landed yet (pending receipts)
+
+Print-first means a customer can scan a receipt PackPerks has never heard
+of. That scan is treated as **not validated yet**, never as invalid:
+
+- The page says we're checking the receipt (it can take up to ~30
+  minutes) and offers an email field — "email me when it's ready" — with
+  a privacy-policy consent.
+- The unknown batch id is recorded server-side as a *pending* sighting.
+- The moment the bin's `/bin-mint-batch` call arrives with that
+  `session_id`, the batch mints as normal, the pending sighting is
+  resolved, and anyone who left an email gets a "your refund is ready to
+  collect" message with the link. If they pre-registered, the payout is
+  attached to their PackPerks refund account automatically.
+
+Nothing is required from the bin beyond eventually delivering the queued
+call. If a session can never be delivered (dead bin, lost queue), the
+receipt stays pending — which is what the backup cups below are for.
 
 ---
 
 ## Backup cups (Redirect Refund bins)
 
-The bin always prints a receipt — including when it can't reach us. For
-that case it holds a short list of **reserved cup ids** in its own config
-and prints one (or several) instead of calling the API.
+Print-first plus a delivery queue covers temporary outages. Backup cups
+are the **last resort** for when the bin knows the session may never be
+delivered at all (no queue, storage failure, key trouble): it holds a
+short list of **reserved cup ids** in its own config and prints one (or
+several) instead of a session id.
 
 Nothing needs configuring on our side and there is no separate endpoint:
 the bin just puts the ids in the QR as a comma-separated `cups` parameter
@@ -261,9 +319,15 @@ so single-cup receipts cost more to pay out than they pay.
 Not the bin's problem, but useful context when debugging a receipt:
 
 1. The QR opens `/<slug>/?batch=<uuid>` in the phone's browser.
-2. For a **Redirect Refund** org the app shows a short redirect screen and
-   calls `bin-tikkie`, which atomically claims the batch's cups, creates
-   one anonymous claim, mints a Tikkie cashback link, and redirects.
+2. For a **Redirect Refund** org the app calls `bin-tikkie`, which
+   atomically claims the batch's cups, creates one claim, and mints a
+   Tikkie cashback link. The page then explains how Tikkie works (IBAN +
+   last name — no Visa/Mastercard) and offers two actions: **Open
+   Tikkie**, or leave an email to save the refund for later, which
+   creates a PackPerks refund account with its own home page and history.
+   It no longer auto-redirects.
+   If the bin's session hasn't been delivered yet, the same scan shows
+   the pending "we're checking your receipt" screen instead.
 3. For a **Deposit Rewards** org the app boots normally and `claim-cups`
    credits the cups to the customer's balance.
 

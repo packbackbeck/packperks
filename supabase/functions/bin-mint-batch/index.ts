@@ -1,17 +1,20 @@
 // ──────────────────────────────────────────────────────────────────────
 // bin-mint-batch — the smart bin's only call into PackPerks.
 //
-// The bin runs a session per customer, counts the cups they deposit, then
-// calls this endpoint ONCE at the end of the session with: how many cups,
-// its own session id (UUID v4), and — for Redirect Refund orgs — the UUID
-// v4 it minted for each individual cup. Those cup ids are stored verbatim
-// as the primary keys in `cups`, so the bin and PackPerks refer to the
-// same cup by the same id. We return a URL:
+// PRINT-FIRST flow. The bin runs a session per customer, counts the cups,
+// and does two things in parallel at session end:
 //
-//     https://perks.packback.network/<orgSlug>/?batch=<uuid>
+//   1. Prints the QR immediately, built from its OWN session UUID:
+//        https://perks.packback.network/<orgSlug>/?batch=<session-uuid>
+//   2. Calls this endpoint with { cups, session_id, cup_uuids } to
+//      VALIDATE that session.
 //
-// The bin renders that URL as a QR code itself and prints it. We don't
-// send back an image — just the string to encode.
+// The batch id in our database IS the session id — that is what makes the
+// pre-printed QR resolvable. The bin never needs our response to print;
+// scanning stays "pending" until this call lands. When it lands late (the
+// bin was offline), any customer who scanned in the meantime is resolved
+// here: their link is emailed and their account attached. cup_uuids are
+// still stored verbatim as the cups' primary keys.
 //
 // Scanning that QR is what redeems the batch. For a Redirect Refund
 // (tikkie_only) org it goes straight to a Tikkie link via bin-tikkie; for
@@ -50,6 +53,12 @@ const MAX_TOTAL_EUR = 25;
 const DEFAULT_RATE_EUR = 0.10;
 
 const MAX_CUPS_PER_SESSION = 50;
+
+// For the "your refund link is ready" email when a session arrives AFTER
+// the customer already scanned the receipt (print-first flow, bin offline).
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
+const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") || "no-reply@packback.network";
+const BREVO_SENDER_NAME = Deno.env.get("BREVO_SENDER_NAME") || "PackPerks";
 // The bin's session id. Required, and required to be a UUID v4: a session
 // id is the only thing standing between a retried request and a second
 // payout for the same cups, so a blank or reused-looking value must fail
@@ -238,8 +247,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ── Mint the batch ──
-  const batchId = crypto.randomUUID();
+  // ── Mint the batch — the batch id IS the session id (print-first) ──
+  const batchId = sessionId;
   const rows = Array.from({ length: cups }, (_v, i) => ({
     id: cupUuids ? cupUuids[i] : crypto.randomUUID(),
     batch_id: batchId,
@@ -274,6 +283,52 @@ Deno.serve(async (req) => {
     count: minted,
     detail: { machine_id: machineId, batch_id: batchId, amount_eur: amount, session_id: sessionId },
   }).then(() => {}, () => {}); // best-effort; never blocks the receipt
+
+  /* Print-first resolution: did a customer scan this receipt BEFORE this
+   * call arrived? If so their scan sat "pending". The batch now exists, so
+   * their next open pays out — and if they left an email, tell them. */
+  try {
+    const { data: pending } = await admin
+      .from("pending_batches")
+      .select("batch_id, email, user_id, resolved_at")
+      .eq("batch_id", batchId)
+      .maybeSingle();
+    if (pending && !pending.resolved_at) {
+      await admin.from("pending_batches").update({
+        resolved_at: new Date().toISOString(),
+        org_id: keyRow.org_id,
+      }).eq("batch_id", batchId);
+
+      if (pending.email && BREVO_API_KEY) {
+        const link = buildUrl(batchId);
+        await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: { "api-key": BREVO_API_KEY, "content-type": "application/json" },
+          body: JSON.stringify({
+            sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+            to: [{ email: pending.email }],
+            subject: "Your refund is ready to collect",
+            textContent:
+              `Good news — your cup return has been confirmed.\n\n` +
+              `Open your receipt link to collect your refund via Tikkie:\n${link}\n\n` +
+              `${amount != null ? `Amount: €${amount.toFixed(2)}\n\n` : ""}` +
+              `PackPerks`,
+            htmlContent:
+              `<div style="font:15px/1.6 -apple-system,sans-serif;color:#1F1B16">` +
+              `<p>Good news — your cup return has been confirmed.</p>` +
+              `<p><a href="${link}" style="display:inline-block;padding:12px 22px;background:#1A8737;color:#fff;border-radius:999px;text-decoration:none;font-weight:700">Collect your refund</a></p>` +
+              `${amount != null ? `<p>Amount: <strong>€${amount.toFixed(2)}</strong></p>` : ""}` +
+              `<p style="color:#6C6259">PackPerks</p></div>`,
+          }),
+        }).catch((e) => console.error(`[bin-mint-batch] ready email failed: ${String(e)}`));
+        await admin.from("pending_batches").update({
+          notified_at: new Date().toISOString(),
+        }).eq("batch_id", batchId);
+      }
+    }
+  } catch (e) {
+    console.error(`[bin-mint-batch] pending resolution failed: ${String(e)}`);
+  }
 
   console.log(`[bin-mint-batch] ${machineId} → org=${keyRow.org_id} cups=${minted} batch=${batchId}`);
 

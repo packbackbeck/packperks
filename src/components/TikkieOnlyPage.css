@@ -8,7 +8,14 @@
 /* Full-bleed: the receipt pages own the whole viewport. The app shell caps
    #root at 375px for the store app; TikkieOnlyPage adds .pp-fullbleed on
    <html> while mounted, and this lifts the cap for exactly that time. */
-.pp-fullbleed #root { max-width: none; }
+.pp-fullbleed #root {
+  max-width: none;
+  /* index.css sets `overflow-x: hidden` on #root, which silently promotes
+     overflow-y to `auto` — so #root became a nested scroller inside the
+     document. Two scrollers meant the page stopped short and the last
+     controls (privacy line, save button) were unreachable. One scroller. */
+  overflow: visible;
+}
 /* Padded full-width boxes must not overflow the viewport. */
 .tikkie-only, .tikkie-only *, .tikkie-only *::before, .tikkie-only *::after,
 .tikkie-login, .tikkie-login * { box-sizing: border-box; }
@@ -278,3 +285,14 @@
 .tikkie-only__inner--center .tikkie-only__sub--small { margin-top: 18px; }
 .tikkie-only__inner--center .tikkie-only__form .tikkie-only__consent { margin-top: 16px; }
 .tikkie-only__inner--center .tikkie-only__form .tikkie-only__btn--secondary { margin-top: 20px; }
+
+/* Account options under a warning or an error. Separated by a hairline so
+   they read as a next step rather than part of the bad news. */
+.tikkie-only__auth {
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid #EDE6D8;
+}
+.tikkie-only__auth .tikkie-only__btn--secondary { width: 100%; margin-top: 0; }
+.tikkie-only__auth .tikkie-only__form { margin-top: 0; }
+.tikkie-only__auth .tikkie-only__login-row { margin-top: 16px; }

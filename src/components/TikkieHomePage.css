@@ -10,26 +10,42 @@
 /* ── Hero: the total, styled like the user-page value box — white card,
    normal PackPerks colours, never a brand-green slab. ── */
 .tikkie-home__hero {
+  position: relative;
   width: 100%;
+  display: flex; align-items: center; gap: 8px;
   background: var(--pb-orange-warm, #FD6F46);
   border-radius: var(--radius-lg, 16px);
-  padding: 24px 22px;
-  text-align: center;
+  padding: 22px 0 22px 22px;   /* no right padding: the bin bleeds to the edge */
+  text-align: left;
+  overflow: hidden;
   box-shadow: 0 12px 30px rgba(253, 111, 70, 0.28);
   color: #fff;
 }
+.tikkie-home__hero-copy { flex: 1 1 auto; min-width: 0; }
+/* The render has a white background; multiply drops it into the orange so
+   only the machine shows, without needing a cut-out PNG. */
+.tikkie-home__hero-art {
+  flex: 0 0 auto;
+  width: 47%; max-width: 200px; height: auto;
+  align-self: flex-end;
+  margin: 0 -6px -22px 0;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+@media (max-width: 340px) { .tikkie-home__hero-art { display: none; } }
 .tikkie-home__hero-label {
+  display: block;
   font-size: 12px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase;
   color: rgba(255, 255, 255, 0.85);
 }
 .tikkie-home__hero-amount {
-  font-size: 46px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em;
+  font-size: 42px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em;
   color: #fff;
   margin: 6px 0 4px;
 }
 .tikkie-home__hero-sub {
   display: inline-flex; align-items: center; gap: 7px;
-  font-size: 13.5px; font-weight: 700; color: rgba(255, 255, 255, 0.92);
+  font-size: 13px; font-weight: 700; color: rgba(255, 255, 255, 0.92);
 }
 .tikkie-home__hero-dot {
   width: 8px; height: 8px; border-radius: 50%; background: #FFE08A;

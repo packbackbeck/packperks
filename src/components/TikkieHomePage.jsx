@@ -5,6 +5,7 @@ import { getMyClaims, getMyPending, getSmartbinLocations } from '../lib/api';
 import { readRefundAccount } from './TikkieOnlyPage';
 import UserPage from './UserPage';
 import Header from './Header';
+import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
 
 /* Redirect Refund home — the account view for a mode that, until now,
@@ -323,22 +324,28 @@ export default function TikkieHomePage({ org, settings = {} }) {
         showCups={false}
       />
 
-      {/* ── The hero is the money — white tile, normal PackPerks colours ── */}
+      {/* ── The hero is the money: figures left, the machine that pays
+           them on the right. The photo is a white-background render, so
+           `multiply` drops its background into the tile instead of
+           needing a cut-out. ── */}
       <section className="tikkie-home__hero">
-        <span className="tikkie-home__hero-label">Total refunded</span>
-        <div className="tikkie-home__hero-amount">€{animatedTotal.toFixed(2)}</div>
-        <div className="tikkie-home__hero-sub">
-          {totals.available > 0 ? (
-            <>
-              <span className="tikkie-home__hero-dot" aria-hidden="true" />
-              €{totals.available.toFixed(2)} still to collect
-            </>
-          ) : account ? (
-            'Everything collected. Nice.'
-          ) : (
-            'Scan a receipt from the smart bin to start.'
-          )}
+        <div className="tikkie-home__hero-copy">
+          <span className="tikkie-home__hero-label">Total refunded</span>
+          <div className="tikkie-home__hero-amount">€{animatedTotal.toFixed(2)}</div>
+          <div className="tikkie-home__hero-sub">
+            {totals.available > 0 ? (
+              <>
+                <span className="tikkie-home__hero-dot" aria-hidden="true" />
+                €{totals.available.toFixed(2)} still to collect
+              </>
+            ) : account ? (
+              'Everything collected. Nice.'
+            ) : (
+              'Scan a receipt from the smart bin to start.'
+            )}
+          </div>
         </div>
+        <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
       </section>
 
       {/* Uncollected refunds go first: actionable beats archival. */}

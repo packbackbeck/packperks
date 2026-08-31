@@ -508,7 +508,7 @@ export default function UserPage({
   };
 
   return (
-    <div className="user-page">
+    <div className={`user-page${tikkieOnly ? ' user-page--tikkie' : ''}`}>
 
       {/* ── Back header ── */}
       <header className="user-page__header">

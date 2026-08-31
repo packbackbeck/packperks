@@ -368,6 +368,10 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
   const [savedEmail, setSavedEmail] = useState(null);
   const [showPolicy, setShowPolicy] = useState(false);
   const [login, setLogin] = useState(null);     // { email, startAtCode } | null
+  // The warning + error screens hide the signup form behind a button:
+  // those screens are bad news, and a form under bad news reads as noise
+  // until the customer asks for it.
+  const [showSignup, setShowSignup] = useState(false);
   const pollsRef = useRef(0);
   const startedRef = useRef(false);
   const demoRef = useRef(false);
@@ -500,13 +504,47 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
 
   const saveBatchId = payout?.batchId || batchId || (cupIds && cupIds[0]) || '';
 
+  /* Sign up / log in, offered wherever a customer might want an account:
+   * after a warning, after an error, or while waiting. Signing up IS the
+   * save-for-later form (email + privacy → account); logging in attaches
+   * whatever receipt is in the URL to the account they prove they own. */
+  const authBlock = (
+    <>
+      {showSignup ? (
+        <EmailSaveForm
+          batchId={saveBatchId}
+          org={org}
+          settings={settings}
+          variant="later"
+          onSaved={handleSaved}
+          onShowPolicy={() => setShowPolicy(true)}
+          onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
+        />
+      ) : (
+        <button
+          type="button"
+          className="tikkie-only__btn tikkie-only__btn--secondary"
+          onClick={() => setShowSignup(true)}
+        >
+          Create an account
+        </button>
+      )}
+      <p className="tikkie-only__login-row">
+        Already have an account?{' '}
+        <button type="button" className="tikkie-only__policy-link" onClick={() => setLogin({ email: '', startAtCode: false })}>
+          Log in
+        </button>
+      </p>
+    </>
+  );
+
   // The short screens (spinner, waiting, all-set, warnings, errors) sit
   // centred in the viewport; the content-heavy ready screen stays top-led.
   // The brand lockup is pinned to the top of the page either way.
   const centered = ['working', 'pending', 'saved', 'reopened', 'error'].includes(phase);
   // The waiting screen is about US checking, not about Tikkie yet — showing
   // Tikkie there promises a payout we haven't confirmed.
-  const showTikkieLogo = phase !== 'pending' && phase !== 'working';
+  const showTikkieLogo = phase !== 'pending' && phase !== 'working' && phase !== 'error';
 
   return (
     <div className="tikkie-only">
@@ -600,6 +638,13 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
               onShowPolicy={() => setShowPolicy(true)}
               onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
             />
+            <p className="tikkie-only__login-row">
+              Already have an account?{' '}
+              <button type="button" className="tikkie-only__policy-link" onClick={() => setLogin({ email: '', startAtCode: false })}>
+                Log in
+              </button>
+              {' '}and we’ll save this receipt to it.
+            </p>
           </>
         )}
 
@@ -647,6 +692,7 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
                 Open the link anyway
               </a>
             )}
+            <div className="tikkie-only__auth">{authBlock}</div>
           </>
         )}
 
@@ -661,6 +707,7 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
             </div>
             <h1 className="tikkie-only__title">Sorry!</h1>
             <p className="tikkie-only__sub">{error}</p>
+            <div className="tikkie-only__auth">{authBlock}</div>
           </>
         )}
 

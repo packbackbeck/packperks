@@ -51,6 +51,38 @@ function markOpened(orgId, claimId) {
   } catch { /* fine */ }
 }
 
+/* Count the hero total up to its new value instead of snapping.
+ * Only ever animates UPWARD (a refund landing is the moment worth
+ * celebrating); a correction downward just lands. Honours
+ * prefers-reduced-motion, and never leaves a stale number on screen. */
+function useCountUp(target, duration = 900) {
+  const [shown, setShown] = useState(target);
+  const fromRef = useRef(target);
+  const rafRef = useRef(0);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    fromRef.current = target;
+    const reduce = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || target <= from) { setShown(target); return undefined; }
+
+    const started = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - started) / duration);
+      // easeOutCubic: quick off the mark, settles gently on the number.
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(from + (target - from) * eased);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+      else setShown(target);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [target, duration]);
+
+  return shown;
+}
+
 function fmtWhen(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -249,6 +281,9 @@ export default function TikkieHomePage({ org, settings = {} }) {
     return { total, available, openClaims: open };
   }, [claims, openedMap]);
 
+  // The hero number animates up as refunds land.
+  const animatedTotal = useCountUp(totals.total);
+
   const history = useMemo(
     () => [...claims].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
     [claims],
@@ -291,7 +326,7 @@ export default function TikkieHomePage({ org, settings = {} }) {
       {/* ── The hero is the money — white tile, normal PackPerks colours ── */}
       <section className="tikkie-home__hero">
         <span className="tikkie-home__hero-label">Total refunded</span>
-        <div className="tikkie-home__hero-amount">€{totals.total.toFixed(2)}</div>
+        <div className="tikkie-home__hero-amount">€{animatedTotal.toFixed(2)}</div>
         <div className="tikkie-home__hero-sub">
           {totals.available > 0 ? (
             <>

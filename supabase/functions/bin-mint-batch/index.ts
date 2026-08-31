@@ -100,6 +100,53 @@ async function rateLimited(machineId: string): Promise<boolean> {
   }
 }
 
+/* ── Admin-authored email templates ───────────────────────────────────
+ * The dashboard (Email Templates) stores only OVERRIDES under
+ * `email_templates:<orgId>`, so a venue that never edits anything keeps
+ * inheriting the default below. `enabled: false` pauses the mail
+ * entirely. Keep these defaults in step with
+ * src/admin/lib/emailTemplates.js — the two deploy separately. */
+const DEFAULT_READY_SUBJECT = "Your refund is ready to collect";
+const DEFAULT_READY_HTML =
+  `<div style="font:15px/1.6 -apple-system,sans-serif;color:#1F1B16">\n` +
+  `  <p>Good news — your cup return has been confirmed.</p>\n` +
+  `  <p><a href="{{link}}" style="display:inline-block;padding:12px 22px;background:#1A8737;color:#fff;border-radius:999px;text-decoration:none;font-weight:700">Collect your refund</a></p>\n` +
+  `  <p>Amount: <strong>€{{amount}}</strong> for {{cups}} cups.</p>\n` +
+  `  <p style="color:#6C6259">{{venue}} · PackPerks</p>\n` +
+  `</div>`;
+
+async function emailTemplate(
+  orgId: string,
+  key: string,
+  fallback: { subject: string; html: string },
+): Promise<{ subject: string; html: string } | null> {
+  try {
+    const { data } = await admin.from("app_config")
+      .select("value").eq("key", `email_templates:${orgId}`).maybeSingle();
+    const t = ((data?.value ?? {}) as Record<string, {
+      enabled?: boolean; subject?: string; html?: string;
+    }>)[key];
+    if (t?.enabled === false) return null; // admin paused this mail
+    return { subject: t?.subject || fallback.subject, html: t?.html || fallback.html };
+  } catch {
+    return fallback; // a config hiccup must never cost the customer their link
+  }
+}
+
+function fillTemplate(text: string, values: Record<string, string>): string {
+  return Object.entries(values).reduce((acc, [k, v]) => acc.replaceAll(`{{${k}}}`, v), text);
+}
+
+// Plain-text part: HTML-only mail reads as spam to most filters.
+function htmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /* The org's published settings — the mode (which decides whether cup ids
  * are required) and the payout rate come from the same row, so read it once. */
 async function orgSettings(orgId: string): Promise<Record<string, unknown>> {
@@ -299,26 +346,29 @@ Deno.serve(async (req) => {
         org_id: keyRow.org_id,
       }).eq("batch_id", batchId);
 
-      if (pending.email && BREVO_API_KEY) {
+      const tpl = pending.email && BREVO_API_KEY
+        ? await emailTemplate(keyRow.org_id, "refund_ready", {
+            subject: DEFAULT_READY_SUBJECT, html: DEFAULT_READY_HTML,
+          })
+        : null;
+      if (pending.email && tpl) {
         const link = buildUrl(batchId);
+        const values = {
+          link,
+          amount: amount != null ? amount.toFixed(2) : "",
+          cups: String(minted),
+          venue: org?.name || "PackPerks",
+        };
+        const htmlContent = fillTemplate(tpl.html, values);
         await fetch("https://api.brevo.com/v3/smtp/email", {
           method: "POST",
           headers: { "api-key": BREVO_API_KEY, "content-type": "application/json" },
           body: JSON.stringify({
             sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
             to: [{ email: pending.email }],
-            subject: "Your refund is ready to collect",
-            textContent:
-              `Good news — your cup return has been confirmed.\n\n` +
-              `Open your receipt link to collect your refund via Tikkie:\n${link}\n\n` +
-              `${amount != null ? `Amount: €${amount.toFixed(2)}\n\n` : ""}` +
-              `PackPerks`,
-            htmlContent:
-              `<div style="font:15px/1.6 -apple-system,sans-serif;color:#1F1B16">` +
-              `<p>Good news — your cup return has been confirmed.</p>` +
-              `<p><a href="${link}" style="display:inline-block;padding:12px 22px;background:#1A8737;color:#fff;border-radius:999px;text-decoration:none;font-weight:700">Collect your refund</a></p>` +
-              `${amount != null ? `<p>Amount: <strong>€${amount.toFixed(2)}</strong></p>` : ""}` +
-              `<p style="color:#6C6259">PackPerks</p></div>`,
+            subject: fillTemplate(tpl.subject, values),
+            textContent: htmlToText(htmlContent),
+            htmlContent,
           }),
         }).catch((e) => console.error(`[bin-mint-batch] ready email failed: ${String(e)}`));
         await admin.from("pending_batches").update({

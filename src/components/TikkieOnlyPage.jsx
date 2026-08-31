@@ -500,21 +500,31 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
 
   const saveBatchId = payout?.batchId || batchId || (cupIds && cupIds[0]) || '';
 
-  // The short screens (spinner, waiting, all-set, reopened warnings) sit
+  // The short screens (spinner, waiting, all-set, warnings, errors) sit
   // centred in the viewport; the content-heavy ready screen stays top-led.
-  const centered = ['working', 'pending', 'saved', 'reopened'].includes(phase);
+  // The brand lockup is pinned to the top of the page either way.
+  const centered = ['working', 'pending', 'saved', 'reopened', 'error'].includes(phase);
+  // The waiting screen is about US checking, not about Tikkie yet — showing
+  // Tikkie there promises a payout we haven't confirmed.
+  const showTikkieLogo = phase !== 'pending' && phase !== 'working';
 
   return (
     <div className="tikkie-only">
       <div className={`tikkie-only__inner${centered ? ' tikkie-only__inner--center' : ''}`}>
         <div className="tikkie-only__logos">
           <img className="tikkie-only__logo" src={org?.logo_url || packbackLogo} alt={org?.name || 'PackBack'} />
-          <svg className="tikkie-only__link-arrows" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="13 6 19 12 13 18" />
-          </svg>
-          <img className="tikkie-only__tikkie-logo" src={tikkieLogo} alt="Tikkie" />
+          {showTikkieLogo && (
+            <>
+              <svg className="tikkie-only__link-arrows" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="13 6 19 12 13 18" />
+              </svg>
+              <img className="tikkie-only__tikkie-logo" src={tikkieLogo} alt="Tikkie" />
+            </>
+          )}
         </div>
+
+        <div className="tikkie-only__content">
 
         {phase === 'working' && (
           <>
@@ -572,7 +582,7 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
                 <polyline points="12 7 12 12 15.5 14" />
               </svg>
             </div>
-            <h1 className="tikkie-only__title">We’re checking your receipt</h1>
+            <h1 className="tikkie-only__title">Verifying your receipt</h1>
             <p className="tikkie-only__sub">
               This can take up to <strong>30 minutes</strong>. You don’t have to wait here:
               leave your email and we’ll send you the link when it’s ready.
@@ -618,24 +628,16 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
               )}
             </h1>
             <p className="tikkie-only__sub">
-              {payout?.tikkieStatus === 'redeemed' ? (
-                <>This cashback has already been collected, so the link below won’t pay out again.</>
-              ) : payout?.tikkieStatus === 'expired' ? (
-                <>This cashback link has expired, so it can no longer be collected.</>
-              ) : (
-                <>This receipt was scanned before, so its Tikkie link has most likely been used already.</>
-              )}
+              {payout?.tikkieStatus === 'redeemed'
+                ? <>This €{Number(payout?.amount ?? 0).toFixed(2)} was already collected.</>
+                : payout?.tikkieStatus === 'expired'
+                  ? <>This link has expired and can’t be collected.</>
+                  : <>Its link has most likely been used already.</>}
             </p>
             <div className="tikkie-only__note">
-              <strong>Already entered your bank details? The money is on its way.</strong> Don’t enter
-              them again: a cashback link only pays out once.
+              <strong>Already entered your bank details?</strong> The money is on its way.
+              Don’t enter them again: a link pays out once.
             </div>
-            {payout?.amount != null && (
-              <p className="tikkie-only__sub tikkie-only__sub--small">
-                This receipt was worth €{Number(payout.amount).toFixed(2)}
-                {payout?.cups != null && <> for {payout.cups} cup{payout.cups === 1 ? '' : 's'}</>}.
-              </p>
-            )}
             {payout?.url && (
               <a className="tikkie-only__btn tikkie-only__btn--muted" href={payout.url}>
                 Open the link anyway
@@ -658,7 +660,7 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
           </>
         )}
 
-        <p className="tikkie-only__foot">Powered by PackPerks</p>
+        </div>
       </div>
 
       {showPolicy && (

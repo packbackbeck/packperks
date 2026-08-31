@@ -15,24 +15,34 @@
 .tikkie-only__inner {
   width: 100%;
   margin: 0;
-  padding: 30px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  /* Generous breathing room above the brand lockup, which is pinned to the
+     top of every screen regardless of where the content sits. */
+  padding: calc(env(safe-area-inset-top, 0px) + 64px) 20px calc(env(safe-area-inset-bottom, 0px) + 28px);
   text-align: center;
-}
-/* Short screens: everything centred in the viewport as one column. */
-.tikkie-only__inner--center {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+}
+/* Short screens: the content block centres in the space under the lockup. */
+.tikkie-only__inner--center .tikkie-only__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
+  /* Optically centred: sit a touch above true centre. */
+  padding-bottom: 8vh;
 }
 .tikkie-only__logos {
   display: flex; align-items: center; justify-content: center; gap: 14px;
-  margin-bottom: 26px;
+  margin-bottom: 40px;
+  flex-shrink: 0;
 }
 .tikkie-only__logo {
-  height: 40px; max-width: 120px; object-fit: contain;
+  height: 34px; max-width: 190px; width: auto; object-fit: contain;
 }
+/* Alone on the waiting screen, the venue mark can breathe. */
+.tikkie-only__logos:only-child .tikkie-only__logo,
+.tikkie-only__logos > .tikkie-only__logo:only-child { height: 38px; max-width: 230px; }
 .tikkie-only__link-arrows { color: #C9C2B4; flex-shrink: 0; }
 /* Tikkie's own logo. Sized against the PackBack mark opposite it rather
    than to its own bounding box, so the two read as an even pair. */
@@ -90,11 +100,6 @@
   background: #47478A; color: #fff;
   font-family: inherit;
   font-size: 16px; font-weight: 800; text-decoration: none;
-}
-.tikkie-only__foot {
-  margin: 28px 0 0;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-  color: #B4AB9C;
 }
 
 /* ── The explainer: ONE block. Bulleted text on the left, the real Tikkie

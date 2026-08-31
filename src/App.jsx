@@ -718,7 +718,13 @@ export default function App({ consentReady = true } = {}) {
           setTikkieOnly({
             // Real org id so public reads (bin locations) resolve; all
             // customer data still comes from the demo fixtures.
-            org: { id: 'da6f18cc-7493-4547-b54e-4987de2606b4', slug: seg0 || 't3', name: 'Demo venue', logo_url: null, brand_color: null },
+            org: {
+              id: 'da6f18cc-7493-4547-b54e-4987de2606b4',
+              slug: seg0 || 't3',
+              name: 'Unknown Campus',
+              logo_url: '/brand/unknown-campus.png',
+              brand_color: null,
+            },
             batchId: '',
             cupIds: [],
             settings: {},

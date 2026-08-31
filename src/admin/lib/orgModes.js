@@ -53,6 +53,7 @@ export const TIKKIE_ONLY_PAGES = new Set([
   'tikkielog',    // the payout log
   'backupcups',   // the bin's offline fallback codes + outage alarm
   'smartbins',    // the bin locations behind the customer map
+  'emailtemplates', // the automated customer emails
   // Redirect Refund grew a user base (refund accounts + mailos), so the
   // audience pages are back — each one adapts itself to this mode.
   'users',        // refund accounts + mailos (AdminTikkieUsers)
@@ -126,8 +127,8 @@ export const ORG_MODELS = {
     group: 'never',
     steps: { rewards: false, copy: false, features: false },
     defaults: {
-      // Per-cup payout. Each Tikkie mint carries a transaction fee, so this
-      // starts low and deliberately conservative.
+      // Per-cup payout. Starts low and deliberately conservative — this is
+      // real money leaving the venue's Tikkie cashback account per cup.
       cashbackRatePerCup: 0.10,
       refundRatePerCup: 0.10,
       featureCupSharing: false,

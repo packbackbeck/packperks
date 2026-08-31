@@ -127,6 +127,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    // Redirect Refund only: the automated customer emails.
+    id: 'emailtemplates',
+    label: 'Email Templates',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+        <path d="M3.5 7l8.5 6 8.5-6" />
+      </svg>
+    ),
+  },
+  {
     // Redirect Refund only: the bin locations behind the customer map.
     id: 'smartbins',
     label: 'Smart Bins',
@@ -308,9 +319,9 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
             // reports), each adapted to this mode. (Settings/history/support
             // stay reachable via the top-bar dock; see TIKKIE_ONLY_PAGES.)
             if (isTikkieOnly) {
-              return ['tikkielog', 'cupqr', 'smartbins', 'backupcups', 'users', 'behaviour', 'stats', 'reports'].includes(item.id);
+              return ['tikkielog', 'cupqr', 'smartbins', 'emailtemplates', 'backupcups', 'users', 'behaviour', 'stats', 'reports'].includes(item.id);
             }
-            if (item.id === 'smartbins') return false;
+            if (item.id === 'smartbins' || item.id === 'emailtemplates') return false;
             if (item.id === 'tikkielog' || item.id === 'backupcups') return false;
             // Phase 3 gating:
             //  • Cup Transfers only when cup sharing is on for this org.

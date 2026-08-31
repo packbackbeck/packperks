@@ -730,8 +730,6 @@ function StepLocation({ data, onChange }) {
 }
 
 /* ─── Step: cup economics ─────────────────────────────────────────── */
-const TIKKIE_FEE_EUR = 0.50;
-
 function StepEconomics({ data, modelKey, features, onChange }) {
   const isTikkie = modelKey === 'tikkie_only';
   // Tikkie-only settles on ONE rate — the refund rate. bin-tikkie reads it.
@@ -739,8 +737,8 @@ function StepEconomics({ data, modelKey, features, onChange }) {
 
   if (isTikkie) {
     // One number matters here: what a returned cup is worth. Every receipt
-    // mints one Tikkie link, and each link carries a fixed transaction fee —
-    // so a small receipt can cost more to pay out than it pays.
+    // mints one Tikkie link, paid straight out of the venue's cashback
+    // account — there is no per-link charge to weigh against it.
     const examples = [1, 4, 10];
     return (
       <div className="oow-form">
@@ -765,14 +763,7 @@ function StepEconomics({ data, modelKey, features, onChange }) {
             </div>
           ))}
         </div>
-        {rate > 0 && rate < TIKKIE_FEE_EUR && (
-          <p className="oow-warn">
-            Heads up: every Tikkie link costs about €{TIKKIE_FEE_EUR.toFixed(2)} to issue, so a
-            single-cup receipt at €{rate.toFixed(2)} costs more in fees than it pays out. That's
-            fine if customers usually return several cups at once — worth checking against how
-            this bin is actually used.
-          </p>
-        )}
+
       </div>
     );
   }

@@ -315,8 +315,8 @@ the Redirect Refund org `t3` — with no change to the bin.
 | `5c1ea491d2a746938d305c19a46a1ed1` | Titaan — slug `titaan` | Deposit Rewards | `…/titaan/?batch=<uuid>` → app |
 
 Rate for `t3`: **€0.10 per cup** (Settings → Payout rates → Refund rate).
-Each Tikkie link issued carries a fixed transaction fee of roughly €0.50,
-so single-cup receipts cost more to pay out than they pay.
+Each link is paid straight out of the venue's Tikkie cashback account;
+there is no per-link charge for issuing one.
 
 ---
 

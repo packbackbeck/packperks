@@ -10,6 +10,7 @@ import AdminOverview from './overview/AdminOverview';
 import AdminRewards from './rewards/AdminRewards';
 import AdminUsers from './users/AdminUsers';
 import AdminSmartBins from './smartbins/AdminSmartBins';
+import AdminEmailTemplates from './emailtemplates/AdminEmailTemplates';
 import AdminClaims from './claims/AdminClaims';
 import AdminCupScans from './cupscans/AdminCupScans';
 import AdminWorkspace from './settings/AdminWorkspace';
@@ -83,6 +84,7 @@ const VALID_PAGES = new Set([
   'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
   'transactions', 'donations', 'byorequests', 'futurevendors', 'org', 'organizations', 'settings',
   'history', 'reports', 'stats', 'behaviour', 'support', 'tikkielog', 'backupcups',
+  'smartbins', 'emailtemplates',
 ]);
 const DEFAULT_PAGE = 'overview';
 
@@ -266,6 +268,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="smartbins" activeId={page} visited={visited}>
             <AdminSmartBins />
+          </KeepAlive>
+          <KeepAlive id="emailtemplates" activeId={page} visited={visited}>
+            <AdminEmailTemplates />
           </KeepAlive>
           <KeepAlive id="backupcups" activeId={page} visited={visited}>
             <AdminBackupCups onNavigate={setPage} />

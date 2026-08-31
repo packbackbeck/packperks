@@ -3,6 +3,7 @@ import { applyOrgFilter, getActiveOrgId } from '../context/orgState';
 import { ALL_FAILURE_CODES, getFailureLabel } from './aiVerdictLabels';
 import { fmtDuration } from './behaviourFormat';
 import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
+import { EMAIL_TEMPLATE_KEY } from './emailTemplates';
 import { providerForCountry } from '../../lib/payments';
 
 /* Multi-regional payout routing: resolve which payment provider (and edge
@@ -1525,6 +1526,47 @@ function sliceBehaviourRows(allRows, fromMs, toMs) {
 
 
 
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Email templates — the automated customer mails, editable per org.
+ * Defaults and tag contracts live in ./emailTemplates.js; only the
+ * OVERRIDES are stored, so a venue that never edits anything keeps
+ * inheriting improvements to the defaults.
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getEmailTemplates(orgId) {
+  const id = orgId || getActiveOrgId();
+  if (!id) return {};
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', EMAIL_TEMPLATE_KEY(id)).maybeSingle();
+  return (data?.value && typeof data.value === 'object') ? data.value : {};
+}
+
+export async function saveEmailTemplates(orgId, templates) {
+  const id = orgId || getActiveOrgId();
+  if (!id) throw new Error('No active organisation.');
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key: EMAIL_TEMPLATE_KEY(id), value: templates }, { onConflict: 'key' });
+  if (error) throw error;
+  return templates;
+}
+
+/* Send one template to the signed-in admin, rendered with sample values.
+ * The Brevo key never leaves the server, so this goes through an edge
+ * function that re-checks the caller is an active admin. */
+export async function sendTestEmail({ orgId, templateKey, subject, html, to }) {
+  const { data, error } = await supabase.functions.invoke('send-test-email', {
+    body: { org_id: orgId || getActiveOrgId(), template_key: templateKey, subject, html, to },
+  });
+  if (error) {
+    // Edge errors carry their JSON body on the context — surface the real reason.
+    const detail = await error.context?.json?.().catch(() => null);
+    throw new Error(detail?.error || error.message || 'Test send failed.');
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * Smart-bin locations (Redirect Refund) — the pins on the customer home
  * map. The BYO equivalent is Future Vendors; this is the same idea for a
@@ -1740,7 +1782,7 @@ function computeTikkieMetrics({ claims, users, pending, backup }) {
         valueType: 'count', value: null, rawValue: avgPayout,
         valueText: avgPayout != null ? `€${avgPayout.toFixed(2)}` : null,
         numerator: receipts, numLabel: 'Receipts', denominator: null, denLabel: null,
-        desc: 'Average euro value of a receipt. Each Tikkie link also carries a fixed transaction fee, so small receipts cost more to pay out than they pay.',
+        desc: 'Average euro value of a receipt — the money actually leaving the Tikkie cashback account per scan.',
         ...(avgPayout == null ? { note: 'No receipts scanned yet.' } : {}) },
     { measurable: avgCups != null, id: 'tk_avg_cups', group: 'optional', label: 'Avg cups per receipt',
         valueType: 'count', value: null, rawValue: avgCups,

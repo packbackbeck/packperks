@@ -547,6 +547,49 @@ async function sha256Hex(text: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/* ── Admin-authored email templates ───────────────────────────────────
+ * The dashboard (Email Templates) stores only OVERRIDES under
+ * `email_templates:<orgId>`; a venue that never edits anything keeps the
+ * default below. The login code CANNOT be paused — logging in depends on
+ * it — so `enabled:false` is ignored for this one. Keep these defaults in
+ * step with src/admin/lib/emailTemplates.js. */
+const DEFAULT_CODE_SUBJECT = "{{code}} is your PackPerks code";
+const DEFAULT_CODE_HTML =
+  `<div style="font:15px/1.6 -apple-system,sans-serif;color:#1F1B16">\n` +
+  `  <p>Your one-time PackPerks code is:</p>\n` +
+  `  <p style="font-size:30px;font-weight:800;letter-spacing:0.2em">{{code}}</p>\n` +
+  `  <p>It expires in {{minutes}} minutes. If you didn't request it, you can ignore this email.</p>\n` +
+  `  <p style="color:#6C6259">{{venue}} · PackPerks</p>\n` +
+  `</div>`;
+
+async function loginCodeTemplate(orgId: string): Promise<{ subject: string; html: string }> {
+  try {
+    const { data } = await supabase.from("app_config")
+      .select("value").eq("key", `email_templates:${orgId}`).maybeSingle();
+    const t = ((data?.value ?? {}) as Record<string, { subject?: string; html?: string }>).login_code;
+    return {
+      subject: t?.subject || DEFAULT_CODE_SUBJECT,
+      html: t?.html || DEFAULT_CODE_HTML,
+    };
+  } catch {
+    return { subject: DEFAULT_CODE_SUBJECT, html: DEFAULT_CODE_HTML };
+  }
+}
+
+function fillTemplate(text: string, values: Record<string, string>): string {
+  return Object.entries(values).reduce((acc, [k, v]) => acc.replaceAll(`{{${k}}}`, v), text);
+}
+
+// Plain-text part: HTML-only mail reads as spam to most filters.
+function htmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 async function sendOtpEmail(orgId: string, email: string, purpose: string, batchId: string | null, deviceId: string): Promise<boolean> {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   // One live code per (org,email): a new request invalidates the old one.
@@ -566,22 +609,25 @@ async function sendOtpEmail(orgId: string, email: string, purpose: string, batch
   }
   if (!BREVO_API_KEY) return false;
   try {
+    const [tpl, { data: orgRow }] = await Promise.all([
+      loginCodeTemplate(orgId),
+      supabase.from("organizations").select("name").eq("id", orgId).maybeSingle(),
+    ]);
+    const values = {
+      code,
+      minutes: String(Math.round(OTP_TTL_MS / 60000)),
+      venue: orgRow?.name || "PackPerks",
+    };
+    const htmlContent = fillTemplate(tpl.html, values);
     const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: { "api-key": BREVO_API_KEY, "content-type": "application/json" },
       body: JSON.stringify({
         sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
         to: [{ email }],
-        subject: `${code} is your PackPerks code`,
-        textContent:
-          `Your one-time PackPerks code is: ${code}\n\n` +
-          `It expires in 10 minutes. If you didn't request it, you can ignore this email.`,
-        htmlContent:
-          `<div style="font:15px/1.6 -apple-system,sans-serif">` +
-          `<p>Your one-time PackPerks code is:</p>` +
-          `<p style="font-size:30px;font-weight:800;letter-spacing:0.2em">${code}</p>` +
-          `<p>It expires in 10 minutes. If you didn't request it, you can ignore this email.</p>` +
-          `</div>`,
+        subject: fillTemplate(tpl.subject, values),
+        textContent: htmlToText(htmlContent),
+        htmlContent,
       }),
     });
     return resp.ok;

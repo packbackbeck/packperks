@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase';
 
 /* The three destinations. BYO's href resolves live (group rename-safe);
  * the Titaan slugs are the two provisioned venues. */
-const TITAAN_SLUGS = ['titaan', 't3'];
+const TITAAN_SLUGS = ['t2', 't3'];
 
 export default function ModelChooser() {
   const [byoHref, setByoHref] = useState('/byo');
@@ -59,7 +59,7 @@ export default function ModelChooser() {
         if (!alive) return;
         const bySlug = Object.fromEntries((titaanOrgs || []).map(o => [o.slug, o.id]));
         setMaint({
-          titaan: down.has(bySlug.titaan),
+          titaan: down.has(bySlug.t2),
           t3: down.has(bySlug.t3),
           byo: (byoMembers || []).length > 0 && byoMembers.every(m => down.has(m.id)),
         });
@@ -95,7 +95,7 @@ export default function ModelChooser() {
             </svg>
           </Tile>
 
-          <Tile href="/titaan" variant="bin" title="Titaan Rewards" sub="SmartBin deposit · rewards" down={maint.titaan}>
+          <Tile href="/t2" variant="bin" title="Titaan Rewards" sub="SmartBin deposit · rewards" down={maint.titaan}>
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 7h16" />
               <path d="M6 7l1 12.5a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9L20 7" />
@@ -106,9 +106,9 @@ export default function ModelChooser() {
 
           <Tile href="/t3" variant="refund" title="Titaan Direct Refund" sub="SmartBin · instant Tikkie refund" down={maint.t3}>
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M14.8 8.6a3.2 3.2 0 0 0-5.6 2.1c0 2.4 2.3 3 5.6 3.1" />
-              <path d="M8.6 12.9h5.2" />
+              <rect x="2.5" y="5.5" width="19" height="13" rx="2.5" />
+              <path d="M16 9.6a3.6 3.6 0 1 0 0 4.8" />
+              <path d="M8.4 11.2h5M8.4 12.9h5" />
             </svg>
           </Tile>
         </div>

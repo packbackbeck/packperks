@@ -1,0 +1,161 @@
+/* AdminEmailTemplates — editor + live preview, same card language as the
+   rest of the Redirect Refund pages. */
+.aet { padding: 28px 32px 60px; max-width: 1280px; }
+
+.aet__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  margin-bottom: 18px;
+}
+.aet__title { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: #1F1B16; }
+.aet__sub { margin: 0; font-size: 13px; line-height: 1.55; color: #7A7166; max-width: 640px; }
+.aet__headactions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.aet__dirty { font-size: 12px; font-weight: 700; color: #C98A12; white-space: nowrap; }
+
+.aet__error, .aet__notice {
+  margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; font-size: 13px;
+}
+.aet__error  { background: #FBEAE5; color: #A03A22; }
+.aet__notice { background: #E4F5E9; color: #1A6B33; }
+
+/* Template switcher */
+.aet__tabs { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.aet__tab {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 11px 18px; border-radius: 12px;
+  border: 1.5px solid #EDE6D8; background: #fff; cursor: pointer;
+  font-family: inherit; text-align: left; min-width: 160px;
+}
+.aet__tab:hover { background: #FBF8F1; }
+.aet__tab.is-on { border-color: #1A8737; box-shadow: 0 0 0 3px rgba(26, 135, 55, 0.12); }
+.aet__tab-name { font-size: 14px; font-weight: 800; color: #1F1B16; }
+.aet__tab-meta { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #9A9186; }
+.aet__tab-off { font-style: normal; color: #C4472B; }
+
+.aet__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1080px) { .aet__grid { grid-template-columns: minmax(0, 1fr); } }
+
+.aet__card {
+  background: #fff; border: 1px solid #EDE6D8; border-radius: 14px;
+  padding: 20px 22px;
+}
+.aet__card-title { margin: 0 0 4px; font-size: 15.5px; font-weight: 800; color: #1F1B16; }
+.aet__empty { padding: 40px 4px; font-size: 13px; color: #8A8175; }
+
+.aet__when {
+  margin: 0 0 14px; padding: 11px 13px; border-radius: 10px;
+  background: #FBF8F1; font-size: 12.5px; line-height: 1.55; color: #6C6259;
+}
+.aet__when strong { color: #1F1B16; }
+.aet__locked { margin: 0 0 14px; font-size: 12.5px; color: #9A9186; }
+
+/* Enable switch */
+.aet__switch { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; cursor: pointer; }
+.aet__switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.aet__switch-track {
+  flex-shrink: 0; margin-top: 2px; width: 38px; height: 22px; border-radius: 999px;
+  background: #DED6C6; transition: background 0.16s ease; position: relative;
+}
+.aet__switch-thumb {
+  position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; transition: transform 0.16s ease;
+}
+.aet__switch input:checked + .aet__switch-track { background: #1A8737; }
+.aet__switch input:checked + .aet__switch-track .aet__switch-thumb { transform: translateX(16px); }
+.aet__switch-label { font-size: 13px; font-weight: 700; color: #1F1B16; }
+.aet__switch-label em { display: block; margin-top: 2px; font-style: normal; font-weight: 400; font-size: 12px; color: #9A9186; }
+
+.aet__field { display: block; margin-bottom: 14px; }
+.aet__field > span {
+  display: block; margin-bottom: 5px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.03em;
+  text-transform: uppercase; color: #9A9186;
+}
+.aet__field input, .aet__field textarea {
+  width: 100%; box-sizing: border-box; padding: 10px 12px;
+  border: 1.5px solid #E2DACA; border-radius: 9px;
+  font-family: inherit; font-size: 13.5px; color: #1F1B16; background: #fff;
+}
+.aet__field input:focus, .aet__field textarea:focus { outline: none; border-color: #1A8737; }
+.aet__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 12.5px !important; line-height: 1.6; resize: vertical; tab-size: 2;
+}
+
+/* Tag palette */
+.aet__tagbar { margin-bottom: 14px; }
+.aet__tagbar-label {
+  display: block; margin-bottom: 6px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.03em;
+  text-transform: uppercase; color: #9A9186;
+}
+.aet__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.aet__tag {
+  padding: 5px 11px; border-radius: 999px;
+  border: 1.5px solid #DCD7EC; background: #F3F1FB; color: #47478A;
+  font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.aet__tag:hover { background: #E7E4F7; }
+
+.aet__warn {
+  margin: 0 0 14px; padding: 10px 13px; border-radius: 10px;
+  background: #FCF2D6; color: #8A6410; font-size: 12.5px; line-height: 1.5;
+}
+
+.aet__actions { display: flex; gap: 10px; margin-bottom: 18px; }
+
+.aet__btn {
+  padding: 9px 18px; border-radius: 999px; border: 1.5px solid #E2DACA;
+  background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700;
+  color: #4A443C; cursor: pointer; white-space: nowrap;
+}
+.aet__btn:hover:not(:disabled) { background: #F7F3E9; }
+.aet__btn:disabled { opacity: 0.5; cursor: default; }
+.aet__btn--primary { background: #1A8737; border-color: #1A8737; color: #fff; }
+.aet__btn--primary:hover:not(:disabled) { background: #15702D; }
+
+/* Test send */
+.aet__test { border-top: 1px solid #F0EAE0; padding-top: 16px; }
+.aet__test-label {
+  display: block; margin-bottom: 7px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.03em;
+  text-transform: uppercase; color: #9A9186;
+}
+.aet__test-row { display: flex; gap: 8px; }
+.aet__test-row input {
+  flex: 1; padding: 9px 12px; border: 1.5px solid #E2DACA; border-radius: 9px;
+  font-family: inherit; font-size: 13px; color: #1F1B16;
+}
+.aet__test-row input:focus { outline: none; border-color: #1A8737; }
+.aet__hint { margin: 7px 0 0; font-size: 12px; line-height: 1.5; color: #9A9186; }
+
+/* Preview */
+.aet__card--preview { position: sticky; top: 20px; }
+.aet__mail {
+  margin-top: 12px; border: 1px solid #EDE6D8; border-radius: 12px; overflow: hidden;
+  background: #fff;
+}
+.aet__mail-head { padding: 12px 14px; background: #FBF8F1; border-bottom: 1px solid #EDE6D8; }
+.aet__mail-from {
+  display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #9A9186;
+}
+.aet__mail-subject { display: block; margin-top: 3px; font-size: 14.5px; font-weight: 800; color: #1F1B16; }
+.aet__mail-subject em { font-style: normal; color: #B4AB9C; }
+.aet__mail-body { width: 100%; height: 340px; border: none; display: block; background: #fff; }
+
+.aet__legend { margin-top: 16px; }
+.aet__legend-title {
+  display: block; margin-bottom: 7px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.03em;
+  text-transform: uppercase; color: #9A9186;
+}
+.aet__legend ul { list-style: none; margin: 0; padding: 0; }
+.aet__legend li {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 0; border-bottom: 1px solid #F5F0E6; font-size: 12.5px; color: #6C6259;
+}
+.aet__legend li:last-child { border-bottom: none; }
+.aet__legend code {
+  font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700;
+  color: #47478A; white-space: nowrap;
+}

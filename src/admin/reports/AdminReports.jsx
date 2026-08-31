@@ -269,14 +269,42 @@ export default function AdminReports({ onNavigate }) {
   // sees the safe datasets (cup_scans, activity) only. We resolve the
   // role once here and reuse it through the rest of the page.
   const { profile } = useAuth();
+  const { activeOrgMode } = useOrg();
+  const isTikkie = activeOrgMode === 'tikkie_only';
   const role = profile?.role || 'checker';
   const canExportPii = role === 'owner' || role === 'admin';
   // Email configs (digest + notifications) can be set by any admin, managers
   // included — only view-only checkers are locked out.
   const canManageAlerts = role !== 'checker';
 
+  // Redirect Refund orgs have no cup scans, cup balances or rewards —
+  // the datasets and columns trim themselves to what that mode records.
+  const datasets = useMemo(() => {
+    if (!isTikkie) return DATASETS;
+    const strip = {
+      users: new Set(['cup_balance', 'lifetime_cups']),
+      claims: new Set(['reward_id']),
+    };
+    const out = {};
+    for (const [id, d] of Object.entries(DATASETS)) {
+      if (id === 'cup_scans') continue;
+      out[id] = strip[id]
+        ? { ...d, columns: d.columns.filter(c => !strip[id].has(c.key)) }
+        : d;
+      if (id === 'users') out[id] = { ...out[id], description: 'Refund accounts (email save-for-later).' };
+      if (id === 'claims') out[id] = { ...out[id], label: 'Refunds', description: 'Smart-bin Tikkie payouts.' };
+    }
+    return out;
+  }, [isTikkie]);
+
   const [dataset, setDataset] = useState(canExportPii ? 'users' : 'cup_scans');
-  const cfg = DATASETS[dataset];
+  // Snap the selection back onto an existing dataset when the mode
+  // removes the current one (e.g. cup_scans in Redirect Refund).
+  useEffect(() => {
+    if (!datasets[dataset]) setDataset(Object.keys(datasets)[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasets, dataset]);
+  const cfg = datasets[dataset] || DATASETS[dataset];
 
   const [selectedCols, setSelectedCols] = useState(() =>
     new Set(cfg.columns.filter(c => c.default).map(c => c.key))
@@ -510,7 +538,7 @@ export default function AdminReports({ onNavigate }) {
           <div className="rep-config__section">
             <div className="rep-config__label">Dataset</div>
             <div className="rep-config__datasets">
-              {Object.entries(DATASETS).map(([id, d]) => {
+              {Object.entries(datasets).map(([id, d]) => {
                 const isPii = PII_DATASETS.has(id);
                 const locked = isPii && !canExportPii;
                 return (

@@ -3,7 +3,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { getStatsMetrics, getAiAccuracy, purgeOrgRecords } from '../lib/adminApi';
+import { getStatsMetrics, getTikkieStatsMetrics, getAiAccuracy, purgeOrgRecords } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import ScopeToggle from '../shared/ScopeToggle';
 import './AdminStats.css';
@@ -235,7 +235,8 @@ function AiAccuracySection({ acc, scope }) {
 }
 
 export default function AdminStats() {
-  const { activeOrg, scopeOrgIds, statsScope } = useOrg();
+  const { activeOrg, scopeOrgIds, statsScope, activeOrgMode } = useOrg();
+  const isTikkie = activeOrgMode === 'tikkie_only';
   const [range, setRange] = useState('all');
   const [data, setData] = useState(null);
   const [aiAcc, setAiAcc] = useState(null);
@@ -259,9 +260,13 @@ export default function AdminStats() {
     try {
       const r = RANGES.find(x => x.id === rangeId) || RANGES[0];
       const fromTs = r.days ? Date.now() - r.days * 24 * 60 * 60 * 1000 : null;
+      // Redirect Refund orgs: their pipeline is bin session → Tikkie link,
+      // not QR scan → reward, and there is no receipt AI to score.
       const [result, ai] = await Promise.all([
-        getStatsMetrics({ fromTs, orgIds: scopeOrgIds }),
-        getAiAccuracy({ orgIds: scopeOrgIds, fromTs }).catch(() => null),
+        isTikkie
+          ? getTikkieStatsMetrics({ fromTs, orgIds: scopeOrgIds })
+          : getStatsMetrics({ fromTs, orgIds: scopeOrgIds }),
+        isTikkie ? Promise.resolve(null) : getAiAccuracy({ orgIds: scopeOrgIds, fromTs }).catch(() => null),
       ]);
       setData(result);
       setAiAcc(ai);
@@ -316,7 +321,9 @@ export default function AdminStats() {
         <div>
           <h1 className="stats-header__title">System Health</h1>
           <p className="stats-header__sub">
-            Health of the {orgName} return flow: QR generation, scan, reward, and dashboard tracking.
+            {isTikkie
+              ? `Health of the ${orgName} refund flow: bin sessions, Tikkie link minting, and the offline fallback.`
+              : `Health of the ${orgName} return flow: QR generation, scan, reward, and dashboard tracking.`}
           </p>
         </div>
         <div className="stats-header__actions">
@@ -351,9 +358,9 @@ export default function AdminStats() {
               {verdict === 'na' && 'Not enough data collected yet to reach a verdict.'}
             </div>
             <div className="stats-verdict__totals">
-              <span><strong>{data.totals.totalScans}</strong> scans</span>
-              <span><strong>{data.totals.attemptingUsers}</strong> users</span>
-              <span><strong>{data.totals.batchesGenerated}</strong> QR batches</span>
+              <span><strong>{data.totals.totalScans}</strong> {isTikkie ? 'receipts' : 'scans'}</span>
+              <span><strong>{data.totals.attemptingUsers}</strong> {isTikkie ? 'accounts' : 'users'}</span>
+              <span><strong>{data.totals.batchesGenerated}</strong> {isTikkie ? 'bin sessions' : 'QR batches'}</span>
             </div>
           </div>
 
@@ -400,7 +407,7 @@ export default function AdminStats() {
           {/* Charts row */}
           <div className="stats-charts">
             <div className="stats-panel">
-              <h2 className="stats-panel__title">Scans over time</h2>
+              <h2 className="stats-panel__title">{isTikkie ? 'Payouts over time' : 'Scans over time'}</h2>
               {data.timeSeries.length === 0 ? (
                 <p className="stats-empty">No scans in this range yet.</p>
               ) : (
@@ -487,7 +494,7 @@ export default function AdminStats() {
       )}
 
       {/* ── AI accuracy: AI verdict vs admin decision ── */}
-      <AiAccuracySection acc={aiAcc} scope={statsScope} />
+      {!isTikkie && <AiAccuracySection acc={aiAcc} scope={statsScope} />}
 
       {/* ── Danger zone: org-scoped test-data reset ── */}
       <div className="stats-danger">

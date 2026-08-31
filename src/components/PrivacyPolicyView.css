@@ -13,7 +13,11 @@
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
   animation: pp-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-@keyframes pp-rise { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+/* A real bottom-sheet slide: the whole sheet travels up from below the
+   viewport, stopping just short of the top (the 92vh height keeps the
+   margin above it). */
+@keyframes pp-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .pp-sheet { animation: none; } }
 
 .pp-head {
   flex-shrink: 0;

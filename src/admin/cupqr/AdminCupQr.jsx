@@ -485,8 +485,10 @@ export default function AdminCupQr({ onNavigate }) {
       {/* ── Left: generation controls ────────────────────────────────── */}
       <div className="acq-layout">
         <div className="acq-controls">
-          {/* Quick print — one tap mints a fresh batch of N cups and prints it. */}
-          <div className="acq-card acq-quick">
+          {/* Quick print — one tap mints a fresh batch of N cups and prints it.
+              Hidden for Redirect Refund orgs: the smart bin prints its own
+              receipts, so a desk quick-print has no role there. */}
+          {!isTikkieOnly && <div className="acq-card acq-quick">
             <h2 className="acq-card__title">Quick print</h2>
             <p className="acq-field__hint">
               One tap mints a fresh batch and prints it to {printerIp}.
@@ -506,7 +508,7 @@ export default function AdminCupQr({ onNavigate }) {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
           <div className="acq-card">
             <h2 className="acq-card__title">New batch</h2>

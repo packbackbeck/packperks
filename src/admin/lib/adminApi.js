@@ -766,6 +766,170 @@ export async function getAiAccuracy({ orgIds, fromTs, toTs } = {}) {
   };
 }
 
+
+/* ─────────────────────────────────────────────────────────────────────
+ * getTikkieStatsMetrics — System Health for Redirect Refund orgs.
+ *
+ * Same output shape as getStatsMetrics (metrics/bands/verdict/series/
+ * errors/totals) so AdminStats renders it unchanged, but measured on the
+ * pipeline this mode actually runs: bin session → batch → Tikkie link.
+ * There are no cup scans, no rewards and no receipt AI here.
+ * ───────────────────────────────────────────────────────────────────── */
+export async function getTikkieStatsMetrics({ fromTs = null, toTs = null, orgIds } = {}) {
+  const ids = (Array.isArray(orgIds) ? orgIds : [orgIds]).filter(Boolean);
+  const inRange = (q, col) => {
+    if (fromTs) q = q.gte(col, new Date(fromTs).toISOString());
+    if (toTs)   q = q.lte(col, new Date(toTs).toISOString());
+    return q;
+  };
+
+  const [claimsRes, pendingRes, backupRes, sessionsRes] = await Promise.all([
+    inRange(applyOrgFilter(
+      supabase.from('claims')
+        .select('id, created_at, cups_redeemed, payout_amount, user_id, tikkie_url, tikkie_status, tikkie_last_error')
+        .not('batch_id', 'is', null),
+      orgIds
+    ), 'created_at').order('created_at', { ascending: true }),
+    inRange(
+      supabase.from('pending_batches')
+        .select('batch_id, org_id, email, user_id, first_seen, resolved_at')
+        .or(ids.length ? `org_id.is.null,org_id.in.(${ids.join(',')})` : 'org_id.is.null'),
+      'first_seen'
+    ),
+    inRange(applyOrgFilter(
+      supabase.from('backup_cup_uses').select('id, claim_id, used_at'), orgIds
+    ), 'used_at'),
+    inRange(applyOrgFilter(
+      supabase.from('bin_sessions').select('id, created_at'), orgIds
+    ), 'created_at'),
+  ]);
+
+  const claims   = claimsRes.data   || [];
+  const pending  = pendingRes.data  || [];
+  const backup   = backupRes.data   || [];
+  const sessions = sessionsRes.data || [];
+
+  const total       = claims.length;
+  const minted      = claims.filter(c => c.tikkie_url);
+  const failed      = claims.filter(c => !c.tikkie_url && c.tikkie_last_error);
+  const backupSet   = new Set(backup.map(b => b.claim_id).filter(Boolean));
+  const pendingAll  = pending.length;
+  const pendingDone = pending.filter(p => p.resolved_at).length;
+  const accounts    = new Set(claims.map(c => c.user_id).filter(Boolean)).size;
+
+  // Uptime proxy: active hours (any receipt) with zero mint failures.
+  const hourBuckets = new Map();
+  for (const c of claims) {
+    const hourKey = new Date(c.created_at).toISOString().slice(0, 13);
+    const b = hourBuckets.get(hourKey) || { hasCritical: false };
+    if (!c.tikkie_url && c.tikkie_last_error) b.hasCritical = true;
+    hourBuckets.set(hourKey, b);
+  }
+  const activeHours = hourBuckets.size;
+  const cleanHours = Array.from(hourBuckets.values()).filter(b => !b.hasCritical).length;
+
+  const metrics = [
+    {
+      id: 'tk_mint', label: 'Tikkie link mint rate',
+      value: pct(minted.length, total), numerator: minted.length, denominator: total,
+      lowerIsBetter: false, thresholds: { go: 98, condLow: 90 },
+      formula: 'Receipts with a Tikkie link / receipts scanned',
+      note: total === 0 ? 'No receipts scanned in this range yet.' : null,
+    },
+    {
+      id: 'tk_mint_fail', label: 'Mint failure rate',
+      value: total > 0 ? pct(failed.length, total) : null, numerator: failed.length, denominator: total,
+      lowerIsBetter: true, thresholds: { go: 2, condHigh: 10 },
+      formula: 'Receipts whose Tikkie mint errored / receipts scanned',
+      note: failed.length > 0 ? 'A failed mint retries on the next scan of the same receipt.' : null,
+    },
+    {
+      id: 'tk_pending', label: 'Bin confirmation rate',
+      value: pct(pendingDone, pendingAll), numerator: pendingDone, denominator: pendingAll,
+      lowerIsBetter: false, thresholds: { go: 90, condLow: 70 },
+      formula: 'Pending receipts the bin later confirmed / receipts scanned before confirmation',
+      note: pendingAll === 0
+        ? 'No receipt has been scanned before its bin session arrived — the bin is delivering sessions ahead of the customer.'
+        : 'Low means the bin is losing sessions: printed receipts whose confirmation never arrives.',
+    },
+    {
+      id: 'tk_backup', label: 'Backup fallback rate',
+      value: total > 0 ? pct(backupSet.size, total) : null, numerator: backupSet.size, denominator: total,
+      lowerIsBetter: true, thresholds: { go: 0, condHigh: 15 },
+      formula: 'Payouts from reserved backup cups / receipts scanned',
+      note: backupSet.size > 0 ? 'Anything above zero means the bin was offline — see Backup Cups.' : null,
+    },
+    {
+      id: 'tk_uptime', label: 'Payout uptime',
+      value: activeHours > 0 ? (cleanHours / activeHours) * 100 : null,
+      numerator: cleanHours, denominator: activeHours,
+      lowerIsBetter: false, thresholds: { go: 95, condLow: 85 },
+      formula: 'Active hours with zero mint failures / active hours',
+      note: 'Proxy: hours with at least one receipt and no failed mint.',
+    },
+  ].map(m => ({
+    ...m,
+    band: classify({
+      value: m.value,
+      lowerIsBetter: m.lowerIsBetter,
+      go: m.thresholds.go,
+      condLow: m.thresholds.condLow,
+      condHigh: m.thresholds.condHigh,
+    }),
+  }));
+
+  const realBands = metrics.filter(m => m.band !== 'na').map(m => m.band);
+  let verdict = 'na';
+  if (realBands.length) {
+    if (realBands.includes('nogo')) verdict = 'nogo';
+    else if (realBands.includes('cond')) verdict = 'cond';
+    else verdict = 'go';
+  }
+
+  // Daily series: minted vs failed payouts.
+  const dayMap = new Map();
+  for (const c of claims) {
+    const day = new Date(c.created_at).toISOString().slice(0, 10);
+    const d = dayMap.get(day) || { date: day, success: 0, failed: 0, total: 0 };
+    if (c.tikkie_url) d.success += 1; else if (c.tikkie_last_error) d.failed += 1;
+    d.total += 1;
+    dayMap.set(day, d);
+  }
+  const timeSeries = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  // Error breakdown: mint failures grouped by the error's leading phrase.
+  const errMap = new Map();
+  for (const c of claims) {
+    if (!c.tikkie_last_error) continue;
+    const code = String(c.tikkie_last_error).split(/[:\n]/)[0].trim().slice(0, 40) || 'mint_error';
+    const e = errMap.get(code) || { code, count: 0, lastMessage: null, lastSeen: null, critical: true };
+    e.count += 1;
+    if (!e.lastSeen || c.created_at > e.lastSeen) {
+      e.lastSeen = c.created_at;
+      e.lastMessage = c.tikkie_last_error;
+    }
+    errMap.set(code, e);
+  }
+  const errorBreakdown = Array.from(errMap.values()).sort((a, b) => b.count - a.count);
+
+  return {
+    metrics,
+    verdict,
+    timeSeries,
+    errorBreakdown,
+    details: {},
+    totals: {
+      totalScans: total,
+      reached: minted.length,
+      failed: failed.length,
+      attemptingUsers: accounts,
+      batchesGenerated: sessions.length,
+      firstScan: claims[0]?.created_at || null,
+      lastScan: claims[claims.length - 1]?.created_at || null,
+    },
+  };
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * User Action Stats — real behavioural percentages for the active org.
  * Every number is derived from live rows (cups / cup_scans / claims);

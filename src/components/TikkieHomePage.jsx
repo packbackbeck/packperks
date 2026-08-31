@@ -37,16 +37,30 @@ function fmtWhen(iso) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+/* "You are here" marker for the locate button - same pulsing dot as the
+ * BYO market map. */
+const userDotIcon = L.divIcon({
+  className: 'tikkie-home__userdot-icon',
+  html: '<span class="tikkie-home__userdot"></span>',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
+
 function BinMap() {
   const mapRef = useRef(null);
   const elRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (!elRef.current || mapRef.current) return;
+    // Same interaction model as the BYO market map: +/- zoom controls,
+    // draggable, pinch-zoom on touch (scroll-wheel zoom stays off so the
+    // page can still be scrolled past the map).
     const map = L.map(elRef.current, {
       center: [BIN_LOCATIONS[0].lat, BIN_LOCATIONS[0].lng],
       zoom: 13,
-      zoomControl: false,
+      zoomControl: true,
       attributionControl: false,
       scrollWheelZoom: false,
       dragging: true,
@@ -72,18 +86,81 @@ function BinMap() {
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
-  return <div ref={elRef} className="tikkie-home__map" aria-label="Smart bin locations" />;
+  /* Locate: drop the pulsing you-are-here dot and frame the map on the
+   * customer plus the nearest bin, like the market map does. */
+  const handleLocate = () => {
+    if (locating || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const map = mapRef.current;
+        if (!map) return;
+        const loc = [pos.coords.latitude, pos.coords.longitude];
+        if (userMarkerRef.current) userMarkerRef.current.setLatLng(loc);
+        else userMarkerRef.current = L.marker(loc, { icon: userDotIcon, interactive: false }).addTo(map);
+        map.fitBounds(
+          [loc, [BIN_LOCATIONS[0].lat, BIN_LOCATIONS[0].lng]],
+          { padding: [50, 50], maxZoom: 16, animate: true },
+        );
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
+  return (
+    <div className="tikkie-home__map-wrap">
+      <div ref={elRef} className="tikkie-home__map" aria-label="Smart bin locations" />
+      <button
+        type="button"
+        className="tikkie-home__locate"
+        onClick={handleLocate}
+        disabled={locating}
+        aria-label="Find my location"
+      >
+        {locating ? (
+          <span className="tikkie-home__locate-spinner" aria-hidden="true" />
+        ) : (
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="7" />
+            <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+            <line x1="12" y1="1.6" x2="12" y2="4.4" /><line x1="12" y1="19.6" x2="12" y2="22.4" />
+            <line x1="1.6" y1="12" x2="4.4" y2="12" /><line x1="19.6" y1="12" x2="22.4" y2="12" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
 }
 
+/* Dev-only sample data: /t3/?demo=full renders the populated home with no
+ * account or network (DEV gate strips it from production behaviour). */
+const HOME_DEMO_PARAM = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('demo') : null;
+const HOME_DEMO = HOME_DEMO_PARAM === 'empty'
+  ? { account: null, claims: [], pending: [] }
+  : HOME_DEMO_PARAM === 'full'
+  ? {
+      account: { userId: 'demo', email: 'anna@example.com' },
+      claims: [
+        { id: 'd1', status: 'completed', payout_amount: 0.4, cups_redeemed: 4, tikkie_url: 'https://tikkie.me/pay/demo', tikkie_status: 'created', created_at: new Date(Date.now() - 2 * 864e5).toISOString() },
+        { id: 'd2', status: 'completed', payout_amount: 0.3, cups_redeemed: 3, tikkie_url: 'https://tikkie.me/pay/demo', tikkie_status: 'redeemed', created_at: new Date(Date.now() - 6 * 864e5).toISOString() },
+        { id: 'd3', status: 'completed', payout_amount: 0.2, cups_redeemed: 2, tikkie_url: 'https://tikkie.me/pay/demo', tikkie_status: 'redeemed', created_at: new Date(Date.now() - 12 * 864e5).toISOString() },
+      ],
+      pending: [{ batch_id: 'demo-pend', first_seen: new Date(Date.now() - 36e5).toISOString(), resolved_at: null }],
+    }
+  : null;
+
 export default function TikkieHomePage({ org, settings = {} }) {
-  const account = useMemo(() => readRefundAccount(org?.id), [org?.id]);
-  const [claims, setClaims] = useState([]);
-  const [pending, setPending] = useState([]);
-  const [loading, setLoading] = useState(!!account);
+  const account = useMemo(() => HOME_DEMO ? HOME_DEMO.account : readRefundAccount(org?.id), [org?.id]);
+  const [claims, setClaims] = useState(HOME_DEMO ? HOME_DEMO.claims : []);
+  const [pending, setPending] = useState(HOME_DEMO ? HOME_DEMO.pending : []);
+  const [loading, setLoading] = useState(HOME_DEMO ? false : !!account);
   const [showAccount, setShowAccount] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    if (HOME_DEMO) return undefined;
     if (!account?.userId) { setLoading(false); return undefined; }
     Promise.all([
       getMyClaims([account.userId]).catch(() => []),

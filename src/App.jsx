@@ -706,6 +706,23 @@ export default function App({ consentReady = true } = {}) {
         const segs = (window.location.pathname || '/').split('/').filter(Boolean);
         const seg0 = segs[0] === 'admin' ? null : (segs[0] || null);
         const seg1 = segs[1] || null;
+        // Dev-only design review: ?demo=<state> skips the whole network boot
+        // and renders the Redirect Refund pages with sample data, so state
+        // screenshots are deterministic (headless capture can't wait for a
+        // live boot). Stripped from production behaviour by the DEV gate.
+        if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo')) {
+          try {
+            window.__ppkSuppressConsent = true;
+            window.dispatchEvent(new Event('packperks:suppress-consent'));
+          } catch { /* noop */ }
+          setTikkieOnly({
+            org: { id: null, slug: seg0 || 't3', name: 'Demo venue', logo_url: null, brand_color: null },
+            batchId: '',
+            cupIds: [],
+            settings: {},
+          });
+          return; // finally{} clears isLoading
+        }
         let org = null;
         let hubRoute = false;
         if (seg0) {
@@ -747,7 +764,7 @@ export default function App({ consentReady = true } = {}) {
             // not put a banner between the customer and their payout — but a
             // BARE visit is the refunds HOME, which behaves like the normal
             // app (accounts, localStorage), so there the banner shows.
-            if (sp.get('batch') || sp.get('cups')) {
+            if (sp.get('batch') || sp.get('cups') || (import.meta.env.DEV && sp.get('demo'))) {
               // Flag + event: the flag survives StrictMode's remount of
               // ConsentGate (which would otherwise miss an already-fired
               // event and pop the banner over a receipt).
@@ -1758,6 +1775,21 @@ export default function App({ consentReady = true } = {}) {
   if (tikkieOnly) {
     // A receipt in the URL → the redirect/refund page. A bare visit →
     // the refunds home (their saved account, or the empty state).
+    // Dev-only: ?demo=<state> forces the redirect page's states for design
+    // review (?demo=full is the home's own sample state).
+    const demoState = import.meta.env.DEV
+      ? new URLSearchParams(window.location.search).get('demo')
+      : null;
+    if (demoState && demoState !== 'full' && demoState !== 'empty') {
+      return (
+        <TikkieOnlyPage
+          org={tikkieOnly.org}
+          batchId=""
+          cupIds={[]}
+          settings={tikkieOnly.settings}
+        />
+      );
+    }
     if (!tikkieOnly.batchId && !(tikkieOnly.cupIds || []).length) {
       return <TikkieHomePage org={tikkieOnly.org} settings={tikkieOnly.settings} />;
     }

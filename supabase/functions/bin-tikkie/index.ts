@@ -141,6 +141,9 @@ const RL_MAX = 30;
 // their own, much roomier bucket — polling must never eat the 30/h that
 // real scans depend on.
 const RL_MAX_CHECK = 240;
+// Sending login codes emails strangers on request, so it gets the
+// TIGHTEST bucket: 10 sends per IP per hour is plenty for real logins.
+const RL_MAX_OTP = 10;
 async function rateLimited(req: Request, bucket = "bin-tikkie", max = RL_MAX): Promise<boolean> {
   try {
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
@@ -528,6 +531,131 @@ async function validateTikkieOrg(orgId: string): Promise<boolean> {
   return settings.mode === "tikkie_only";
 }
 
+/* ── One-time email codes ──────────────────────────────────────────────
+ * Two flows share these codes:
+ *   login  — "Already have an account? Log in": prove the email, get the
+ *            refund account back on this device.
+ *   attach — "save for later" hit an email that already has an account on
+ *            a DIFFERENT device: the code proves the saver owns it before
+ *            the refund is attached to that account.
+ * Codes: 6 digits, hashed at rest, 10 minutes, 5 attempts. */
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sendOtpEmail(orgId: string, email: string, purpose: string, batchId: string | null, deviceId: string): Promise<boolean> {
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  // One live code per (org,email): a new request invalidates the old one.
+  await supabase.from("email_otps").delete().eq("org_id", orgId).eq("email", email);
+  const { error } = await supabase.from("email_otps").insert({
+    org_id: orgId,
+    email,
+    code_hash: await sha256Hex(code),
+    purpose,
+    batch_id: batchId,
+    device_id: deviceId || null,
+    expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+  });
+  if (error) {
+    console.error(`[bin-tikkie] otp insert failed: ${error.message}`);
+    return false;
+  }
+  if (!BREVO_API_KEY) return false;
+  try {
+    const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": BREVO_API_KEY, "content-type": "application/json" },
+      body: JSON.stringify({
+        sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+        to: [{ email }],
+        subject: `${code} is your PackPerks code`,
+        textContent:
+          `Your one-time PackPerks code is: ${code}\n\n` +
+          `It expires in 10 minutes. If you didn't request it, you can ignore this email.`,
+        htmlContent:
+          `<div style="font:15px/1.6 -apple-system,sans-serif">` +
+          `<p>Your one-time PackPerks code is:</p>` +
+          `<p style="font-size:30px;font-weight:800;letter-spacing:0.2em">${code}</p>` +
+          `<p>It expires in 10 minutes. If you didn't request it, you can ignore this email.</p>` +
+          `</div>`,
+      }),
+    });
+    return resp.ok;
+  } catch (e) {
+    console.error(`[bin-tikkie] otp email failed: ${String(e)}`);
+    return false;
+  }
+}
+
+async function userByEmail(orgId: string, email: string): Promise<{ id: string; device_id: string | null } | null> {
+  const { data } = await supabase
+    .from("users").select("id, device_id")
+    .eq("org_id", orgId).eq("email", email)
+    .is("merged_into", null)
+    .order("created_at", { ascending: true })
+    .limit(1).maybeSingle();
+  return (data as { id: string; device_id: string | null } | null) ?? null;
+}
+
+/* login_request — {email, org_id}: send a code to an email that owns an
+ * account here. Deliberately explicit when there is no account: the link
+ * that opens this popup only exists for people trying to log in. */
+async function loginRequest(body: Record<string, unknown>): Promise<Response> {
+  const email = String(body.email || "").trim().toLowerCase();
+  const orgId = String(body.org_id || "").trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "invalid_email" }, 400);
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+  const user = await userByEmail(orgId, email);
+  if (!user) return json({ error: "no_account" }, 404);
+  const sent = await sendOtpEmail(orgId, email, "login", null, String(body.device_id || "").slice(0, 64));
+  if (!sent) return json({ error: "code_send_failed" }, 502);
+  return json({ status: "code_sent" });
+}
+
+/* login_verify — {email, org_id, code, device_id, batch_id?}: check the
+ * code; on success hand back the account id (that IS the login in this
+ * light model) and, when a receipt started the flow, attach it. */
+async function loginVerify(body: Record<string, unknown>): Promise<Response> {
+  const email = String(body.email || "").trim().toLowerCase();
+  const orgId = String(body.org_id || "").trim();
+  const code = String(body.code || "").trim();
+  if (!/^[0-9]{6}$/.test(code)) return json({ error: "invalid_code" }, 400);
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+
+  const { data: otp } = await supabase
+    .from("email_otps").select("id, code_hash, attempts, expires_at, batch_id")
+    .eq("org_id", orgId).eq("email", email)
+    .order("created_at", { ascending: false })
+    .limit(1).maybeSingle();
+  if (!otp) return json({ error: "invalid_code" }, 401);
+  if (new Date(otp.expires_at).getTime() < Date.now()) return json({ error: "code_expired" }, 401);
+  if ((otp.attempts ?? 0) >= OTP_MAX_ATTEMPTS) return json({ error: "too_many_attempts" }, 429);
+
+  if (otp.code_hash !== await sha256Hex(code)) {
+    await supabase.from("email_otps").update({ attempts: (otp.attempts ?? 0) + 1 }).eq("id", otp.id);
+    return json({ error: "invalid_code" }, 401);
+  }
+  await supabase.from("email_otps").delete().eq("id", otp.id);
+
+  const user = await userByEmail(orgId, email);
+  if (!user) return json({ error: "no_account" }, 404);
+
+  // Attach the receipt that started this flow (the save-for-later that
+  // needed verification, or a login opened from a receipt page).
+  const batchId = String(body.batch_id || otp.batch_id || "").trim().toLowerCase();
+  if (UUID_RE.test(batchId)) {
+    const claim = await claimForBatch(batchId);
+    if (claim) await supabase.from("claims").update({ user_id: user.id }).eq("id", claim.id);
+    await supabase.from("pending_batches")
+      .update({ email, user_id: user.id }).eq("batch_id", batchId);
+  }
+  return json({ status: "ok", user_id: user.id, email });
+}
+
 /* save_email — the "save for later" / "notify me" action from the
  * redirect page. Two situations:
  *   • the batch is KNOWN (claim exists): attach the account to the claim
@@ -557,7 +685,18 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
       .from("claims").select("org_id").eq("id", claim.id).maybeSingle();
     const orgId = (claimRow?.org_id as string) || null;
     if (!orgId) return json({ error: "batch_not_found" }, 404);
-    const userId = await findOrCreateUser(orgId, deviceId, email, marketing);
+    // The email may already own an account — on ANOTHER device. Attaching
+    // the refund there on someone's say-so would let anyone claim into a
+    // stranger's history, so a device mismatch demands the email code.
+    const owner = await userByEmail(orgId, email);
+    if (owner && owner.device_id && owner.device_id !== deviceId) {
+      const sent = await sendOtpEmail(orgId, email, "attach", batchId, deviceId);
+      if (!sent) return json({ error: "code_send_failed" }, 502);
+      return json({ status: "verify_required" });
+    }
+    const userId = owner
+      ? owner.id
+      : await findOrCreateUser(orgId, deviceId, email, marketing);
     if (!userId) return json({ error: "account_failed" }, 500);
     await supabase.from("claims").update({ user_id: userId }).eq("id", claim.id);
     return json({ status: "saved", user_id: userId });
@@ -573,9 +712,23 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
   if (!orgId && typeof body.org_id === "string" && await validateTikkieOrg(body.org_id)) {
     orgId = body.org_id;
   }
-  const userId = (createAccount && orgId)
-    ? await findOrCreateUser(orgId, deviceId, email, marketing)
-    : null;
+  let userId: string | null = null;
+  if (createAccount && orgId) {
+    const owner = await userByEmail(orgId, email);
+    if (owner && owner.device_id && owner.device_id !== deviceId) {
+      // Same guard as the claim path: the email belongs to an account on a
+      // different device — store the email on the row, then ask for the code.
+      await supabase.from("pending_batches").update({
+        email,
+        marketing_consent: marketing,
+        ...(orgId && !pending.org_id ? { org_id: orgId } : {}),
+      }).eq("batch_id", batchId);
+      const sent = await sendOtpEmail(orgId, email, "attach", batchId, deviceId);
+      if (!sent) return json({ error: "code_send_failed" }, 502);
+      return json({ status: "verify_required" });
+    }
+    userId = owner ? owner.id : await findOrCreateUser(orgId, deviceId, email, marketing);
+  }
   await supabase.from("pending_batches").update({
     email,
     marketing_consent: marketing,
@@ -621,7 +774,18 @@ Deno.serve(async (req) => {
     return checkBatch(body);
   }
 
+  // Login-code flows: sending emails gets the tightest bucket; verifying
+  // rides the normal one.
+  if (body.action === "login_request") {
+    if (await rateLimited(req, "bin-tikkie-otp", RL_MAX_OTP)) {
+      return json({ error: "rate_limited" }, 429);
+    }
+    return loginRequest(body);
+  }
+
   if (await rateLimited(req)) return json({ error: "rate_limited" }, 429);
+
+  if (body.action === "login_verify") return loginVerify(body);
 
   // "Save for later" / pending notification signup.
   if (body.action === "save_email") return saveEmail(body);

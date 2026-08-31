@@ -5,9 +5,16 @@
   background: #fff;
   font-family: var(--font-primary, system-ui, sans-serif);
 }
+/* Full-bleed: the receipt pages own the whole viewport. The app shell caps
+   #root at 375px for the store app; TikkieOnlyPage adds .pp-fullbleed on
+   <html> while mounted, and this lifts the cap for exactly that time. */
+.pp-fullbleed #root { max-width: none; }
+/* Padded full-width boxes must not overflow the viewport. */
+.tikkie-only, .tikkie-only *, .tikkie-only *::before, .tikkie-only *::after,
+.tikkie-login, .tikkie-login * { box-sizing: border-box; }
 .tikkie-only__inner {
-  max-width: 440px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   padding: 30px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
   text-align: center;
 }
@@ -71,7 +78,9 @@
   margin-top: 18px;
   padding: 14px 30px;
   border-radius: 999px;
-  background: #46BEAA; color: #fff;
+  border: none; cursor: pointer;
+  background: #47478A; color: #fff;
+  font-family: inherit;
   font-size: 16px; font-weight: 800; text-decoration: none;
 }
 .tikkie-only__foot {
@@ -80,75 +89,38 @@
   color: #B4AB9C;
 }
 
-/* ── The explainer: ONE block. Text on the left, a phone showing the
-   Tikkie page on the right. This block is the point of the page. ── */
+/* ── The explainer: ONE block. Bulleted text on the left, the real Tikkie
+   page (screenshot) on the right, ratio kept, equal margins around it. ── */
 .tikkie-only__explain {
-  display: flex; align-items: center; gap: 16px;
+  display: flex; align-items: stretch; gap: 14px;
   margin: 4px 0 6px;
-  padding: 18px 16px;
+  padding: 14px;
   background: #F7F4EC;
   border-radius: 16px;
   text-align: left;
 }
-.tikkie-only__explain-text { flex: 1; min-width: 0; }
-.tikkie-only__explain-text h2 {
-  margin: 0 0 8px;
-  font-size: 15px; font-weight: 800; color: #1F1B16;
+.tikkie-only__explain-text {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center;
 }
 .tikkie-only__explain-text ul {
-  margin: 0; padding: 0 0 0 16px;
-  display: flex; flex-direction: column; gap: 6px;
+  margin: 0; padding: 0 0 0 18px;
+  list-style: disc;
+  display: flex; flex-direction: column; gap: 9px;
 }
 .tikkie-only__explain-text li {
-  font-size: 13px; line-height: 1.45; color: #5F584F;
+  font-size: 13.5px; line-height: 1.45; color: #5F584F;
 }
+.tikkie-only__explain-text li::marker { color: #47478A; }
 .tikkie-only__explain-text strong { color: #1F1B16; }
 
-/* The phone: a slim CSS mockup of Tikkie's claim screen — logo, amount,
-   IBAN + last-name fields, the pay button. No bitmap needed. */
-.tikkie-only__phone {
+/* The real Tikkie claim page. Height-driven so the block's padding gives
+   it the same margin top, bottom and right; ratio preserved. */
+.tikkie-only__shot {
   flex-shrink: 0;
-  width: 118px;
-  border: 5px solid #2B2622;
-  border-radius: 20px;
-  background: #2B2622;
-  position: relative;
-}
-.tikkie-only__phone-notch {
-  position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
-  width: 34px; height: 5px; border-radius: 3px;
-  background: #2B2622; z-index: 2;
-}
-.tikkie-only__phone-screen {
-  border-radius: 13px;
-  background: #fff;
-  padding: 16px 9px 12px;
-  display: flex; flex-direction: column; align-items: stretch; gap: 7px;
-}
-.tikkie-only__phone-logo {
-  height: 18px; width: auto; align-self: center;
-}
-.tikkie-only__phone-amount {
-  text-align: center;
-  font-size: 11px; font-weight: 800; color: #1F1B16;
-}
-.tikkie-only__phone-field {
-  border: 1.2px solid #D9D2C4; border-radius: 6px;
-  padding: 5px 6px;
-  font-size: 8px; font-weight: 700; color: #8A8175;
-  white-space: nowrap; overflow: hidden;
-}
-.tikkie-only__phone-field--mono {
-  font-family: ui-monospace, monospace; font-size: 7.5px; color: #47478A;
-  border-color: #47478A;
-}
-.tikkie-only__phone-btn {
-  margin-top: 2px;
-  border-radius: 999px;
-  background: #46BEAA; color: #fff;
-  text-align: center;
-  padding: 6px 0;
-  font-size: 9px; font-weight: 800;
+  height: 236px; width: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(31, 27, 22, 0.18);
 }
 
 /* "or" divider between Open Tikkie and save-for-later */
@@ -225,3 +197,49 @@
 .tikkie-only__note strong { color: #6E2B18; }
 .tikkie-only__sub--small { font-size: 13px; margin-top: 10px; }
 .tikkie-only__btn--muted { background: #B4AB9C; }
+
+/* Under the save-for-later button: the way back into an existing account. */
+.tikkie-only__login-row {
+  margin: 18px 0 0;
+  font-size: 13px; color: #6C6259;
+}
+
+/* ── Log in — bottom sheet with a one-time email code ── */
+.tikkie-login {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: flex-end;
+}
+.tikkie-login__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(31, 27, 22, 0.45);
+}
+.tikkie-login__sheet {
+  position: relative;
+  width: 100%;
+  background: #fff;
+  border-radius: 22px 22px 0 0;
+  padding: 26px 22px calc(env(safe-area-inset-bottom, 0px) + 26px);
+  animation: tikkie-sheet-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  text-align: left;
+}
+@keyframes tikkie-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .tikkie-login__sheet { animation: none; } }
+.tikkie-login__close {
+  position: absolute; top: 14px; right: 14px;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: #F1EBDF; color: #6C6259;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.tikkie-login__title { margin: 0 0 6px; font-size: 19px; font-weight: 800; color: #1F1B16; }
+.tikkie-login__sub { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: #6C6259; }
+.tikkie-login__btn { width: 100%; margin-top: 12px; }
+.tikkie-login__code {
+  font-family: ui-monospace, monospace;
+  font-size: 22px; letter-spacing: 0.35em; text-align: center;
+}
+.tikkie-login__again {
+  display: block; width: 100%; margin-top: 12px;
+  border: none; background: none; padding: 4px;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  color: #47478A; text-decoration: underline; cursor: pointer;
+}

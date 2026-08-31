@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import packbackLogo from '../assets/images/packback-logo.svg';
 import tikkieLogo from '../assets/images/tikkie-logo.svg';
+import tikkieClaimShot from '../assets/images/tikkie-claim-screen.png';
 import './TikkieOnlyPage.css';
 
 /* Redirect Refund: the customer experience for a smart-bin receipt.
@@ -9,22 +10,23 @@ import './TikkieOnlyPage.css';
  * The bin prints its QR immediately from its own session UUID (print-first),
  * so a scan lands in one of three worlds:
  *
- *   ready    - we know the batch: show the amount, explain how Tikkie works
- *              in one block (text left, phone mockup right), and offer TWO
- *              actions: open Tikkie now, or leave an email to save it for
- *              later (which creates a PackPerks account and goes straight
- *              to the refunds home). No auto-redirect.
- *   pending  - the bin's confirmation hasn't reached us yet (it printed
- *              offline). Short wait copy, an email field, and an OPTIONAL
- *              account toggle. Email without the toggle = a "mailo": we
- *              only mail them the link when it's ready. While the customer
- *              is on this screen we poll; the moment the bin's session
- *              lands the page switches to ready by itself.
+ *   ready    - we know the batch: amount, ONE explainer block (bullets on
+ *              the left, the real Tikkie screen on the right), and two
+ *              actions: open Tikkie, or save for later (account -> home).
+ *   pending  - the bin's confirmation hasn't reached us yet. Email field +
+ *              an optional account toggle; a mailo is email-only. The page
+ *              polls and switches itself to ready when the bin confirms.
  *   reopened - the receipt was opened before; warn instead of redirect.
+ *
+ * Returning customers can also LOG IN with their email + a one-time code
+ * (the same code flow guards saving onto an email that already has an
+ * account on another device).
  *
  * The offline BACKUP-cup path (?cups=) rides the same states and never
  * announces itself; the customer can't tell a fallback from the real thing.
- */
+ *
+ * Dev-only: `?demo=<state>` renders any state with sample data (never
+ * bundled into production behaviour - gated on import.meta.env.DEV). */
 
 const FRIENDLY = {
   already_claimed: 'This receipt has already been used for a cashback.',
@@ -69,7 +71,7 @@ function storeRefundAccount(orgId, account) {
 
 /* One place for every edge-function call. Plain fetch on purpose:
  * supabase.functions.invoke serialises behind the client's auth lock, and
- * a single wedged request then hangs EVERY later call on the page — a
+ * a single wedged request then hangs EVERY later call on the page - a
  * user hit exactly that as an endless "Saving…". This endpoint only needs
  * the anon key, so we skip the shared client entirely and enforce a real
  * abort timeout. Resolves to the parsed body, or null. */
@@ -97,29 +99,11 @@ async function invokeBinTikkie(body, timeoutMs = 15000) {
   }
 }
 
-/* ── The explainer: one block, text left, phone mockup right ── */
-function TikkiePhone({ amount }) {
-  return (
-    <div className="tikkie-only__phone" aria-hidden="true">
-      <div className="tikkie-only__phone-notch" />
-      <div className="tikkie-only__phone-screen">
-        <img className="tikkie-only__phone-logo" src={tikkieLogo} alt="" />
-        <div className="tikkie-only__phone-amount">
-          €{Number(amount ?? 0).toFixed(2)} for you!
-        </div>
-        <div className="tikkie-only__phone-field tikkie-only__phone-field--mono">NL00 ABCD 1020 3040</div>
-        <div className="tikkie-only__phone-field">Last name</div>
-        <div className="tikkie-only__phone-btn">Get paid</div>
-      </div>
-    </div>
-  );
-}
-
-function TikkieExplainer({ amount }) {
+/* ── The explainer: ONE block. Bullets left, the real Tikkie page right. ── */
+function TikkieExplainer() {
   return (
     <div className="tikkie-only__explain">
       <div className="tikkie-only__explain-text">
-        <h2>How you get your money</h2>
         <ul>
           <li>Your refund is paid through <strong>Tikkie</strong>.</li>
           <li>Enter your <strong>IBAN</strong> and last name.</li>
@@ -127,7 +111,131 @@ function TikkieExplainer({ amount }) {
           <li>The money arrives within minutes.</li>
         </ul>
       </div>
-      <TikkiePhone amount={amount} />
+      <img className="tikkie-only__shot" src={tikkieClaimShot} alt="The Tikkie payout page" />
+    </div>
+  );
+}
+
+/* ── Log in with a one-time email code ──
+ * Bottom sheet, two steps: email -> code. `startAtCode` skips straight to
+ * the code step when the server already sent one (the save-for-later that
+ * hit an email owned by another device). Logging in here just means
+ * getting your refund-account id back on this device. */
+function LoginSheet({ org, batchId, initialEmail = '', startAtCode = false, onClose, onLoggedIn }) {
+  const [step, setStep] = useState(startAtCode ? 'code' : 'email');
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  async function requestCode(e) {
+    e?.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    const data = await invokeBinTikkie({
+      action: 'login_request',
+      email: email.trim(),
+      org_id: org?.id || null,
+      device_id: deviceId(),
+    });
+    setBusy(false);
+    if (data?.status === 'code_sent') { setStep('code'); setCode(''); return; }
+    setErr(data?.error === 'no_account'
+      ? 'We couldn’t find an account with this email.'
+      : data?.error === 'rate_limited'
+        ? 'Too many codes requested. Please try again in a while.'
+        : 'We couldn’t send the code just now. Please try again.');
+  }
+
+  async function verify(e) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    const data = await invokeBinTikkie({
+      action: 'login_verify',
+      email: email.trim(),
+      org_id: org?.id || null,
+      code: code.trim(),
+      device_id: deviceId(),
+      batch_id: batchId || null,
+    });
+    setBusy(false);
+    if (data?.status === 'ok' && data.user_id) {
+      if (org?.id) storeRefundAccount(org.id, { userId: data.user_id, email: data.email || email.trim() });
+      onLoggedIn?.();
+      return;
+    }
+    setErr(data?.error === 'code_expired'
+      ? 'That code has expired. Request a new one.'
+      : data?.error === 'too_many_attempts'
+        ? 'Too many tries. Request a new code.'
+        : 'That code isn’t right. Please check the email and try again.');
+  }
+
+  return (
+    <div className="tikkie-login" role="dialog" aria-modal="true" aria-label="Log in">
+      <div className="tikkie-login__backdrop" onClick={onClose} />
+      <div className="tikkie-login__sheet">
+        <button type="button" className="tikkie-login__close" onClick={onClose} aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+
+        {step === 'email' ? (
+          <form onSubmit={requestCode}>
+            <h2 className="tikkie-login__title">Log in</h2>
+            <p className="tikkie-login__sub">
+              Enter the email of your PackPerks account and we’ll send you a one-time code.
+            </p>
+            <input
+              type="email"
+              inputMode="email"
+              className="tikkie-only__input"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={busy}
+              autoFocus
+              required
+            />
+            {err && <p className="tikkie-only__form-err">{err}</p>}
+            <button type="submit" className="tikkie-only__btn tikkie-login__btn" disabled={busy || !email.trim()}>
+              {busy ? 'Sending…' : 'Send code'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={verify}>
+            <h2 className="tikkie-login__title">Enter your code</h2>
+            <p className="tikkie-login__sub">
+              We’ve emailed a 6-digit code to <strong>{email}</strong>. It expires in 10 minutes.
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              className="tikkie-only__input tikkie-login__code"
+              placeholder="000000"
+              value={code}
+              onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+              disabled={busy}
+              autoFocus
+              required
+            />
+            {err && <p className="tikkie-only__form-err">{err}</p>}
+            <button type="submit" className="tikkie-only__btn tikkie-login__btn" disabled={busy || code.length !== 6}>
+              {busy ? 'Checking…' : 'Log in'}
+            </button>
+            <button type="button" className="tikkie-login__again" onClick={requestCode} disabled={busy}>
+              Send a new code
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -137,7 +245,7 @@ function TikkieExplainer({ amount }) {
  *                   creates an account, then goes straight to the home.
  * variant "pending" (waiting screen): optional account toggle. Without it
  *                   we only store the email (a "mailo") and notify. */
-function EmailSaveForm({ batchId, org, settings, variant, onSaved, onShowPolicy }) {
+function EmailSaveForm({ batchId, org, settings, variant, onSaved, onShowPolicy, onVerifyNeeded }) {
   const [email, setEmail] = useState('');
   const [consentOk, setConsentOk] = useState(false); // privacy (later) / account toggle (pending)
   const [busy, setBusy] = useState(false);
@@ -167,6 +275,10 @@ function EmailSaveForm({ batchId, org, settings, variant, onSaved, onShowPolicy 
         storeRefundAccount(org.id, { userId: data.user_id, email: email.trim() });
       }
       onSaved?.(email.trim(), data.user_id || null);
+    } else if (data?.status === 'verify_required') {
+      // This email already owns an account on ANOTHER device - the server
+      // has mailed a code; proving it attaches the refund there.
+      onVerifyNeeded?.(email.trim());
     } else {
       setErr(data?.error === 'invalid_email'
         ? 'That doesn’t look like an email address.'
@@ -182,11 +294,12 @@ function EmailSaveForm({ batchId, org, settings, variant, onSaved, onShowPolicy 
 
   return (
     <form className="tikkie-only__form" onSubmit={submit}>
-      <p className="tikkie-only__form-copy">
-        {variant === 'pending'
-          ? 'Leave your email and we’ll send you the link when it’s ready.'
-          : 'Or save this refund for later. We’ll create a PackPerks account where you can collect it any time and see all your refunds.'}
-      </p>
+      {variant !== 'pending' && (
+        <p className="tikkie-only__form-copy">
+          Or save this refund for later. We’ll create a PackPerks account where you can
+          collect it any time and see all your refunds.
+        </p>
+      )}
       <input
         type="email"
         inputMode="email"
@@ -224,6 +337,29 @@ function EmailSaveForm({ batchId, org, settings, variant, onSaved, onShowPolicy 
   );
 }
 
+/* Dev-only state override: /t3/?demo=ready renders sample data with no
+ * network. Stripped from production behaviour by the DEV gate. */
+function demoSetup(demo) {
+  const payout = {
+    cups: 3, amount: 0.30, batchId: null,
+    url: 'https://tikkie.me/pay/demo', tikkieStatus: 'created',
+  };
+  switch (demo) {
+    case 'working':   return { phase: 'working' };
+    case 'ready':     return { phase: 'ready', payout };
+    case 'pending':   return { phase: 'pending' };
+    case 'saved':     return { phase: 'saved', savedEmail: 'anna@example.com' };
+    case 'reopened':  return { phase: 'reopened', payout };
+    case 'collected': return { phase: 'reopened', payout: { ...payout, tikkieStatus: 'redeemed' } };
+    case 'expired':   return { phase: 'reopened', payout: { ...payout, tikkieStatus: 'expired' } };
+    case 'error':     return { phase: 'error', error: FRIENDLY.batch_not_found };
+    case 'login':     return { phase: 'ready', payout, login: { email: '', startAtCode: false } };
+    case 'code':      return { phase: 'ready', payout, login: { email: 'anna@example.com', startAtCode: true } };
+    case 'privacy':   return { phase: 'ready', payout, policy: true };
+    default:          return null;
+  }
+}
+
 export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {} }) {
   // working | ready | pending | reopened | saved | error
   const [phase, setPhase] = useState('working');
@@ -231,8 +367,10 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
   const [payout, setPayout] = useState(null);   // { cups, amount, url, tikkieStatus, batchId }
   const [savedEmail, setSavedEmail] = useState(null);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [login, setLogin] = useState(null);     // { email, startAtCode } | null
   const pollsRef = useRef(0);
   const startedRef = useRef(false);
+  const demoRef = useRef(false);
 
   const applyPayout = (data) => {
     setPayout({
@@ -244,6 +382,13 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
     });
   };
 
+  /* Full-bleed: these pages own the whole viewport - lift the app shell's
+   * 375px cap while mounted (the class is scoped in CSS). */
+  useEffect(() => {
+    document.documentElement.classList.add('pp-fullbleed');
+    return () => document.documentElement.classList.remove('pp-fullbleed');
+  }, []);
+
   useEffect(() => {
     // StrictMode double-mount guard. NOTE: no companion "cancelled" cleanup -
     // the ref survives StrictMode's unmount/remount cycle, so a cleanup flag
@@ -251,6 +396,20 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
     // result. Post-unmount setState is a no-op in React 18.
     if (startedRef.current) return;
     startedRef.current = true;
+
+    if (import.meta.env.DEV) {
+      const demo = demoSetup(new URLSearchParams(window.location.search).get('demo'));
+      if (demo) {
+        demoRef.current = true;
+        if (demo.payout) setPayout(demo.payout);
+        if (demo.savedEmail) setSavedEmail(demo.savedEmail);
+        if (demo.error) setError(demo.error);
+        if (demo.login) setLogin(demo.login);
+        if (demo.policy) setShowPolicy(true);
+        setPhase(demo.phase);
+        return;
+      }
+    }
 
     const hasBackup = cupIds.length > 0;
     if (!batchId && !hasBackup) {
@@ -299,7 +458,7 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
    * the ONE real scan call happens only when check says it's time. The
    * page then switches to ready on its own. */
   useEffect(() => {
-    if ((phase !== 'pending' && phase !== 'saved') || !batchId) return undefined;
+    if ((phase !== 'pending' && phase !== 'saved') || !batchId || demoRef.current) return undefined;
     let stop = false;
     let timer = null;
     const startedAt = Date.now();
@@ -374,7 +533,7 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
               )}
             </div>
 
-            <TikkieExplainer amount={payout?.amount} />
+            <TikkieExplainer />
 
             {payout?.url && (
               <a className="tikkie-only__btn" href={payout.url}>Open Tikkie</a>
@@ -389,7 +548,15 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
               variant="later"
               onSaved={handleSaved}
               onShowPolicy={() => setShowPolicy(true)}
+              onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
             />
+
+            <p className="tikkie-only__login-row">
+              Already have an account?{' '}
+              <button type="button" className="tikkie-only__policy-link" onClick={() => setLogin({ email: '', startAtCode: false })}>
+                Log in
+              </button>
+            </p>
           </>
         )}
 
@@ -403,7 +570,8 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
             </div>
             <h1 className="tikkie-only__title">We’re checking your receipt</h1>
             <p className="tikkie-only__sub">
-              This can take up to <strong>30 minutes</strong>. You don’t have to wait here.
+              This can take up to <strong>30 minutes</strong>. You don’t have to wait here:
+              leave your email and we’ll send you the link when it’s ready.
             </p>
             <EmailSaveForm
               batchId={saveBatchId}
@@ -412,6 +580,7 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
               variant="pending"
               onSaved={handleSaved}
               onShowPolicy={() => setShowPolicy(true)}
+              onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
             />
           </>
         )}
@@ -492,6 +661,17 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
         <PrivacyPolicyView
           text={settings?.privacyPolicyText}
           onClose={() => setShowPolicy(false)}
+        />
+      )}
+
+      {login && (
+        <LoginSheet
+          org={org}
+          batchId={saveBatchId}
+          initialEmail={login.email}
+          startAtCode={login.startAtCode}
+          onClose={() => setLogin(null)}
+          onLoggedIn={goHome}
         />
       )}
     </div>

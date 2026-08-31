@@ -52,6 +52,7 @@ export const TIKKIE_ONLY_PAGES = new Set([
   'cupqr',        // Receipt Generator — mints the same batches the bin does
   'tikkielog',    // the payout log
   'backupcups',   // the bin's offline fallback codes + outage alarm
+  'smartbins',    // the bin locations behind the customer map
   // Redirect Refund grew a user base (refund accounts + mailos), so the
   // audience pages are back — each one adapts itself to this mode.
   'users',        // refund accounts + mailos (AdminTikkieUsers)

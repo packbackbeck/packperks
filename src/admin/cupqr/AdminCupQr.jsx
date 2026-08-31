@@ -92,6 +92,10 @@ export default function AdminCupQr({ onNavigate }) {
   const [revokingId, setRevokingId] = useState(null); // batch_id being acted on
   const [revokeModal, setRevokeModal] = useState(null); // { batch_id } | null
   const [batchPage, setBatchPage] = useState(0); // Recent-batches pagination
+  // Re-open the QR for any past batch: the receipt can be reprinted, and a
+  // bin-requested session can be checked without hunting through the bin.
+  const [qrModal, setQrModal] = useState(null); // { batch_id, url, source }
+  const modalQrRef = useRef(null);
 
   /* Pull recent batches on mount and whenever a new one is generated /
    * revoked / unrevoked, so the recent list stays in sync without a
@@ -116,6 +120,24 @@ export default function AdminCupQr({ onNavigate }) {
       color: { dark: '#0F0F0F', light: '#FFFFFF' },
     }).catch(err => console.error('QR draw failed:', err));
   }, [batch]);
+
+  // Draw the re-opened batch's QR whenever the modal opens.
+  useEffect(() => {
+    if (!qrModal?.url || !modalQrRef.current) return;
+    QRCode.toCanvas(modalQrRef.current, qrModal.url, {
+      width: 220,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0F0F0F', light: '#FFFFFF' },
+    }).catch(err => console.error('QR draw failed:', err));
+  }, [qrModal]);
+
+  // The customer URL for any batch, past or present — the same shape the
+  // generator prints and the bin encodes (print-first: batch id = session id).
+  const urlForBatch = (batchId) => {
+    const slugPath = activeOrg?.slug ? `${activeOrg.slug}/` : '';
+    return `${PROD_URL}${slugPath}?batch=${batchId}`;
+  };
 
   async function handleGenerate() {
     if (count < 1 || count > 50) {
@@ -763,6 +785,7 @@ export default function AdminCupQr({ onNavigate }) {
                   />
                 </th>
                 <th>Batch</th>
+                <th>Source</th>
                 <th>Generated</th>
                 <th>Used</th>
                 <th>Expiry</th>
@@ -795,6 +818,19 @@ export default function AdminCupQr({ onNavigate }) {
                     <td>
                       <span className="acq-mono">{b.batch_id.slice(0, 8)}…</span>
                     </td>
+                    <td>
+                      {/* Where the batch came from: the smart bin asked for
+                          it (print-first — its session id IS this batch id),
+                          or an admin generated it here. */}
+                      <span
+                        className={`acq-src acq-src--${b.source === 'requested' ? 'bin' : 'admin'}`}
+                        title={b.source === 'requested'
+                          ? `Requested by the smart bin${b.machine_id ? ` · machine ${b.machine_id.slice(0, 10)}…` : ''}${b.session_id ? ` · session ${b.session_id}` : ''}`
+                          : 'Generated in the dashboard'}
+                      >
+                        {b.source === 'requested' ? 'Requested' : 'Generated'}
+                      </span>
+                    </td>
                     <td className="acq-batches__muted">
                       {new Date(b.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </td>
@@ -811,6 +847,13 @@ export default function AdminCupQr({ onNavigate }) {
                       </span>
                     </td>
                     <td className="acq-batches__actions">
+                      <button
+                        className="acq-batches__btn acq-batches__btn--ghost"
+                        onClick={() => setQrModal({ batch_id: b.batch_id, url: urlForBatch(b.batch_id), source: b.source })}
+                        title="Show this batch's QR code again"
+                      >
+                        QR
+                      </button>
                       {isRevoked ? (
                         <button
                           className="acq-batches__btn acq-batches__btn--ghost"
@@ -867,6 +910,34 @@ export default function AdminCupQr({ onNavigate }) {
         onClear={batchSel.clear}
         onDelete={handleDeleteBatches}
       />
+
+      {/* Re-opened QR for a past batch — reprint a receipt, or check the
+          exact link a bin-requested session points at. */}
+      {qrModal && (
+        <div className="acq-qrmodal" role="dialog" aria-modal="true" aria-label="Batch QR code">
+          <div className="acq-qrmodal__back" onClick={() => setQrModal(null)} />
+          <div className="acq-qrmodal__card">
+            <h2 className="acq-qrmodal__title">Batch QR</h2>
+            <p className="acq-qrmodal__meta">
+              <span className={`acq-src acq-src--${qrModal.source === 'requested' ? 'bin' : 'admin'}`}>
+                {qrModal.source === 'requested' ? 'Requested' : 'Generated'}
+              </span>
+              <span className="acq-mono">{qrModal.batch_id}</span>
+            </p>
+            <div className="acq-qrmodal__qr"><canvas ref={modalQrRef} /></div>
+            <code className="acq-url acq-qrmodal__url">{qrModal.url}</code>
+            <div className="acq-qrmodal__actions">
+              <button
+                className="acq-batches__btn acq-batches__btn--ghost"
+                onClick={() => navigator.clipboard?.writeText(qrModal.url).catch(() => {})}
+              >
+                Copy link
+              </button>
+              <button className="acq-btn acq-btn--primary" onClick={() => setQrModal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {revokeModal && (
         <RevokeBatchModal

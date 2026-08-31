@@ -1144,6 +1144,21 @@ export async function getMyClaims(userIds) {
   return data || []
 }
 
+// Redirect Refund home: the smart-bin pins for the map. Managed in the
+// dashboard (Smart Bins page); public-readable because a bin's location is
+// a shop-window fact, not customer data.
+export async function getSmartbinLocations(orgId) {
+  if (!orgId) return []
+  const { data, error } = await supabase
+    .from('smartbin_locations')
+    .select('id, name, address, lat, lng, status')
+    .eq('org_id', orgId)
+    .eq('active', true)
+    .order('name')
+  if (error) throw error
+  return (data || []).filter(b => b.lat != null && b.lng != null)
+}
+
 // Redirect Refund home: the customer's own "in process" receipts — batches
 // scanned before the smart bin's confirmation reached PackPerks. Same RPC
 // trust model as get_customer_claims (keyed by the device's account ids).

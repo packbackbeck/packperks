@@ -9,7 +9,7 @@ import AdminSidebar from './AdminSidebar';
 import AdminOverview from './overview/AdminOverview';
 import AdminRewards from './rewards/AdminRewards';
 import AdminUsers from './users/AdminUsers';
-import AdminTikkieUsers from './users/AdminTikkieUsers';
+import AdminSmartBins from './smartbins/AdminSmartBins';
 import AdminClaims from './claims/AdminClaims';
 import AdminCupScans from './cupscans/AdminCupScans';
 import AdminWorkspace from './settings/AdminWorkspace';
@@ -218,11 +218,9 @@ function AdminShell() {
             <AdminAppDesign draftState={draftState} />
           </KeepAlive>
           <KeepAlive id="users" activeId={page} visited={visited}>
-            {/* Redirect Refund orgs get their own Users page: refund
-                accounts + mailos, no cup balances or merges. */}
-            {activeOrgMode === 'tikkie_only'
-              ? <AdminTikkieUsers />
-              : <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} focusSection={page === 'users' ? deepSection : null} onSectionConsumed={() => setDeepSection(null)} />}
+            {/* One Users page for every mode — it hides the cup/reward
+                columns and adds the mailos section for Redirect Refund. */}
+            <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} focusSection={page === 'users' ? deepSection : null} onSectionConsumed={() => setDeepSection(null)} />
           </KeepAlive>
           <KeepAlive id="claims" activeId={page} visited={visited}>
             <AdminClaims onNavigate={setPage} draftState={draftState} />
@@ -265,6 +263,9 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="tikkielog" activeId={page} visited={visited}>
             <AdminTikkieLog onNavigate={setPage} />
+          </KeepAlive>
+          <KeepAlive id="smartbins" activeId={page} visited={visited}>
+            <AdminSmartBins />
           </KeepAlive>
           <KeepAlive id="backupcups" activeId={page} visited={visited}>
             <AdminBackupCups onNavigate={setPage} />

@@ -320,12 +320,14 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     if (!containerRef.current || mapRef.current) return undefined;
     const map = L.map(containerRef.current, { zoomControl: true, scrollWheelZoom: false });
     // CARTO "Voyager" — a soft, friendly, simplified basemap (free, no key).
-    // Carto's keyless CDN now stamps "API KEY REQUIRED" over the tiles —
-    // plain OSM tiles need no key and carry no watermark.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      subdomains: 'abcd',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      maxZoom: 20,
+    /* Basemap: OSM "Humanitarian" — soft pastel palette, calm labels, and
+       (unlike Carto's keyless CDN, which now stamps "API KEY REQUIRED"
+       across every tile) free with no key. The Redirect Refund bin map
+       uses the same layer so both maps read as one product. */
+    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+      subdomains: 'ab',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · HOT',
+      maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, deleteGroupAccounts, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
+import TikkieMailosSection from './TikkieMailosSection';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import PiiMask from '../shared/PiiMask';
@@ -99,7 +100,7 @@ const ACT_META = {
   cups_donated:   { color: '#4ADE80', symbol: '♥' },
 };
 
-function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
+function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCups = false }) {
   const [activity, setActivity] = useState([]);
   const [claims, setClaims] = useState([]);
   const [adjustVal, setAdjustVal] = useState(user.cupBalance);
@@ -207,14 +208,20 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
 
       <div className="udp__body">
         <div className="udp__meta-grid">
-          <div className="udp__meta-item">
-            <span className="udp__meta-label">Cup Balance</span>
-            <span className="udp__meta-val udp__meta-val--big">{user.cupBalance}</span>
-          </div>
-          <div className="udp__meta-item">
-            <span className="udp__meta-label">Lifetime Cups</span>
-            <span className="udp__meta-val">{user.lifetimeCups || 0}</span>
-          </div>
+          {/* Redirect Refund has no cup balance to show or adjust — the
+              money goes straight out through Tikkie. */}
+          {!hideCups && (
+            <>
+              <div className="udp__meta-item">
+                <span className="udp__meta-label">Cup Balance</span>
+                <span className="udp__meta-val udp__meta-val--big">{user.cupBalance}</span>
+              </div>
+              <div className="udp__meta-item">
+                <span className="udp__meta-label">Lifetime Cups</span>
+                <span className="udp__meta-val">{user.lifetimeCups || 0}</span>
+              </div>
+            </>
+          )}
           <div className="udp__meta-item">
             <span className="udp__meta-label">Joined</span>
             <span className="udp__meta-val">{formatDate(user.created_at)}</span>
@@ -267,7 +274,7 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
         </div>
 
         {/* Balance adjust */}
-        <div className="udp__section">
+        {!hideCups && <div className="udp__section">
           <div className="udp__section-header">
             <span className="udp__section-title">Balance</span>
             <button className="udp__section-btn" onClick={() => setAdjustOpen(v => !v)}>
@@ -300,7 +307,7 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser }) {
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Claims */}
         <div className="udp__section">
@@ -357,7 +364,10 @@ const SORT_KEYS = {
 export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, focusSection, onSectionConsumed }) {
   // Group awareness: within a BYO group, users are one shared account across
   // every store, so we load the whole group's deduped customer base.
-  const { activeOrgId, activeGroupId, groupMemberIds, groupMembers } = useOrg();
+  const { activeOrgId, activeGroupId, groupMemberIds, groupMembers, activeOrgMode } = useOrg();
+  // Redirect Refund customers have no cup balance and no rewards: the same
+  // page, minus the columns and controls that would always read zero.
+  const isTikkie = activeOrgMode === 'tikkie_only';
   const grouped = !!activeGroupId && groupMembers.length > 1;
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -380,15 +390,20 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
     { id: 'email', label: 'Email', defaultOn: true },
     { id: 'marketing', label: 'Marketing', defaultOn: true },
     { id: 'device', label: 'Device', defaultOn: true },
-    ...orgCols.map(c => ({ id: c.id, label: `${c.label} cups`, defaultOn: c.orgId === activeOrgId })),
-    ...(grouped ? [{ id: 'total', label: 'Total cups', desc: 'Combined across every store', defaultOn: true }] : []),
-    { id: 'lifetime', label: 'Lifetime', defaultOn: true },
+    ...(isTikkie ? [] : [
+      ...orgCols.map(c => ({ id: c.id, label: `${c.label} cups`, defaultOn: c.orgId === activeOrgId })),
+      ...(grouped ? [{ id: 'total', label: 'Total cups', desc: 'Combined across every store', defaultOn: true }] : []),
+      { id: 'lifetime', label: 'Lifetime', defaultOn: true },
+    ]),
     { id: 'joined', label: 'Joined', defaultOn: true },
     { id: 'active', label: 'Last active', defaultOn: true },
   ];
   const defaultVisibleCols = () => {
-    const s = new Set(['type', 'email', 'marketing', 'device', 'lifetime', 'joined', 'active']);
-    if (grouped) { s.add('total'); s.add(`org:${activeOrgId}`); }
+    const s = new Set(['type', 'email', 'marketing', 'device', 'joined', 'active']);
+    if (!isTikkie) {
+      s.add('lifetime');
+      if (grouped) { s.add('total'); s.add(`org:${activeOrgId}`); }
+    }
     return s;
   };
   const [visibleCols, setVisibleCols] = useState(defaultVisibleCols);
@@ -504,7 +519,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
   // for the empty-state colSpan.
   const valueColCount =
     (isCol('type') ? 1 : 0) + (isCol('email') ? 1 : 0) + (isCol('marketing') ? 1 : 0) + (isCol('device') ? 1 : 0) +
-    (grouped ? orgCols.filter(c => isCol(c.id)).length + (isCol('total') ? 1 : 0) : 1) +
+    (grouped ? orgCols.filter(c => isCol(c.id)).length + (isCol('total') ? 1 : 0) : (isTikkie ? 0 : 1)) +
     (isCol('lifetime') ? 1 : 0) + (isCol('joined') ? 1 : 0) + (isCol('active') ? 1 : 0);
   const tableColSpan = 2 + valueColCount;
 
@@ -595,7 +610,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                           {isCol('total') && <ThCol label="Total" sortKey="total" style={{ width: 80 }} />}
                         </>
                       )
-                      : <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />}
+                      : (!isTikkie && <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />)}
                     {isCol('lifetime') && <ThCol label="Lifetime" sortKey="lifetime" style={{ width: 90 }} />}
                     {isCol('joined') && <ThCol label="Joined" sortKey="joined" style={{ width: 120 }} />}
                     {isCol('active') && <ThCol label="Last active" sortKey="active" style={{ width: 120 }} />}
@@ -688,7 +703,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                           {isCol('total') && <td><span className="au-cup-badge">{user.cupBalance}</span></td>}
                         </>
                       ) : (
-                        <td><span className="au-cup-badge">{user.cupBalance}</span></td>
+                        (!isTikkie && <td><span className="au-cup-badge">{user.cupBalance}</span></td>)
                       )}
                       {isCol('lifetime') && <td className="au-muted">{user.lifetimeCups || 0}</td>}
                       {isCol('joined') && <td className="au-muted">{formatDate(user.created_at)}</td>}
@@ -721,6 +736,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
             onClose={() => setSelectedUser(null)}
             onAdjustBalance={handleAdjustBalance}
             onUpdateUser={handleUpdateUser}
+            hideCups={isTikkie}
           />
         )}
       </div>
@@ -766,6 +782,11 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
           reload();
         }}
       />
+
+      {/* Redirect Refund also has "mailos": people who left an email on the
+          waiting screen without opening an account. They are not users, so
+          they get their own section rather than fake rows in the table. */}
+      {isTikkie && <TikkieMailosSection accounts={users.length} />}
 
       <MergeRequestsSection focusSection={focusSection} onSectionConsumed={onSectionConsumed} />
     </div>

@@ -716,7 +716,9 @@ export default function App({ consentReady = true } = {}) {
             window.dispatchEvent(new Event('packperks:suppress-consent'));
           } catch { /* noop */ }
           setTikkieOnly({
-            org: { id: null, slug: seg0 || 't3', name: 'Demo venue', logo_url: null, brand_color: null },
+            // Real org id so public reads (bin locations) resolve; all
+            // customer data still comes from the demo fixtures.
+            org: { id: 'da6f18cc-7493-4547-b54e-4987de2606b4', slug: seg0 || 't3', name: 'Demo venue', logo_url: null, brand_color: null },
             batchId: '',
             cupIds: [],
             settings: {},

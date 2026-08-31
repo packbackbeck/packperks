@@ -127,6 +127,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    // Redirect Refund only: the bin locations behind the customer map.
+    id: 'smartbins',
+    label: 'Smart Bins',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z" />
+        <circle cx="12" cy="10" r="2.6" />
+      </svg>
+    ),
+  },
+  {
     id: 'cupqr',
     // "Receipt Generator" hosts two tabs: the QR cup-receipt batch
     // generator and the rewards test-receipt image generator.
@@ -297,8 +308,9 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
             // reports), each adapted to this mode. (Settings/history/support
             // stay reachable via the top-bar dock; see TIKKIE_ONLY_PAGES.)
             if (isTikkieOnly) {
-              return ['tikkielog', 'cupqr', 'backupcups', 'users', 'behaviour', 'stats', 'reports'].includes(item.id);
+              return ['tikkielog', 'cupqr', 'smartbins', 'backupcups', 'users', 'behaviour', 'stats', 'reports'].includes(item.id);
             }
+            if (item.id === 'smartbins') return false;
             if (item.id === 'tikkielog' || item.id === 'backupcups') return false;
             // Phase 3 gating:
             //  • Cup Transfers only when cup sharing is on for this org.

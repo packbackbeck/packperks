@@ -127,13 +127,13 @@
 .tikkie-only__explain-text li::marker { color: #47478A; }
 .tikkie-only__explain-text strong { color: #1F1B16; }
 
-/* The real Tikkie claim page. Height-driven so the block's padding gives
-   it the same margin top, bottom and right; ratio preserved. */
+/* The real Tikkie page, shot inside its own phone frame. Height-driven so
+   the block's padding gives it equal margin top, bottom and right; the
+   artwork brings its own bezel, so no border-radius or shadow here. */
 .tikkie-only__shot {
   flex-shrink: 0;
-  height: 236px; width: auto;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(31, 27, 22, 0.18);
+  height: 250px; width: auto;
+  display: block;
 }
 
 /* "or" divider between Open Tikkie and save-for-later */

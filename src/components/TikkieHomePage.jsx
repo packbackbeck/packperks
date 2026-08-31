@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { getMyClaims, getMyPending } from '../lib/api';
+import { getMyClaims, getMyPending, getSmartbinLocations } from '../lib/api';
 import { readRefundAccount } from './TikkieOnlyPage';
 import UserPage from './UserPage';
 import Header from './Header';
@@ -26,11 +26,11 @@ import './TikkieHomePage.css';
  * saved a refund for later (account in localStorage) or they typed the
  * URL — the empty state explains what to do. */
 
-/* The live bin(s). Hardcoded on purpose: bins are provisioned by hand in
- * smartbin_keys and there is no admin UI for coordinates yet. */
-const BIN_LOCATIONS = [
-  { name: 'Titaan Smart Bin', area: 'RAI Amsterdam', lat: 52.3411, lng: 4.8887 },
-];
+/* Where the map opens when there are no pins yet: the Netherlands. Real
+ * pins come from smartbin_locations, managed on the dashboard's Smart
+ * Bins page — the map fits itself around whatever is live. */
+const NL_CENTER = [52.15, 5.3];
+const NL_ZOOM = 7;
 
 /* "Ready to collect" hygiene: once the customer has OPENED a link and 24
  * hours have passed, it leaves the list (they almost certainly claimed it;
@@ -65,9 +65,16 @@ const userDotIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
-function BinMap() {
+/* Popup text is venue data from our own dashboard, but it still goes
+ * through innerHTML — escape it rather than trust it. */
+function esc(v) {
+  return String(v ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+}
+
+function BinMap({ bins }) {
   const mapRef = useRef(null);
   const elRef = useRef(null);
+  const layerRef = useRef(null);
   const userMarkerRef = useRef(null);
   const [locating, setLocating] = useState(false);
 
@@ -77,33 +84,46 @@ function BinMap() {
     // draggable, pinch-zoom on touch (scroll-wheel zoom stays off so the
     // page can still be scrolled past the map).
     const map = L.map(elRef.current, {
-      center: [BIN_LOCATIONS[0].lat, BIN_LOCATIONS[0].lng],
-      zoom: 13,
+      center: NL_CENTER,
+      zoom: NL_ZOOM,
       zoomControl: true,
       attributionControl: false,
       scrollWheelZoom: false,
       dragging: true,
     });
-    // Same tile set as the BYO market map (StoresPage). OSM directly:
-    // Carto's keyless CDN now stamps "API KEY REQUIRED" over the tiles.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    /* Exactly the layer the BYO market map uses: OSM "Humanitarian" — soft
+       pastel, calm labels, free and keyless. */
+    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+      subdomains: 'ab',
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
+      attribution: '&copy; OpenStreetMap · HOT',
     }).addTo(map);
-    BIN_LOCATIONS.forEach(b => {
-      const icon = L.divIcon({
-        className: 'tikkie-home__pin',
-        html: `<div class="tikkie-home__pin-dot">♻︎</div>`,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-      });
-      L.marker([b.lat, b.lng], { icon })
-        .addTo(map)
-        .bindPopup(`<strong>${b.name}</strong><br>${b.area}`);
-    });
+    layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
+    return () => { map.remove(); mapRef.current = null; layerRef.current = null; };
   }, []);
+
+  /* Re-pin whenever the location list changes, and frame the map around
+   * every bin (one bin → a close view; a national network → the country). */
+  useEffect(() => {
+    const map = mapRef.current, layer = layerRef.current;
+    if (!map || !layer) return;
+    layer.clearLayers();
+    if (!bins.length) { map.setView(NL_CENTER, NL_ZOOM); return; }
+    const icon = L.divIcon({
+      className: 'tikkie-home__pin',
+      html: '<div class="tikkie-home__pin-dot">♻︎</div>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+    bins.forEach(b => {
+      L.marker([b.lat, b.lng], { icon })
+        .addTo(layer)
+        .bindPopup(`<strong>${esc(b.name)}</strong>${b.address ? `<br>${esc(b.address)}` : ''}`);
+    });
+    if (bins.length === 1) map.setView([bins[0].lat, bins[0].lng], 14);
+    else map.fitBounds(bins.map(b => [b.lat, b.lng]), { padding: [18, 18], maxZoom: 13 });
+  }, [bins]);
 
   /* Locate: drop the pulsing you-are-here dot and frame the map on the
    * customer plus the nearest bin, like the market map does. */
@@ -118,10 +138,17 @@ function BinMap() {
         const loc = [pos.coords.latitude, pos.coords.longitude];
         if (userMarkerRef.current) userMarkerRef.current.setLatLng(loc);
         else userMarkerRef.current = L.marker(loc, { icon: userDotIcon, interactive: false }).addTo(map);
-        map.fitBounds(
-          [loc, [BIN_LOCATIONS[0].lat, BIN_LOCATIONS[0].lng]],
-          { padding: [50, 50], maxZoom: 16, animate: true },
-        );
+        // Frame the customer together with their nearest bin.
+        let nearest = null, best = Infinity;
+        for (const b of bins) {
+          const d = (b.lat - loc[0]) ** 2 + (b.lng - loc[1]) ** 2;
+          if (d < best) { best = d; nearest = b; }
+        }
+        if (nearest) {
+          map.fitBounds([loc, [nearest.lat, nearest.lng]], { padding: [50, 50], maxZoom: 16, animate: true });
+        } else {
+          map.setView(loc, 14, { animate: true });
+        }
       },
       () => setLocating(false),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
@@ -173,9 +200,19 @@ const HOME_DEMO = HOME_DEMO_PARAM === 'empty'
 export default function TikkieHomePage({ org, settings = {} }) {
   const account = useMemo(() => HOME_DEMO ? HOME_DEMO.account : readRefundAccount(org?.id), [org?.id]);
   const [claims, setClaims] = useState(HOME_DEMO ? HOME_DEMO.claims : []);
+  const [bins, setBins] = useState([]);
   const [pending, setPending] = useState(HOME_DEMO ? HOME_DEMO.pending : []);
   const [loading, setLoading] = useState(HOME_DEMO ? false : !!account);
   const [showAccount, setShowAccount] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (!org?.id) return undefined;
+    getSmartbinLocations(org.id)
+      .then(rows => { if (alive) setBins(rows || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [org?.id]);
 
   useEffect(() => {
     let alive = true;
@@ -358,9 +395,11 @@ export default function TikkieHomePage({ org, settings = {} }) {
       {/* ── Where the bins are ── */}
       <section className="tikkie-home__section">
         <h2 className="tikkie-home__section-title">Smart bins near you</h2>
-        <BinMap />
+        <BinMap bins={bins} />
         <p className="tikkie-home__map-note">
-          {BIN_LOCATIONS[0].name} · {BIN_LOCATIONS[0].area}
+          {bins.length
+            ? `${bins.length} smart bin${bins.length === 1 ? '' : 's'} · tap a pin for the address`
+            : 'Bin locations are on their way.'}
         </p>
       </section>
 

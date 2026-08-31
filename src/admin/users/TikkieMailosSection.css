@@ -1,0 +1,68 @@
+/* Mailos section — sits under the Users table, same card language as the
+   account-merge queue that follows it. */
+.tms {
+  margin: 22px 26px 0;
+  background: #fff; border: 1px solid #EDE6D8; border-radius: 14px;
+  padding: 20px 22px;
+}
+.tms__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  margin-bottom: 14px;
+}
+.tms__title { margin: 0 0 4px; font-size: 15.5px; font-weight: 800; color: #1F1B16; }
+.tms__count {
+  margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  background: #F3EEE4; color: #7A7166; font-size: 12px; font-weight: 700;
+}
+.tms__sub { margin: 0; font-size: 12.5px; line-height: 1.5; color: #8A8175; max-width: 560px; }
+.tms__refresh {
+  flex-shrink: 0; padding: 8px 16px; border-radius: 999px; border: 1.5px solid #E2DACA;
+  background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700;
+  color: #4A443C; cursor: pointer;
+}
+.tms__refresh:hover { background: #F7F3E9; }
+.tms__refresh:disabled { opacity: 0.6; cursor: default; }
+
+.tms__error {
+  margin-bottom: 12px; padding: 10px 14px; border-radius: 10px;
+  background: #FBEAE5; color: #A03A22; font-size: 13px;
+}
+
+.tms__split-wrap { margin-bottom: 16px; }
+.tms__split-head {
+  display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px;
+}
+.tms__split-label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #9A9186;
+}
+.tms__split-pct { font-size: 13px; font-weight: 800; color: #1F1B16; }
+.tms__split { height: 12px; border-radius: 999px; overflow: hidden; background: #EEDFA8; }
+.tms__split-acc { height: 100%; background: #1A8737; border-radius: 999px 0 0 999px; }
+.tms__legend {
+  display: flex; gap: 18px; margin-top: 8px;
+  font-size: 12.5px; font-weight: 700; color: #6C6259;
+}
+.tms__dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.tms__dot--acc { background: #1A8737; }
+.tms__dot--mailo { background: #C98A12; }
+
+.tms__empty { padding: 18px 2px; font-size: 13px; color: #8A8175; }
+
+.tms__table-wrap { overflow-x: auto; }
+.tms__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tms__table th {
+  text-align: left; padding: 8px 10px; border-bottom: 1.5px solid #EDE6D8;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #9A9186; white-space: nowrap;
+}
+.tms__table td {
+  padding: 9px 10px; border-bottom: 1px solid #F5F0E6; color: #4A443C; white-space: nowrap;
+}
+.tms__table tr:last-child td { border-bottom: none; }
+.tms__email { font-weight: 700; color: #1F1B16; }
+.tms__muted { color: #9A9186; }
+.tms__mono { font-family: ui-monospace, monospace; font-size: 12px; color: #6C6259; }
+.tms__badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.tms__badge--ok { background: #E4F5E9; color: #1A8737; }
+.tms__badge--wait { background: #FCF2D6; color: #9A6E12; }

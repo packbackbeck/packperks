@@ -655,3 +655,42 @@
   animation: acq-quick-spin 0.7s linear infinite;
 }
 @keyframes acq-quick-spin { to { transform: rotate(360deg); } }
+
+/* ── Batch source tag (Recent batches) ──
+   "Requested" = the smart bin asked for this batch (print-first: the bin's
+   session id is the batch id). "Generated" = minted here at a desk. */
+.acq-src {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; white-space: nowrap;
+}
+.acq-src--bin   { background: #E7EEFB; color: #2A5DAF; }
+.acq-src--admin { background: #F1EBDF; color: #7A7166; }
+
+/* ── Re-opened QR for a past batch ── */
+.acq-qrmodal {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.acq-qrmodal__back { position: absolute; inset: 0; background: rgba(31, 27, 22, 0.45); }
+.acq-qrmodal__card {
+  position: relative; width: 100%; max-width: 380px;
+  background: #fff; border-radius: 16px; padding: 22px 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+.acq-qrmodal__title { margin: 0 0 10px; font-size: 17px; font-weight: 800; color: #1F1B16; }
+.acq-qrmodal__meta {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 0 0 14px; font-size: 12px; color: #7A7166; flex-wrap: wrap;
+}
+.acq-qrmodal__qr {
+  display: flex; justify-content: center;
+  padding: 12px; background: #fff; border: 1px solid #EDE6D8; border-radius: 12px;
+}
+.acq-qrmodal__url {
+  display: block; margin: 12px 0 0; word-break: break-all;
+  font-size: 11.5px; text-align: left;
+}
+.acq-qrmodal__actions {
+  display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;
+}

@@ -613,9 +613,9 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
               </svg>
             </div>
             <h1 className="tikkie-only__title">
-              {payout?.tikkieStatus === 'redeemed'
-                ? 'Already collected'
-                : 'You’ve opened this receipt before'}
+              {payout?.tikkieStatus === 'redeemed' ? 'Already collected' : (
+                <>You’ve opened<br />this receipt before</>
+              )}
             </h1>
             <p className="tikkie-only__sub">
               {payout?.tikkieStatus === 'redeemed' ? (

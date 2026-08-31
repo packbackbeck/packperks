@@ -1524,6 +1524,72 @@ function sliceBehaviourRows(allRows, fromMs, toMs) {
 }
 
 
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Smart-bin locations (Redirect Refund) — the pins on the customer home
+ * map. The BYO equivalent is Future Vendors; this is the same idea for a
+ * mode whose venues are machines, not shops.
+ * ───────────────────────────────────────────────────────────────────── */
+export async function listSmartbinLocations(orgId) {
+  const id = orgId || getActiveOrgId();
+  if (!id) return [];
+  const { data, error } = await supabase
+    .from('smartbin_locations')
+    .select('id, name, address, lat, lng, status, machine_id, active, created_at')
+    .eq('org_id', id)
+    .order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveSmartbinLocation(row) {
+  const orgId = row.org_id || getActiveOrgId();
+  if (!orgId) throw new Error('No active organisation.');
+  const payload = {
+    org_id: orgId,
+    name: String(row.name || '').trim(),
+    address: String(row.address || '').trim() || null,
+    lat: row.lat === '' || row.lat == null ? null : Number(row.lat),
+    lng: row.lng === '' || row.lng == null ? null : Number(row.lng),
+    status: row.status === 'coming_soon' ? 'coming_soon' : 'live',
+    machine_id: String(row.machine_id || '').trim() || null,
+    active: row.active !== false,
+    updated_at: new Date().toISOString(),
+  };
+  if (!payload.name) throw new Error('A bin needs a name.');
+  const q = row.id
+    ? supabase.from('smartbin_locations').update(payload).eq('id', row.id)
+    : supabase.from('smartbin_locations').insert(payload);
+  const { data, error } = await q.select('id').maybeSingle();
+  if (error) throw error;
+  return data?.id || row.id;
+}
+
+export async function deleteSmartbinLocation(id) {
+  if (!id) return;
+  const { error } = await supabase.from('smartbin_locations').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/* Geocode an address to coordinates so an admin never has to hunt for
+ * lat/lng by hand. Nominatim is free and keyless; it asks for a real
+ * User-Agent, which the browser sends automatically. Returns null when
+ * the address can't be resolved — the admin can still type coordinates. */
+export async function geocodeAddress(address) {
+  const q = String(address || '').trim();
+  if (!q) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'nl,en' } });
+    if (!resp.ok) return null;
+    const [hit] = await resp.json();
+    if (!hit) return null;
+    return { lat: Number(Number(hit.lat).toFixed(6)), lng: Number(Number(hit.lon).toFixed(6)), label: hit.display_name };
+  } catch {
+    return null;
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * Tikkie-only (Redirect Refund) behaviour metrics.
  *
@@ -2916,19 +2982,40 @@ export async function listCupBatches() {
   // for the active org as one row each — no client-side cup-row fetch, so
   // older batches are never dropped by PostgREST's row cap. The caller
   // paginates the full list client-side.
+  const orgId = getActiveOrgId();
   const { data, error } = await supabase.rpc('admin_list_cup_batches', {
-    p_org_id: getActiveOrgId(),
+    p_org_id: orgId,
   });
   if (error) throw error;
-  return (data || []).map(b => ({
-    batch_id: b.batch_id,
-    created_at: b.created_at,
-    expires_at: b.expires_at,
-    revoked_at: b.revoked_at,
-    revoked_reason: b.revoked_reason,
-    total: Number(b.total) || 0,
-    activated: Number(b.activated) || 0,
-  }));
+
+  /* Where did this batch come from? A row in bin_sessions means the SMART
+   * BIN asked for it (print-first: the bin's session id IS the batch id);
+   * anything else was generated here in the dashboard. Best-effort — if
+   * the session log can't be read the column simply shows "Generated". */
+  let sessions = new Map();
+  try {
+    const { data: sess } = await supabase
+      .from('bin_sessions')
+      .select('batch_id, machine_id, session_id, cups, created_at')
+      .eq('org_id', orgId);
+    sessions = new Map((sess || []).map(r => [r.batch_id, r]));
+  } catch { /* leave every batch as admin-generated */ }
+
+  return (data || []).map(b => {
+    const s = sessions.get(b.batch_id);
+    return {
+      batch_id: b.batch_id,
+      created_at: b.created_at,
+      expires_at: b.expires_at,
+      revoked_at: b.revoked_at,
+      revoked_reason: b.revoked_reason,
+      total: Number(b.total) || 0,
+      activated: Number(b.activated) || 0,
+      source: s ? 'requested' : 'generated',
+      machine_id: s?.machine_id || null,
+      session_id: s?.session_id || null,
+    };
+  });
 }
 
 // Generate a short-lived signed URL for a private receipt photo. Admin UI

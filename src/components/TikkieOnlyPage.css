@@ -261,3 +261,20 @@
   font-family: inherit; font-size: 13px; font-weight: 700;
   color: #47478A; text-decoration: underline; cursor: pointer;
 }
+
+/* ── Centred screens breathe ──
+   The waiting / warning / error screens carry few elements, so tight
+   margins made them read as one clump. These gaps apply only there; the
+   content-heavy ready screen keeps its original rhythm. */
+.tikkie-only__inner--center .tikkie-only__pending-icon,
+.tikkie-only__inner--center .tikkie-only__warn-icon,
+.tikkie-only__inner--center .tikkie-only__err-icon,
+.tikkie-only__inner--center .tikkie-only__check,
+.tikkie-only__inner--center .tikkie-only__spinner { margin-bottom: 28px; }
+.tikkie-only__inner--center .tikkie-only__title { margin-bottom: 16px; }
+.tikkie-only__inner--center .tikkie-only__form { margin-top: 30px; }
+.tikkie-only__inner--center .tikkie-only__note { margin: 30px 0 0; }
+.tikkie-only__inner--center .tikkie-only__btn { margin-top: 30px; }
+.tikkie-only__inner--center .tikkie-only__sub--small { margin-top: 18px; }
+.tikkie-only__inner--center .tikkie-only__form .tikkie-only__consent { margin-top: 16px; }
+.tikkie-only__inner--center .tikkie-only__form .tikkie-only__btn--secondary { margin-top: 20px; }

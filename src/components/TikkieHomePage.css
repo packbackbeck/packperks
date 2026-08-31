@@ -174,3 +174,12 @@
 .tikkie-home__map-wrap .leaflet-control-zoom a:last-child { border-bottom: none; }
 .tikkie-home__map-wrap .leaflet-control-zoom a:hover { background: #F7F3E9; color: var(--pb-brown, #502314); }
 .tikkie-home__map-wrap .leaflet-control-zoom a.leaflet-disabled { color: #C9C2B4; background: var(--white, #fff); }
+
+/* The venue mark in the home header. The shared Header sizes it as a
+   square badge (29px) for logo-only brands; a wide wordmark needs width
+   instead, so widen it for this page only. */
+.tikkie-home .header__logo-bk {
+  width: auto;
+  max-width: 168px;
+  height: 26px;
+}

@@ -512,7 +512,11 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
     <div className="tikkie-only">
       <div className={`tikkie-only__inner${centered ? ' tikkie-only__inner--center' : ''}`}>
         <div className="tikkie-only__logos">
-          <img className="tikkie-only__logo" src={org?.logo_url || packbackLogo} alt={org?.name || 'PackBack'} />
+          {/* Always the PackBack mark here, never the venue's own: the
+              receipt screens are about the PackBack → Tikkie handover, and
+              a venue wordmark in that lockup reads as a third brand. The
+              venue's logo belongs on their home page. */}
+          <img className="tikkie-only__logo" src={packbackLogo} alt="PackBack" />
           {showTikkieLogo && (
             <>
               <svg className="tikkie-only__link-arrows" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

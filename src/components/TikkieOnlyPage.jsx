@@ -104,8 +104,8 @@ function TikkieExplainer() {
   return (
     <div className="tikkie-only__explain">
       <div className="tikkie-only__explain-text">
+        <p className="tikkie-only__explain-lead">Your refund is paid through <strong>Tikkie</strong>.</p>
         <ul>
-          <li>Your refund is paid through <strong>Tikkie</strong>.</li>
           <li>Enter your <strong>IBAN</strong> and last name.</li>
           <li>Visa and Mastercard are <strong>not</strong> supported.</li>
           <li>The money arrives within minutes.</li>
@@ -296,7 +296,7 @@ function EmailSaveForm({ batchId, org, settings, variant, onSaved, onShowPolicy,
     <form className="tikkie-only__form" onSubmit={submit}>
       {variant !== 'pending' && (
         <p className="tikkie-only__form-copy">
-          Or save this refund for later. We’ll create a PackPerks account where you can
+          Save this refund for later. We’ll create a PackPerks account where you can
           collect it any time and see all your refunds.
         </p>
       )}
@@ -500,9 +500,13 @@ export default function TikkieOnlyPage({ org, batchId, cupIds = [], settings = {
 
   const saveBatchId = payout?.batchId || batchId || (cupIds && cupIds[0]) || '';
 
+  // The short screens (spinner, waiting, all-set, reopened warnings) sit
+  // centred in the viewport; the content-heavy ready screen stays top-led.
+  const centered = ['working', 'pending', 'saved', 'reopened'].includes(phase);
+
   return (
     <div className="tikkie-only">
-      <div className="tikkie-only__inner">
+      <div className={`tikkie-only__inner${centered ? ' tikkie-only__inner--center' : ''}`}>
         <div className="tikkie-only__logos">
           <img className="tikkie-only__logo" src={org?.logo_url || packbackLogo} alt={org?.name || 'PackBack'} />
           <svg className="tikkie-only__link-arrows" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

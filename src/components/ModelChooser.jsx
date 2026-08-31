@@ -8,22 +8,78 @@ import { supabase } from '../lib/supabase';
  * The bare root has no venue slug, so it must NOT boot the customer app — doing
  * so used to fall back to an org (the oldest = Burger King), flashing BK rewards
  * and creating a wrong-org users row that crashed on the unique constraint.
- * Instead the root is a minimal chooser: pick the BYO café group or the SmartBin
- * deposit venue. Each tile is a full navigation to a real slug, which then boots
- * the app for that venue with a proper org resolved. No data is collected here,
- * so there is no cookie gate. */
+ * Instead the root is a minimal chooser with the three live models:
+ *
+ *   • Bring Your Own          → the café group hub
+ *   • Titaan Rewards          → the SmartBin deposit venue (t2)
+ *   • Titaan Direct Refund    → the SmartBin → Tikkie venue (t3)
+ *
+ * A venue in maintenance mode greys its tile out and makes it inert — the
+ * same published settings.maintenanceMode flag that shows the maintenance
+ * page inside the app. No data is collected here, so no cookie gate. */
+
+/* The three destinations. BYO's href resolves live (group rename-safe);
+ * the Titaan slugs are the two provisioned venues. */
+const TITAAN_SLUGS = ['titaan', 't3'];
+
 export default function ModelChooser() {
-  // The BYO café tile points at the café GROUP slug. Resolve it live from the
-  // DB so it follows any future rename (was hard-coded to the old '/byonl').
-  // Falls back to '/byo' until the lookup resolves.
   const [byoHref, setByoHref] = useState('/byo');
+  // slug → true while that venue is in maintenance. BYO greys out only if
+  // EVERY member café is down (one closed café shouldn't kill the hub).
+  const [maint, setMaint] = useState({ byo: false, titaan: false, t3: false });
+
   useEffect(() => {
     let alive = true;
-    supabase.from('org_groups').select('slug').order('created_at').limit(1).maybeSingle()
-      .then(({ data }) => { if (alive && data?.slug) setByoHref(`/${data.slug}`); })
-      .catch(() => { /* keep the fallback */ });
+    (async () => {
+      try {
+        const { data: group } = await supabase
+          .from('org_groups').select('id, slug').order('created_at').limit(1).maybeSingle();
+        if (alive && group?.slug) setByoHref(`/${group.slug}`);
+
+        const [{ data: titaanOrgs }, { data: byoMembers }] = await Promise.all([
+          supabase.from('organizations').select('id, slug').in('slug', TITAAN_SLUGS).is('deleted_at', null),
+          group?.id
+            ? supabase.from('organizations').select('id').eq('group_id', group.id).is('deleted_at', null)
+            : Promise.resolve({ data: [] }),
+        ]);
+
+        const ids = [
+          ...(titaanOrgs || []).map(o => o.id),
+          ...(byoMembers || []).map(o => o.id),
+        ];
+        if (!ids.length) return;
+        const { data: cfgs } = await supabase
+          .from('app_config').select('key, value')
+          .in('key', ids.map(id => `published:${id}`));
+        const down = new Set(
+          (cfgs || [])
+            .filter(c => c.value?.settings?.maintenanceMode)
+            .map(c => c.key.replace('published:', '')),
+        );
+        if (!alive) return;
+        const bySlug = Object.fromEntries((titaanOrgs || []).map(o => [o.slug, o.id]));
+        setMaint({
+          titaan: down.has(bySlug.titaan),
+          t3: down.has(bySlug.t3),
+          byo: (byoMembers || []).length > 0 && byoMembers.every(m => down.has(m.id)),
+        });
+      } catch { /* chooser stays fully clickable on any lookup hiccup */ }
+    })();
     return () => { alive = false; };
   }, []);
+
+  const Tile = ({ href, variant, title, sub, down, children }) => (
+    <a
+      className={`mc__tile mc__tile--${variant}${down ? ' mc__tile--off' : ''}`}
+      href={down ? undefined : href}
+      aria-disabled={down || undefined}
+      onClick={down ? (e) => e.preventDefault() : undefined}
+    >
+      <span className="mc__tile-icon" aria-hidden="true">{children}</span>
+      <span className="mc__tile-title">{title}</span>
+      <span className="mc__tile-sub">{down ? 'Under maintenance' : sub}</span>
+    </a>
+  );
 
   return (
     <div className="mc">
@@ -32,29 +88,29 @@ export default function ModelChooser() {
         <p className="mc__prompt">Choose the model</p>
 
         <div className="mc__tiles">
-          <a className="mc__tile mc__tile--byo" href={byoHref}>
-            <span className="mc__tile-icon" aria-hidden="true">
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 4h14l-1.3 15.3a2.5 2.5 0 0 1-2.5 2.2H8.8a2.5 2.5 0 0 1-2.5-2.2L5 4z" />
-                <path d="M4 8h16" /><path d="M10 12v4M14 12v4" />
-              </svg>
-            </span>
-            <span className="mc__tile-title">Bring your own cup</span>
-            <span className="mc__tile-sub">Café venues</span>
-          </a>
+          <Tile href={byoHref} variant="byo" title="Bring Your Own" sub="Café venues" down={maint.byo}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 4h14l-1.3 15.3a2.5 2.5 0 0 1-2.5 2.2H8.8a2.5 2.5 0 0 1-2.5-2.2L5 4z" />
+              <path d="M4 8h16" /><path d="M10 12v4M14 12v4" />
+            </svg>
+          </Tile>
 
-          <a className="mc__tile mc__tile--bin" href="/titaan">
-            <span className="mc__tile-icon" aria-hidden="true">
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 7h16" />
-                <path d="M6 7l1 12.5a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9L20 7" />
-                <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                <path d="M10 11v6M14 11v6" />
-              </svg>
-            </span>
-            <span className="mc__tile-title">SmartBin deposit</span>
-            <span className="mc__tile-sub">Deposit venues</span>
-          </a>
+          <Tile href="/titaan" variant="bin" title="Titaan Rewards" sub="SmartBin deposit · rewards" down={maint.titaan}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 7h16" />
+              <path d="M6 7l1 12.5a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9L20 7" />
+              <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
+          </Tile>
+
+          <Tile href="/t3" variant="refund" title="Titaan Direct Refund" sub="SmartBin · instant Tikkie refund" down={maint.t3}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M14.8 8.6a3.2 3.2 0 0 0-5.6 2.1c0 2.4 2.3 3 5.6 3.1" />
+              <path d="M8.6 12.9h5.2" />
+            </svg>
+          </Tile>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-/* Root-path venue-model chooser — deliberately minimal (logo, prompt, 2 tiles). */
+/* Root-path venue-model chooser — deliberately minimal (logo, prompt, 3 tiles). */
 .mc {
   min-height: 100dvh;
   display: flex;
@@ -65,6 +65,17 @@
 }
 .mc__tile--byo .mc__tile-icon { color: var(--pb-green-500); background: var(--pb-green-100); }
 .mc__tile--bin .mc__tile-icon { color: var(--pb-brown); background: #F1E7DF; }
+.mc__tile--refund .mc__tile-icon { color: #47478A; background: #ECECF6; }
+
+/* Maintenance: greyed and inert. The sub line says why. */
+.mc__tile--off {
+  filter: grayscale(1);
+  opacity: 0.55;
+  pointer-events: none;
+  cursor: default;
+  box-shadow: none;
+}
+.mc__tile--off:hover { transform: none; box-shadow: none; }
 
 .mc__tile-title {
   font-family: var(--font-primary);

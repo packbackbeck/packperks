@@ -760,14 +760,13 @@ export default function App({ consentReady = true } = {}) {
           const earlyCfg = await getAppConfig(org?.id).catch(() => null);
           if (earlyCfg?.settings?.mode === 'tikkie_only') {
             const sp = new URLSearchParams(window.location.search);
-            // Receipt scans (batch/cups in the URL) set no cookies and must
-            // not put a banner between the customer and their payout — but a
-            // BARE visit is the refunds HOME, which behaves like the normal
-            // app (accounts, localStorage), so there the banner shows.
-            if (sp.get('batch') || sp.get('cups') || (import.meta.env.DEV && sp.get('demo'))) {
-              // Flag + event: the flag survives StrictMode's remount of
-              // ConsentGate (which would otherwise miss an already-fired
-              // event and pop the banner over a receipt).
+            // The redirect page collects data (device id, email, account
+            // creation), so the cookie banner shows there like everywhere
+            // else — the choice is remembered once, app-wide. Only the
+            // DEV demo captures suppress it, to keep state screenshots
+            // clean. (Flag + event: the flag survives StrictMode's remount
+            // of ConsentGate, which would otherwise miss the event.)
+            if (import.meta.env.DEV && sp.get('demo')) {
               try {
                 window.__ppkSuppressConsent = true;
                 window.dispatchEvent(new Event('packperks:suppress-consent'));

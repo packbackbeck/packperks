@@ -32,6 +32,25 @@ const BIN_LOCATIONS = [
   { name: 'Titaan Smart Bin', area: 'RAI Amsterdam', lat: 52.3411, lng: 4.8887 },
 ];
 
+/* "Ready to collect" hygiene: once the customer has OPENED a link and 24
+ * hours have passed, it leaves the list (they almost certainly claimed it;
+ * Tikkie statuses lag) — but the refund stays in the history below. Opens
+ * are only knowable client-side, so they live in localStorage. */
+const OPENED_KEY = (orgId) => `packperks_tikkie_opened:${orgId}`;
+const OPENED_TTL_MS = 24 * 60 * 60 * 1000;
+function readOpened(orgId) {
+  try { return JSON.parse(localStorage.getItem(OPENED_KEY(orgId)) || '{}'); } catch { return {}; }
+}
+function markOpened(orgId, claimId) {
+  try {
+    const m = readOpened(orgId);
+    if (!m[claimId]) {
+      m[claimId] = Date.now();
+      localStorage.setItem(OPENED_KEY(orgId), JSON.stringify(m));
+    }
+  } catch { /* fine */ }
+}
+
 function fmtWhen(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -178,13 +197,20 @@ export default function TikkieHomePage({ org, settings = {} }) {
     return () => { alive = false; };
   }, [account?.userId]);
 
+  const [openedMap, setOpenedMap] = useState(() => readOpened(org?.id));
+
   const totals = useMemo(() => {
     const done = claims.filter(c => c.status === 'completed');
     const total = done.reduce((s, c) => s + Number(c.payout_amount || 0), 0);
-    const open = done.filter(c => c.tikkie_url && c.tikkie_status !== 'redeemed');
+    const open = done.filter(c =>
+      c.tikkie_url &&
+      c.tikkie_status !== 'redeemed' &&
+      // Opened over 24h ago → delisted here, kept in the history below.
+      !(openedMap[c.id] && Date.now() - openedMap[c.id] > OPENED_TTL_MS)
+    );
     const available = open.reduce((s, c) => s + Number(c.payout_amount || 0), 0);
     return { total, available, openClaims: open };
-  }, [claims]);
+  }, [claims, openedMap]);
 
   const history = useMemo(
     () => [...claims].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
@@ -248,7 +274,12 @@ export default function TikkieHomePage({ org, settings = {} }) {
         <section className="tikkie-home__section">
           <h2 className="tikkie-home__section-title">Ready to collect</h2>
           {totals.openClaims.map(c => (
-            <a key={c.id} className="tikkie-home__open" href={c.tikkie_url}>
+            <a
+              key={c.id}
+              className="tikkie-home__open"
+              href={c.tikkie_url}
+              onClick={() => { markOpened(org?.id, c.id); setOpenedMap(readOpened(org?.id)); }}
+            >
               <div>
                 <div className="tikkie-home__open-amount">€{Number(c.payout_amount || 0).toFixed(2)}</div>
                 <div className="tikkie-home__open-meta">

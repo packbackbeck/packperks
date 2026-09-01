@@ -114,9 +114,6 @@ function TikkieExplainer() {
           <li>Enter your <strong>IBAN</strong> and last name</li>
           <li>The money arrives within minutes</li>
         </ul>
-        {/* Kept out of the list on purpose: it is a warning, not a step,
-            and customers who reach for a card get stuck without it. */}
-        <p className="tikkie-only__explain-warn">Visa and Mastercard are not supported.</p>
       </div>
       <img className="tikkie-only__shot" src={tikkieClaimShot} alt="The Tikkie payout page" />
     </div>

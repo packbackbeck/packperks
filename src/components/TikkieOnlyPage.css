@@ -132,10 +132,6 @@
   margin: 0 0 8px;
   font-size: 13.5px; font-weight: 800; color: #1F1B16;
 }
-.tikkie-only__explain-warn {
-  margin: 10px 0 0;
-  font-size: 12px; line-height: 1.4; font-weight: 700; color: #C4472B;
-}
 .tikkie-only__explain-text ul {
   margin: 0; padding: 0 0 0 16px;
   list-style: disc;

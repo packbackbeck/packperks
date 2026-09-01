@@ -5,7 +5,8 @@ import './AdminTikkieLog.css';
 
 /* Tikkie payouts log — the reporting page for tikkie-only (smart-bin) orgs.
  *
- * Every converted bin receipt is one claims row keyed by batch_id: when it
+ * Every Tikkie link is one claims row: wallet-era bulk payouts (no batch,
+ * they sweep many receipts) and legacy per-receipt links. When a link
  * was generated, how many cups, the amount, and the live Tikkie status
  * (created → redeemed/expired, kept fresh by the tikkie-webhook). This page
  * is deliberately a flat log + a few counters — in tikkie-only mode there is
@@ -133,7 +134,7 @@ export default function AdminTikkieLog() {
       ) : visible.length === 0 ? (
         <div className="atl-empty">
           {rows.length === 0
-            ? 'No payouts yet. They appear here the moment a customer scans a bin receipt.'
+            ? 'No payouts yet. They appear here the moment a customer collects their balance.'
             : 'Nothing matches this filter.'}
         </div>
       ) : (
@@ -167,7 +168,9 @@ export default function AdminTikkieLog() {
                     </td>
                     <td>{fmtDateTime(r.tikkie_redeemed_at)}</td>
                     <td>{r.tikkie_expires_at ? new Date(r.tikkie_expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}</td>
-                    <td className="atl-batch" title={r.batch_id}>{(r.batch_id || '').slice(0, 8)}</td>
+                    <td className="atl-batch" title={r.batch_id || 'Bulk payout: one link for the whole wallet balance'}>
+                      {r.batch_id ? r.batch_id.slice(0, 8) : 'bulk'}
+                    </td>
                     <td>
                       {r.tikkie_url && (
                         <a className="atl-link" href={r.tikkie_url} target="_blank" rel="noopener noreferrer">Link</a>

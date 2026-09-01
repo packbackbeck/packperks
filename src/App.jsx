@@ -73,7 +73,6 @@ import {
 import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, getGroupBySlug } from './lib/groups';
 import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
-import TikkieOnlyPage from './components/TikkieOnlyPage';
 import TikkieHomePage from './components/TikkieHomePage';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
@@ -1780,32 +1779,17 @@ export default function App({ consentReady = true } = {}) {
   /* Tikkie-only mode: the redirect page IS the whole app for these orgs.
    * Checked before isLoading so the boot's early return lands here. */
   if (tikkieOnly) {
-    // A receipt in the URL → the redirect/refund page. A bare visit →
-    // the refunds home (their saved account, or the empty state).
-    // Dev-only: ?demo=<state> forces the redirect page's states for design
-    // review (?demo=full is the home's own sample state).
-    const demoState = import.meta.env.DEV
-      ? new URLSearchParams(window.location.search).get('demo')
-      : null;
-    if (demoState && demoState !== 'full' && demoState !== 'empty') {
-      return (
-        <TikkieOnlyPage
-          org={tikkieOnly.org}
-          batchId=""
-          cupIds={[]}
-          settings={tikkieOnly.settings}
-        />
-      );
-    }
-    if (!tikkieOnly.batchId && !(tikkieOnly.cupIds || []).length) {
-      return <TikkieHomePage org={tikkieOnly.org} settings={tikkieOnly.settings} />;
-    }
+    /* Wallet model: EVERYTHING lands on the home. A receipt in the URL is
+     * credited there (after the cookie choice — consentReady gates the
+     * scan, so rejecting the banner leaves the QR valid). The old
+     * redirect page is retired; see src/archive/. */
     return (
-      <TikkieOnlyPage
+      <TikkieHomePage
         org={tikkieOnly.org}
-        batchId={tikkieOnly.batchId}
-        cupIds={tikkieOnly.cupIds}
         settings={tikkieOnly.settings}
+        batchId={tikkieOnly.batchId || ''}
+        cupIds={tikkieOnly.cupIds || []}
+        consentReady={consentReady}
       />
     );
   }

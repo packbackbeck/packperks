@@ -57,7 +57,9 @@ customer deposits cups
 
   customer scans it → https://perks.packback.network/t3/?batch=<session_id>
         │
-        ├─ session validated   → Redirect Refund page → Tikkie link (bin-tikkie)
+        ├─ session validated   → wallet home: value credited to the
+        │                         customer's balance (bin-tikkie); ONE
+        │                         Tikkie link is minted when they collect
         │                        Deposit org → the PackPerks app (claim-cups)
         └─ call not landed yet → "we're checking your receipt" screen
                                  (customer may leave an email and gets the
@@ -207,7 +209,7 @@ retry on network error / `5xx` / `429` with backoff, always with the same
 survives reboots and drain it whenever connectivity returns — the printed
 receipt only pays out once its call has landed. A session delivered hours
 late is still honoured in full, and anyone who left their email on the
-waiting screen is mailed their link the moment it is.
+held-for-review popup is mailed the moment it is.
 
 ---
 
@@ -216,21 +218,19 @@ waiting screen is mailed their link the moment it is.
 Print-first means a customer can scan a receipt PackPerks has never heard
 of. That scan is treated as **not validated yet**, never as invalid:
 
-- The page says we're checking the receipt (it can take up to ~30
-  minutes) and offers an email field — "email me when it's ready" — plus
-  an OPTIONAL "also create a PackPerks account" toggle (which carries the
-  privacy-policy consent). Email without the toggle is stored as a
-  notification-only contact; with it, a refund account is created and the
-  customer lands on their refunds home immediately.
-- While the customer stays on the screen, the page quietly polls; the
-  moment the bin's session lands, it switches to the normal refund page
-  by itself — no re-scan needed.
+- The wallet home shows a "held for review" popup (it can take up to
+  ~30 minutes). A customer whose profile already has an email just
+  acknowledges it; otherwise the popup offers an email field — "email me
+  when it's added" — with the privacy-policy consent.
+- While the customer stays on the page it quietly polls; the moment the
+  bin's session lands, the receipt is credited to their balance and the
+  popup flips to "€X added" by itself — no re-scan needed.
 - The unknown batch id is recorded server-side as a *pending* sighting.
 - The moment the bin's `/bin-mint-batch` call arrives with that
   `session_id`, the batch mints as normal, the pending sighting is
-  resolved, and anyone who left an email gets a "your refund is ready to
-  collect" message with the link. If they pre-registered, the payout is
-  attached to their PackPerks refund account automatically.
+  resolved, and anyone who left an email gets a "your refund is ready"
+  message with the link — opening it credits their balance. A pending
+  pre-registration attaches the credit to that profile automatically.
 
 Nothing is required from the bin beyond eventually delivering the queued
 call. If a session can never be delivered (dead bin, lost queue), the
@@ -254,10 +254,10 @@ instead of a `batch`:
 https://perks.packback.network/t3/?cups=<uuid>[,<uuid>…]
 ```
 
-These ids never expire and mint a **new** Tikkie link on every scan —
-they have to, because the same list is handed to many customers over the
-bin's life. The customer sees exactly the same screen as a normal
-receipt and is never told it came from the fallback.
+These ids never expire and credit the scanner's wallet on **every**
+scan — they have to, because the same list is handed to many customers
+over the bin's life. The customer sees exactly the same "€X added"
+popup as a normal receipt and is never told it came from the fallback.
 
 Because they keep paying, they are fenced on our side: a per-cup cooldown,
 a daily ceiling per venue, a full use log, and an **email alert on every
@@ -325,23 +325,22 @@ there is no per-link charge for issuing one.
 Not the bin's problem, but useful context when debugging a receipt:
 
 1. The QR opens `/<slug>/?batch=<uuid>` in the phone's browser.
-2. For a **Redirect Refund** org the app calls `bin-tikkie`, which
-   atomically claims the batch's cups, creates one claim, and mints a
-   Tikkie cashback link. The page then explains how Tikkie works (IBAN +
-   last name — no Visa/Mastercard) and offers two actions: **Open
-   Tikkie**, or leave an email to save the refund for later, which
-   creates a PackPerks refund account with its own home page and history.
-   It no longer auto-redirects.
+2. For a **Redirect Refund** org the app opens the wallet home and (after
+   the cookie choice) calls `bin-tikkie`, which atomically claims the
+   batch's cups, creates the scanner's profile if this is their first
+   scan, and **credits the receipt's value to that profile's balance** —
+   no Tikkie link is minted here. The customer collects by tapping the
+   balance tile → **Open Tikkie**, which sweeps every available credit
+   into ONE bulk cashback link.
    If the bin's session hasn't been delivered yet, the same scan shows
-   the pending "we're checking your receipt" screen instead.
+   the "held for review" popup instead.
 3. For a **Deposit Rewards** org the app boots normally and `claim-cups`
    credits the cups to the customer's balance.
 
-A receipt can be scanned more than once without minting a second payout —
-the same link comes back every time. On a re-scan the Redirect Refund
-screen stops instead of redirecting, checks the live status with Tikkie,
-and tells the customer the link has most likely already been used (and
-that entering bank details a second time will not pay out again).
+A receipt pays at most once: the cookie banner gates the scan (rejecting
+it leaves the QR untouched and valid), and once credited a re-scan shows
+"already in your wallet" — or "receipt already used" on another phone —
+never a second credit.
 
 ---
 

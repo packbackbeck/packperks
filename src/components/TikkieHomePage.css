@@ -199,3 +199,29 @@
   max-width: 168px;
   height: 26px;
 }
+
+/* ── Wallet-model additions ── */
+/* The hero is a button now (tap → redeem sheet). */
+button.tikkie-home__hero {
+  border: none; font-family: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button.tikkie-home__hero:active { transform: scale(0.99); }
+
+/* Signed history amounts. */
+.tikkie-home__row-amount { font-size: 14px; font-weight: 800; color: #1A8737; margin-left: auto; }
+.tikkie-home__row-amount--out { color: #8A8175; }
+
+/* The save-your-balance card. */
+.tikkie-home__emailcard {
+  width: 100%; box-sizing: border-box;
+  background: var(--white, #fff); border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
+  padding: 16px;
+}
+.tikkie-home__emailcopy {
+  margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: #6C6259;
+}
+
+/* Redeem sheet buttons: "Do it later" first and highlighted, per design. */
+.tk-sheet__actions { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }

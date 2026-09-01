@@ -54,9 +54,9 @@ export const TIKKIE_ONLY_PAGES = new Set([
   'backupcups',   // the bin's offline fallback codes + outage alarm
   'smartbins',    // the bin locations behind the customer map
   'emailtemplates', // the automated customer emails
-  // Redirect Refund grew a user base (refund accounts + mailos), so the
+  // Redirect Refund has a real user base (profiles + accounts), so the
   // audience pages are back — each one adapts itself to this mode.
-  'users',        // refund accounts + mailos (AdminTikkieUsers)
+  'users',        // refund profiles + accounts
   'behaviour',    // tikkie funnel metrics (links, collect rate, audience)
   'stats',        // System Health — org-scoped ops events, mode-agnostic
   'reports',      // Reports & alerts + the automated email reports

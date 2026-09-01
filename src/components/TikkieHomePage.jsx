@@ -1,77 +1,82 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { getMyClaims, getMyPending, getSmartbinLocations } from '../lib/api';
-import { readRefundAccount } from './TikkieOnlyPage';
+import { getSmartbinLocations } from '../lib/api';
+import {
+  readStoredProfile, storeProfile, fetchWallet, scanBatch,
+  scanBackupCups, redeemWallet, setEmail, savePendingEmail, checkBatch,
+} from '../lib/tikkieWallet';
+import { animalForProfile } from '../lib/animals';
+import { TikkieExplainer, Sheet, LoginSheet } from './tikkie/TikkieBits';
+import PrivacyPolicyView from './PrivacyPolicyView';
 import UserPage from './UserPage';
 import Header from './Header';
 import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
 
-/* Redirect Refund home — the account view for a mode that, until now,
- * had no users at all.
+/* ─────────────────────────────────────────────────────────────────────
+ * TikkieHomePage — the WHOLE Redirect Refund experience (wallet model).
  *
- * It reuses the REAL home-page chrome (the `.app` shell and the shared
- * <Header>, minus the add-cups and cup-balance tiles: cups go in the
- * smart bin, and there is no balance). Where the normal home shows
- * rewards, this shows the money:
+ * Scanning a receipt lands here. After the cookie choice, the scan
+ * credits the receipt's value to this device's wallet — the first scan
+ * is what creates the profile (adjective+animal identity, like every
+ * other mode). No Tikkie link exists per return: the customer collects
+ * in bulk by tapping the orange tile → "Open Tikkie", which mints ONE
+ * link for the whole available balance.
  *
- *   • hero tile — total refunded, with the still-uncollected amount
- *   • "Ready to collect" — unclaimed Tikkie links, one tap away
- *   • "In process" — receipts scanned before the bin's confirmation
- *     reached us; the link appears (and the customer is emailed) the
- *     moment it does
- *   • history, and the smart-bin map (same style as the market map)
- *
- * Reached from /<slug>/ with no batch in the URL: either the customer
- * saved a refund for later (account in localStorage) or they typed the
- * URL — the empty state explains what to do. */
+ * Everything that used to be the redirect page is now a popup on this
+ * screen: credited, already-claimed, held-for-review, errors, and the
+ * redeem sheet with the Tikkie explainer.
+ * ───────────────────────────────────────────────────────────────────── */
 
-/* Where the map opens when there are no pins yet: the Netherlands. Real
- * pins come from smartbin_locations, managed on the dashboard's Smart
- * Bins page — the map fits itself around whatever is live. */
 const NL_CENTER = [52.15, 5.3];
 const NL_ZOOM = 7;
 
-/* "Ready to collect" hygiene: once the customer has OPENED a link and 24
- * hours have passed, it leaves the list (they almost certainly claimed it;
- * Tikkie statuses lag) — but the refund stays in the history below. Opens
- * are only knowable client-side, so they live in localStorage. */
-const OPENED_KEY = (orgId) => `packperks_tikkie_opened:${orgId}`;
-const OPENED_TTL_MS = 24 * 60 * 60 * 1000;
-function readOpened(orgId) {
-  try { return JSON.parse(localStorage.getItem(OPENED_KEY(orgId)) || '{}'); } catch { return {}; }
-}
-function markOpened(orgId, claimId) {
-  try {
-    const m = readOpened(orgId);
-    if (!m[claimId]) {
-      m[claimId] = Date.now();
-      localStorage.setItem(OPENED_KEY(orgId), JSON.stringify(m));
-    }
-  } catch { /* fine */ }
+const SCAN_ERRORS = {
+  batch_revoked:   'This receipt is no longer valid.',
+  batch_expired:   'This receipt has expired.',
+  batch_not_found: 'We couldn’t recognise this QR code. Please use the receipt printed by the bin.',
+  invalid_batch:   'We couldn’t recognise this QR code. Please use the receipt printed by the bin.',
+  wrong_mode:      'This QR code belongs to a different PackPerks programme.',
+  backup_cooldown:  'This receipt was just used. Please wait a moment and scan again.',
+  backup_daily_cap: 'We can’t process this receipt right now. Please ask a member of staff.',
+  missing_device:  'Your browser is blocking storage, which we need to keep your balance. Please turn off private mode and scan again.',
+};
+
+/* Dev-only sample states for design review (?demo=…). */
+const DEMO = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('demo') : null;
+const DEMO_WALLET = {
+  profile: { user_id: 'demo', name: 'Perky Otter', animal_index: 5, email: null },
+  balance: 0.9,
+  history: [
+    { id: 'd1', kind: 'return', cups: 4, amount: 0.4, created_at: new Date(Date.now() - 2 * 864e5).toISOString() },
+    { id: 'd2', kind: 'return', cups: 3, amount: 0.3, created_at: new Date(Date.now() - 6 * 864e5).toISOString() },
+    { id: 'd3', kind: 'payout', cups: 5, amount: 0.5, created_at: new Date(Date.now() - 9 * 864e5).toISOString(), redeemed: true },
+    { id: 'd4', kind: 'return', cups: 2, amount: 0.2, created_at: new Date(Date.now() - 12 * 864e5).toISOString() },
+  ],
+  outstanding: null,
+};
+
+function fmtWhen(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-/* Count the hero total up to its new value instead of snapping.
- * Only ever animates UPWARD (a refund landing is the moment worth
- * celebrating); a correction downward just lands. Honours
- * prefers-reduced-motion, and never leaves a stale number on screen. */
+/* Count the balance up smoothly when it increases; corrections just land.
+ * Honours prefers-reduced-motion. */
 function useCountUp(target, duration = 900) {
   const [shown, setShown] = useState(target);
   const fromRef = useRef(target);
   const rafRef = useRef(0);
-
   useEffect(() => {
     const from = fromRef.current;
     fromRef.current = target;
     const reduce = typeof window !== 'undefined'
       && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduce || target <= from) { setShown(target); return undefined; }
-
     const started = performance.now();
     const tick = (now) => {
       const t = Math.min(1, (now - started) / duration);
-      // easeOutCubic: quick off the mark, settles gently on the number.
       const eased = 1 - Math.pow(1 - t, 3);
       setShown(from + (target - from) * eased);
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
@@ -80,17 +85,10 @@ function useCountUp(target, duration = 900) {
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, [target, duration]);
-
   return shown;
 }
 
-function fmtWhen(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-}
-
-/* "You are here" marker for the locate button - same pulsing dot as the
- * BYO market map. */
+/* ── Map (unchanged from v1: OSM HOT, zoom, locate) ── */
 const userDotIcon = L.divIcon({
   className: 'tikkie-home__userdot-icon',
   html: '<span class="tikkie-home__userdot"></span>',
@@ -98,8 +96,6 @@ const userDotIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
-/* Popup text is venue data from our own dashboard, but it still goes
- * through innerHTML — escape it rather than trust it. */
 function esc(v) {
   return String(v ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 }
@@ -113,31 +109,18 @@ function BinMap({ bins }) {
 
   useEffect(() => {
     if (!elRef.current || mapRef.current) return;
-    // Same interaction model as the BYO market map: +/- zoom controls,
-    // draggable, pinch-zoom on touch (scroll-wheel zoom stays off so the
-    // page can still be scrolled past the map).
     const map = L.map(elRef.current, {
-      center: NL_CENTER,
-      zoom: NL_ZOOM,
-      zoomControl: true,
-      attributionControl: false,
-      scrollWheelZoom: false,
-      dragging: true,
+      center: NL_CENTER, zoom: NL_ZOOM,
+      zoomControl: true, attributionControl: false, scrollWheelZoom: false, dragging: true,
     });
-    /* Exactly the layer the BYO market map uses: OSM "Humanitarian" — soft
-       pastel, calm labels, free and keyless. */
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-      subdomains: 'ab',
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap · HOT',
+      subdomains: 'ab', maxZoom: 19, attribution: '&copy; OpenStreetMap · HOT',
     }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; layerRef.current = null; };
   }, []);
 
-  /* Re-pin whenever the location list changes, and frame the map around
-   * every bin (one bin → a close view; a national network → the country). */
   useEffect(() => {
     const map = mapRef.current, layer = layerRef.current;
     if (!map || !layer) return;
@@ -146,8 +129,7 @@ function BinMap({ bins }) {
     const icon = L.divIcon({
       className: 'tikkie-home__pin',
       html: '<div class="tikkie-home__pin-dot">♻︎</div>',
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
+      iconSize: [24, 24], iconAnchor: [12, 12],
     });
     bins.forEach(b => {
       L.marker([b.lat, b.lng], { icon })
@@ -158,8 +140,6 @@ function BinMap({ bins }) {
     else map.fitBounds(bins.map(b => [b.lat, b.lng]), { padding: [18, 18], maxZoom: 13 });
   }, [bins]);
 
-  /* Locate: drop the pulsing you-are-here dot and frame the map on the
-   * customer plus the nearest bin, like the market map does. */
   const handleLocate = () => {
     if (locating || typeof navigator === 'undefined' || !navigator.geolocation) return;
     setLocating(true);
@@ -171,17 +151,13 @@ function BinMap({ bins }) {
         const loc = [pos.coords.latitude, pos.coords.longitude];
         if (userMarkerRef.current) userMarkerRef.current.setLatLng(loc);
         else userMarkerRef.current = L.marker(loc, { icon: userDotIcon, interactive: false }).addTo(map);
-        // Frame the customer together with their nearest bin.
         let nearest = null, best = Infinity;
         for (const b of bins) {
           const d = (b.lat - loc[0]) ** 2 + (b.lng - loc[1]) ** 2;
           if (d < best) { best = d; nearest = b; }
         }
-        if (nearest) {
-          map.fitBounds([loc, [nearest.lat, nearest.lng]], { padding: [50, 50], maxZoom: 16, animate: true });
-        } else {
-          map.setView(loc, 14, { animate: true });
-        }
+        if (nearest) map.fitBounds([loc, [nearest.lat, nearest.lng]], { padding: [50, 50], maxZoom: 16, animate: true });
+        else map.setView(loc, 14, { animate: true });
       },
       () => setLocating(false),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
@@ -191,16 +167,8 @@ function BinMap({ bins }) {
   return (
     <div className="tikkie-home__map-wrap">
       <div ref={elRef} className="tikkie-home__map" aria-label="Smart bin locations" />
-      <button
-        type="button"
-        className="tikkie-home__locate"
-        onClick={handleLocate}
-        disabled={locating}
-        aria-label="Find my location"
-      >
-        {locating ? (
-          <span className="tikkie-home__locate-spinner" aria-hidden="true" />
-        ) : (
+      <button type="button" className="tikkie-home__locate" onClick={handleLocate} disabled={locating} aria-label="Find my location">
+        {locating ? <span className="tikkie-home__locate-spinner" aria-hidden="true" /> : (
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="7" />
             <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
@@ -213,94 +181,221 @@ function BinMap({ bins }) {
   );
 }
 
-/* Dev-only sample data: /t3/?demo=full renders the populated home with no
- * account or network (DEV gate strips it from production behaviour). */
-const HOME_DEMO_PARAM = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('demo') : null;
-const HOME_DEMO = HOME_DEMO_PARAM === 'empty'
-  ? { account: null, claims: [], pending: [] }
-  : HOME_DEMO_PARAM === 'full'
-  ? {
-      account: { userId: 'demo', email: 'anna@example.com' },
-      claims: [
-        { id: 'd1', status: 'completed', payout_amount: 0.4, cups_redeemed: 4, tikkie_url: 'https://tikkie.me/pay/demo', tikkie_status: 'created', created_at: new Date(Date.now() - 2 * 864e5).toISOString() },
-        { id: 'd2', status: 'completed', payout_amount: 0.3, cups_redeemed: 3, tikkie_url: 'https://tikkie.me/pay/demo', tikkie_status: 'redeemed', created_at: new Date(Date.now() - 6 * 864e5).toISOString() },
-        { id: 'd3', status: 'completed', payout_amount: 0.2, cups_redeemed: 2, tikkie_url: 'https://tikkie.me/pay/demo', tikkie_status: 'redeemed', created_at: new Date(Date.now() - 12 * 864e5).toISOString() },
-      ],
-      pending: [{ batch_id: 'demo-pend', first_seen: new Date(Date.now() - 36e5).toISOString(), resolved_at: null }],
-    }
-  : null;
+/* ── The email section: save the balance to an address. Same consent
+   pattern as the sign-in sheet (privacy required, marketing optional). ── */
+function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy }) {
+  const [email, setEmailVal] = useState('');
+  const [privacyOk, setPrivacyOk] = useState(false);
+  const [marketing, setMarketing] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
 
-export default function TikkieHomePage({ org, settings = {} }) {
-  const account = useMemo(() => HOME_DEMO ? HOME_DEMO.account : readRefundAccount(org?.id), [org?.id]);
-  const [claims, setClaims] = useState(HOME_DEMO ? HOME_DEMO.claims : []);
+  async function submit(e) {
+    e.preventDefault();
+    if (busy || !privacyOk) return;
+    setBusy(true);
+    setErr(null);
+    const data = await setEmail(org?.id, email.trim(), marketing);
+    setBusy(false);
+    if (data?.status === 'saved') { onSaved?.(data.profile); return; }
+    if (data?.status === 'verify_required') { onVerifyNeeded?.(email.trim()); return; }
+    setErr(data?.error === 'invalid_email'
+      ? 'That doesn’t look like an email address.'
+      : 'We couldn’t save your email just now. Please try again.');
+  }
+
+  return (
+    <section className="tikkie-home__section">
+      <h2 className="tikkie-home__section-title">Save your balance</h2>
+      <form className="tikkie-home__emailcard" onSubmit={submit}>
+        <p className="tikkie-home__emailcopy">
+          Add your email to keep your balance safe and get back to it from any device.
+        </p>
+        <input
+          type="email"
+          inputMode="email"
+          className="tk-input"
+          placeholder="you@example.com"
+          value={email}
+          onChange={e => setEmailVal(e.target.value)}
+          disabled={busy}
+          required
+        />
+        <label className="tk-consent">
+          <input type="checkbox" checked={privacyOk} onChange={e => setPrivacyOk(e.target.checked)} disabled={busy} />
+          <span>I have read the <button type="button" className="tk-link" onClick={onShowPolicy}>Privacy Policy</button>.</span>
+        </label>
+        <label className="tk-consent">
+          <input type="checkbox" checked={marketing} onChange={e => setMarketing(e.target.checked)} disabled={busy} />
+          <span>Send me offers and updates.</span>
+        </label>
+        {err && <p className="tk-err">{err}</p>}
+        <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || !email.trim() || !privacyOk}>
+          {busy ? 'Saving…' : 'Save my balance'}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+export default function TikkieHomePage({ org, settings = {}, batchId = '', cupIds = [], consentReady = true }) {
+  const [profile, setProfile] = useState(() => {
+    if (DEMO && DEMO !== 'empty') return DEMO_WALLET.profile;
+    if (DEMO) return null;
+    const stored = readStoredProfile(org?.id);
+    return stored?.userId
+      ? { user_id: stored.userId, name: stored.name || null, animal_index: stored.animalIndex ?? null, email: stored.email || null }
+      : null;
+  });
+  const [balance, setBalance] = useState(DEMO && DEMO !== 'empty' ? DEMO_WALLET.balance : 0);
+  const [history, setHistory] = useState(DEMO && DEMO !== 'empty' ? DEMO_WALLET.history : []);
+  const [outstanding, setOutstanding] = useState(null);
   const [bins, setBins] = useState([]);
-  const [pending, setPending] = useState(HOME_DEMO ? HOME_DEMO.pending : []);
-  const [loading, setLoading] = useState(HOME_DEMO ? false : !!account);
+  const [popup, setPopup] = useState(() => {
+    if (DEMO === 'credited') return { type: 'credited', amount: 0.4, cups: 4 };
+    if (DEMO === 'claimed') return { type: 'claimed', yours: false };
+    if (DEMO === 'pending') return { type: 'pending' };
+    if (DEMO === 'redeem') return { type: 'redeem' };
+    return null;
+  });
+  const [login, setLogin] = useState(null);
+  const [showPolicy, setShowPolicy] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
+  const scanStartedRef = useRef(false);
 
+  const shownBalance = useCountUp(balance);
+  const animal = useMemo(
+    () => animalForProfile({ displayName: profile?.name, animalIndex: profile?.animal_index }),
+    [profile],
+  );
+
+  const applyWallet = useCallback((data) => {
+    if (!data) return;
+    if (data.profile) {
+      setProfile(data.profile);
+      storeProfile(org?.id, { userId: data.profile.user_id, email: data.profile.email, name: data.profile.name });
+    }
+    setBalance(Number(data.balance || 0));
+    setHistory(data.history || []);
+    setOutstanding(data.outstanding || null);
+  }, [org?.id]);
+
+  const refreshWallet = useCallback(async () => {
+    if (DEMO) return;
+    const data = await fetchWallet(org?.id);
+    applyWallet(data);
+  }, [org?.id, applyWallet]);
+
+  /* Bin pins for the map. */
   useEffect(() => {
     let alive = true;
-    if (!org?.id) return undefined;
+    if (!org?.id || DEMO === 'empty') return undefined;
     getSmartbinLocations(org.id)
       .then(rows => { if (alive) setBins(rows || []); })
       .catch(() => {});
     return () => { alive = false; };
   }, [org?.id]);
 
+  /* The wallet itself. */
+  useEffect(() => { refreshWallet(); }, [refreshWallet]);
+
+  /* The scan — only after the cookie choice, and only once. Rejecting the
+   * banner (CookieBlocked) means this never runs: no profile, no credit,
+   * and the receipt stays valid for a later scan. */
   useEffect(() => {
-    let alive = true;
-    if (HOME_DEMO) return undefined;
-    if (!account?.userId) { setLoading(false); return undefined; }
-    Promise.all([
-      getMyClaims([account.userId]).catch(() => []),
-      getMyPending([account.userId]).catch(() => []),
-    ])
-      .then(([rows, pend]) => {
-        if (!alive) return;
-        setClaims(rows || []);
-        // "In process": scanned, but the bin's confirmation hasn't reached
-        // us — no link yet. Resolved rows graduate into claims, so only
-        // the unresolved ones show here.
-        setPending((pend || []).filter(p => !p.resolved_at));
-      })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [account?.userId]);
+    if (DEMO) return;
+    if (!consentReady || scanStartedRef.current) return;
+    const hasBackup = cupIds.length > 0;
+    if (!batchId && !hasBackup) return;
+    scanStartedRef.current = true;
 
-  const [openedMap, setOpenedMap] = useState(() => readOpened(org?.id));
+    (async () => {
+      const data = hasBackup ? await scanBackupCups(cupIds) : await scanBatch(batchId);
+      if (data?.status === 'credited') {
+        if (data.profile) {
+          setProfile(data.profile);
+          storeProfile(org?.id, { userId: data.profile.user_id, email: data.profile.email, name: data.profile.name });
+        }
+        setPopup({ type: 'credited', amount: Number(data.amount || 0), cups: data.cups });
+        await refreshWallet();
+        return;
+      }
+      if (data?.status === 'already_claimed' || data?.error === 'already_claimed') {
+        setPopup({ type: 'claimed', yours: data.yours === true });
+        await refreshWallet();
+        return;
+      }
+      if (data?.status === 'pending_validation') {
+        setPopup({ type: 'pending' });
+        return;
+      }
+      setPopup({ type: 'error', message: SCAN_ERRORS[data?.error] || 'We couldn’t process this receipt right now. Please scan it again in a moment.' });
+    })();
+  }, [consentReady, batchId, cupIds, org?.id, refreshWallet]);
 
-  const totals = useMemo(() => {
-    const done = claims.filter(c => c.status === 'completed');
-    const total = done.reduce((s, c) => s + Number(c.payout_amount || 0), 0);
-    const open = done.filter(c =>
-      c.tikkie_url &&
-      c.tikkie_status !== 'redeemed' &&
-      // Opened over 24h ago → delisted here, kept in the history below.
-      !(openedMap[c.id] && Date.now() - openedMap[c.id] > OPENED_TTL_MS)
-    );
-    const available = open.reduce((s, c) => s + Number(c.payout_amount || 0), 0);
-    return { total, available, openClaims: open };
-  }, [claims, openedMap]);
+  /* While the held-for-review popup is the story, quietly poll: the moment
+   * the bin's confirmation lands, credit the receipt and switch the popup. */
+  useEffect(() => {
+    if (DEMO || popup?.type !== 'pending' || !batchId) return undefined;
+    let stop = false;
+    let timer = null;
+    const startedAt = Date.now();
+    async function tick() {
+      if (stop || Date.now() - startedAt > 30 * 60 * 1000) return;
+      const data = await checkBatch(batchId);
+      if (stop) return;
+      if (data?.status === 'validated' || data?.url) {
+        const credit = await scanBatch(batchId);
+        if (stop) return;
+        if (credit?.status === 'credited') {
+          if (credit.profile) setProfile(credit.profile);
+          setPopup({ type: 'credited', amount: Number(credit.amount || 0), cups: credit.cups });
+          await refreshWallet();
+          return;
+        }
+      }
+      timer = setTimeout(tick, 25000);
+    }
+    timer = setTimeout(tick, 25000);
+    return () => { stop = true; if (timer) clearTimeout(timer); };
+  }, [popup?.type, batchId, refreshWallet]);
 
-  // The hero number animates up as refunds land.
-  const animatedTotal = useCountUp(totals.total);
+  /* Open Tikkie: mint ONE link for the whole balance and go there. */
+  async function handleOpenTikkie() {
+    if (DEMO) { setPopup(null); return; }
+    setRedeeming(true);
+    const data = await redeemWallet(org?.id);
+    setRedeeming(false);
+    if (data?.url) {
+      window.location.href = data.url;
+      return;
+    }
+    setPopup({
+      type: 'error',
+      message: data?.error === 'no_balance'
+        ? 'There’s nothing to collect yet. Return some cups first.'
+        : 'We couldn’t create your Tikkie link right now. Your balance is safe — please try again in a moment.',
+    });
+    refreshWallet();
+  }
 
-  const history = useMemo(
-    () => [...claims].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
-    [claims],
-  );
-
+  /* ── Account view ── */
   if (showAccount) {
     return (
       <UserPage
         tikkieOnly
-        profile={{ displayName: account?.email?.split('@')[0] || 'My account', email: account?.email || '' }}
+        profile={{
+          displayName: profile?.name || 'My account',
+          email: profile?.email || '',
+          animalIndex: profile?.animal_index ?? 0,
+        }}
         onSaveProfile={() => {}}
         cupCount={0}
         history={[]}
-        userClaims={claims}
-        authEmail={account?.email || null}
-        isVisitor={!account}
+        userClaims={[]}
+        authEmail={profile?.email || null}
+        isVisitor={!profile}
         showActivity={false}
         showImpact={false}
         storeName={org?.name}
@@ -309,127 +404,74 @@ export default function TikkieHomePage({ org, settings = {} }) {
     );
   }
 
+  const returns = history.filter(h => h.kind === 'return');
+
   return (
     <div className="app tikkie-home">
-      {/* The REAL home header — brand lockup + the account tile. The
-          add-cups and cup-balance tiles are hidden: no balance here. */}
       <Header
         cupCount={0}
         onBadgeClick={() => setShowAccount(true)}
         onAddCup={() => {}}
         org={org}
         design={null}
-        claimStatus={totals.openClaims.length > 0 ? 'ready' : null}
+        claimStatus={balance > 0 ? 'ready' : null}
         showAdd={false}
         showCups={false}
       />
 
-      {/* ── The hero is the money: figures left, the machine that pays
-           them on the right. The photo is a white-background render, so
-           `multiply` drops its background into the tile instead of
-           needing a cut-out. ── */}
-      <section className="tikkie-home__hero">
+      {/* ── The wallet tile: the AVAILABLE amount, tap to collect ── */}
+      <button type="button" className="tikkie-home__hero" onClick={() => setPopup({ type: 'redeem' })}>
         <div className="tikkie-home__hero-copy">
-          <span className="tikkie-home__hero-label">Total refunded</span>
-          <div className="tikkie-home__hero-amount">€{animatedTotal.toFixed(2)}</div>
+          <span className="tikkie-home__hero-label">Available to collect</span>
+          <div className="tikkie-home__hero-amount">€{shownBalance.toFixed(2)}</div>
           <div className="tikkie-home__hero-sub">
-            {totals.available > 0 ? (
-              <>
-                <span className="tikkie-home__hero-dot" aria-hidden="true" />
-                €{totals.available.toFixed(2)} still to collect
-              </>
-            ) : account ? (
-              'Everything collected. Nice.'
-            ) : (
-              'Scan a receipt from the smart bin to start.'
-            )}
+            {balance > 0
+              ? 'Tap to collect via Tikkie'
+              : profile
+                ? 'Return cups at a smart bin to top up.'
+                : 'Scan a receipt from the smart bin to start.'}
           </div>
         </div>
         <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
-      </section>
+      </button>
 
-      {/* Uncollected refunds go first: actionable beats archival. */}
-      {totals.openClaims.length > 0 && (
-        <section className="tikkie-home__section">
-          <h2 className="tikkie-home__section-title">Ready to collect</h2>
-          {totals.openClaims.map(c => (
-            <a
-              key={c.id}
-              className="tikkie-home__open"
-              href={c.tikkie_url}
-              onClick={() => { markOpened(org?.id, c.id); setOpenedMap(readOpened(org?.id)); }}
-            >
-              <div>
-                <div className="tikkie-home__open-amount">€{Number(c.payout_amount || 0).toFixed(2)}</div>
-                <div className="tikkie-home__open-meta">
-                  {c.cups_redeemed} cup{c.cups_redeemed === 1 ? '' : 's'} · {fmtWhen(c.created_at)}
-                </div>
-              </div>
-              <span className="tikkie-home__open-cta">Open Tikkie</span>
-            </a>
-          ))}
-        </section>
+      {/* ── Save the balance to an email (profiles without one) ── */}
+      {profile && !profile.email && (
+        <EmailSection
+          org={org}
+          onShowPolicy={() => setShowPolicy(true)}
+          onSaved={(p) => { setProfile(p); storeProfile(org?.id, { userId: p.user_id, email: p.email, name: p.name }); }}
+          onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
+        />
       )}
 
-      {/* ── In process: scanned, waiting for the bin's confirmation.
-           The link is generated the moment it arrives, and we email
-           the customer — nothing for them to do here but wait. ── */}
-      {pending.length > 0 && (
-        <section className="tikkie-home__section">
-          <h2 className="tikkie-home__section-title">In process</h2>
-          {pending.map(p => (
-            <div key={p.batch_id} className="tikkie-home__pending">
-              <span className="tikkie-home__pending-clock" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="9" />
-                  <polyline points="12 7 12 12 15.5 14" />
-                </svg>
-              </span>
-              <div className="tikkie-home__pending-main">
-                <span className="tikkie-home__pending-title">Receipt scanned {fmtWhen(p.first_seen)}</span>
-                <span className="tikkie-home__pending-note">We’ll email you when your link is ready.</span>
-              </div>
-              <span className="tikkie-home__row-status">In process</span>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {/* ── History — same visual rhythm as the store account activity ── */}
+      {/* ── Activity ── */}
       <section className="tikkie-home__section">
-        <h2 className="tikkie-home__section-title">Your refunds</h2>
-        {loading ? (
-          <div className="tikkie-home__empty">Loading…</div>
-        ) : history.length === 0 ? (
+        <h2 className="tikkie-home__section-title">Activity</h2>
+        {history.length === 0 ? (
           <div className="tikkie-home__empty">
-            {account
-              ? 'No refunds yet. Return your cups at a smart bin and scan the receipt.'
-              : 'Return your cups at a smart bin, scan the printed receipt, and choose “save for later” to see your refunds here.'}
+            No returns yet. Drop your cups in a smart bin and scan the printed receipt.
           </div>
         ) : (
           <ul className="tikkie-home__history">
-            {history.map(c => {
-              const collected = c.tikkie_status === 'redeemed';
-              return (
-                <li key={c.id} className="tikkie-home__row">
-                  <span className={`tikkie-home__row-icon${collected ? ' tikkie-home__row-icon--done' : ''}`} aria-hidden="true">
-                    {collected ? '✓' : '€'}
+            {history.map(h => (
+              <li key={h.id} className="tikkie-home__row">
+                <span className={`tikkie-home__row-icon${h.kind === 'payout' ? ' tikkie-home__row-icon--done' : ''}`} aria-hidden="true">
+                  {h.kind === 'payout' ? '✓' : '♻︎'}
+                </span>
+                <div className="tikkie-home__row-main">
+                  <span className="tikkie-home__row-title">
+                    {h.kind === 'payout'
+                      ? 'Collected via Tikkie'
+                      : `${h.cups} cup${h.cups === 1 ? '' : 's'} returned`}
                   </span>
-                  <div className="tikkie-home__row-main">
-                    <span className="tikkie-home__row-title">
-                      {c.cups_redeemed} cup{c.cups_redeemed === 1 ? '' : 's'} returned
-                    </span>
-                    <span className="tikkie-home__row-date">{fmtWhen(c.created_at)}</span>
-                  </div>
-                  <div className="tikkie-home__row-right">
-                    <span className="tikkie-home__row-amount">€{Number(c.payout_amount || 0).toFixed(2)}</span>
-                    <span className={`tikkie-home__row-status${collected ? ' tikkie-home__row-status--done' : ''}`}>
-                      {collected ? 'Collected' : 'Ready'}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
+                  <span className="tikkie-home__row-date">{fmtWhen(h.created_at)}</span>
+                </div>
+                <span className={`tikkie-home__row-amount${h.kind === 'payout' ? ' tikkie-home__row-amount--out' : ''}`}>
+                  {h.kind === 'payout' ? '−' : '+'}€{Number(h.amount || 0).toFixed(2)}
+                </span>
+              </li>
+            ))}
           </ul>
         )}
       </section>
@@ -445,7 +487,179 @@ export default function TikkieHomePage({ org, settings = {} }) {
         </p>
       </section>
 
-      <p className="tikkie-home__foot">Powered by PackPerks</p>
+      {/* ── How Tikkie works (static) ── */}
+      <section className="tikkie-home__section">
+        <h2 className="tikkie-home__section-title">How you get paid</h2>
+        <TikkieExplainer />
+      </section>
+
+      {/* ═══ Popups ═══ */}
+
+      {popup?.type === 'credited' && (
+        <Sheet onClose={() => setPopup(null)} label="Refund added">
+          <div className="tk-icon tk-icon--ok" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          </div>
+          <h2 className="tk-sheet__title">€{Number(popup.amount).toFixed(2)} added</h2>
+          <p className="tk-sheet__sub">
+            {popup.cups} cup{popup.cups === 1 ? '' : 's'} returned. Your balance is €{balance.toFixed(2)} —
+            collect it whenever you like from the orange tile.
+          </p>
+          <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Nice</button>
+        </Sheet>
+      )}
+
+      {popup?.type === 'claimed' && (
+        <Sheet onClose={() => setPopup(null)} label="Receipt already used">
+          <div className="tk-icon tk-icon--warn" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+          </div>
+          <h2 className="tk-sheet__title">{popup.yours ? 'Already in your wallet' : 'Receipt already used'}</h2>
+          <p className="tk-sheet__sub">
+            {popup.yours
+              ? 'This receipt was already added to your balance — scanning it again doesn’t add it twice.'
+              : 'This receipt was already added to a wallet, so it can’t be used again.'}
+          </p>
+          <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Understood</button>
+        </Sheet>
+      )}
+
+      {popup?.type === 'pending' && (
+        <PendingSheet
+          org={org}
+          batchId={batchId}
+          profile={profile}
+          onShowPolicy={() => setShowPolicy(true)}
+          onClose={() => setPopup(null)}
+          onProfile={(p) => { setProfile(p); }}
+        />
+      )}
+
+      {popup?.type === 'error' && (
+        <Sheet onClose={() => setPopup(null)} label="Something went wrong">
+          <div className="tk-icon tk-icon--err" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+          </div>
+          <h2 className="tk-sheet__title">Sorry!</h2>
+          <p className="tk-sheet__sub">{popup.message}</p>
+          <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Understood</button>
+        </Sheet>
+      )}
+
+      {popup?.type === 'redeem' && (
+        <Sheet onClose={() => setPopup(null)} label="Collect your balance">
+          <h2 className="tk-sheet__title">Collect your balance</h2>
+          <div className="tk-sheet__amount">
+            €{(outstanding && balance === 0 ? outstanding.amount : balance).toFixed(2)}
+          </div>
+          {outstanding && balance === 0 ? (
+            <p className="tk-sheet__sub">
+              Your Tikkie link is ready — open it to finish collecting this amount.
+            </p>
+          ) : (
+            <TikkieExplainer />
+          )}
+          <div className="tk-sheet__actions">
+            <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>
+              Do it later
+            </button>
+            <button
+              type="button"
+              className="tk-btn tk-btn--tikkie tk-btn--full"
+              onClick={handleOpenTikkie}
+              disabled={redeeming || (balance === 0 && !outstanding)}
+            >
+              {redeeming ? 'Preparing…' : 'Open Tikkie'}
+            </button>
+          </div>
+          {balance === 0 && !outstanding && (
+            <p className="tk-note">Nothing to collect yet — return some cups first.</p>
+          )}
+        </Sheet>
+      )}
+
+      {showPolicy && (
+        <PrivacyPolicyView text={settings?.privacyPolicyText} onClose={() => setShowPolicy(false)} />
+      )}
+
+      {login && (
+        <LoginSheet
+          org={org}
+          batchId={batchId}
+          initialEmail={login.email}
+          startAtCode={login.startAtCode}
+          onClose={() => setLogin(null)}
+          onLoggedIn={() => { setLogin(null); refreshWallet(); }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Held for review: the bin's confirmation hasn't reached us. Email
+   capture when the profile has no address; a plain acknowledgement when
+   it does (we already know where to write). ── */
+function PendingSheet({ org, batchId, profile, onClose, onProfile, onShowPolicy }) {
+  const hasEmail = !!profile?.email;
+  const [email, setEmailVal] = useState('');
+  const [privacyOk, setPrivacyOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (busy || !privacyOk) return;
+    setBusy(true);
+    setErr(null);
+    const data = await savePendingEmail(org?.id, batchId, email.trim(), false);
+    setBusy(false);
+    if (data?.status === 'saved' || data?.status === 'saved_pending') {
+      setSaved(true);
+      if (data.user_id) onProfile?.({ user_id: data.user_id, email: email.trim(), name: profile?.name, animal_index: profile?.animal_index });
+      return;
+    }
+    setErr(data?.error === 'invalid_email'
+      ? 'That doesn’t look like an email address.'
+      : 'We couldn’t save your email just now. Please try again.');
+  }
+
+  return (
+    <Sheet onClose={onClose} label="Return held for review">
+      <div className="tk-icon tk-icon--warn" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
+      </div>
+      <h2 className="tk-sheet__title">Held for review</h2>
+      <p className="tk-sheet__sub">
+        We couldn’t confirm this return with the smart bin yet — it can take up to 30 minutes.
+        {hasEmail || saved
+          ? ' We’ll email you as soon as it’s added to your balance.'
+          : ' Leave your email and we’ll let you know the moment it’s added to your balance.'}
+      </p>
+      {hasEmail || saved ? (
+        <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={onClose}>Understood</button>
+      ) : (
+        <form onSubmit={submit}>
+          <input
+            type="email"
+            inputMode="email"
+            className="tk-input"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmailVal(e.target.value)}
+            disabled={busy}
+            required
+          />
+          <label className="tk-consent">
+            <input type="checkbox" checked={privacyOk} onChange={e => setPrivacyOk(e.target.checked)} disabled={busy} />
+            <span>I have read the <button type="button" className="tk-link" onClick={onShowPolicy}>Privacy Policy</button>.</span>
+          </label>
+          {err && <p className="tk-err">{err}</p>}
+          <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || !email.trim() || !privacyOk}>
+            {busy ? 'Saving…' : 'Email me when it’s added'}
+          </button>
+        </form>
+      )}
+    </Sheet>
   );
 }

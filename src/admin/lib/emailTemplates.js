@@ -23,11 +23,11 @@ export const EMAIL_TEMPLATES = [
     key: 'refund_ready',
     label: 'Refund ready',
     sentBy: 'bin-mint-batch',
-    when: 'The customer left their email on the waiting screen, and the smart bin has now confirmed the receipt. This is the mail that hands them their payout link.',
+    when: 'The customer left their email on the held-for-review popup, and the smart bin has now confirmed the receipt. This mail brings them back — opening the link adds the refund to their balance.',
     canDisable: true,
     disableNote: 'Turn this off and customers who left an email while waiting are never told their refund is ready.',
     tags: [
-      { tag: '{{link}}',   desc: 'The customer’s receipt link (opens their payout)', sample: 'https://perks.packback.network/t3/?batch=…' },
+      { tag: '{{link}}',   desc: 'The customer’s receipt link (opens their wallet and credits it)', sample: 'https://perks.packback.network/t3/?batch=…' },
       { tag: '{{amount}}', desc: 'Payout amount, formatted (e.g. 0.40)',             sample: '0.40' },
       { tag: '{{cups}}',   desc: 'Cups on the receipt',                              sample: '4' },
       { tag: '{{venue}}',  desc: 'Venue name',                                       sample: 'Unknown Campus' },

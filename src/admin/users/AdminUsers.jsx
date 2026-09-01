@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, deleteGroupAccounts, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
-import TikkieMailosSection from './TikkieMailosSection';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import PiiMask from '../shared/PiiMask';
@@ -783,10 +782,6 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
         }}
       />
 
-      {/* Redirect Refund also has "mailos": people who left an email on the
-          waiting screen without opening an account. They are not users, so
-          they get their own section rather than fake rows in the table. */}
-      {isTikkie && <TikkieMailosSection accounts={users.length} />}
 
       <MergeRequestsSection focusSection={focusSection} onSectionConsumed={onSectionConsumed} />
     </div>

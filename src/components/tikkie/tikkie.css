@@ -1,0 +1,117 @@
+/* Shared Redirect Refund pieces: bottom sheets, inputs, buttons, and the
+   Tikkie explainer. Customer-app palette (green primary, Tikkie purple). */
+
+/* ── Bottom sheet ── */
+.tk-sheet {
+  position: fixed; inset: 0; z-index: 4000;
+  display: flex; align-items: flex-end;
+}
+.tk-sheet__backdrop { position: absolute; inset: 0; background: rgba(31, 27, 22, 0.45); }
+.tk-sheet__card {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 22px 22px 0 0;
+  padding: 26px 22px calc(env(safe-area-inset-bottom, 0px) + 26px);
+  animation: tk-sheet-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  text-align: left;
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+@keyframes tk-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .tk-sheet__card { animation: none; } }
+.tk-sheet__close {
+  position: absolute; top: 14px; right: 14px;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: #F1EBDF; color: #6C6259;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.tk-sheet__title { margin: 0 0 6px; font-size: 19px; font-weight: 800; color: #1F1B16; }
+.tk-sheet__sub { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: #6C6259; }
+.tk-sheet__amount {
+  margin: 2px 0 12px;
+  font-size: 34px; font-weight: 800; letter-spacing: -0.02em; color: #1F1B16;
+}
+
+/* ── Inputs, buttons, links ── */
+.tk-input {
+  width: 100%; box-sizing: border-box; padding: 13px 14px;
+  border: 1.5px solid #E2DACA; border-radius: 11px;
+  font-family: inherit; font-size: 15px; color: #1F1B16; background: #fff;
+}
+.tk-input:focus { outline: none; border-color: #1A8737; }
+.tk-input--code {
+  font-family: ui-monospace, monospace;
+  font-size: 22px; letter-spacing: 0.35em; text-align: center;
+}
+.tk-btn {
+  display: inline-block;
+  padding: 13px 26px; border-radius: 999px;
+  border: 1.5px solid #1A8737; background: #fff; color: #1A8737;
+  font-family: inherit; font-size: 15px; font-weight: 800;
+  text-decoration: none; text-align: center; cursor: pointer;
+}
+.tk-btn:disabled { opacity: 0.5; cursor: default; }
+.tk-btn--primary { background: #1A8737; color: #fff; }
+.tk-btn--tikkie { background: #47478A; border-color: #47478A; color: #fff; }
+.tk-btn--full { width: 100%; margin-top: 12px; box-sizing: border-box; }
+.tk-link {
+  border: none; background: none; padding: 0;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  color: #1A8737; text-decoration: underline; cursor: pointer;
+}
+.tk-link--center { display: block; width: 100%; margin-top: 12px; text-align: center; }
+.tk-err { margin: 9px 0 0; font-size: 12.5px; color: #C4472B; }
+.tk-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: #9A9186; }
+
+/* Consent checkboxes (same pattern as the sign-in sheet). */
+.tk-consent {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 12px 2px 0; cursor: pointer;
+  font-size: 12.5px; line-height: 1.5; color: #6C6259; text-align: left;
+}
+.tk-consent input { margin-top: 2px; accent-color: #1A8737; }
+
+/* Sheet status icons */
+.tk-icon {
+  width: 46px; height: 46px; margin: 0 auto 14px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.tk-icon--ok   { background: #1A8737; color: #fff; }
+.tk-icon--warn { background: #FCF2D6; color: #9A6E12; }
+.tk-icon--err  { background: #FBEAE5; color: #C4472B; }
+
+/* ── The Tikkie explainer ── */
+.tk-explain {
+  display: flex; align-items: stretch; gap: 12px;
+  padding: 14px;
+  background: #F7F4EC;
+  border-radius: 16px;
+  text-align: left;
+}
+.tk-explain__text {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.tk-explain__lead {
+  margin: 0 0 12px;
+  font-size: 13.5px; line-height: 1.5; font-weight: 600; color: #5F584F;
+}
+.tk-explain__lead strong { color: #47478A; font-weight: 800; }
+.tk-explain__q { margin: 0 0 8px; font-size: 13.5px; font-weight: 800; color: #1F1B16; }
+.tk-explain__text ul {
+  margin: 0; padding: 0 0 0 16px;
+  list-style: disc;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.tk-explain__text li { font-size: 13px; line-height: 1.4; color: #5F584F; }
+.tk-explain__text li::marker { color: #47478A; }
+.tk-explain__text strong { color: #1F1B16; }
+.tk-explain__shot {
+  flex-shrink: 0;
+  height: 208px; width: auto;
+  align-self: center;
+  display: block;
+}

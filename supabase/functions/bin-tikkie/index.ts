@@ -5,14 +5,17 @@
 // For an org whose published config has settings.mode === 'tikkie_only',
 // the app renders a minimal redirect page that calls THIS function:
 //
-//   1. resolve the batch → its cups + org
-//   2. server-side authority: the org must really be tikkie_only
-//   3. atomically activate the batch's available cups (the replay guard —
-//      row state, same model as claim-cups)
-//   4. payout = cups × the org's per-cup refund rate (server config, never client)
-//   5. one claims row per batch (unique index on batch_id = idempotency)
-//   6. mint the Tikkie cashback (same lock + API contract as tikkie-cashback)
-//   7. return the Tikkie URL — re-scans return the SAME link forever
+//   WALLET MODEL (v11):
+//   1. resolve the batch → its cups + org (must really be tikkie_only)
+//   2. atomically activate the batch's available cups (the replay guard)
+//   3. find or create the device's PROFILE (adjective+animal identity,
+//      the same one every other PackPerks mode assigns)
+//   4. CREDIT the receipt's value to that profile — one claims row per
+//      batch (unique index = idempotency), user_id set, NO Tikkie link
+//   5. a link is minted only by the separate `redeem` action, covering
+//      the whole available balance in one bulk cashback
+//   A re-scan of a credited batch reports already_claimed (and whether
+//   it was credited to THIS device), never a link.
 //
 // A second entry point handles the OFFLINE case: when the bin can't reach
 // us it prints one of its reserved "backup" cup ids instead of a batch.
@@ -81,6 +84,30 @@ async function backupLimits(orgId: string): Promise<{ dailyCap: number; perDevic
   } catch {
     return { dailyCap: BACKUP_DAILY_CAP_DEFAULT, perDeviceDaily: BACKUP_DEVICE_DAILY_DEFAULT };
   }
+}
+
+/* ── Anonymous identity ──
+ * Mirror of src/lib/animals.js: adjective + animal display name, with
+ * animal_index stored on the row so the client resolves the emoji avatar
+ * exactly like every other mode. Keep the two lists in sync. */
+const ADJECTIVES = [
+  "Bouncy", "Wiggly", "Zesty", "Jolly", "Sparkly", "Peppy", "Snuggly", "Dizzy", "Silly", "Cheery",
+  "Mellow", "Toasty", "Nifty", "Fuzzy", "Bubbly", "Perky", "Wobbly", "Sunny", "Goofy", "Chirpy",
+  "Sprightly", "Cozy", "Giggly", "Plucky", "Twinkly", "Scooty", "Fluffy", "Munchy", "Noodly", "Breezy",
+  "Dapper", "Hoppy", "Jumpy", "Poppy", "Jazzy", "Quirky", "Glowy", "Tippy", "Wavy", "Clever",
+  "Mighty", "Tiny", "Swift", "Dreamy", "Buttoned", "Curious", "Gentle", "Happy", "Playful", "Whimsical",
+];
+const ANIMAL_NAMES = [
+  "Axolotl", "Capybara", "Quokka", "Penguin", "Puffin", "Otter", "Wombat", "Meerkat", "Alpaca", "Koala",
+  "Panda", "Turtle", "Hedgehog", "Squirrel", "Raccoon", "Seal", "Dolphin", "Narwhal", "Llama", "Gecko",
+  "Chameleon", "Platypus", "Kangaroo", "Wallaby", "Hamster", "Ferret", "Marmot", "Beaver", "Badger", "Fox",
+  "Rabbit", "Duck", "Goose", "Flamingo", "Toucan", "Parrot", "Kiwi", "Sloth", "Tapir", "Manatee",
+  "Mongoose", "Lemur", "Opossum", "Armadillo", "Porcupine", "Pangolin", "Moose", "Yak", "Octopus", "Seahorse",
+];
+function generateIdentity(): { displayName: string; animalIndex: number } {
+  const animalIndex = Math.floor(Math.random() * ANIMAL_NAMES.length);
+  const adjective = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  return { displayName: `${adjective} ${ANIMAL_NAMES[animalIndex]}`, animalIndex };
 }
 
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
@@ -418,13 +445,17 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
   const count = cupIds.length;
   const amount = Math.min(maxTotal, Math.round(count * rate * 100) / 100);
 
-  // A synthetic batch id per scan. Backup cups deliberately do NOT dedupe
-  // on the cup ids — a fresh id here is what gives every scan its own
-  // claim row, its own Tikkie link, and its own line in the payout log.
+  /* Wallet model: the backup scan CREDITS the scanner's wallet exactly
+   * like a normal receipt (synthetic batch id per scan — the reserved
+   * ids deliberately don't dedupe), and no link is minted here. */
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+  const profile = await findOrCreateProfile(orgId, deviceId);
+  if (!profile) return json({ error: "account_failed" }, 500);
+
   const syntheticBatch = crypto.randomUUID();
   const { data: inserted, error: insErr } = await supabase.from("claims")
     .insert({
-      user_id: null,
+      user_id: profile.id,
       org_id: orgId,
       type: "cashback",
       status: "completed",
@@ -439,10 +470,22 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
   if (insErr || !inserted) return json({ error: "claim_insert_failed", detail: insErr?.message }, 500);
 
   const claim = inserted as ClaimRow;
-  const minted = await mintForClaim(claim);
+  const { balance } = await walletBalance(profile.id);
+  const credited = json({
+    status: "credited",
+    amount,
+    cups: count,
+    balance,
+    profile: {
+      user_id: profile.id,
+      name: profile.display_name,
+      animal_index: profile.animal_index,
+      email: profile.email,
+    },
+  });
 
-  // Log + alert regardless of how the mint went: the bin being offline is
-  // the thing worth knowing, and a failed mint is even more worth knowing.
+  // Log + alert regardless: the bin being offline is the thing worth
+  // knowing, whatever else happens with the credit.
   const usedAt = new Date().toISOString();
   await supabase.from("backup_cup_uses").insert(
     cupsRows.map((c) => ({
@@ -473,7 +516,7 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
     when: new Date(usedAt).toUTCString(),
   });
 
-  return minted;
+  return credited;
 }
 
 /* ── Accounts ────────────────────────────────────────────────────────────
@@ -481,39 +524,83 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
  * email to save a refund for later, or to be notified when a pending
  * receipt is validated. One account per device per org — the same
  * users_device_org uniqueness the rest of PackPerks relies on. */
-async function findOrCreateUser(orgId: string, deviceId: string, email: string, marketing: boolean): Promise<string | null> {
+interface ProfileRow {
+  id: string;
+  display_name: string | null;
+  animal_index: number | null;
+  email: string | null;
+}
+const PROFILE_COLS = "id, display_name, animal_index, email";
+
+async function findOrCreateProfile(
+  orgId: string,
+  deviceId: string,
+  email: string | null = null,
+  marketing = false,
+): Promise<ProfileRow | null> {
   try {
     const { data: existing } = await supabase
-      .from("users").select("id")
+      .from("users").select(PROFILE_COLS)
       .eq("org_id", orgId).eq("device_id", deviceId)
       .is("merged_into", null)
       .maybeSingle();
     if (existing?.id) {
-      await supabase.from("users").update({
-        email,
-        marketing_consent: marketing,
-        marketing_consent_at: marketing ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      }).eq("id", existing.id);
-      return existing.id as string;
+      if (email) {
+        await supabase.from("users").update({
+          email,
+          marketing_consent: marketing,
+          marketing_consent_at: marketing ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        }).eq("id", existing.id);
+        return { ...(existing as ProfileRow), email };
+      }
+      return existing as ProfileRow;
     }
+    // Fresh profile: the same playful identity every other mode assigns.
+    const identity = generateIdentity();
     const { data: created, error } = await supabase.from("users").insert({
       org_id: orgId,
       device_id: deviceId,
       email,
-      display_name: "Refund account",
+      display_name: identity.displayName,
+      animal_index: identity.animalIndex,
       marketing_consent: marketing,
       marketing_consent_at: marketing ? new Date().toISOString() : null,
-    }).select("id").maybeSingle();
+    }).select(PROFILE_COLS).maybeSingle();
     if (error) {
-      console.error(`[bin-tikkie] user create failed: ${error.message}`);
+      console.error(`[bin-tikkie] profile create failed: ${error.message}`);
       return null;
     }
-    return (created?.id as string) ?? null;
+    return (created as ProfileRow) ?? null;
   } catch (e) {
-    console.error(`[bin-tikkie] findOrCreateUser: ${String(e)}`);
+    console.error(`[bin-tikkie] findOrCreateProfile: ${String(e)}`);
     return null;
   }
+}
+
+/* Back-compat shim for the flows that only need the id. */
+async function findOrCreateUser(orgId: string, deviceId: string, email: string, marketing: boolean): Promise<string | null> {
+  const p = await findOrCreateProfile(orgId, deviceId, email, marketing);
+  return p?.id ?? null;
+}
+
+/* The wallet's arithmetic, in one place: available = credits not yet swept
+ * into a payout. Legacy per-return links (credits that carry their own
+ * tikkie_url from the pre-wallet era) are excluded — their money already
+ * left through that link. */
+async function walletBalance(userId: string): Promise<{ balance: number; credits: number }> {
+  const { data } = await supabase
+    .from("claims")
+    .select("payout_amount")
+    .eq("user_id", userId)
+    .not("batch_id", "is", null)
+    .is("payout_claim_id", null)
+    .is("tikkie_url", null);
+  const rows = data || [];
+  return {
+    balance: Math.round(rows.reduce((t, r) => t + Number(r.payout_amount || 0), 0) * 100) / 100,
+    credits: rows.length,
+  };
 }
 
 /* The pending screen knows which org's page it is on (the slug in the
@@ -694,8 +781,12 @@ async function loginVerify(body: Record<string, unknown>): Promise<Response> {
   // needed verification, or a login opened from a receipt page).
   const batchId = String(body.batch_id || otp.batch_id || "").trim().toLowerCase();
   if (UUID_RE.test(batchId)) {
-    const claim = await claimForBatch(batchId);
-    if (claim) await supabase.from("claims").update({ user_id: user.id }).eq("id", claim.id);
+    // Attach the receipt — but never MOVE money: a claim already credited
+    // to another wallet stays where it is (wallet model).
+    await supabase.from("claims")
+      .update({ user_id: user.id })
+      .eq("batch_id", batchId)
+      .is("user_id", null);
     await supabase.from("pending_batches")
       .update({ email, user_id: user.id }).eq("batch_id", batchId);
   }
@@ -728,24 +819,29 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
   const claim = await claimForBatch(batchId);
   if (claim) {
     const { data: claimRow } = await supabase
-      .from("claims").select("org_id").eq("id", claim.id).maybeSingle();
+      .from("claims").select("org_id, user_id").eq("id", claim.id).maybeSingle();
     const orgId = (claimRow?.org_id as string) || null;
     if (!orgId) return json({ error: "batch_not_found" }, 404);
-    // The email may already own an account — on ANOTHER device. Attaching
-    // the refund there on someone's say-so would let anyone claim into a
-    // stranger's history, so a device mismatch demands the email code.
+    /* Wallet model: a credited claim IS money in someone's wallet. It may
+     * only ever move onto the profile of the device that already owns it
+     * — re-pointing it anywhere else on say-so would let a photographed
+     * receipt drain the scanner's wallet. */
+    const mine = await findOrCreateProfile(orgId, deviceId);
+    if (!mine) return json({ error: "account_failed" }, 500);
+    if (claimRow?.user_id && claimRow.user_id !== mine.id) {
+      return json({ error: "already_claimed" }, 409);
+    }
+    // The email may already own an account — on ANOTHER device. The email
+    // code proves ownership before anything is linked to it.
     const owner = await userByEmail(orgId, email);
     if (owner && owner.device_id && owner.device_id !== deviceId) {
       const sent = await sendOtpEmail(orgId, email, "attach", batchId, deviceId);
       if (!sent) return json({ error: "code_send_failed" }, 502);
       return json({ status: "verify_required" });
     }
-    const userId = owner
-      ? owner.id
-      : await findOrCreateUser(orgId, deviceId, email, marketing);
-    if (!userId) return json({ error: "account_failed" }, 500);
-    await supabase.from("claims").update({ user_id: userId }).eq("id", claim.id);
-    return json({ status: "saved", user_id: userId });
+    await findOrCreateProfile(orgId, deviceId, email, marketing);
+    await supabase.from("claims").update({ user_id: mine.id }).eq("id", claim.id);
+    return json({ status: "saved", user_id: mine.id });
   }
 
   const { data: pending } = await supabase
@@ -784,6 +880,172 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
   return json({ status: "saved_pending", user_id: userId });
 }
 
+/* ── The wallet ──────────────────────────────────────────────────────
+ * action:"wallet" {org_id, device_id} — everything the home screen needs
+ * in one read-only call: the profile (name/animal/email), the available
+ * balance, the return history, and any outstanding bulk-payout link. */
+async function walletAction(body: Record<string, unknown>): Promise<Response> {
+  const orgId = String(body.org_id || "").trim();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+
+  const { data: profile } = await supabase
+    .from("users").select(PROFILE_COLS)
+    .eq("org_id", orgId).eq("device_id", deviceId)
+    .is("merged_into", null)
+    .maybeSingle();
+  if (!profile) return json({ profile: null, balance: 0, history: [] });
+
+  const [{ balance }, { data: rows }] = await Promise.all([
+    walletBalance(profile.id),
+    supabase.from("claims")
+      .select("id, created_at, cups_redeemed, payout_amount, batch_id, payout_claim_id, tikkie_url, tikkie_status")
+      .eq("user_id", profile.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+
+  const history = (rows || []).map(r => ({
+    id: r.id,
+    kind: r.batch_id ? "return" : "payout",
+    cups: r.cups_redeemed,
+    amount: Number(r.payout_amount || 0),
+    created_at: r.created_at,
+    redeemed: r.tikkie_status === "redeemed",
+  }));
+  // An outstanding bulk link: money already swept out of the balance but
+  // (as far as we know) not collected yet — "Open Tikkie" reopens it.
+  const outstanding = (rows || []).find(r =>
+    !r.batch_id && r.tikkie_url && r.tikkie_status !== "redeemed" && r.tikkie_status !== "expired");
+
+  return json({
+    profile: {
+      user_id: profile.id,
+      name: profile.display_name,
+      animal_index: profile.animal_index,
+      email: profile.email,
+    },
+    balance,
+    history,
+    outstanding: outstanding ? { url: outstanding.tikkie_url, amount: Number(outstanding.payout_amount || 0) } : null,
+  });
+}
+
+/* ── Bulk redemption ─────────────────────────────────────────────────
+ * action:"redeem" {org_id, device_id} — sweep every available credit into
+ * ONE payout row, mint ONE Tikkie link for the total, return it. No email
+ * required: holding the device that earned the credits IS the identity.
+ *
+ * Race-safe: the sweep is a single conditional UPDATE, so two concurrent
+ * redeems can't both claim the same credits — the loser sweeps nothing,
+ * cleans up its empty payout row, and gets the winner's link back. */
+async function redeemAction(body: Record<string, unknown>): Promise<Response> {
+  const orgId = String(body.org_id || "").trim();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+
+  const { data: profile } = await supabase
+    .from("users").select("id")
+    .eq("org_id", orgId).eq("device_id", deviceId)
+    .is("merged_into", null)
+    .maybeSingle();
+  if (!profile) return json({ error: "no_balance" }, 404);
+
+  const outstandingReply = async (): Promise<Response | null> => {
+    const { data: out } = await supabase
+      .from("claims").select(CLAIM_COLS)
+      .eq("user_id", profile.id).is("batch_id", null)
+      .not("tikkie_url", "is", null)
+      .order("created_at", { ascending: false }).limit(5);
+    const live = (out || []).find(r => r.tikkie_status !== "redeemed" && r.tikkie_status !== "expired");
+    if (live) return claimReply(live as ClaimRow, "exists");
+    return null;
+  };
+
+  // The payout row first (amount filled in after the sweep tells us the sum).
+  const { data: payout, error: insErr } = await supabase.from("claims")
+    .insert({
+      user_id: profile.id,
+      org_id: orgId,
+      type: "cashback",
+      status: "completed",
+      payout_status: "queued",
+      cups_redeemed: 0,
+      payout_amount: 0,
+      batch_id: null,
+      notify_email: false,
+      notify_push: false,
+    })
+    .select(CLAIM_COLS).maybeSingle();
+  if (insErr || !payout) return json({ error: "claim_insert_failed", detail: insErr?.message }, 500);
+
+  // The atomic sweep. tikkie_url IS NULL excludes legacy per-return links,
+  // whose money already left through their own link.
+  const { data: swept, error: sweepErr } = await supabase.from("claims")
+    .update({ payout_claim_id: payout.id })
+    .eq("user_id", profile.id)
+    .not("batch_id", "is", null)
+    .is("payout_claim_id", null)
+    .is("tikkie_url", null)
+    .select("id, payout_amount, cups_redeemed");
+  if (sweepErr) {
+    await supabase.from("claims").delete().eq("id", payout.id);
+    return json({ error: "db_error", detail: sweepErr.message }, 500);
+  }
+  if (!swept || swept.length === 0) {
+    await supabase.from("claims").delete().eq("id", payout.id);
+    const existing = await outstandingReply();
+    return existing ?? json({ error: "no_balance" }, 409);
+  }
+
+  const amount = Math.round(swept.reduce((t, r) => t + Number(r.payout_amount || 0), 0) * 100) / 100;
+  const cups = swept.reduce((t, r) => t + Number(r.cups_redeemed || 0), 0);
+  await supabase.from("claims")
+    .update({ payout_amount: amount, cups_redeemed: cups })
+    .eq("id", payout.id);
+
+  const minted = await mintForClaim({ ...(payout as ClaimRow), payout_amount: amount, cups_redeemed: cups });
+  if (minted.status >= 400) {
+    // Put the money back: release the credits and drop the empty payout.
+    await supabase.from("claims").update({ payout_claim_id: null }).eq("payout_claim_id", payout.id);
+    await supabase.from("claims").delete().eq("id", payout.id);
+  }
+  return minted;
+}
+
+/* ── Email on the profile ────────────────────────────────────────────
+ * action:"set_email" {org_id, device_id, email, privacy_accepted,
+ * marketing_consent} — the home page's "save your balance" section. If
+ * the email already belongs to a DIFFERENT device's profile, the email
+ * code proves ownership first (verify_required → login_verify switches
+ * this device onto that account). */
+async function setEmailAction(body: Record<string, unknown>): Promise<Response> {
+  const orgId = String(body.org_id || "").trim();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  const email = String(body.email || "").trim().toLowerCase();
+  const marketing = body.marketing_consent === true;
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "invalid_email" }, 400);
+  if (body.privacy_accepted !== true) return json({ error: "privacy_required" }, 400);
+
+  const owner = await userByEmail(orgId, email);
+  if (owner && owner.device_id && owner.device_id !== deviceId) {
+    const sent = await sendOtpEmail(orgId, email, "attach", null, deviceId);
+    if (!sent) return json({ error: "code_send_failed" }, 502);
+    return json({ status: "verify_required" });
+  }
+
+  const profile = await findOrCreateProfile(orgId, deviceId, email, marketing);
+  if (!profile) return json({ error: "account_failed" }, 500);
+  return json({
+    status: "saved",
+    profile: { user_id: profile.id, name: profile.display_name, animal_index: profile.animal_index, email },
+  });
+}
+
 /* action:"check" — the pending screen's poll. Read-only and cheap: is the
  * batch validated yet? Never mints, never activates cups, never writes —
  * the client makes ONE real scan call once this says the wait is over. */
@@ -811,13 +1073,14 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* fall through to validation */ }
 
-  // The pending screen's poll: read-only, own (roomy) rate bucket so a
-  // waiting customer can't poll themselves out of their actual payout.
-  if (body.action === "check") {
+  // Read-only calls ride the roomy bucket: the wallet home refreshes
+  // whenever it opens, and the pending poll fires every 25s — neither
+  // must eat the 30/h that money-moving calls depend on.
+  if (body.action === "check" || body.action === "wallet") {
     if (await rateLimited(req, "bin-tikkie-check", RL_MAX_CHECK)) {
       return json({ error: "rate_limited" }, 429);
     }
-    return checkBatch(body);
+    return body.action === "wallet" ? walletAction(body) : checkBatch(body);
   }
 
   // Login-code flows: sending emails gets the tightest bucket; verifying
@@ -833,7 +1096,13 @@ Deno.serve(async (req) => {
 
   if (body.action === "login_verify") return loginVerify(body);
 
-  // "Save for later" / pending notification signup.
+  // Bulk redemption: the ONLY place a Tikkie link is minted now.
+  if (body.action === "redeem") return redeemAction(body);
+
+  // The home page's "save your balance" email section.
+  if (body.action === "set_email") return setEmailAction(body);
+
+  // Pending-receipt notification signup (kept for the held-for-review popup).
   if (body.action === "save_email") return saveEmail(body);
 
   // The offline receipt carries cup ids rather than a batch.
@@ -848,15 +1117,30 @@ Deno.serve(async (req) => {
   const batchId = String(body.batch_id || "").trim().toLowerCase();
   if (!UUID_RE.test(batchId)) return json({ error: "invalid_batch" }, 400);
 
-  // Fast path: the batch was already converted — hand back the same link.
+  const scanDeviceId = String(body.device_id || "").trim().slice(0, 64);
+
+  /* Re-scan: the batch was already credited to a wallet. Never a link —
+   * report it, and say whether it was THIS device's wallet so the page
+   * can show "it's in your wallet" instead of an accusation. */
   const existing = await claimForBatch(batchId);
   if (existing) {
-    if (existing.tikkie_url) {
-      const live = await liveTikkieStatus(existing.tikkie_cashback_id);
-      return claimReply(existing, "exists", live);
+    let yours = false;
+    if (scanDeviceId) {
+      const { data: me } = await supabase
+        .from("users").select("id")
+        .eq("device_id", scanDeviceId).is("merged_into", null)
+        .limit(5);
+      const mine = new Set((me || []).map(u => u.id));
+      const { data: full } = await supabase
+        .from("claims").select("user_id").eq("id", existing.id).maybeSingle();
+      yours = !!full?.user_id && mine.has(full.user_id);
     }
-    if (existing.tikkie_status === "minting") return json({ status: "in_progress" }, 202);
-    return mintForClaim(existing); // earlier mint failed — resume it
+    return json({
+      status: "already_claimed",
+      yours,
+      amount: existing.payout_amount,
+      cups: existing.cups_redeemed,
+    }, 409);
   }
 
   // Resolve the batch → cups + owning org.
@@ -930,32 +1214,38 @@ Deno.serve(async (req) => {
   const maxTotal = Math.min(MAX_TOTAL_EUR, Number.isFinite(cfgMax) && cfgMax > 0 ? cfgMax : MAX_TOTAL_EUR);
   const amount = Math.min(maxTotal, Math.round(count * rate * 100) / 100);
 
-  // If the customer pre-registered on the waiting screen, their account is
-  // on the pending row — the claim is born attached to it. If they left an
-  // email while the org was still unknown (no account could be created
-  // yet), create it now: whoever opens the ready link is the customer, and
-  // their device id has just arrived with this request.
-  let pendingUserId: string | null = null;
+  /* The wallet owner: the scanning device's profile (created on first
+   * scan — this is the moment a customer becomes a profile). A pending
+   * pre-registration wins if one exists: they claimed this receipt while
+   * waiting, possibly from this very device. */
+  let profile: ProfileRow | null = null;
   {
     const { data: p } = await supabase
       .from("pending_batches")
       .select("user_id, email, marketing_consent")
       .eq("batch_id", batchId).maybeSingle();
-    pendingUserId = (p?.user_id as string) ?? null;
-    const scanDevice = String(body.device_id || "").trim().slice(0, 64);
-    if (!pendingUserId && p?.email && scanDevice) {
-      pendingUserId = await findOrCreateUser(orgId, scanDevice, p.email as string, p.marketing_consent === true);
-      if (pendingUserId) {
+    if (p?.user_id) {
+      const { data: pre } = await supabase
+        .from("users").select(PROFILE_COLS).eq("id", p.user_id).maybeSingle();
+      profile = (pre as ProfileRow) ?? null;
+    }
+    if (!profile && scanDeviceId) {
+      profile = await findOrCreateProfile(
+        orgId, scanDeviceId, (p?.email as string) ?? null, p?.marketing_consent === true,
+      );
+      if (profile && p) {
         await supabase.from("pending_batches")
-          .update({ user_id: pendingUserId }).eq("batch_id", batchId);
+          .update({ user_id: profile.id }).eq("batch_id", batchId);
       }
     }
   }
+  if (!profile) return json({ error: "missing_device" }, 400);
 
-  // One claim per batch — the unique index arbitrates concurrent scans.
+  // The CREDIT — one claims row per batch (the unique index arbitrates
+  // concurrent scans), attached to the wallet, and deliberately linkless.
   const { data: inserted, error: insErr } = await supabase.from("claims")
     .insert({
-      user_id: pendingUserId, // attached if they pre-registered; else anonymous
+      user_id: profile.id,
       org_id: orgId,
       type: "cashback",
       status: "completed",    // the bin already verified the deposit
@@ -968,15 +1258,23 @@ Deno.serve(async (req) => {
     })
     .select(CLAIM_COLS).maybeSingle();
   if (insErr) {
-    // Unique-violation race: the concurrent scan inserted first — reuse it.
+    // Unique-violation race: the concurrent scan credited first.
     const race = await claimForBatch(batchId);
-    if (race) {
-      if (race.tikkie_url) return claimReply(race, "exists");
-      if (race.tikkie_status === "minting") return json({ status: "in_progress" }, 202);
-      return mintForClaim(race);
-    }
+    if (race) return json({ status: "already_claimed", yours: true, amount: race.payout_amount, cups: race.cups_redeemed }, 409);
     return json({ error: "claim_insert_failed", detail: insErr.message }, 500);
   }
 
-  return mintForClaim(inserted as ClaimRow);
+  const { balance } = await walletBalance(profile.id);
+  return json({
+    status: "credited",
+    amount,
+    cups: count,
+    balance,
+    profile: {
+      user_id: profile.id,
+      name: profile.display_name,
+      animal_index: profile.animal_index,
+      email: profile.email,
+    },
+  });
 });

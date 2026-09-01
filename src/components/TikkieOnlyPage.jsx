@@ -104,12 +104,19 @@ function TikkieExplainer() {
   return (
     <div className="tikkie-only__explain">
       <div className="tikkie-only__explain-text">
-        <p className="tikkie-only__explain-lead">Your refund is paid through <strong>Tikkie</strong>.</p>
+        <p className="tikkie-only__explain-lead">
+          Your refund is via <strong>Tikkie</strong>. Tikkie is a secure, fast way to get money
+          straight into your bank account.
+        </p>
+        <p className="tikkie-only__explain-q">Don’t have Tikkie yet?</p>
         <ul>
-          <li>Enter your <strong>IBAN</strong> and last name.</li>
-          <li>Visa and Mastercard are <strong>not</strong> supported.</li>
-          <li>The money arrives within minutes.</li>
+          <li>Click <strong>Open Tikkie</strong></li>
+          <li>Enter your <strong>IBAN</strong> and last name</li>
+          <li>The money arrives within minutes</li>
         </ul>
+        {/* Kept out of the list on purpose: it is a warning, not a step,
+            and customers who reach for a card get stuck without it. */}
+        <p className="tikkie-only__explain-warn">Visa and Mastercard are not supported.</p>
       </div>
       <img className="tikkie-only__shot" src={tikkieClaimShot} alt="The Tikkie payout page" />
     </div>

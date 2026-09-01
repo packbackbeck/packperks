@@ -24,7 +24,7 @@
   margin: 0;
   /* Generous breathing room above the brand lockup, which is pinned to the
      top of every screen regardless of where the content sits. */
-  padding: calc(env(safe-area-inset-top, 0px) + 64px) 20px calc(env(safe-area-inset-bottom, 0px) + 28px);
+  padding: calc(env(safe-area-inset-top, 0px) + 34px) 20px calc(env(safe-area-inset-bottom, 0px) + 28px);
   text-align: center;
   min-height: 100dvh;
   display: flex;
@@ -41,7 +41,7 @@
 }
 .tikkie-only__logos {
   display: flex; align-items: center; justify-content: center; gap: 14px;
-  margin-bottom: 40px;
+  margin-bottom: 22px;
   flex-shrink: 0;
 }
 .tikkie-only__logo {
@@ -112,7 +112,7 @@
 /* ── The explainer: ONE block. Bulleted text on the left, the real Tikkie
    page (screenshot) on the right, ratio kept, equal margins around it. ── */
 .tikkie-only__explain {
-  display: flex; align-items: stretch; gap: 14px;
+  display: flex; align-items: stretch; gap: 12px;
   margin: 4px 0 6px;
   padding: 14px;
   background: #F7F4EC;
@@ -124,17 +124,25 @@
   display: flex; flex-direction: column; justify-content: center;
 }
 .tikkie-only__explain-lead {
-  margin: 0 0 10px;
-  font-size: 14.5px; line-height: 1.45; font-weight: 700; color: #1F1B16;
+  margin: 0 0 12px;
+  font-size: 13.5px; line-height: 1.5; font-weight: 600; color: #5F584F;
 }
-.tikkie-only__explain-lead strong { color: #47478A; }
+.tikkie-only__explain-lead strong { color: #47478A; font-weight: 800; }
+.tikkie-only__explain-q {
+  margin: 0 0 8px;
+  font-size: 13.5px; font-weight: 800; color: #1F1B16;
+}
+.tikkie-only__explain-warn {
+  margin: 10px 0 0;
+  font-size: 12px; line-height: 1.4; font-weight: 700; color: #C4472B;
+}
 .tikkie-only__explain-text ul {
-  margin: 0; padding: 0 0 0 18px;
+  margin: 0; padding: 0 0 0 16px;
   list-style: disc;
-  display: flex; flex-direction: column; gap: 9px;
+  display: flex; flex-direction: column; gap: 7px;
 }
 .tikkie-only__explain-text li {
-  font-size: 13.5px; line-height: 1.45; color: #5F584F;
+  font-size: 13px; line-height: 1.4; color: #5F584F;
 }
 .tikkie-only__explain-text li::marker { color: #47478A; }
 .tikkie-only__explain-text strong { color: #1F1B16; }
@@ -144,7 +152,11 @@
    artwork brings its own bezel, so no border-radius or shadow here. */
 .tikkie-only__shot {
   flex-shrink: 0;
-  height: 250px; width: auto;
+  /* Sized so the copy column keeps a readable measure beside it: the
+     render is tall and narrow, so every pixel of its height costs the
+     text about half a pixel of width. */
+  height: 208px; width: auto;
+  align-self: center;
   display: block;
 }
 

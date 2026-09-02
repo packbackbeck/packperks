@@ -93,8 +93,8 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
 
       <div className="header__tiles" role="group" aria-label="Account actions">
         {/* Tile 1 — Plus button. Triggers the scan / add-more-cups flow.
-            Hidden on the Redirect Refund home: cups go in the smart bin,
-            not through an in-app scan. */}
+            On the Redirect Refund home it opens the same camera scanner,
+            for adding another smart-bin receipt to the balance. */}
         {showAdd && <button
           type="button"
           className="header__tile header__tile--add"

@@ -1166,7 +1166,7 @@ function ProfileEditModal({
 /* ─── ImpactSummary — what shows inside the clickable card on the
  * profile page. Three rows. Tap target is the wrapping button in
  * UserPage. ─── */
-function ImpactSummary({ cups }) {
+export function ImpactSummary({ cups }) {
   const co2 = cups * CO2_GRAMS_PER_CUP;
   return (
     <div className="user-page__impact-summary">
@@ -1207,7 +1207,7 @@ function ImpactSummary({ cups }) {
 
 /* ─── ImpactDetailModal — opens when the summary card is tapped.
  * Shows the personal stats and the community totals (server-sourced). ─── */
-function ImpactDetailModal({ cups, onClose }) {
+export function ImpactDetailModal({ cups, onClose }) {
   const [community, setCommunity] = useState(null); // { totalLifetimeCups, returningUsers }
   const [communityErr, setCommunityErr] = useState(null);
 

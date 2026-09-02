@@ -41,7 +41,7 @@ function ProcessingOverlay({ count }) {
  * frame via jsQR every ~150ms, and as soon as a parsed cups payload comes
  * out it hands the UUID list off to onScan() which calls the claim-cups
  * edge function. Errors (already-claimed, invalid) bubble up via onError. */
-export default function CupScanPage({ onScan, onBack, onError }) {
+export default function CupScanPage({ onScan, onBack, onError, copy = {} }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -151,10 +151,10 @@ export default function CupScanPage({ onScan, onBack, onError }) {
       </button>
 
       <div className="receipt-page__header">
-        <h1 className="receipt-page__title">Scan your cup QR</h1>
+        <h1 className="receipt-page__title">{copy.title || 'Scan your cup QR'}</h1>
         <p className="receipt-page__subtitle">
-          Point your camera at the PackPerks QR on the café counter.
-          We'll add a cup to your balance at that venue.
+          {copy.subtitle || `Point your camera at the PackPerks QR on the café counter.
+          We'll add a cup to your balance at that venue.`}
         </p>
       </div>
 
@@ -191,7 +191,7 @@ export default function CupScanPage({ onScan, onBack, onError }) {
       {hint && <p className="cup-scan__hint">{hint}</p>}
 
       <p className="cup-scan__caption">
-        Point your camera at the QR code on the counter and hold steady in good light.
+        {copy.caption || 'Point your camera at the QR code on the counter and hold steady in good light.'}
       </p>
     </div>
   );

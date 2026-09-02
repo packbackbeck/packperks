@@ -140,7 +140,10 @@
 }
 
 /* Map chrome: locate button + you-are-here dot (market-map style). */
-.tikkie-home__map-wrap { position: relative; }
+/* `isolation` pins Leaflet's internal z-index scale (panes and controls go
+   up to 1000) inside this box, so the zoom buttons can't float over a
+   modal or bottom sheet opened elsewhere on the page. */
+.tikkie-home__map-wrap { position: relative; z-index: 0; isolation: isolate; }
 .tikkie-home__locate {
   position: absolute; right: 10px; bottom: 10px; z-index: 500;
   width: 40px; height: 40px; border-radius: 50%; border: none;
@@ -193,12 +196,21 @@
 
 /* The venue mark in the home header. The shared Header sizes it as a
    square badge (29px) for logo-only brands; a wide wordmark needs width
-   instead, so widen it for this page only. */
+   instead, so widen it for this page only. It must also YIELD: with the
+   scan tile added there are two tiles on the right, and a wordmark at
+   its full 168px would be overrun by them on a narrow phone. */
+.tikkie-home .header__brands {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.tikkie-home .header__logo-packback { flex: none; }
 .tikkie-home .header__logo-bk {
   width: auto;
   max-width: 168px;
   height: 26px;
+  min-width: 0;
 }
+.tikkie-home .header__tiles { flex: none; }
 
 /* ── Wallet-model additions ── */
 /* The hero is a button now (tap → redeem sheet). */

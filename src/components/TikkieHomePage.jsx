@@ -9,7 +9,8 @@ import {
 import { animalForProfile } from '../lib/animals';
 import { TikkieExplainer, Sheet, LoginSheet } from './tikkie/TikkieBits';
 import PrivacyPolicyView from './PrivacyPolicyView';
-import UserPage from './UserPage';
+import CupScanPage from './CupScanPage';
+import UserPage, { ImpactSummary, ImpactDetailModal } from './UserPage';
 import Header from './Header';
 import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
@@ -261,8 +262,13 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   const [login, setLogin] = useState(null);
   const [showPolicy, setShowPolicy] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+  const [impactOpen, setImpactOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
   const scanStartedRef = useRef(false);
+  // The batch the "held for review" popup is waiting on — the URL's, or one
+  // the camera just read.
+  const [pendingBatch, setPendingBatch] = useState(batchId || '');
+  const [scanner, setScanner] = useState(false);
 
   const shownBalance = useCountUp(balance);
   const animal = useMemo(
@@ -300,53 +306,59 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   /* The wallet itself. */
   useEffect(() => { refreshWallet(); }, [refreshWallet]);
 
-  /* The scan — only after the cookie choice, and only once. Rejecting the
-   * banner (CookieBlocked) means this never runs: no profile, no credit,
-   * and the receipt stays valid for a later scan. */
+  /* One receipt → the wallet. Shared by the two ways a receipt arrives:
+   * the QR's own URL (?batch=/?cups=) and the in-app camera scanner. */
+  const runScan = useCallback(async ({ batchId: bid = '', cupIds: cids = [] } = {}) => {
+    const hasBackup = cids.length > 0;
+    if (!bid && !hasBackup) return;
+    const data = hasBackup ? await scanBackupCups(cids) : await scanBatch(bid);
+    if (data?.status === 'credited') {
+      if (data.profile) {
+        setProfile(data.profile);
+        storeProfile(org?.id, { userId: data.profile.user_id, email: data.profile.email, name: data.profile.name });
+      }
+      setPopup({ type: 'credited', amount: Number(data.amount || 0), cups: data.cups });
+      await refreshWallet();
+      return;
+    }
+    if (data?.status === 'already_claimed' || data?.error === 'already_claimed') {
+      setPopup({ type: 'claimed', yours: data.yours === true });
+      await refreshWallet();
+      return;
+    }
+    if (data?.status === 'pending_validation') {
+      setPendingBatch(bid);
+      setPopup({ type: 'pending' });
+      return;
+    }
+    setPopup({ type: 'error', message: SCAN_ERRORS[data?.error] || 'We couldn’t process this receipt right now. Please scan it again in a moment.' });
+  }, [org?.id, refreshWallet]);
+
+  /* The scan from the URL — only after the cookie choice, and only once.
+   * Rejecting the banner (CookieBlocked) means this never runs: no profile,
+   * no credit, and the receipt stays valid for a later scan. */
   useEffect(() => {
     if (DEMO) return;
     if (!consentReady || scanStartedRef.current) return;
-    const hasBackup = cupIds.length > 0;
-    if (!batchId && !hasBackup) return;
+    if (!batchId && !cupIds.length) return;
     scanStartedRef.current = true;
-
-    (async () => {
-      const data = hasBackup ? await scanBackupCups(cupIds) : await scanBatch(batchId);
-      if (data?.status === 'credited') {
-        if (data.profile) {
-          setProfile(data.profile);
-          storeProfile(org?.id, { userId: data.profile.user_id, email: data.profile.email, name: data.profile.name });
-        }
-        setPopup({ type: 'credited', amount: Number(data.amount || 0), cups: data.cups });
-        await refreshWallet();
-        return;
-      }
-      if (data?.status === 'already_claimed' || data?.error === 'already_claimed') {
-        setPopup({ type: 'claimed', yours: data.yours === true });
-        await refreshWallet();
-        return;
-      }
-      if (data?.status === 'pending_validation') {
-        setPopup({ type: 'pending' });
-        return;
-      }
-      setPopup({ type: 'error', message: SCAN_ERRORS[data?.error] || 'We couldn’t process this receipt right now. Please scan it again in a moment.' });
-    })();
-  }, [consentReady, batchId, cupIds, org?.id, refreshWallet]);
+    runScan({ batchId, cupIds });
+  }, [consentReady, batchId, cupIds, runScan]);
 
   /* While the held-for-review popup is the story, quietly poll: the moment
    * the bin's confirmation lands, credit the receipt and switch the popup. */
   useEffect(() => {
-    if (DEMO || popup?.type !== 'pending' || !batchId) return undefined;
+    const waitFor = pendingBatch || batchId;
+    if (DEMO || popup?.type !== 'pending' || !waitFor) return undefined;
     let stop = false;
     let timer = null;
     const startedAt = Date.now();
     async function tick() {
       if (stop || Date.now() - startedAt > 30 * 60 * 1000) return;
-      const data = await checkBatch(batchId);
+      const data = await checkBatch(waitFor);
       if (stop) return;
       if (data?.status === 'validated' || data?.url) {
-        const credit = await scanBatch(batchId);
+        const credit = await scanBatch(waitFor);
         if (stop) return;
         if (credit?.status === 'credited') {
           if (credit.profile) setProfile(credit.profile);
@@ -359,7 +371,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     }
     timer = setTimeout(tick, 25000);
     return () => { stop = true; if (timer) clearTimeout(timer); };
-  }, [popup?.type, batchId, refreshWallet]);
+  }, [popup?.type, pendingBatch, batchId, refreshWallet]);
 
   /* Open Tikkie: mint ONE link for the whole balance and go there. */
   async function handleOpenTikkie() {
@@ -378,6 +390,30 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         : 'We couldn’t create your Tikkie link right now. Your balance is safe — please try again in a moment.',
     });
     refreshWallet();
+  }
+
+  /* ── The in-app scanner: add another receipt without leaving the app ── */
+  if (scanner) {
+    return (
+      <CupScanPage
+        copy={{
+          title: 'Scan your receipt',
+          subtitle: 'Point your camera at the QR on the receipt the smart bin printed. We’ll add its value to your balance.',
+          caption: 'Hold steady in good light — the QR is at the bottom of the receipt.',
+        }}
+        onBack={() => setScanner(false)}
+        onScan={(parsed) => {
+          setScanner(false);
+          // A BYO counter QR isn't a refund receipt — say so rather than
+          // failing silently on a code this mode can't pay out.
+          if (!parsed?.batchId && !parsed?.cupIds?.length) {
+            setPopup({ type: 'error', message: SCAN_ERRORS.wrong_mode });
+            return;
+          }
+          runScan({ batchId: parsed.batchId || '', cupIds: parsed.cupIds || [] });
+        }}
+      />
+    );
   }
 
   /* ── Account view ── */
@@ -405,31 +441,32 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   }
 
   const returns = history.filter(h => h.kind === 'return');
+  const lifetimeCups = returns.reduce((t, h) => t + Number(h.cups || 0), 0);
 
   return (
     <div className="app tikkie-home">
       <Header
         cupCount={0}
         onBadgeClick={() => setShowAccount(true)}
-        onAddCup={() => {}}
+        onAddCup={() => setScanner(true)}
         org={org}
         design={null}
         claimStatus={balance > 0 ? 'ready' : null}
-        showAdd={false}
+        showAdd
         showCups={false}
       />
 
       {/* ── The wallet tile: the AVAILABLE amount, tap to collect ── */}
-      <button type="button" className="tikkie-home__hero" onClick={() => setPopup({ type: 'redeem' })}>
+      <button
+        type="button"
+        className="tikkie-home__hero"
+        onClick={() => (balance > 0 || outstanding ? setPopup({ type: 'redeem' }) : setScanner(true))}
+      >
         <div className="tikkie-home__hero-copy">
           <span className="tikkie-home__hero-label">Available to collect</span>
           <div className="tikkie-home__hero-amount">€{shownBalance.toFixed(2)}</div>
           <span className="tikkie-home__hero-cta">
-            {balance > 0
-              ? 'Collect via Tikkie'
-              : profile
-                ? 'Return cups to top up'
-                : 'Scan a receipt to start'}
+            {balance > 0 || outstanding ? 'Collect via Tikkie' : 'Scan a receipt'}
           </span>
         </div>
         <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
@@ -481,6 +518,22 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         <h2 className="tikkie-home__section-title">How you get paid</h2>
         <TikkieExplainer />
       </section>
+
+      {/* ── Lifetime impact — the same card every other PackPerks mode
+             shows, reused verbatim from UserPage. ── */}
+      {lifetimeCups > 0 && (
+        <section className="tikkie-home__section">
+          <h2 className="tikkie-home__section-title">Your impact</h2>
+          <button
+            type="button"
+            className="user-page__card user-page__card--list user-page__impact-card"
+            onClick={() => setImpactOpen(true)}
+            aria-label="See your detailed impact"
+          >
+            <ImpactSummary cups={lifetimeCups} />
+          </button>
+        </section>
+      )}
 
       {/* ── Where the bins are ── */}
       <section className="tikkie-home__section">
@@ -574,6 +627,10 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
             <p className="tk-note">Nothing to collect yet — return some cups first.</p>
           )}
         </Sheet>
+      )}
+
+      {impactOpen && (
+        <ImpactDetailModal cups={lifetimeCups} onClose={() => setImpactOpen(false)} />
       )}
 
       {showPolicy && (

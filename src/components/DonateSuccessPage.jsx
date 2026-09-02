@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
+import { co2ForCups } from '../lib/impact';
 import './DonateSuccessPage.css';
 
 export default function DonateSuccessPage({ amount, onClose }) {
-  // 72g CO2 per cup
-  const co2Reduced = amount * 72;
+  // CO₂ per cup comes from lib/impact.js (CO2_GRAMS_PER_CUP), not a local number.
+  const co2Reduced = co2ForCups(amount);
 
   // Auto-scroll to top when page opens
   useEffect(() => {

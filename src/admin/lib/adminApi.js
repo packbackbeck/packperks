@@ -1077,7 +1077,7 @@ export async function getUserActionStats() {
  *   • Redeemed  = a generated batch that got ≥1 successful QR scan.
  *   • Cup spent = cups_redeemed on committed claims (completed + pending).
  * ───────────────────────────────────────────────────────────────────── */
-function computeMetrics({ cups, scans, claims, users, ev }) {
+function computeMetrics({ cups, scans, claims, users, ev, rej = [] }) {
   const ok = (s) => s.status === 'success' || s.status === 'partial';
   const successScans = scans.filter(s => s.source === 'qr' && ok(s));
 
@@ -1369,6 +1369,11 @@ function computeMetrics({ cups, scans, claims, users, ev }) {
           breakdown: [],
           desc: 'How visitors reach the app — in-app share, messaging/social, a cup receipt QR, a plain link, or direct.',
           note: 'No app-open events recorded yet. Fills in as customers open the app.' }),
+    { measurable: true, id: 'cookie_rejected', group: 'optional', label: 'Cookie rejections',
+        valueType: 'count', value: null, rawValue: rej.length, valueText: rej.length.toLocaleString(),
+        numerator: rej.length, numLabel: 'Visitors who rejected essential cookies', denominator: null, denLabel: null,
+        desc: 'How many visitors turned essential cookies off, which blocks the app — they see the "we can\'t run without these" screen and go no further. Counted anonymously (venue + time only): someone who refuses analytics cannot be tracked any other way, so there is no rate to compare it against.',
+        note: rej.length === 0 ? 'Nobody has rejected the cookie banner in this period.' : undefined },
     M({ id: 'visitor_rate', group: 'optional', label: 'Visitor rate',
         numerator: visitorUsers, denominator: totalUsers,
         numLabel: 'Visitors (opened only)', denLabel: 'All profiles',
@@ -1421,6 +1426,7 @@ const BEHAVIOUR_TS = {
   claims: r => r.created_at,
   users:  r => r.created_at,
   ev:     r => r.created_at,
+  rej:    r => r.created_at,
 };
 
 const toMsOrNull = (v) => {
@@ -1472,12 +1478,15 @@ function makeDailyBuckets(fromMs, toMs) {
 /* Load every behaviour-relevant table for the active org (or an explicit
  * group scope via orgIds), once. */
 async function fetchBehaviourRows(orgIds) {
-  const [cupsRes, scansRes, claimsRes, usersRes, cliRes] = await Promise.all([
+  const [cupsRes, scansRes, claimsRes, usersRes, cliRes, rejRes] = await Promise.all([
     applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at'), orgIds),
     applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at'), orgIds),
     applyOrgFilter(supabase.from('claims').select('id, user_id, type, status, cups_redeemed, created_at'), orgIds),
     applyOrgFilter(supabase.from('users').select('id, email, selected_reward_id, created_at'), orgIds),
     applyOrgFilter(supabase.from('client_events').select('event, session_id, user_id, created_at, props'), orgIds),
+    // Cookie rejections live outside client_events on purpose: the visitor
+    // refused analytics, so all we hold is an anonymous org + timestamp.
+    applyOrgFilter(supabase.from('consent_rejections').select('id, org_id, created_at'), orgIds),
   ]);
   return {
     cups:   cupsRes.data   || [],
@@ -1485,6 +1494,7 @@ async function fetchBehaviourRows(orgIds) {
     claims: claimsRes.data || [],
     users:  usersRes.data  || [],
     ev:     cliRes.data     || [],
+    rej:    rejRes.data     || [],
   };
 }
 
@@ -1647,11 +1657,12 @@ const TIKKIE_TS = {
   users:   r => r.created_at,
   pending: r => r.first_seen,
   backup:  r => r.used_at,
+  rej:     r => r.created_at,
 };
 
 async function fetchTikkieRows(orgIds) {
   const ids = (Array.isArray(orgIds) ? orgIds : [orgIds]).filter(Boolean);
-  const [claimsRes, usersRes, pendingRes, backupRes] = await Promise.all([
+  const [claimsRes, usersRes, pendingRes, backupRes, rejRes] = await Promise.all([
     applyOrgFilter(
       supabase.from('claims')
         .select('id, org_id, user_id, created_at, cups_redeemed, payout_amount, batch_id, tikkie_status, tikkie_url'),
@@ -1670,12 +1681,17 @@ async function fetchTikkieRows(orgIds) {
       supabase.from('backup_cup_uses').select('id, org_id, claim_id, used_at'),
       orgIds
     ),
+    applyOrgFilter(
+      supabase.from('consent_rejections').select('id, org_id, created_at'),
+      orgIds
+    ),
   ]);
   return {
     claims:  claimsRes.data  || [],
     users:   usersRes.data   || [],
     pending: pendingRes.data || [],
     backup:  backupRes.data  || [],
+    rej:     rejRes.data     || [],
   };
 }
 
@@ -1712,7 +1728,7 @@ function sliceTikkieRows(allRows, fromMs, toMs) {
   return out;
 }
 
-function computeTikkieMetrics({ claims, users, pending, backup }) {
+function computeTikkieMetrics({ claims, users, pending, backup, rej = [] }) {
   const pctOf = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
   const M = (o) => {
     const value = pctOf(o.numerator, o.denominator);
@@ -1767,6 +1783,11 @@ function computeTikkieMetrics({ claims, users, pending, backup }) {
         desc: 'How many profiles saved an email and became a full account.' }),
 
     // ── Secondary ──
+    { measurable: true, id: 'tk_cookie_rejected', group: 'secondary', label: 'Cookie rejections',
+        valueType: 'count', value: null, rawValue: rej.length, valueText: rej.length.toLocaleString(),
+        numerator: rej.length, numLabel: 'Visitors who rejected essential cookies', denominator: null, denLabel: null,
+        desc: 'Scanners who turned essential cookies off. The banner gates the scan, so nothing was credited and their receipt is still valid — they can come back and scan it again. Counted anonymously (venue + time only).',
+        note: rej.length === 0 ? 'Nobody has rejected the cookie banner in this period.' : undefined },
     M({ id: 'tk_attached', group: 'secondary', label: 'Refunds on profiles',
         numerator: attached, denominator: receipts,
         numLabel: 'Credits attached to a profile', denLabel: 'Receipts scanned',

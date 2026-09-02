@@ -192,12 +192,14 @@ function buildCupDistribution(rawClaims, rawBalances) {
 const SPOTLIGHT = {
   'stat-total-users': {
     title: 'New Users Per Day',
+    unit: 'users', agg: 'sum',
     color: '#60A5FA',
     type: 'area',
     getData: (stats, period) => buildDailyTimeSeries(stats?.rawUsers || [], period),
   },
   'stat-active-users': {
     title: 'User Activity Per Day (last update)',
+    unit: 'users', agg: 'sum',
     color: '#A78BFA',
     type: 'area',
     getData: (stats, period) => buildDailyTimeSeries(
@@ -206,12 +208,14 @@ const SPOTLIGHT = {
   },
   'stat-cups-collected': {
     title: 'Cups Added Per Day',
+    unit: 'cups',  agg: 'sum',
     color: '#FFC52F',
     type: 'area',
     getData: (stats, period) => buildDailyTimeSeries(stats?.rawCupActivity || [], period),
   },
   'stat-cups-redeemed': {
     title: 'Cups Spent Per Day',
+    unit: 'cups',  agg: 'sum',
     color: '#FD6F46',
     type: 'bar',
     getData: (stats, period) => buildDailyTimeSeries(
@@ -220,6 +224,7 @@ const SPOTLIGHT = {
   },
   'stat-cashback': {
     title: 'Cashback Paid Per Day (€)',
+    unit: '€',     agg: 'sum',
     color: '#4ADE80',
     type: 'area',
     getData: (stats, period) => buildDailySumSeries(
@@ -232,6 +237,7 @@ const SPOTLIGHT = {
     // day. Captures the cumulative "fraction of one-time users who came
     // back" trend over the selected period.
     title: 'Retention Rate Per Day (%)',
+    unit: '%',     agg: 'avg',
     color: '#A78BFA',
     type: 'area',
     getData: (stats, period) => buildRetentionTimeSeries(stats?.rawCupActivity || [], period),
@@ -243,7 +249,8 @@ function ChartTooltip({ active, payload, label, prefix = '' }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="ov-tooltip">
-      <div className="ov-tooltip__label">{label}</div>
+      {/* bucketed series carry a `range` ("3 Jun – 9 Jun"); daily ones don't */}
+      <div className="ov-tooltip__label">{payload[0]?.payload?.range || label}</div>
       {payload.map((p, i) => (
         <div key={i} className="ov-tooltip__row">
           <span className="ov-tooltip__dot" style={{ background: p.color }} />
@@ -280,7 +287,7 @@ function EyeToggle({ id, visible, onToggle }) {
  *     handleStatFocus jumps straight to the Claims page.
  *
  * The visual affordance (cursor, arrow chevron) follows the same rule. */
-function StatCard({ id, label, value, sub, color, icon, tooltip, editMode, visible, onToggle, focused, onFocus, reorder }) {
+function StatCard({ id, label, value, sub, desc, color, icon, tooltip, editMode, visible, onToggle, focused, onFocus, reorder }) {
   const isClickable = !editMode && (SPOTLIGHT[id] || id === 'stat-pending');
   const isDragging  = editMode && reorder?.dragId === id;
   const isDropOver  = editMode && reorder?.overId === id && reorder?.dragId !== id;
@@ -318,17 +325,29 @@ function StatCard({ id, label, value, sub, color, icon, tooltip, editMode, visib
         <div className="ov-stat__label">
           {label}
           {tooltip && (
-            <span className="ov-stat__info" title={tooltip}>
+            /* Hover or keyboard-focus the circled i for the full method note.
+               stopPropagation so reading it never spotlights the card. */
+            <span
+              className="ov-stat__info"
+              tabIndex={0}
+              aria-label={`How ${label} is calculated`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="16" x2="12" y2="12" />
                 <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
+              <span className="ov-stat__info-pop" role="tooltip">
+                <span className="ov-stat__info-pop-title">How this is calculated</span>
+                {tooltip}
+              </span>
             </span>
           )}
         </div>
         <div className="ov-stat__value">{value}</div>
         {sub && <div className="ov-stat__sub">{sub}</div>}
+        {desc && <div className="ov-stat__desc">{desc}</div>}
       </div>
       {isClickable && (
         <svg className="ov-stat__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -416,6 +435,51 @@ const PERIOD_OPTIONS = [
 ];
 
 const AXIS_TICK = { fill: '#9E9A93', fontSize: 10 };
+const AXIS_LABEL = { fill: '#8A857D', fontSize: 10, fontWeight: 600, letterSpacing: 0.3 };
+
+/* ── Graph scale controls ────────────────────────────────────────────
+ * X and Y are adjusted independently:
+ *   X = how wide each bucket on the time axis is (day / week / month)
+ *   Y = how the value axis is spaced (linear / logarithmic)
+ * Bucketing respects what the metric MEANS: counts and money are summed
+ * over the bucket, rates and percentages are averaged — summing a
+ * percentage over 7 days would be meaningless. */
+const X_GRAINS = [
+  { id: 'day',   label: 'Day',   size: 1,  per: 'day' },
+  { id: 'week',  label: 'Week',  size: 7,  per: 'week' },
+  { id: 'month', label: 'Month', size: 30, per: 'month' },
+];
+
+function bucketSeries(series, size, agg = 'sum') {
+  const rows = Array.isArray(series) ? series : [];
+  if (size <= 1 || rows.length === 0) return rows;
+  const out = [];
+  for (let i = 0; i < rows.length; i += size) {
+    const chunk = rows.slice(i, i + size);
+    const total = chunk.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+    const value = agg === 'avg' ? +(total / chunk.length).toFixed(1) : total;
+    /* Axis label stays short (bucket start) so 13 weekly ticks still fit;
+       the full span rides along for the tooltip. */
+    out.push({
+      date: chunk[0].date,
+      range: chunk.length > 1 ? `${chunk[0].date} – ${chunk[chunk.length - 1].date}` : chunk[0].date,
+      value,
+    });
+  }
+  return out;
+}
+
+/* Log spacing needs strictly positive values; a single empty day would
+ * blow up the axis, so the control is offered only when the data allows. */
+function canUseLog(series) {
+  return Array.isArray(series) && series.length > 0 && series.every(d => (Number(d.value) || 0) > 0);
+}
+
+/* "cups per week" / "% (avg per day)" — the reader should never have to
+ * guess what the Y numbers are counting. */
+function yAxisCaption(unit, grain, agg) {
+  return agg === 'avg' ? `${unit} (avg per ${grain.per})` : `${unit} per ${grain.per}`;
+}
 
 /* Date-only "today" helper for the custom range picker — gives the
  * date input a sensible max so admins can't pick a future end date. */
@@ -446,6 +510,9 @@ export default function AdminOverview({ draftState, onNavigate }) {
    * to a non-today endpoint; for now the range simply controls the
    * window length. */
   const [showCustomRange, setShowCustomRange] = useState(false);
+  // Graph scale: X bucket width and Y spacing are controlled separately.
+  const [xGrain, setXGrain] = useState('day');
+  const [yScale, setYScale] = useState('linear');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState(todayIso());
   const customRangeDays = (() => {
@@ -583,6 +650,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
   const STAT_CARDS = [
     {
       id: 'stat-total-users',
+      desc: 'Everyone with an account, however they signed up.',
       label: 'Total Users',
       value: loading ? '—' : (s.totalUsers || 0).toLocaleString(),
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
@@ -592,6 +660,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
     },
     {
       id: 'stat-retention',
+      desc: 'How many cup-returners come back on another day.',
       label: 'Retention',
       // % of users who came back to return a cup on another day — i.e.
       // not just a one-time tryer. (Counted in adminApi.getAdminStats.)
@@ -608,6 +677,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
     },
     {
       id: 'stat-cups-collected',
+      desc: 'Every cup ever credited to a customer balance.',
       label: 'Cups Added',
       value: loading ? '—' : (s.totalCupsCollected || 0).toLocaleString(),
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
@@ -617,6 +687,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
     },
     {
       id: 'stat-cups-redeemed',
+      desc: 'Cups customers have spent on cashback rewards.',
       label: 'Cups Spent',
       value: loading ? '—' : (s.totalCupsRedeemed || 0).toLocaleString(),
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>,
@@ -626,6 +697,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
     },
     {
       id: 'stat-cashback',
+      desc: 'Real money paid out to customers so far.',
       label: 'Total Cashback',
       value: loading ? '—' : `€${(s.totalCashback || 0).toFixed(2)}`,
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
@@ -639,6 +711,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
     },
     {
       id: 'stat-pending',
+      desc: 'Claims still waiting on a manual decision.',
       // Scoped down to claims only — cup-scan pending is a transient
       // state (auto-resolved by the edge function in seconds) and was
       // double-counting against the operational queue.
@@ -653,6 +726,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
 
   const spotlightDef = focusedStat ? SPOTLIGHT[focusedStat] : null;
   const xInterval = Math.max(0, Math.floor(period / 7) - 1);
+  const grain = X_GRAINS.find(g => g.id === xGrain) || X_GRAINS[0];
 
   return (
     <div className="admin-overview">
@@ -828,10 +902,65 @@ export default function AdminOverview({ draftState, onNavigate }) {
         {/* Primary chart — shows cups by default, replaced by stat spotlight on click */}
         {(() => {
           const def = focusedStat ? SPOTLIGHT[focusedStat] : null;
-          const primData  = def ? spotlightData : cupsData;
+          const rawData   = def ? spotlightData : cupsData;
+          const primAgg   = def?.agg  || 'sum';
+          const primUnit  = def?.unit || 'cups';
+          const primData  = bucketSeries(rawData, grain.size, primAgg);
           const primTitle = def ? `${def.title} — Last ${period} Days` : `Cups Added — Last ${period} Days`;
           const primColor = def?.color || '#FFC52F';
           const primType  = def?.type || 'area';
+          /* Buckets are already sparse, so only the raw daily view needs
+           * tick thinning. */
+          const primInterval = grain.size > 1 ? 0 : xInterval;
+          const logOk    = canUseLog(primData);
+          const logOn    = yScale === 'log' && logOk;
+          const yCaption = yAxisCaption(primUnit, grain, primAgg);
+          const yAxisProps = logOn
+            ? { scale: 'log', domain: [1, 'auto'], allowDataOverflow: true }
+            : { domain: [0, 'auto'] };
+          const scaleBar = (
+            <div className="ov-scale" role="group" aria-label="Graph scale">
+              <div className="ov-scale__group">
+                <span className="ov-scale__legend" id="ov-scale-x">X · time</span>
+                <div className="ov-scale__seg" role="group" aria-labelledby="ov-scale-x">
+                  {X_GRAINS.map(g => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      className={`ov-scale__btn${xGrain === g.id ? ' ov-scale__btn--on' : ''}`}
+                      aria-pressed={xGrain === g.id}
+                      onClick={() => setXGrain(g.id)}
+                      title={g.size === 1
+                        ? 'One point per day'
+                        : `One point per ${g.per} — ${primAgg === 'avg' ? 'averaged' : 'totalled'} over ${g.size} days`}
+                    >{g.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="ov-scale__group">
+                <span className="ov-scale__legend" id="ov-scale-y">Y · {yCaption}</span>
+                <div className="ov-scale__seg" role="group" aria-labelledby="ov-scale-y">
+                  <button
+                    type="button"
+                    className={`ov-scale__btn${!logOn ? ' ov-scale__btn--on' : ''}`}
+                    aria-pressed={!logOn}
+                    onClick={() => setYScale('linear')}
+                    title="Even spacing — equal steps are equal amounts"
+                  >Linear</button>
+                  <button
+                    type="button"
+                    className={`ov-scale__btn${logOn ? ' ov-scale__btn--on' : ''}`}
+                    aria-pressed={logOn}
+                    disabled={!logOk}
+                    onClick={() => setYScale('log')}
+                    title={logOk
+                      ? 'Logarithmic — compresses big peaks so small days stay readable'
+                      : 'Log needs every point above zero; this range has an empty bucket'}
+                  >Log</button>
+                </div>
+              </div>
+            </div>
+          );
           return (
             <ChartBlock id="chart-cups-per-day" label={primTitle}
               fullWidth editMode={editMode} visible={isVisible('chart-cups-per-day')} onToggle={toggleBlock} reorder={chartReorder}>
@@ -839,9 +968,10 @@ export default function AdminOverview({ draftState, onNavigate }) {
                *  Clicking the focused stat card again (or any other
                *  spotlight card) already toggles focus off — the
                *  button was redundant. */}
+              {scaleBar}
               <ResponsiveContainer width="100%" height={200}>
                 {primType === 'area' ? (
-                  <AreaChart data={primData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <AreaChart data={primData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
                     <defs>
                       <linearGradient id="primGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%"  stopColor={primColor} stopOpacity={0.25} />
@@ -849,17 +979,21 @@ export default function AdminOverview({ draftState, onNavigate }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F0EDE8" />
-                    <XAxis dataKey="date" tick={AXIS_TICK} tickLine={false} axisLine={false} interval={xInterval} />
-                    <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <XAxis dataKey="date" tick={AXIS_TICK} tickLine={false} axisLine={false} interval={primInterval} />
+                    <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={62}
+                      {...yAxisProps}
+                      label={{ value: yCaption, angle: -90, position: 'insideLeft', style: AXIS_LABEL }} />
                     <Tooltip content={<ChartTooltip />} />
                     <Area type="monotone" dataKey="value" stroke={primColor} strokeWidth={2}
                       fill="url(#primGrad)" dot={false} activeDot={{ r: 4, fill: primColor }} />
                   </AreaChart>
                 ) : (
-                  <BarChart data={primData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={period <= 7 ? 28 : 14}>
+                  <BarChart data={primData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }} barSize={primData.length <= 7 ? 28 : 14}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F0EDE8" vertical={false} />
-                    <XAxis dataKey="date" tick={AXIS_TICK} tickLine={false} axisLine={false} interval={xInterval} />
-                    <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <XAxis dataKey="date" tick={AXIS_TICK} tickLine={false} axisLine={false} interval={primInterval} />
+                    <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={62}
+                      {...yAxisProps}
+                      label={{ value: yCaption, angle: -90, position: 'insideLeft', style: AXIS_LABEL }} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="value" fill={primColor} radius={[4, 4, 0, 0]} />
                   </BarChart>

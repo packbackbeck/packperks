@@ -15,7 +15,7 @@ import { usePwaInstall } from '../lib/pwa';
 import { requestPushPermission, getPermissionState } from '../lib/notify';
 import { useMoney } from '../lib/RegionContext';
 import { getRegion, formatMoney } from '../lib/regions';
-import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, formatCo2 } from '../lib/impact';
+import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, formatCo2, pickComparison as pickImpactComparison } from '../lib/impact';
 
 const PUSH_PREF_KEY = 'packperks_push_rewards';
 
@@ -1159,55 +1159,9 @@ function ProfileEditModal({
  * different cup material.
  * ───────────────────────────────────────────────────────────────────── */
 
-const GRAMS_PER_CUP = 5;
-
-/* Five everyday comparisons. All ground "5 g of plastic" in tangible
- * objects people see every day — no Eiffel Towers, no football
- * pitches, no abstract percentages. Same user sees a stable phrasing
- * (picked via `cups % len`) that shifts as they earn more cups. */
-const COMPARISON_PHRASES = [
-  /* Coffee cups directly — 1:1 ratio (each returned cup IS a coffee
-   * cup kept out of landfill). */
-  (cups) => `${cups} disposable coffee cup${cups === 1 ? '' : 's'} kept out of landfill`,
-
-  /* Plastic grocery bags — thin bags weigh ~5 g each, so 1 cup ≈ 1
-   * bag by mass. */
-  (cups) => `roughly ${cups} plastic grocery bag${cups === 1 ? '' : 's'} of waste avoided`,
-
-  /* Plastic straws — ~0.5 g each, so 1 cup ≈ 10 straws. */
-  (cups) => {
-    const straws = cups * 10;
-    return `about ${straws.toLocaleString()} plastic straw${straws === 1 ? '' : 's'} kept out of the ocean`;
-  },
-
-  /* Disposable forks — ~5 g each, 1:1 ratio. */
-  (cups) => `${cups} disposable plastic fork${cups === 1 ? '' : 's'} that didn't get thrown away`,
-
-  /* Weight ladder — picks an everyday object that matches the user's
-   * total plastic mass. The user gets a sense of "is this a sugar
-   * packet or a brick?" without needing to do mental math. */
-  (cups) => {
-    const g = cups * GRAMS_PER_CUP;
-    if (g < 30)   return `about the weight of a sugar packet of plastic saved`;
-    if (g < 80)   return `about the weight of a chocolate bar of plastic saved`;
-    if (g < 200)  return `about the weight of an apple of plastic saved`;
-    if (g < 600)  return `about the weight of a paperback book of plastic saved`;
-    if (g < 1500) return `about the weight of a bag of sugar of plastic saved`;
-    if (g < 5000) return `about the weight of a brick of plastic saved`;
-    return `about ${(g / 1000).toFixed(1)} kg of plastic, a small backpack's worth`;
-  },
-];
-
-function pickComparison(cups) {
-  if (cups <= 0) return 'Collect your first cup to see your impact';
-  const i = cups % COMPARISON_PHRASES.length;
-  return COMPARISON_PHRASES[i](cups);
-}
-
-function formatGrams(g) {
-  if (g >= 1000) return `${(g / 1000).toFixed(1)} kg`;
-  return `${g} g`;
-}
+/* Plastic-per-cup, the comparison phrases and the CO₂ factor all live in
+ * lib/impact.js so the profile card, the Stores hub and the donation screen
+ * can never drift apart. */
 
 /* ─── ImpactSummary — what shows inside the clickable card on the
  * profile page. Three rows. Tap target is the wrapping button in
@@ -1288,7 +1242,7 @@ function ImpactDetailModal({ cups, onClose }) {
   }, [onClose]);
 
   const co2           = cups * CO2_GRAMS_PER_CUP;
-  const comparison    = pickComparison(cups);
+  const comparison    = pickImpactComparison(cups, 'Collect your first cup to see your impact');
   // Collective total = the whole Packback network's returned cups (base) plus
   // every cup returned through PackPerks, expressed as CO₂e avoided.
   const communityTotalCups = NETWORK_BASE_CUPS + (community?.totalLifetimeCups || 0);

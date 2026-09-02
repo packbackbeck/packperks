@@ -1,7 +1,7 @@
 import { useState, useEffect, cloneElement, isValidElement } from 'react';
 import CookieConsent, { CookieBlocked } from './CookieConsent';
 import PrivacyPolicyView from './PrivacyPolicyView';
-import { getConsent, setConsent, setConsentPrefs, clearConsent } from '../lib/consent';
+import { getConsent, setConsent, setConsentPrefs, clearConsent, recordConsentRejection } from '../lib/consent';
 
 /* Wraps the customer app: shows the first-run cookie banner, blocks the app on
  * "Reject" (essential cookies are required), and lets the user reopen the
@@ -40,6 +40,13 @@ export default function ConsentGate({ children }) {
   // screen.
   const choose = (level) => { setConsent(level); setLocal(getConsent()); setReopen(false); };
   const customize = (prefs) => { setConsentPrefs(prefs); setLocal(getConsent()); setReopen(false); };
+
+  /* A full rejection is the one choice we can't learn about from analytics
+   * (the visitor just refused them), so it is counted separately — see
+   * recordConsentRejection: an anonymous org + timestamp, nothing more. */
+  useEffect(() => {
+    if (consent === 'rejected') recordConsentRejection();
+  }, [consent]);
   const policyModal = showPolicy ? <PrivacyPolicyView onClose={() => setShowPolicy(false)} /> : null;
 
   if (consent === 'rejected') {

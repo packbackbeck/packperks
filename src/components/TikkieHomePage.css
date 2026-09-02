@@ -225,3 +225,18 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
 
 /* Redeem sheet buttons: "Do it later" first and highlighted, per design. */
 .tk-sheet__actions { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+
+/* The hero's call to action: a white pill on the orange tile. The whole
+   tile is the button — this is the affordance, not a nested control. */
+.tikkie-home__hero-cta {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #1F1B16;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(31, 27, 22, 0.14);
+}

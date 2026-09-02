@@ -82,3 +82,27 @@ export function hasAnalyticsConsent() {
   const p = getConsentPrefs();
   return !!(p && p.technical && p.analytical);
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Rejection counter.
+ *
+ * A visitor who turns Technical off can't run the app, and — having
+ * refused analytics along with it — can never be tracked through
+ * client_events. We still want to know HOW OFTEN that happens, so a
+ * full rejection writes one deliberately anonymous row: org and time,
+ * nothing else. No session id, no device id, no user, no properties.
+ * That is a count, not a profile, which is why it is allowed to exist
+ * without consent. Fire-and-forget: a failure here must never be
+ * allowed to break the blocked screen the visitor is about to see.
+ * ───────────────────────────────────────────────────────────────────── */
+export function recordConsentRejection(orgId = null) {
+  try {
+    if (window.__ppkRejectionLogged) return;   // once per page, not per re-render
+    window.__ppkRejectionLogged = true;
+    import('./supabase').then(({ supabase }) => {
+      supabase.from('consent_rejections')
+        .insert({ org_id: orgId || window.__ppkOrgId || null })
+        .then(() => {}, () => {});
+    }).catch(() => {});
+  } catch { /* storage or network blocked — nothing to do */ }
+}

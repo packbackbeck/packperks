@@ -48,9 +48,15 @@ const COMPARISON_PHRASES = [
   },
 ];
 
-export function pickComparison(cups) {
-  if (!cups || cups <= 0) return 'Collect your first cup to start your impact';
+export function pickComparison(cups, emptyText = 'Collect your first cup to start your impact') {
+  if (!cups || cups <= 0) return emptyText;
   return COMPARISON_PHRASES[cups % COMPARISON_PHRASES.length](cups);
+}
+
+/* CO₂e avoided for a cup count, in grams. The single place cups become CO₂ —
+ * every CO₂ figure in the product should come through here or CO2_GRAMS_PER_CUP. */
+export function co2ForCups(cups) {
+  return Math.max(0, Number(cups) || 0) * CO2_GRAMS_PER_CUP;
 }
 
 export function formatGrams(g) {

@@ -424,13 +424,13 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         <div className="tikkie-home__hero-copy">
           <span className="tikkie-home__hero-label">Available to collect</span>
           <div className="tikkie-home__hero-amount">€{shownBalance.toFixed(2)}</div>
-          <div className="tikkie-home__hero-sub">
+          <span className="tikkie-home__hero-cta">
             {balance > 0
-              ? 'Tap to collect via Tikkie'
+              ? 'Collect via Tikkie'
               : profile
-                ? 'Return cups at a smart bin to top up.'
-                : 'Scan a receipt from the smart bin to start.'}
-          </div>
+                ? 'Return cups to top up'
+                : 'Scan a receipt to start'}
+          </span>
         </div>
         <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
       </button>
@@ -476,21 +476,19 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         )}
       </section>
 
-      {/* ── Where the bins are ── */}
-      <section className="tikkie-home__section">
-        <h2 className="tikkie-home__section-title">Smart bins near you</h2>
-        <BinMap bins={bins} />
-        <p className="tikkie-home__map-note">
-          {bins.length
-            ? `${bins.length} smart bin${bins.length === 1 ? '' : 's'} · tap a pin for the address`
-            : 'Bin locations are on their way.'}
-        </p>
-      </section>
-
       {/* ── How Tikkie works (static) ── */}
       <section className="tikkie-home__section">
         <h2 className="tikkie-home__section-title">How you get paid</h2>
         <TikkieExplainer />
+      </section>
+
+      {/* ── Where the bins are ── */}
+      <section className="tikkie-home__section">
+        <h2 className="tikkie-home__section-title">Smart bins near you</h2>
+        <BinMap bins={bins} />
+        {!bins.length && (
+          <p className="tikkie-home__map-note">Bin locations are on their way.</p>
+        )}
       </section>
 
       {/* ═══ Popups ═══ */}

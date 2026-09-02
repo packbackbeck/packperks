@@ -115,3 +115,12 @@
   align-self: center;
   display: block;
 }
+
+/* tikkie.me — the brand name in the explainer doubles as the way to go
+   look Tikkie up before handing over an IBAN. */
+.tk-explain__link {
+  color: #47478A;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

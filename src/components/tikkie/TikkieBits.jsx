@@ -17,8 +17,10 @@ export function TikkieExplainer() {
     <div className="tk-explain">
       <div className="tk-explain__text">
         <p className="tk-explain__lead">
-          Your refund is via <strong>Tikkie</strong>. Tikkie is a secure, fast way to get money
-          straight into your bank account.
+          Your refund is via{' '}
+          <a className="tk-explain__link" href="https://www.tikkie.me/" target="_blank" rel="noopener noreferrer">
+            Tikkie
+          </a>. Tikkie is a secure, fast way to get money straight into your bank account.
         </p>
         <p className="tk-explain__q">Don’t have Tikkie yet?</p>
         <ul>

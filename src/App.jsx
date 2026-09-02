@@ -756,6 +756,10 @@ export default function App({ consentReady = true } = {}) {
         // to the root venue chooser instead.
         if (!org) { window.location.replace('/'); return; }
         setActiveOrg(org);
+        // The org is known here, long before any profile exists — publish it
+        // so a cookie REJECTION (which stops the boot dead) can still be
+        // counted against the right venue. See recordConsentRejection.
+        try { window.__ppkOrgId = org.id; } catch { /* noop */ }
 
         // Tikkie-only orgs (smart-bin cashback): stop the boot right here —
         // no anonymous user row, no rewards, no identity. The render below

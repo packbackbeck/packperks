@@ -921,15 +921,21 @@
 }
 
 /* ── Stat card info tooltip ─────────────────────────────────────────
- * Tiny circled-i next to the card label. Uses native `title` for now —
- * cheap, accessible, and good enough for an admin tool. Could upgrade
- * to a styled popover when there's appetite for the dependency. */
+ * Tiny circled-i next to the card label. Hovering (or focusing it with
+ * the keyboard) opens a styled popover with the full method note — the
+ * native `title` was slow to appear and truncated long explanations.
+ *
+ * The popover is positioned against the CARD, not the icon: it spans the
+ * card's width and drops below it, so it can never be clipped or pushed
+ * off-screen by a card near the grid edge. `.ov-stat__info` therefore
+ * stays position:static on purpose. */
 .ov-stat__label {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 .ov-stat__info {
+  position: static;
   display: inline-grid;
   place-items: center;
   width: 14px;
@@ -939,10 +945,126 @@
   cursor: help;
   transition: color 0.14s ease, background 0.14s ease;
 }
-.ov-stat__info:hover {
+.ov-stat__info:hover,
+.ov-stat__info:focus-visible {
   color: var(--pb-purple-600);
   background: rgba(83, 51, 165, 0.08);
 }
+.ov-stat__info:focus-visible {
+  outline: 2px solid var(--pb-purple-600);
+  outline-offset: 2px;
+}
+
+.ov-stat__info-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: #241E19;
+  color: #F2EEE7;
+  /* reset the uppercase label styling this sits inside */
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.55;
+  text-align: left;
+  white-space: normal;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s;
+  pointer-events: none;
+}
+.ov-stat__info-pop::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 22px;
+  border: 6px solid transparent;
+  border-bottom-color: #241E19;
+}
+.ov-stat__info-pop-title {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #B9A9EE;
+  margin-bottom: 4px;
+}
+.ov-stat__info:hover .ov-stat__info-pop,
+.ov-stat__info:focus-visible .ov-stat__info-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Always-visible plain-English description. Wraps freely — a metric the
+ * reader can't interpret is worse than no metric, so this is never
+ * clamped or ellipsised. */
+.ov-stat__desc {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #6C6259;
+  overflow-wrap: anywhere;
+}
+
+/* ── Graph scale controls (X and Y set independently) ─────────────── */
+.ov-scale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin: -2px 0 12px;
+}
+.ov-scale__group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.ov-scale__legend {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #9E9A93;
+  white-space: nowrap;
+}
+.ov-scale__seg {
+  display: inline-flex;
+  background: #F4F1EC;
+  border: 1px solid #E8E6E1;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+.ov-scale__btn {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6C6259;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.ov-scale__btn:hover:not(:disabled) { background: rgba(83, 51, 165, 0.08); color: #2A251F; }
+.ov-scale__btn--on,
+.ov-scale__btn--on:hover:not(:disabled) {
+  background: #FFFFFF;
+  color: var(--pb-purple-600);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.ov-scale__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Triage queue panel ─────────────────────────────────────────────
  * The first block an admin sees on Overview when something is pending.

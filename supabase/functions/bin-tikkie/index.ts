@@ -1149,12 +1149,24 @@ Deno.serve(async (req) => {
     .eq("batch_id", batchId);
   if (cupsErr) return json({ error: "db_error", detail: cupsErr.message }, 500);
   if (!cups || cups.length === 0) {
-    /* Print-first: the bin prints the QR from its own session UUID without
-     * waiting for us, so a scan can arrive BEFORE the bin's notification.
-     * An unknown batch is therefore "not validated yet", not "invalid" —
-     * record the sighting and tell the page to show the waiting screen.
+    /* No cups for this batch means one of two very different things, and
+     * bin_sessions tells them apart:
+     *
+     *   • a session row EXISTS → the bin did mint this batch and its cup ids
+     *     have since been recycled into a newer receipt (bin-mint-batch
+     *     releases ids after CUP_ID_TTL_HOURS). The receipt is spent; saying
+     *     "held for review" would strand the customer on a popup that can
+     *     never resolve.
+     *   • no session row → print-first: the bin printed the QR from its own
+     *     session UUID and its call hasn't reached us yet. That IS pending.
+     *
+     * Print-first case: record the sighting and show the waiting screen.
      * (org_id stays null until the bin's call fills it in; the org here is
      * unknowable from the URL alone and unauthenticated input anyway.) */
+    const { data: mintedBefore } = await supabase
+      .from("bin_sessions").select("batch_id").eq("batch_id", batchId).maybeSingle();
+    if (mintedBefore) return json({ error: "batch_expired" }, 409);
+
     await supabase.from("pending_batches")
       .upsert({ batch_id: batchId }, { onConflict: "batch_id", ignoreDuplicates: true });
     const { data: p } = await supabase

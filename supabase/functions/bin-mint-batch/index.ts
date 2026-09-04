@@ -54,6 +54,13 @@ const DEFAULT_RATE_EUR = 0.10;
 
 const MAX_CUPS_PER_SESSION = 50;
 
+/* How long a bin-supplied cup id stays claimed by the batch it was minted
+ * into. Cup ids are physical and finite — the bin reuses the same engraved
+ * ids — so a registration has to lapse or the bin eventually runs out.
+ * Within the window a repeat id is still a retry (same batch handed back)
+ * or a genuine conflict; past it, the id is recycled into the new batch. */
+const CUP_ID_TTL_HOURS = 24;
+
 // For the "your refund link is ready" email when a session arrives AFTER
 // the customer already scanned the receipt (print-first flow, bin offline).
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
@@ -269,28 +276,53 @@ Deno.serve(async (req) => {
    * ids are already one batch of ours, hand that batch back instead. */
   if (cupUuids) {
     const { data: existing } = await admin
-      .from("cups").select("id, batch_id").in("id", cupUuids);
+      .from("cups").select("id, batch_id, created_at").in("id", cupUuids);
     if (existing && existing.length > 0) {
-      const batches = [...new Set(existing.map((r) => r.batch_id))];
-      if (batches.length === 1 && existing.length === cupUuids.length) {
-        const priorBatch = batches[0] as string;
-        const { data: ps } = await admin
-          .from("bin_sessions").select("cups, amount_eur").eq("batch_id", priorBatch).maybeSingle();
+      /* Cup ids are physical: a bin engraves a finite set and hands the same
+       * ones out again and again, so an id is only ever OURS for a while.
+       * After CUP_ID_TTL_HOURS the registration lapses and the id is free to
+       * be minted into a new batch — otherwise a bin would run out of ids and
+       * start failing with cup_uuids_conflict forever.
+       *
+       * Only the cup ROWS are released. The claims those old batches created
+       * keep their batch_id, cups and amount, so customer balances, history
+       * and the already-claimed guard are all untouched — and the old
+       * receipt, whose cups no longer exist, simply stops paying out. */
+      const cutoff = Date.now() - CUP_ID_TTL_HOURS * 60 * 60 * 1000;
+      const lapsed = existing.filter((r) => {
+        const t = r.created_at ? new Date(r.created_at).getTime() : NaN;
+        return Number.isFinite(t) && t < cutoff;
+      });
+      if (lapsed.length === existing.length) {
+        const ids = lapsed.map((r) => r.id);
+        const { error: relErr } = await admin.from("cups").delete().in("id", ids);
+        if (relErr) {
+          return json({ error: "cup_release_failed", detail: relErr.message }, 500);
+        }
+        console.log(`[bin-mint-batch] released ${ids.length} lapsed cup id(s) older than ${CUP_ID_TTL_HOURS}h`);
+        // Fall through and mint them into this session's batch.
+      } else {
+        const batches = [...new Set(existing.map((r) => r.batch_id))];
+        if (batches.length === 1 && existing.length === cupUuids.length) {
+          const priorBatch = batches[0] as string;
+          const { data: ps } = await admin
+            .from("bin_sessions").select("cups, amount_eur").eq("batch_id", priorBatch).maybeSingle();
+          return json({
+            batch_id: priorBatch,
+            url: buildUrl(priorBatch),
+            cups: ps?.cups ?? existing.length,
+            count: ps?.cups ?? existing.length,
+            amount_eur: ps?.amount_eur ?? previewAmount(settings, existing.length),
+            currency: "EUR",
+            slug,
+            reused: true,
+          });
+        }
         return json({
-          batch_id: priorBatch,
-          url: buildUrl(priorBatch),
-          cups: ps?.cups ?? existing.length,
-          count: ps?.cups ?? existing.length,
-          amount_eur: ps?.amount_eur ?? previewAmount(settings, existing.length),
-          currency: "EUR",
-          slug,
-          reused: true,
-        });
+          error: "cup_uuids_conflict",
+          detail: `${existing.length - lapsed.length} of the supplied cup ids are still registered to a batch from the last ${CUP_ID_TTL_HOURS}h`,
+        }, 409);
       }
-      return json({
-        error: "cup_uuids_conflict",
-        detail: `${existing.length} of the supplied cup ids already exist under a different batch`,
-      }, 409);
     }
   }
 

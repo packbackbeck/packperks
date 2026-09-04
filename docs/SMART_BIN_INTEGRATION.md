@@ -171,7 +171,7 @@ getting the original batch back (see below).
 | `400` | `{"error":"cup_uuids_mismatch"}` | `cup_uuids` length doesn't equal `cups` |
 | `400` | `{"error":"invalid_cup_uuids"}` | Not an array, or an entry isn't a UUID v4 |
 | `400` | `{"error":"duplicate_cup_uuids"}` | The same id appears twice in `cup_uuids` |
-| `409` | `{"error":"cup_uuids_conflict"}` | Some of those cup ids are still registered to a batch from the last 24h |
+| `409` | `{"error":"cup_uuids_conflict"}` | Some of those cup ids are still registered to a batch from the last 8h |
 | `429` | `{"error":"rate_limited"}` | More than 120 mints/hour from one bin |
 | `500` | `{"error":"mint_failed"}` | Database write failed — safe to retry |
 
@@ -203,13 +203,13 @@ reason. If only *some* of the ids are already known we refuse the call
 outright (`cup_uuids_conflict`) — a half-overlapping batch is a bug worth
 surfacing, not something to guess at.
 
-### Cup ids are recycled after 24 hours
+### Cup ids are recycled after 8 hours
 
 Cup ids are physical: a bin engraves a finite set and hands the same ones
 out again and again, so a registration cannot be permanent or the bin
 would eventually run out and fail on every session.
 
-A cup id therefore belongs to its batch for **24 hours**. Within that
+A cup id therefore belongs to its batch for **8 hours**. Within that
 window the rules above apply unchanged (retry → same batch; partial
 overlap → `cup_uuids_conflict`). After it, the id has lapsed: the next
 session that presents it takes it over, and the id is minted into that
@@ -222,7 +222,7 @@ untouched — but the old printed receipt is spent: scanning it returns
 rather than being left waiting.
 
 Nothing is required from the bin: it can reuse its id pool freely as long
-as a given id isn't presented twice inside the same 24 hours.
+as a given id isn't presented twice inside the same 8 hours.
 
 Recommended client behaviour: print immediately, then send the call and
 retry on network error / `5xx` / `429` with backoff, always with the same

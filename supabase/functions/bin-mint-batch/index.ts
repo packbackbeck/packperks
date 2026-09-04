@@ -59,7 +59,7 @@ const MAX_CUPS_PER_SESSION = 50;
  * ids — so a registration has to lapse or the bin eventually runs out.
  * Within the window a repeat id is still a retry (same batch handed back)
  * or a genuine conflict; past it, the id is recycled into the new batch. */
-const CUP_ID_TTL_HOURS = 24;
+const CUP_ID_TTL_HOURS = 8;
 
 // For the "your refund link is ready" email when a session arrives AFTER
 // the customer already scanned the receipt (print-first flow, bin offline).

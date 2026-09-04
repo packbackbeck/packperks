@@ -252,3 +252,11 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
   line-height: 1;
   box-shadow: 0 2px 8px rgba(31, 27, 22, 0.14);
 }
+
+/* A scan the bin hasn't confirmed: no amount yet, so it reads as waiting
+   rather than as money already earned. */
+.tikkie-home__row-icon--wait { background: #FBF0D6; color: #8A6D1F; }
+.tikkie-home__row-amount--wait {
+  font-size: 12px; font-weight: 800; color: #8A6D1F;
+  background: #FBF0D6; border-radius: 999px; padding: 4px 10px;
+}

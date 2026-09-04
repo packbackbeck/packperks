@@ -3,7 +3,9 @@
 
 /* ── Bottom sheet ── */
 .tk-sheet {
-  position: fixed; inset: 0; z-index: 4000;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 4000;
+  height: 100vh;    /* fallback */
+  height: 100dvh;   /* tracks the visible viewport under iOS Safari's bar */
   display: flex; align-items: flex-end;
 }
 .tk-sheet__backdrop { position: absolute; inset: 0; background: rgba(31, 27, 22, 0.45); }
@@ -28,7 +30,7 @@
   display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .tk-sheet__title { margin: 0 0 6px; font-size: 19px; font-weight: 800; color: #1F1B16; }
-.tk-sheet__sub { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: #6C6259; }
+.tk-sheet__sub { margin: 0 0 14px; font-size: 15px; line-height: 1.55; color: #3F3830; }
 .tk-sheet__amount {
   margin: 2px 0 12px;
   font-size: 34px; font-weight: 800; letter-spacing: -0.02em; color: #1F1B16;

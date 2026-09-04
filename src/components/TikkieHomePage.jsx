@@ -50,6 +50,7 @@ const DEMO_WALLET = {
   profile: { user_id: 'demo', name: 'Perky Otter', animal_index: 5, email: null },
   balance: 0.9,
   history: [
+    { id: 'd5', kind: 'pending', cups: null, amount: null, created_at: new Date(Date.now() - 1 * 36e5).toISOString() },
     { id: 'd1', kind: 'return', cups: 4, amount: 0.4, created_at: new Date(Date.now() - 2 * 864e5).toISOString() },
     { id: 'd2', kind: 'return', cups: 3, amount: 0.3, created_at: new Date(Date.now() - 6 * 864e5).toISOString() },
     { id: 'd3', kind: 'payout', cups: 5, amount: 0.5, created_at: new Date(Date.now() - 9 * 864e5).toISOString(), redeemed: true },
@@ -327,8 +328,10 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       return;
     }
     if (data?.status === 'pending_validation') {
+      if (data.profile) setProfile(data.profile);
       setPendingBatch(bid);
       setPopup({ type: 'pending' });
+      await refreshWallet();   // the wait now shows in the activity list
       return;
     }
     setPopup({ type: 'error', message: SCAN_ERRORS[data?.error] || 'We couldn’t process this receipt right now. Please scan it again in a moment.' });
@@ -493,20 +496,37 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           <ul className="tikkie-home__history">
             {history.map(h => (
               <li key={h.id} className="tikkie-home__row">
-                <span className={`tikkie-home__row-icon${h.kind === 'payout' ? ' tikkie-home__row-icon--done' : ''}`} aria-hidden="true">
-                  {h.kind === 'payout' ? '✓' : '♻︎'}
+                <span
+                  className={`tikkie-home__row-icon${
+                    h.kind === 'payout' ? ' tikkie-home__row-icon--done' : ''
+                  }${h.kind === 'pending' ? ' tikkie-home__row-icon--wait' : ''}`}
+                  aria-hidden="true"
+                >
+                  {h.kind === 'payout' ? '✓' : h.kind === 'pending' ? '◷' : '♻︎'}
                 </span>
                 <div className="tikkie-home__row-main">
                   <span className="tikkie-home__row-title">
                     {h.kind === 'payout'
                       ? 'Collected via Tikkie'
-                      : `${h.cups} cup${h.cups === 1 ? '' : 's'} returned`}
+                      : h.kind === 'pending'
+                        ? 'Scanned and held for a review'
+                        : `${h.cups} cup${h.cups === 1 ? '' : 's'} returned`}
                   </span>
-                  <span className="tikkie-home__row-date">{fmtWhen(h.created_at)}</span>
+                  <span className="tikkie-home__row-date">
+                    {h.kind === 'pending'
+                      ? `${fmtWhen(h.created_at)} · waiting for the bin`
+                      : fmtWhen(h.created_at)}
+                  </span>
                 </div>
-                <span className={`tikkie-home__row-amount${h.kind === 'payout' ? ' tikkie-home__row-amount--out' : ''}`}>
-                  {h.kind === 'payout' ? '−' : '+'}€{Number(h.amount || 0).toFixed(2)}
-                </span>
+                {/* A pending scan carries no amount yet: the bin hasn't told
+                    us how many cups went in. */}
+                {h.kind === 'pending' ? (
+                  <span className="tikkie-home__row-amount tikkie-home__row-amount--wait">Pending</span>
+                ) : (
+                  <span className={`tikkie-home__row-amount${h.kind === 'payout' ? ' tikkie-home__row-amount--out' : ''}`}>
+                    {h.kind === 'payout' ? '−' : '+'}€{Number(h.amount || 0).toFixed(2)}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -680,11 +700,11 @@ function PendingSheet({ org, batchId, profile, onClose, onProfile, onShowPolicy 
   }
 
   return (
-    <Sheet onClose={onClose} label="Return held for review">
+    <Sheet onClose={onClose} label="Scanned and held for a review">
       <div className="tk-icon tk-icon--warn" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
       </div>
-      <h2 className="tk-sheet__title">Held for review</h2>
+      <h2 className="tk-sheet__title">Scanned and held for a review</h2>
       <p className="tk-sheet__sub">
         We couldn’t confirm this return with the smart bin yet — it can take up to 30 minutes.
         {hasEmail || saved

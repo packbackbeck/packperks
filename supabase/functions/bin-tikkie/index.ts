@@ -897,13 +897,21 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
     .maybeSingle();
   if (!profile) return json({ profile: null, balance: 0, history: [] });
 
-  const [{ balance }, { data: rows }] = await Promise.all([
+  const [{ balance }, { data: rows }, { data: pendingRows }] = await Promise.all([
     walletBalance(profile.id),
     supabase.from("claims")
       .select("id, created_at, cups_redeemed, payout_amount, batch_id, payout_claim_id, tikkie_url, tikkie_status")
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(100),
+    // Scans the bin hasn't confirmed yet. They carry no cup count or
+    // amount — that only arrives with the bin's call — but the customer
+    // still scanned a real receipt, so it belongs in their activity.
+    supabase.from("pending_batches")
+      .select("batch_id, first_seen, resolved_at")
+      .eq("user_id", profile.id)
+      .order("first_seen", { ascending: false })
+      .limit(50),
   ]);
 
   const history = (rows || []).map(r => ({
@@ -914,6 +922,24 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
     created_at: r.created_at,
     redeemed: r.tikkie_status === "redeemed",
   }));
+
+  /* A pending row stops being pending the moment its batch is credited,
+   * so drop any whose batch already has a claim here rather than showing
+   * the same return twice. */
+  const creditedBatches = new Set((rows || []).map(r => r.batch_id).filter(Boolean));
+  for (const p of pendingRows || []) {
+    if (creditedBatches.has(p.batch_id)) continue;
+    history.push({
+      id: `pending:${p.batch_id}`,
+      kind: "pending",
+      batch_id: p.batch_id,
+      cups: null,
+      amount: null,
+      created_at: p.first_seen,
+    });
+  }
+  history.sort((a, b) =>
+    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   // An outstanding bulk link: money already swept out of the balance but
   // (as far as we know) not collected yet — "Open Tikkie" reopens it.
   const outstanding = (rows || []).find(r =>
@@ -1169,9 +1195,41 @@ Deno.serve(async (req) => {
 
     await supabase.from("pending_batches")
       .upsert({ batch_id: batchId }, { onConflict: "batch_id", ignoreDuplicates: true });
+
+    /* Attach the sighting to the scanner's profile (creating it if this is
+     * their first scan) so the wait is visible in their activity list
+     * rather than vanishing until the bin reports. The org isn't knowable
+     * from the URL, so this only works once a profile already exists for
+     * this device — which, after any earlier scan, it does. */
+    let pendingProfile: ProfileRow | null = null;
+    if (scanDeviceId) {
+      const { data: mine } = await supabase
+        .from("users").select(PROFILE_COLS)
+        .eq("device_id", scanDeviceId).is("merged_into", null)
+        .order("created_at", { ascending: true })
+        .limit(1).maybeSingle();
+      pendingProfile = (mine as ProfileRow) ?? null;
+      if (pendingProfile) {
+        await supabase.from("pending_batches")
+          .update({ user_id: pendingProfile.id })
+          .eq("batch_id", batchId).is("user_id", null);
+      }
+    }
+
     const { data: p } = await supabase
       .from("pending_batches").select("email").eq("batch_id", batchId).maybeSingle();
-    return json({ status: "pending_validation", has_email: !!p?.email }, 202);
+    return json({
+      status: "pending_validation",
+      has_email: !!p?.email,
+      profile: pendingProfile
+        ? {
+            user_id: pendingProfile.id,
+            name: pendingProfile.display_name,
+            animal_index: pendingProfile.animal_index,
+            email: pendingProfile.email,
+          }
+        : null,
+    }, 202);
   }
   const orgId = cups[0].org_id as string | null;
   if (!orgId) return json({ error: "batch_not_found" }, 404);

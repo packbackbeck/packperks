@@ -1032,7 +1032,7 @@ export async function getOrgBySlug(slug) {
   try {
     const { data } = await supabase
       .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
+      .select('id, name, slug, country, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
       .eq('slug', slug)
       .is('deleted_at', null)
       .maybeSingle()
@@ -1067,7 +1067,7 @@ export async function getOrgById(orgId) {
   try {
     const { data } = await supabase
       .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
+      .select('id, name, slug, country, brand_color, logo_url, logo_width, partner_brand_name, email_domain_hint')
       .eq('id', orgId)
       .maybeSingle()
     return data || null

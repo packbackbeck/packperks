@@ -74,7 +74,8 @@ import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, ge
 import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
 import TikkieHomePage from './components/TikkieHomePage';
-import VoucherPage from './components/VoucherPage';
+import VoucherPage, { requestMotionPermission } from './components/VoucherPage';
+import ActivityDetailModal from './components/ActivityDetailModal';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
 
@@ -1473,7 +1474,8 @@ export default function App({ consentReady = true } = {}) {
     // A verified email is REQUIRED to claim cashback (that's how we pay it out
     // and reach the customer). No email yet → open the sign-in sheet; once the
     // email verifies we continue straight to the receipt step (onVerified).
-    if (isVoucher) { setPage('voucher'); return; }
+    // iOS only grants gyroscope access from inside a tap — this one.
+    if (isVoucher) { requestMotionPermission(); setPage('voucher'); return; }
     if (!(authEmail || profile?.email)) {
       setClaimAfterSignIn(true);
       setShowSignIn(true);
@@ -1488,6 +1490,8 @@ export default function App({ consentReady = true } = {}) {
    * Nothing to review and nothing to pay out, so no email is needed either:
    * the reward is settled when staff slide on the customer's own phone. */
   const isVoucher = liveSettings.paymentMethod === 'voucher';
+  // The receipt shown on the home page right after a counter redemption.
+  const [voucherReceipt, setVoucherReceipt] = useState(null);
   const handleVoucherRedeemed = (res) => {
     const newCount = Number.isFinite(res?.newBalance) ? res.newBalance : Math.max(0, cupCount - selectedReward.cupsNeeded);
     track(EVENTS.REWARD_CLAIM_SUCCESS, {
@@ -1503,8 +1507,11 @@ export default function App({ consentReady = true } = {}) {
     }]);
     setCupCount(newCount);
     if (res?.claim) setUserClaims((prev) => [res.claim, ...prev]);
+    // Home first, then the receipt on top of it — the voucher screen is
+    // finished the moment the slide lands.
     setPage('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (res?.item && res?.claim) setVoucherReceipt({ item: res.item, claim: res.claim });
   };
 
   /* ── Receipt submission → AI verification ─────────────────────────────
@@ -1665,7 +1672,7 @@ export default function App({ consentReady = true } = {}) {
   const handleViewDetail = (reward) => setDetailReward(reward);
   const handleClaimFromDetail = async () => {
     if (!(await ensureRewardBudgetOk())) return;
-    if (isVoucher) { setDetailReward(null); setPage('voucher'); return; }
+    if (isVoucher) { requestMotionPermission(); setDetailReward(null); setPage('voucher'); return; }
     // Same email gate as the main claim button.
     if (!(authEmail || profile?.email)) {
       setDetailReward(null);
@@ -2379,6 +2386,16 @@ export default function App({ consentReady = true } = {}) {
           orgName={activeOrg?.partner_brand_name || activeOrg?.name}
           isByo={isByo}
           isVoucher={isVoucher}
+        />
+      )}
+
+      {voucherReceipt && (
+        <ActivityDetailModal
+          item={voucherReceipt.item}
+          profile={profile}
+          userClaims={[voucherReceipt.claim]}
+          onClose={() => setVoucherReceipt(null)}
+          onDone={() => setVoucherReceipt(null)}
         />
       )}
 

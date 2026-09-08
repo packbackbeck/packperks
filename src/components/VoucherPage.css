@@ -1,165 +1,175 @@
 /* ─────────────────────────────────────────────────────────────────────
- * VoucherPage
+ * VoucherPage — a premium card on a quiet, patterned ground.
  *
- * The background is four blurred colour fields drifting on their own
- * clocks, a slow conic sweep over the top, and a whisper of grain so it
- * reads as material rather than a flat gradient. Everything animates by
- * transform/opacity only — the gradients are painted once — so it stays
- * on the compositor and doesn't cook the phone.
- *
- * --vp (0–1) is the slide progress. It brightens and saturates the sky,
- * grows the fields, and fades in a faster second layer, so the screen
- * visibly answers the staff member's hand.
+ * Variables set from JS each frame:
+ *   --rx / --ry   card rotation (deg) from the tilt
+ *   --px / --py   where the light is (%), drives the foil + glare
+ *   --sx / --sy   shadow offset (px), opposite the tilt
+ *   --vp          slide progress 0–1
  * ───────────────────────────────────────────────────────────────────── */
 
-.voucher {
-  --vp: 0;
+.hv {
+  --vp: 0; --rx: 0deg; --ry: 0deg; --px: 50%; --py: 50%; --sx: 0px; --sy: 18px;
   position: fixed; inset: 0; z-index: 900;
   height: 100dvh;
   display: flex; flex-direction: column;
-  background: var(--pb-cream, #F4EBDC);
   color: var(--black, #1F1B16);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--pb-brown, #502314) 13%, var(--pb-cream, #F4EBDC)) 0%,
+      var(--pb-cream, #F4EBDC) 42%,
+      color-mix(in srgb, var(--pb-orange, #F58220) 6%, var(--pb-cream, #F4EBDC)) 100%);
   overflow: hidden;
 }
 
-/* ── Sky ── */
-.voucher__sky {
-  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
-  filter: saturate(calc(1 + var(--vp) * 0.9)) brightness(calc(1 + var(--vp) * 0.08));
-  transition: filter 0.2s linear;
+/* ── Background: pattern, not weather ── */
+.hv__bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+/* fine diagonal hairlines, like security paper */
+.hv__lines {
+  position: absolute; inset: 0; opacity: 0.55;
+  background: repeating-linear-gradient(135deg,
+    rgba(31, 27, 22, 0.055) 0 1px, transparent 1px 13px);
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.35) 60%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.35) 60%, transparent);
 }
-.voucher__blob {
-  position: absolute; border-radius: 50%;
-  filter: blur(64px);
-  will-change: transform;
-  transform: scale(calc(1 + var(--vp) * 0.45));
-  transition: transform 0.25s ease-out;
+/* two long rules that cross the screen and drift a little */
+.hv__rule {
+  position: absolute; left: -20%; width: 140%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(31, 27, 22, 0.16), transparent);
 }
-.voucher__blob--a {
-  width: 68vmax; height: 68vmax; left: -22vmax; top: -18vmax;
-  background: radial-gradient(circle, var(--pb-brown, #502314) 0%, transparent 62%);
-  opacity: 0.55;
-  animation: vb-a 26s ease-in-out infinite alternate;
-}
-.voucher__blob--b {
-  width: 60vmax; height: 60vmax; right: -24vmax; top: 6vmax;
-  background: radial-gradient(circle, var(--pb-orange, #F58220) 0%, transparent 62%);
-  opacity: 0.42;
-  animation: vb-b 31s ease-in-out infinite alternate;
-}
-.voucher__blob--c {
-  width: 70vmax; height: 70vmax; left: -10vmax; bottom: -30vmax;
-  background: radial-gradient(circle, var(--pb-red, #C85A1B) 0%, transparent 62%);
-  opacity: 0.32;
-  animation: vb-c 37s ease-in-out infinite alternate;
-}
-.voucher__blob--d {
-  width: 46vmax; height: 46vmax; right: -8vmax; bottom: 4vmax;
-  background: radial-gradient(circle, #FFFFFF 0%, transparent 60%);
-  opacity: 0.5;
-  animation: vb-d 22s ease-in-out infinite alternate;
-}
-@keyframes vb-a { from { transform: translate(0, 0) scale(calc(1 + var(--vp) * 0.45)); } to { transform: translate(18vmax, 14vmax) scale(calc(1.15 + var(--vp) * 0.45)); } }
-@keyframes vb-b { from { transform: translate(0, 0) scale(calc(1 + var(--vp) * 0.45)); } to { transform: translate(-16vmax, 22vmax) scale(calc(1.2 + var(--vp) * 0.45)); } }
-@keyframes vb-c { from { transform: translate(0, 0) scale(calc(1 + var(--vp) * 0.45)); } to { transform: translate(20vmax, -16vmax) scale(calc(1.1 + var(--vp) * 0.45)); } }
-@keyframes vb-d { from { transform: translate(0, 0); } to { transform: translate(-14vmax, -18vmax); } }
-
-/* A slow sweep of light across everything — the part that most clearly
-   can't be a screenshot. Speeds up as the slide progresses via the
-   second, faster copy fading in. */
-.voucher__sweep {
-  position: absolute; inset: -40%;
-  background: conic-gradient(from 0deg, transparent 0 62%, rgba(255, 255, 255, 0.55) 72%, transparent 82%);
-  mix-blend-mode: soft-light;
-  animation: vsweep 14s linear infinite;
-}
-.voucher__glow {
-  position: absolute; inset: -40%;
-  background: conic-gradient(from 180deg, transparent 0 58%, var(--pb-orange, #F58220) 70%, transparent 82%);
-  mix-blend-mode: screen;
-  opacity: calc(var(--vp) * 0.55);
-  animation: vsweep 4.5s linear infinite;
-  transition: opacity 0.2s linear;
-}
-@keyframes vsweep { to { transform: rotate(360deg); } }
-
-.voucher__grain {
-  position: absolute; inset: 0; opacity: 0.07; mix-blend-mode: multiply;
+.hv__rule--1 { top: 22%; transform: rotate(-14deg); animation: hv-rule 22s ease-in-out infinite alternate; }
+.hv__rule--2 { top: 78%; transform: rotate(-14deg); animation: hv-rule 27s ease-in-out infinite alternate-reverse; }
+@keyframes hv-rule { from { translate: 0 0; } to { translate: 0 -18px; } }
+/* concentric rings, drifting slowly — the one moving background element */
+.hv__rings { position: absolute; fill: none; stroke: var(--pb-brown, #502314); stroke-width: 0.6; opacity: 0.11; }
+.hv__rings--a { width: 92vmin; height: 92vmin; right: -36vmin; top: -30vmin; animation: hv-ring-a 48s ease-in-out infinite alternate; }
+.hv__rings--b { width: 70vmin; height: 70vmin; left: -32vmin; bottom: -22vmin; animation: hv-ring-b 56s ease-in-out infinite alternate; }
+@keyframes hv-ring-a { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(-6vmin, 5vmin) rotate(18deg); } }
+@keyframes hv-ring-b { from { transform: translate(0, 0); } to { transform: translate(7vmin, -6vmin); } }
+.hv__grain {
+  position: absolute; inset: 0; opacity: 0.06; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-@media (prefers-reduced-motion: reduce) {
-  .voucher__blob, .voucher__sweep, .voucher__glow { animation: none; }
-}
+@media (prefers-reduced-motion: reduce) { .hv__rule, .hv__rings { animation: none; } }
 
 /* ── Chrome ── */
-.voucher__bar {
+.hv__bar {
   position: relative; z-index: 2;
   display: flex; align-items: center; justify-content: space-between;
   padding: calc(env(safe-area-inset-top, 0px) + 14px) 18px 0;
 }
-.voucher__close {
+.hv__close {
   width: 40px; height: 40px; border-radius: 50%; border: none;
-  background: rgba(255, 255, 255, 0.55); color: var(--black, #1F1B16);
+  background: rgba(255, 255, 255, 0.6); color: var(--black, #1F1B16);
   display: flex; align-items: center; justify-content: center; cursor: pointer;
-  backdrop-filter: blur(8px);
 }
-.voucher__clock {
-  font-variant-numeric: tabular-nums;
-  font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
-  color: rgba(31, 27, 22, 0.55);
+.hv__clock {
+  font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700;
+  letter-spacing: 0.04em; color: rgba(31, 27, 22, 0.5);
 }
 
 /* ── Body ── */
-.voucher__body {
-  position: relative; z-index: 2;
-  flex: 1; min-height: 0;
+.hv__body {
+  position: relative; z-index: 2; flex: 1; min-height: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px;
-  padding: 8px 24px calc(env(safe-area-inset-bottom, 0px) + 22px);
-  text-align: center;
-}
-.voucher__tile {
-  width: 128px; height: 128px; border-radius: 28px; overflow: hidden;
-  box-shadow: 0 14px 34px rgba(31, 27, 22, 0.22);
-  transform: translateY(calc(var(--vp) * -6px));
-  transition: transform 0.25s ease-out;
-}
-.voucher__img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.voucher__name {
-  margin: 8px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.15;
-}
-.voucher__amount {
-  font-size: 40px; font-weight: 800; letter-spacing: -0.025em; line-height: 1;
+  gap: 18px; padding: 8px 22px calc(env(safe-area-inset-bottom, 0px) + 22px);
 }
 
-.voucher__qr-card {
-  margin-top: 12px; padding: 12px;
-  background: #fff; border-radius: 22px;
-  box-shadow: 0 10px 30px rgba(31, 27, 22, 0.14);
+/* ── The card ── */
+.hv__stage { perspective: 1000px; width: 100%; max-width: 352px; }
+.hv__card {
+  position: relative; overflow: hidden;
+  border-radius: 26px; padding: 20px 20px 18px;
+  color: #fff;
+  /* The org's own colour, deepening toward the lower-right so the card has
+     a face and a shade — the reward photo is the accent. */
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--pb-brown, #502314) 88%, #fff) 0%,
+    var(--pb-brown, #502314) 45%,
+    color-mix(in srgb, var(--pb-brown, #502314) 78%, #000) 100%);
+  transform: rotateX(var(--rx)) rotateY(var(--ry)) translateZ(0) scale(calc(1 + var(--vp) * 0.03));
+  transform-style: preserve-3d;
+  transition: transform 0.08s linear;
+  box-shadow:
+    var(--sx) var(--sy) 42px rgba(31, 27, 22, calc(0.28 + var(--vp) * 0.12)),
+    0 2px 6px rgba(31, 27, 22, 0.18);
+  touch-action: none;
 }
-.voucher__qr { display: block; width: 150px; height: 150px; }
+.hv__row { display: flex; align-items: center; gap: 16px; position: relative; z-index: 2; }
+.hv__tile {
+  flex: none; width: 92px; height: 92px; border-radius: 22px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+.hv__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hv__meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.hv__eyebrow {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  opacity: 0.72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hv__name { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; }
+.hv__amount { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; }
 
-.voucher__cta {
-  margin-top: 16px; width: 100%; max-width: 360px; padding: 16px 20px;
+.hv__qr-wrap {
+  position: relative; z-index: 2; margin-top: 16px; padding: 12px;
+  background: #fff; border-radius: 18px;
+  display: flex; justify-content: center;
+}
+.hv__qr { display: block; width: 148px; height: 148px; }
+
+/* Foil: a rainbow that lives under fine holo lines; it slides with the
+   light. color-dodge keeps it a sheen, not a paint job. */
+.hv__foil {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0) 0 3px, rgba(255,255,255,0.055) 3px 4px),
+    linear-gradient(115deg,
+      transparent 0%,
+      rgba(255, 80, 120, 0.55) 25%,
+      rgba(255, 220, 90, 0.55) 40%,
+      rgba(90, 255, 180, 0.55) 55%,
+      rgba(90, 160, 255, 0.55) 70%,
+      transparent 100%);
+  background-size: auto, 300% 300%;
+  background-position: 0 0, var(--px) var(--py);
+  mix-blend-mode: color-dodge;
+  opacity: calc(0.3 + var(--vp) * 0.3);
+  filter: saturate(1.2) contrast(1.05);
+}
+/* Glare: the spot where the light actually hits. */
+.hv__glare {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: radial-gradient(circle at var(--px) var(--py),
+    rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 22%, transparent 55%);
+  mix-blend-mode: screen;
+  opacity: calc(0.7 + var(--vp) * 0.3);
+}
+/* A hairline highlight on the top edge sells the thickness. */
+.hv__edge {
+  position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: 26px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* ── CTA / staff step ── */
+.hv__cta {
+  width: 100%; max-width: 352px; padding: 17px 20px;
   border: none; border-radius: 999px;
   background: var(--pb-brown, #502314); color: #fff;
   font-family: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer;
-  box-shadow: 0 8px 24px rgba(31, 27, 22, 0.22);
+  box-shadow: 0 8px 24px rgba(31, 27, 22, 0.2);
 }
-.voucher__cta:active { transform: scale(0.985); }
-
-/* ── Staff step ── */
-.voucher__staff {
-  margin-top: 14px; width: 100%; max-width: 360px;
-  display: flex; flex-direction: column; gap: 12px;
-  animation: vstaff-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+.hv__cta:active { transform: scale(0.985); }
+.hv__staff {
+  width: 100%; max-width: 352px;
+  display: flex; flex-direction: column; gap: 12px; text-align: center;
+  animation: hv-staff-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
-@keyframes vstaff-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-.voucher__staff-note { margin: 0; font-size: 14.5px; color: rgba(31, 27, 22, 0.78); }
-.voucher__staff-note strong { color: var(--black, #1F1B16); }
-.voucher__staff .stc { background: rgba(255, 255, 255, 0.62); backdrop-filter: blur(8px); }
-.voucher__err { margin: 0; font-size: 13.5px; font-weight: 700; color: #C0392B; }
-.voucher__cancel {
+@keyframes hv-staff-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.hv__staff-note { margin: 0; font-size: 14.5px; color: rgba(31, 27, 22, 0.78); }
+.hv__staff-note strong { color: var(--black, #1F1B16); }
+.hv__staff .stc { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(8px); }
+.hv__err { margin: 0; font-size: 13.5px; font-weight: 700; color: #C0392B; }
+.hv__cancel {
   align-self: center; border: none; background: none; padding: 6px 10px;
   font-family: inherit; font-size: 13.5px; font-weight: 700;
   color: rgba(31, 27, 22, 0.55); cursor: pointer;

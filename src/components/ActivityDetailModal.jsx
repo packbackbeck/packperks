@@ -120,7 +120,7 @@ function ToneIcon({ icon }) {
   return null;
 }
 
-export default function ActivityDetailModal({ item, profile, userClaims, onClose }) {
+export default function ActivityDetailModal({ item, profile, userClaims, onClose, onDone }) {
   const cardRef = useRef(null);
   const { collectLabel, payout } = useRegion();
   const [collectOpen, setCollectOpen] = useState(false);
@@ -306,6 +306,11 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
             Share
           </button>
         </div>
+        {/* A voucher just redeemed at the counter closes with a plain "Done" —
+            the customer is standing at a till, not filing paperwork. */}
+        {onDone && (
+          <button type="button" className="adm-done" onClick={onDone}>Done</button>
+        )}
       </div>
     </div>,
     document.body,

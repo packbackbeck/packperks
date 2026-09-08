@@ -11,7 +11,7 @@ import './SlideToConfirm.css';
  * slide is not a confirmation.
  * ───────────────────────────────────────────────────────────────────── */
 
-const THUMB = 56;   // px, matches the CSS
+const THUMB = 64;   // px, matches the CSS
 const DONE  = 0.88; // fraction of the track that counts as committed
 
 export default function SlideToConfirm({ label, color, disabled = false, onProgress, onComplete }) {
@@ -69,9 +69,9 @@ export default function SlideToConfirm({ label, color, disabled = false, onProgr
       <span className="stc__label" style={{ opacity: Math.max(0, 1 - progress * 1.6) }}>{label}</span>
       <div className="stc__thumb" style={{ left: `calc(${progress} * (100% - ${THUMB}px))` }}>
         {done ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
         ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
         )}
       </div>
     </div>

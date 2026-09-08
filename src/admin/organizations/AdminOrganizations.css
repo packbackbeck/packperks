@@ -764,3 +764,50 @@
   padding-top: 14px; gap: 12px;
 }
 .og-editor__actions-right { display: flex; gap: 8px; }
+
+/* ── Payment method: big tiles, because this decides what happens at the
+      till and is worth reading before clicking. ── */
+.og-paypicker { display: grid; gap: 10px; }
+@media (min-width: 760px) { .og-paypicker { grid-template-columns: 1fr 1fr; } }
+.og-paytile {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 18px 18px 20px; text-align: left;
+  background: #FFFFFF; border: 1.5px solid #E5DECF; border-radius: 14px;
+  cursor: pointer; font-family: inherit;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+.og-paytile:hover:not(:disabled) { border-color: #CFC4AE; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
+.og-paytile:disabled { opacity: 0.55; cursor: default; }
+.og-paytile--on {
+  border-color: var(--pb-purple-600, #6D28D9);
+  background: rgba(109,40,217,0.04);
+  box-shadow: 0 0 0 1px var(--pb-purple-600, #6D28D9);
+}
+.og-paytile__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.og-paytile__label { font-size: 15.5px; font-weight: 800; color: #1A1A1A; }
+.og-paytile__badge {
+  flex: none; padding: 3px 9px; border-radius: 999px;
+  background: var(--pb-purple-600, #6D28D9); color: #fff;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.og-paytile__blurb { font-size: 13.5px; line-height: 1.5; color: #4A4A4A; }
+.og-paytile__detail { font-size: 12.5px; line-height: 1.5; color: #8A8175; }
+.og-paypicker__note { margin: 2px 0 0; font-size: 12.5px; color: #8A8175; }
+
+/* ── The warning before switching ── */
+.og-modal { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.og-modal__backdrop { position: absolute; inset: 0; background: rgba(26,26,26,0.45); }
+.og-modal__card {
+  position: relative; width: 100%; max-width: 460px;
+  background: #fff; border-radius: 16px; padding: 24px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.22);
+}
+.og-modal__warn {
+  width: 44px; height: 44px; border-radius: 50%; margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: #FBEEDA; color: #A85320;
+}
+.og-modal__title { margin: 0 0 10px; font-size: 18px; font-weight: 800; color: #1A1A1A; }
+.og-modal__body { margin: 0 0 10px; font-size: 13.5px; line-height: 1.6; color: #4A4A4A; }
+.og-modal__body--muted { color: #8A8175; }
+.og-modal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }

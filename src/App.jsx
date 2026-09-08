@@ -75,6 +75,7 @@ import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
 import TikkieHomePage from './components/TikkieHomePage';
 import VoucherPage, { requestMotionPermission } from './components/VoucherPage';
+import { resolvePaymentMethod } from './lib/paymentMethods';
 import ActivityDetailModal from './components/ActivityDetailModal';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
@@ -253,10 +254,9 @@ export default function App({ consentReady = true } = {}) {
     featureDonations: true,
     featureDirectRefunds: true,
     maintenanceMode: false,
-    // 'tikkie' = the region's payout provider (a link after review);
-    // 'voucher' = settled at the counter with the slider — no receipt,
-    // no AI check, no link. Set per org in Settings → Payment method.
-    paymentMethod: 'tikkie',
+    // How rewards are settled. null = follow the group; a venue that sets
+    // its own overrides it. See src/lib/paymentMethods.js.
+    paymentMethod: null,
   });
 
   /* ── Active organisation (multi-org) ──
@@ -1489,7 +1489,11 @@ export default function App({ consentReady = true } = {}) {
   /* ── Counter voucher ──
    * Nothing to review and nothing to pay out, so no email is needed either:
    * the reward is settled when staff slide on the customer's own phone. */
-  const isVoucher = liveSettings.paymentMethod === 'voucher';
+  // org's own choice → the group's default → the platform default.
+  const isVoucher = resolvePaymentMethod(
+    liveSettings.paymentMethod,
+    groupCtx?.groupConfig?.settings?.paymentMethod,
+  ) === 'voucher';
   // The receipt shown on the home page right after a counter redemption.
   const [voucherReceipt, setVoucherReceipt] = useState(null);
   const handleVoucherRedeemed = (res) => {

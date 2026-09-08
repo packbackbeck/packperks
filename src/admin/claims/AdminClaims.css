@@ -924,3 +924,12 @@
 .ac-tk-refresh:hover:not(:disabled) { background: #F7F2E8; }
 .ac-tk-refresh:disabled { opacity: 0.6; cursor: default; }
 .ac-tk-refresh-msg { font-size: 12px; color: #9A9186; }
+
+/* Slider vouchers: redeemed at the till, never reviewed. */
+.ac-chip--voucher { background: rgba(26,135,55,0.12); color: #1A8737; }
+.ac-tikkie-status--plain { cursor: default; border: none; }
+.ac-type-filter {
+  padding: 8px 10px; border: 1px solid #E5DECF; border-radius: 10px;
+  background: #FAFAF8; font-family: inherit; font-size: 13px; color: #1A1A1A;
+  cursor: pointer;
+}

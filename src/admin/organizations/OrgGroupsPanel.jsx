@@ -3,6 +3,7 @@ import {
   createOrgGroup,
   renameOrgGroup,
   setOrgGroupMode,
+  setGroupPaymentMethod,
   deleteOrgGroup,
   setOrgGroupMembership,
   setOrgGroupActive,
@@ -12,6 +13,7 @@ import {
   setGroupMultiRegion,
 } from '../lib/adminApi';
 import { MODE_META, getCopyPreset, COPY_MODES } from '../../lib/copyPresets';
+import { PAYMENT_METHODS, PAYMENT_METHOD_META, DEFAULT_PAYMENT_METHOD } from '../../lib/paymentMethods';
 import { regionForCountry } from '../../lib/regions';
 import TypedConfirmModal from '../shared/TypedConfirmModal';
 
@@ -282,6 +284,77 @@ function ModePicker({ value, onChange, disabled, idPrefix }) {
 }
 
 
+/* How every venue in the group settles a reward, unless it sets its own.
+ * Switching it changes what customers are asked to do at the till, so the
+ * choice is confirmed rather than applied on the first click. */
+function PaymentPicker({ value, memberCount, disabled, onPick }) {
+  const current = value || DEFAULT_PAYMENT_METHOD;
+  return (
+    <div className="og-paypicker" role="radiogroup" aria-label="Payment method">
+      {PAYMENT_METHODS.map(m => (
+        <button
+          key={m.key}
+          type="button"
+          role="radio"
+          aria-checked={current === m.key}
+          className={`og-paytile ${current === m.key ? 'og-paytile--on' : ''}`}
+          disabled={disabled}
+          onClick={() => { if (m.key !== current) onPick(m.key); }}
+        >
+          <span className="og-paytile__head">
+            <span className="og-paytile__label">{m.label}</span>
+            {current === m.key && <span className="og-paytile__badge">In use</span>}
+          </span>
+          <span className="og-paytile__blurb">{m.blurb}</span>
+          <span className="og-paytile__detail">{m.detail}</span>
+        </button>
+      ))}
+      <p className="og-paypicker__note">
+        Applies to {memberCount === 1 ? 'the venue' : `all ${memberCount} venues`} in this group that
+        have not chosen their own method.
+      </p>
+    </div>
+  );
+}
+
+function PaymentConfirm({ from, to, memberCount, busy, onCancel, onConfirm }) {
+  const next = PAYMENT_METHOD_META[to];
+  const prev = PAYMENT_METHOD_META[from] || PAYMENT_METHOD_META[DEFAULT_PAYMENT_METHOD];
+  return (
+    <div className="og-modal" role="dialog" aria-modal="true" aria-label="Change payment method">
+      <div className="og-modal__backdrop" onClick={busy ? undefined : onCancel} />
+      <div className="og-modal__card">
+        <div className="og-modal__warn" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </div>
+        <h3 className="og-modal__title">Switch to {next.label}?</h3>
+        <p className="og-modal__body">
+          Customers at {memberCount === 1 ? 'this venue' : `all ${memberCount} venues`} will stop
+          using <strong>{prev.label}</strong> and start using <strong>{next.label}</strong> the next
+          time they open the app.
+        </p>
+        <p className="og-modal__body og-modal__body--muted">
+          {to === 'voucher'
+            ? 'Rewards will be handed over at the counter. No receipt is uploaded, nothing is checked, and no money is sent — so staff need to know to take the phone and slide.'
+            : 'Rewards will be paid out after review. Customers will need an email address, will have to photograph a receipt, and every claim will arrive here for approval.'}
+        </p>
+        <p className="og-modal__body og-modal__body--muted">
+          Claims already recorded are not affected.
+        </p>
+        <div className="og-modal__actions">
+          <button type="button" className="ao-btn" onClick={onCancel} disabled={busy}>Cancel</button>
+          <button type="button" className="ao-btn ao-btn--primary" onClick={onConfirm} disabled={busy}>
+            {busy ? 'Switching…' : `Switch to ${next.short}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
   const [creating, setCreating]   = useState(false);
   const [newName, setNewName]     = useState('');
@@ -293,6 +366,7 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
   const [addSel, setAddSel]         = useState({});     // groupId → orgId queued to add
   const [previewOpen, setPreviewOpen] = useState({});   // groupId → show copy preview
   const [confirmDelete, setConfirmDelete] = useState(null); // {id, name}
+  const [payConfirm, setPayConfirm] = useState(null);       // {groupId, from, to, members}
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState(null);
   const [editingCopyId, setEditingCopyId] = useState(null); // group id whose copy editor is open
@@ -344,6 +418,25 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
     // Switching mode resets copy overrides → close any open editor.
     setEditingCopyId(null);
     run(() => setOrgGroupMode(groupId, mode));
+  }
+
+  const payConfirmNode = payConfirm ? (
+    <PaymentConfirm
+      from={payConfirm.from}
+      to={payConfirm.to}
+      memberCount={payConfirm.members}
+      busy={busy}
+      onCancel={() => setPayConfirm(null)}
+      onConfirm={handleConfirmPayment}
+    />
+  ) : null;
+
+  function handleConfirmPayment() {
+    const { groupId, to } = payConfirm;
+    run(async () => {
+      await setGroupPaymentMethod(groupId, to);
+      setPayConfirm(null);
+    });
   }
 
   function handleSaveCopy(groupId, bundle) {
@@ -616,6 +709,27 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
                         </ul>
                       )}
 
+                      {/* How this group's venues settle rewards. */}
+                      <div className="og-section">
+                        <div className="og-section__head">
+                          <h4 className="og-section__title">Payment method</h4>
+                          <p className="og-section__sub">
+                            How a reward is handed over and paid for. A venue can override this in its own Settings.
+                          </p>
+                        </div>
+                        <PaymentPicker
+                          value={group.config?.settings?.paymentMethod}
+                          memberCount={(group.members || []).length}
+                          disabled={busy}
+                          onPick={(to) => setPayConfirm({
+                            groupId: group.id,
+                            from: group.config?.settings?.paymentMethod || DEFAULT_PAYMENT_METHOD,
+                            to,
+                            members: (group.members || []).length,
+                          })}
+                        />
+                      </div>
+
                       {/* Add member */}
                       <div className="og-add">
                         <select
@@ -775,6 +889,8 @@ export default function OrgGroupsPanel({ orgs = [], groups = [], onChanged }) {
           </div>
         </div>
       )}
+
+      {payConfirmNode}
     </section>
   );
 }

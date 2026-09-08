@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase';
 import { useOrg } from '../context/OrgContext';
 import { getRewardBudget, saveRewardBudget, getGroupHideLiveVendors, setGroupHideLiveVendors, getOrgMode, setOrgMode, createOrgGroup, setOrgGroupMembership, setOrgGroupMode, getByoCap, saveByoCap } from '../lib/adminApi';
 import { ORG_MODE_META, resolveEffectiveMode } from '../lib/orgModes';
+import { PAYMENT_METHODS, PAYMENT_METHOD_META, DEFAULT_PAYMENT_METHOD } from '../../lib/paymentMethods';
+import { getGroupPaymentMethod } from '../lib/adminApi';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import QuickLinks from '../shared/QuickLinks';
 import TypedConfirmModal from '../shared/TypedConfirmModal';
@@ -150,6 +152,79 @@ function prettifyKey(key) {
     .trim();
 }
 
+/* The venue's own settlement method. Three tiles: follow the group, or
+ * override with one of the two methods. Big on purpose — this decides
+ * what happens between a customer and a staff member at the counter. */
+function PaymentTiles({ value, groupDefault, onPick }) {
+  const inherited = groupDefault || DEFAULT_PAYMENT_METHOD;
+  const options = [
+    {
+      key: null,
+      label: 'Follow the group',
+      blurb: `Use whatever the group is set to. Right now that is ${PAYMENT_METHOD_META[inherited].label.toLowerCase()}.`,
+      detail: 'Change it once on the group and every venue that follows it moves together.',
+    },
+    ...PAYMENT_METHODS.map(m => ({ key: m.key, label: m.label, blurb: m.blurb, detail: m.detail })),
+  ];
+  const current = value || null;
+  return (
+    <div className="as-paypicker" role="radiogroup" aria-label="Payment method">
+      {options.map(o => (
+        <button
+          key={o.key || 'inherit'}
+          type="button"
+          role="radio"
+          aria-checked={current === o.key}
+          className={`as-paytile ${current === o.key ? 'as-paytile--on' : ''}`}
+          onClick={() => { if (o.key !== current) onPick(o.key); }}
+        >
+          <span className="as-paytile__head">
+            <span className="as-paytile__label">{o.label}</span>
+            {current === o.key && <span className="as-paytile__badge">In use</span>}
+          </span>
+          <span className="as-paytile__blurb">{o.blurb}</span>
+          <span className="as-paytile__detail">{o.detail}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PaymentConfirmModal({ from, to, groupDefault, onCancel, onConfirm }) {
+  const name = (k) => (k ? PAYMENT_METHOD_META[k].label : `the group default (${PAYMENT_METHOD_META[groupDefault || DEFAULT_PAYMENT_METHOD].label})`);
+  const effective = to || groupDefault || DEFAULT_PAYMENT_METHOD;
+  return (
+    <div className="as-modal" role="dialog" aria-modal="true" aria-label="Change payment method">
+      <div className="as-modal__backdrop" onClick={onCancel} />
+      <div className="as-modal__card">
+        <div className="as-modal__warn" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </div>
+        <h3 className="as-modal__title">Change how this venue pays rewards?</h3>
+        <p className="as-modal__body">
+          Switching from <strong>{name(from)}</strong> to <strong>{name(to)}</strong> changes what
+          customers are asked to do the next time they open the app.
+        </p>
+        <p className="as-modal__body as-modal__body--muted">
+          {effective === 'voucher'
+            ? 'Rewards will be handed over at the counter: no receipt is uploaded, nothing is checked, and no money is sent. Staff need to know to take the phone and slide.'
+            : 'Rewards will be paid out after review: customers need an email address, must photograph a receipt, and every claim arrives in Claims for approval.'}
+        </p>
+        <p className="as-modal__body as-modal__body--muted">
+          This takes effect when you publish. Claims already recorded are not affected.
+        </p>
+        <div className="as-modal__actions">
+          <button type="button" className="as-btn" onClick={onCancel}>Cancel</button>
+          <button type="button" className="as-btn as-btn--primary" onClick={onConfirm}>Change it</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Field({ label, hint, htmlFor, children }) {
   return (
     <div className="as-field">
@@ -285,6 +360,18 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
 
   /* BYO daily auto-credit cap — its own app_config row (byo:cap:<orgId>),
    * read live by the byo-mint edge function, so it saves directly. */
+  // The group's default, shown on the "Follow the group" tile.
+  const [groupPaymentMethod, setGroupPaymentMethod] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeGroupId) { setGroupPaymentMethod(null); return undefined; }
+    getGroupPaymentMethod(activeGroupId)
+      .then(v => { if (!cancelled) setGroupPaymentMethod(v); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeGroupId]);
+  const [payConfirm, setPayConfirm] = useState(null);   // { from, to }
+
   const [byoCap, setByoCap] = useState(2);
   const [byoCapBusy, setByoCapBusy] = useState(false);
   useEffect(() => {
@@ -569,18 +656,13 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             {!isTikkieOnly && (
             <Field
               label="Payment method"
-              hint={settings.paymentMethod === 'voucher'
-                ? 'Rewards are settled at the counter: the customer shows a live voucher, a staff member slides to confirm on their phone, and the cups leave the balance on the spot. No receipt, no AI check, no payout link.'
-                : 'Rewards are paid as cashback: the customer uploads a receipt, it is checked, and a payout link is sent through the region\u2019s provider.'}
+              hint="How a reward is handed over and paid for at this venue. Leave it on the group default unless this venue works differently."
             >
-              <select
-                className="as-input"
-                value={settings.paymentMethod || 'tikkie'}
-                onChange={e => updateSetting('paymentMethod', e.target.value, 'Payment method')}
-              >
-                <option value="tikkie">Cashback link after review</option>
-                <option value="voucher">Counter voucher (staff slide)</option>
-              </select>
+              <PaymentTiles
+                value={settings.paymentMethod}
+                groupDefault={groupPaymentMethod}
+                onPick={(to) => setPayConfirm({ from: settings.paymentMethod, to })}
+              />
             </Field>
             )}
 
@@ -1098,6 +1180,19 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
           </svg>
           <span><strong>Saved</strong> · {savedToast.label}</span>
         </div>
+      )}
+
+      {payConfirm && (
+        <PaymentConfirmModal
+          from={payConfirm.from}
+          to={payConfirm.to}
+          groupDefault={groupPaymentMethod}
+          onCancel={() => setPayConfirm(null)}
+          onConfirm={() => {
+            updateSetting('paymentMethod', payConfirm.to, 'Payment method');
+            setPayConfirm(null);
+          }}
+        />
       )}
     </div>
   );

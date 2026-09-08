@@ -246,12 +246,12 @@ const SORT_KEYS = ['created_at', 'cups_redeemed', 'payout_amount', 'status'];
  * in the row (e.g. when they're using the right-pane Review mode and
  * the photo shows up there anyway). */
 const COLUMN_CONFIG = [
-  { id: 'receipt',    label: 'Receipt',      desc: 'Thumbnail of the uploaded receipt image',                          defaultOn: true  },
-  { id: 'validation', label: 'Validation',  desc: 'AI verdict on the receipt (combined with the old AI check column)', defaultOn: true  },
-  { id: 'reward',     label: 'Reward / Type', desc: 'Which reward the customer picked, or "Direct refund"',           defaultOn: false },
-  { id: 'cups',       label: 'Cups',        desc: 'Cups spent on this claim',                                          defaultOn: false },
-  { id: 'amount',     label: 'Amount',      desc: 'Euro payout amount',                                                defaultOn: true  },
-  { id: 'tikkie',     label: 'Tikkie status', desc: 'Tikkie link stage — Created / Redeemed / Expired (click for the timeline)', defaultOn: true  },
+  { id: 'receipt',    label: 'Receipt',      desc: 'Thumbnail of the uploaded receipt image. Slider vouchers have none — they are settled at the counter.', defaultOn: true  },
+  { id: 'validation', label: 'Validation',  desc: 'AI verdict on the receipt. Slider vouchers read "At counter": no receipt is checked.', defaultOn: true  },
+  { id: 'reward',     label: 'Reward / Type', desc: 'Which reward the customer picked, or "Direct refund" / "Slider voucher"', defaultOn: true  },
+  { id: 'cups',       label: 'Cups',        desc: 'Cups spent on this claim',                                          defaultOn: true  },
+  { id: 'amount',     label: 'Amount',      desc: 'Reward value — paid out for cashback, handed over at the till for a slider voucher', defaultOn: true  },
+  { id: 'tikkie',     label: 'Settlement',  desc: 'How the reward was settled: the Tikkie link stage, or "Settled at counter" for a slider voucher', defaultOn: true  },
   { id: 'review',     label: 'Review',      desc: 'Pending / Approved / Rejected',                                     defaultOn: true  },
   { id: 'decided_by', label: 'Decided by',  desc: 'Admin who made the call',                                           defaultOn: true  },
 ];
@@ -346,6 +346,9 @@ export default function AdminClaims({ onNavigate, draftState }) {
   const [claims, setClaims]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [statusFilter, setStatus]   = useState('all');
+  // How the reward was settled. Vouchers never reach review, so filtering
+  // by status alone can't isolate them.
+  const [typeFilter, setTypeFilter] = useState('all');
   const [search, setSearch]         = useState('');
   const [sortKey, setSortKey]       = useState('created_at');
   const [sortDir, setSortDir]       = useState('desc');
@@ -644,6 +647,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
   const filtered = useMemo(() => {
     let list = claims;
     if (statusFilter !== 'all') list = list.filter(c => c.status === statusFilter);
+    if (typeFilter !== 'all') list = list.filter(c => c.type === typeFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(c =>
@@ -659,12 +663,13 @@ export default function AdminClaims({ onNavigate, draftState }) {
       if (av > bv) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [claims, statusFilter, search, sortKey, sortDir]);
+  }, [claims, statusFilter, typeFilter, search, sortKey, sortDir]);
 
   const counts = {
-    pending:   claims.filter(c => c.status === 'pending').length,
-    completed: claims.filter(c => c.status === 'completed').length,
-    failed:    claims.filter(c => c.status === 'failed').length,
+    pending:   claims.filter(c => c.status === 'pending' && c.type !== 'voucher').length,
+    completed: claims.filter(c => c.status === 'completed' && c.type !== 'voucher').length,
+    failed:    claims.filter(c => c.status === 'failed' && c.type !== 'voucher').length,
+    voucher:   claims.filter(c => c.type === 'voucher').length,
   };
 
   const filteredIds = filtered.map(c => c.id);
@@ -673,6 +678,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
 
   function getRewardName(claim) {
     if (claim.type === 'direct_refund') return null;
+    if (claim.type === 'voucher' && !claim.reward_id) return 'Counter redemption';
     if (!claim.reward_id) return 'Unknown reward';
     const r = rewards.find(r => r.id === claim.reward_id);
     return r?.name || claim.reward_id;
@@ -699,6 +705,11 @@ export default function AdminClaims({ onNavigate, draftState }) {
             <span className="ac-chip ac-chip--pending">{counts.pending} Pending</span>
             <span className="ac-chip ac-chip--completed">{counts.completed} Approved</span>
             <span className="ac-chip ac-chip--failed">{counts.failed} Rejected</span>
+            {counts.voucher > 0 && (
+              <span className="ac-chip ac-chip--voucher" title="Redeemed at the counter with a slider voucher — no review needed">
+                {counts.voucher} Redeemed at counter
+              </span>
+            )}
           </p>
         </div>
 
@@ -774,6 +785,17 @@ export default function AdminClaims({ onNavigate, draftState }) {
             </button>
           ))}
         </div>
+        <select
+          className="ac-type-filter"
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          aria-label="Filter by settlement method"
+        >
+          <option value="all">All methods</option>
+          <option value="cashback">Cashback (receipt)</option>
+          <option value="voucher">Slider voucher</option>
+          <option value="direct_refund">Direct refund</option>
+        </select>
         <div className="ac-search-wrap">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9E9A93" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -973,7 +995,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                             <span className="ac-type-badge ac-type-badge--direct_refund">Direct Refund</span>
                           ) : claim.type === 'voucher' ? (
                             <span className="ac-voucher-cell">
-                              <span className="ac-type-badge ac-type-badge--voucher">Counter voucher</span>
+                              <span className="ac-type-badge ac-type-badge--voucher">Slider voucher</span>
                               {rewardObj
                                 ? <button className="ac-reward-link" onClick={e => { e.stopPropagation(); onNavigate?.('rewards'); }} title="Go to reward">{rewardName}</button>
                                 : <span className="ac-muted">{rewardName}</span>}
@@ -998,7 +1020,19 @@ export default function AdminClaims({ onNavigate, draftState }) {
                           {(() => {
                             const meta = tikkieStatusOf(claim);
                             // Not approved yet → no Tikkie link → empty cell.
-                            return meta ? (
+                            if (!meta) return null;
+                            if (meta.plain) {
+                              return (
+                                <span
+                                  className="ac-tikkie-status ac-tikkie-status--plain"
+                                  style={{ background: meta.bg, color: meta.color }}
+                                  title="Redeemed at the counter — no payout link is involved"
+                                >
+                                  {meta.label}
+                                </span>
+                              );
+                            }
+                            return (
                               <button
                                 type="button"
                                 className="ac-tikkie-status"
@@ -1008,7 +1042,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                               >
                                 {meta.label}
                               </button>
-                            ) : null;
+                            );
                           })()}
                         </td>
                       )}
@@ -1125,6 +1159,13 @@ const TIKKIE_STATUS_META = {
 };
 
 function tikkieStatusOf(claim) {
+  /* A slider voucher never has a link: it was settled at the till the
+   * moment staff slid, so this column reports THAT rather than an empty
+   * cell. `plain` marks it as a statement of fact, not a clickable
+   * timeline (there is no link history to open). */
+  if (claim?.type === 'voucher') {
+    return { label: 'Settled at counter', color: '#1A8737', bg: '#DFF5E3', plain: true };
+  }
   // Only cashback/refund claims pay via Tikkie; donations etc. show nothing.
   const paysViaTikkie = claim?.type === 'cashback' || claim?.type === 'direct_refund';
   if (!paysViaTikkie) return null;

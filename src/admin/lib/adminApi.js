@@ -3911,6 +3911,34 @@ export async function saveGroupCopy(groupId, copy) {
   return value;
 }
 
+/* Read a group's default settlement method (null when it has never been
+ * set, which the UI shows as the platform default). */
+export async function getGroupPaymentMethod(groupId) {
+  if (!groupId) return null;
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', GROUP_CFG_KEY(groupId)).maybeSingle();
+  const v = data?.value?.settings?.paymentMethod;
+  return v === 'voucher' || v === 'tikkie' ? v : null;
+}
+
+/* The group-wide default settlement method — every member venue that has
+ * not set its own follows this. See src/lib/paymentMethods.js. */
+export async function setGroupPaymentMethod(groupId, method) {
+  const key = GROUP_CFG_KEY(groupId);
+  const { data: existing } = await supabase
+    .from('app_config').select('value').eq('key', key).maybeSingle();
+  const value = existing?.value
+    ? JSON.parse(JSON.stringify(existing.value))
+    : { settings: { mode: 'byo' } };
+  value.settings = value.settings || {};
+  value.settings.paymentMethod = method === 'voucher' ? 'voucher' : 'tikkie';
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return value;
+}
+
 /* Toggle the group's curated "coming soon / not-yet" placeholder venues on the
  * customer Stores map + list. Stored on the group config; the customer app
  * reads settings.showNotYetStores (default on when unset). */

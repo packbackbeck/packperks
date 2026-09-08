@@ -46,3 +46,36 @@ export function resolvePaymentMethod(orgMethod, groupMethod) {
     || normalizePaymentMethod(groupMethod)
     || DEFAULT_PAYMENT_METHOD;
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+ * voucherGuideSteps — the "How does it work?" story, retold for a venue
+ * that settles at the counter.
+ *
+ * The first steps of any guide are about collecting cups and are true
+ * either way; only the LAST one differs, because the ending genuinely
+ * changes: no receipt to photograph, no wait, no money sent. Rather than
+ * keep a second full guide in sync, this swaps that final step and
+ * leaves the rest of the venue's own guide alone.
+ * ───────────────────────────────────────────────────────────────────── */
+export const VOUCHER_FINAL_STEP = {
+  title: 'Redeem it at the counter',
+  body: 'Once it is unlocked, open your voucher and hand your phone to the staff. They slide to confirm, the cups leave your balance, and the drink is yours — no receipt, no waiting.',
+  image: '/how-it-works/byo-4.png',
+  bg: 'linear-gradient(165deg, #F1E6F8 0%, #E2D2F2 100%)',
+  accent: '#7C4DBE',
+  icon: 'cup',
+};
+
+export function voucherGuideSteps(steps) {
+  if (!Array.isArray(steps) || steps.length === 0) return steps;
+  // Keep the venue's own artwork rhythm: reuse the last step's image and
+  // palette when it has one, so the swap doesn't stand out.
+  const last = steps[steps.length - 1] || {};
+  const swapped = {
+    ...VOUCHER_FINAL_STEP,
+    image: last.image || VOUCHER_FINAL_STEP.image,
+    bg: last.bg || VOUCHER_FINAL_STEP.bg,
+    accent: last.accent || VOUCHER_FINAL_STEP.accent,
+  };
+  return [...steps.slice(0, -1), swapped];
+}

@@ -44,62 +44,90 @@ export async function requestMotionPermission() {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-/* Tilt as a pair in [-1, 1]. Gyroscope first; pointer while the mouse is
- * over the card; otherwise a slow figure-of-eight so the foil still lives. */
+/* Tilt, written straight to the element.
+ *
+ * The first version kept tilt in React state and updated it every frame,
+ * while the card also carried a CSS transition — so each frame restarted
+ * an 80ms tween that the next frame interrupted. That fight is what made
+ * the card jitter when nothing was happening.
+ *
+ * Now a single rAF loop eases the CURRENT value toward a TARGET and sets
+ * the custom properties directly: no re-renders, no transition, and the
+ * easing doubles as a low-pass filter, so gyroscope noise and a shaky
+ * hand smooth out instead of shivering.
+ */
 function useTilt(ref) {
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const srcRef = useRef('idle');      // 'gyro' | 'pointer' | 'idle'
-  const rafRef = useRef(0);
-  const baseRef = useRef(null);       // the resting orientation, so "flat" is wherever the phone started
+  const target = useRef({ x: 0, y: 0 });
+  const src = useRef('idle');          // 'gyro' | 'pointer' | 'idle'
+  const base = useRef(null);           // resting orientation: "flat" is where the phone started
 
   useEffect(() => {
-    let last = 0;
+    const el = ref.current;
+    if (!el) return undefined;
+
     const onOrient = (e) => {
       if (e.beta == null || e.gamma == null) return;
-      const now = performance.now();
-      if (now - last < 16) return;    // ~60fps cap
-      last = now;
-      if (!baseRef.current) baseRef.current = { beta: e.beta, gamma: e.gamma };
-      const b = clamp((e.beta - baseRef.current.beta) / 28, -1, 1);
-      const g = clamp((e.gamma - baseRef.current.gamma) / 28, -1, 1);
-      srcRef.current = 'gyro';
-      setTilt({ x: g, y: -b });
+      if (!base.current) base.current = { beta: e.beta, gamma: e.gamma };
+      src.current = 'gyro';
+      target.current = {
+        x: clamp((e.gamma - base.current.gamma) / 30, -1, 1),
+        y: -clamp((e.beta - base.current.beta) / 30, -1, 1),
+      };
     };
     window.addEventListener('deviceorientation', onOrient, true);
 
-    const el = ref.current;
     const onMove = (e) => {
-      if (srcRef.current === 'gyro') return;
+      if (src.current === 'gyro') return;
       const r = el.getBoundingClientRect();
-      srcRef.current = 'pointer';
-      setTilt({
+      src.current = 'pointer';
+      target.current = {
         x: clamp(((e.clientX - r.left) / r.width) * 2 - 1, -1, 1),
-        y: clamp(((e.clientY - r.top) / r.height) * 2 - 1, -1, 1) * -1,
-      });
+        y: -clamp(((e.clientY - r.top) / r.height) * 2 - 1, -1, 1),
+      };
     };
-    const onLeave = () => { if (srcRef.current === 'pointer') srcRef.current = 'idle'; };
-    el?.addEventListener('pointermove', onMove);
-    el?.addEventListener('pointerleave', onLeave);
+    const onLeave = () => { if (src.current === 'pointer') src.current = 'idle'; };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerleave', onLeave);
 
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const t0 = performance.now();
-    const idle = (now) => {
-      if (srcRef.current === 'idle') {
+    let cur = { x: 0, y: 0 };
+    let raf = 0;
+
+    const frame = (now) => {
+      if (src.current === 'idle' && !reduced) {
+        // A slow, wide drift so the foil keeps moving when the phone is
+        // resting on a counter. Long periods — this must read as breathing,
+        // never as a tremor.
         const t = (now - t0) / 1000;
-        setTilt({ x: Math.sin(t * 0.55) * 0.45, y: Math.sin(t * 0.38 + 1.2) * 0.35 });
+        target.current = { x: Math.sin(t * 0.34) * 0.34, y: Math.sin(t * 0.23 + 1.2) * 0.26 };
       }
-      rafRef.current = requestAnimationFrame(idle);
+      // Ease 12% of the remaining distance per frame: quick to follow a
+      // deliberate move, slow enough to swallow jitter.
+      cur = {
+        x: cur.x + (target.current.x - cur.x) * 0.12,
+        y: cur.y + (target.current.y - cur.y) * 0.12,
+      };
+      const node = ref.current;
+      if (node) {
+        node.style.setProperty('--rx', `${(cur.y * 7).toFixed(2)}deg`);
+        node.style.setProperty('--ry', `${(cur.x * 9).toFixed(2)}deg`);
+        node.style.setProperty('--px', `${(50 + cur.x * 38).toFixed(1)}%`);
+        node.style.setProperty('--py', `${(50 - cur.y * 38).toFixed(1)}%`);
+        node.style.setProperty('--sx', `${(-cur.x * 16).toFixed(1)}px`);
+        node.style.setProperty('--sy', `${(cur.y * 16 + 14).toFixed(1)}px`);
+      }
+      raf = requestAnimationFrame(frame);
     };
-    rafRef.current = requestAnimationFrame(idle);
+    raf = requestAnimationFrame(frame);
 
     return () => {
       window.removeEventListener('deviceorientation', onOrient, true);
-      el?.removeEventListener('pointermove', onMove);
-      el?.removeEventListener('pointerleave', onLeave);
-      cancelAnimationFrame(rafRef.current);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerleave', onLeave);
+      cancelAnimationFrame(raf);
     };
   }, [ref]);
-
-  return tilt;
 }
 
 function useClock() {
@@ -117,7 +145,7 @@ export default function VoucherPage({ reward, org, userId, profile, cupCount = 0
   const money = useMoney();
   const clock = useClock();
   const cardRef = useRef(null);
-  const tilt = useTilt(cardRef);
+  useTilt(cardRef);
   const [qr, setQr] = useState(null);
   const [staffStep, setStaffStep] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -181,19 +209,9 @@ export default function VoucherPage({ reward, org, userId, profile, cupCount = 0
   }
 
   const primary = 'var(--pb-brown, #502314)';
-  // Tilt → card rotation, sheen position, glare position, shadow offset.
-  const style = {
-    '--vp': progress,
-    '--rx': `${(tilt.y * 9).toFixed(2)}deg`,
-    '--ry': `${(tilt.x * 11).toFixed(2)}deg`,
-    '--px': `${(50 + tilt.x * 40).toFixed(1)}%`,
-    '--py': `${(50 - tilt.y * 40).toFixed(1)}%`,
-    '--sx': `${(-tilt.x * 22).toFixed(1)}px`,
-    '--sy': `${(tilt.y * 22 + 18).toFixed(1)}px`,
-  };
 
   return (
-    <div className="hv" style={style}>
+    <div className="hv" style={{ '--vp': progress }}>
       {/* ── Quiet background: hairlines, rules, drifting rings ── */}
       <div className="hv__bg" aria-hidden="true">
         {/* Symmetrical, printed-security feel: a centred rosette of rings and

@@ -75,7 +75,7 @@ import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
 import TikkieHomePage from './components/TikkieHomePage';
 import VoucherPage, { requestMotionPermission } from './components/VoucherPage';
-import { resolvePaymentMethod } from './lib/paymentMethods';
+import { resolvePaymentMethod, voucherGuideSteps } from './lib/paymentMethods';
 import ActivityDetailModal from './components/ActivityDetailModal';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
@@ -541,7 +541,16 @@ export default function App({ consentReady = true } = {}) {
   const isByo        = groupCopy?.mode === 'byo';
   // Guide "stories" steps: an admin-edited guide (App Design) wins; else the
   // group-mode copy; else HowItWorks falls back to its built-in steps.
-  const guideSteps   = (design.guide?.steps?.length ? design.guide.steps : groupCopy?.howItWorks?.steps);
+  const rawGuideSteps = (design.guide?.steps?.length ? design.guide.steps : groupCopy?.howItWorks?.steps);
+  /* How this venue settles a reward: its own choice → the group's default
+   * → the platform default. Decided here because the how-it-works guide
+   * has to tell the right story about the ending. */
+  const isVoucher = resolvePaymentMethod(
+    liveSettings.paymentMethod,
+    groupCtx?.groupConfig?.settings?.paymentMethod,
+  ) === 'voucher';
+  // A counter venue never asks for a receipt, so the last step is retold.
+  const guideSteps = isVoucher ? voucherGuideSteps(rawGuideSteps) : rawGuideSteps;
 
   /* Detect "preview mode" — when the App Design tab's iframe embeds
    * us with ?preview=1, we skip every Supabase round-trip (auth,
@@ -1489,11 +1498,6 @@ export default function App({ consentReady = true } = {}) {
   /* ── Counter voucher ──
    * Nothing to review and nothing to pay out, so no email is needed either:
    * the reward is settled when staff slide on the customer's own phone. */
-  // org's own choice → the group's default → the platform default.
-  const isVoucher = resolvePaymentMethod(
-    liveSettings.paymentMethod,
-    groupCtx?.groupConfig?.settings?.paymentMethod,
-  ) === 'voucher';
   // The receipt shown on the home page right after a counter redemption.
   const [voucherReceipt, setVoucherReceipt] = useState(null);
   const handleVoucherRedeemed = (res) => {

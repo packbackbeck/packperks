@@ -23,7 +23,7 @@ export default function FeaturedReward({
   orgName,
 }) {
   const money = useMoney();
-  const { payoutNoun } = useRegion();
+  const { payout, payoutNoun } = useRegion();
   // Only NL's Tikkie payout has a public explainer page to deep-link to; other
   // regions render the payout noun as plain text.
   const isTikkie = payoutNoun === 'Tikkie link';
@@ -125,7 +125,7 @@ export default function FeaturedReward({
             <h3 className="featured-reward__success-title">Reward claimed!</h3>
             <p className="featured-reward__success-desc">
               Your <strong>{reward.name}</strong> cashback is on its way.
-              We'll send you a {payoutNoun} to collect it once your receipt is approved.
+              Once your receipt is approved, {payout.send}.
             </p>
             <button className="featured-reward__success-btn" onClick={onResetClaim}>
               Claim another reward
@@ -139,10 +139,10 @@ export default function FeaturedReward({
                 {isUnlocked
                   ? <>Buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>
                   : <>Once you unlock this, buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>}
-                We'll send your cashback via{' '}
                 {isTikkie
-                  ? <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>
-                  : <span className="featured-reward__tikkie-link">a {payoutNoun}</span>}.
+                  ? <>We'll send your cashback via{' '}
+                      <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>.</>
+                  : <>We'll send your cashback to you.</>}
                 {' '}
                 <button className="featured-reward__info-link" onClick={onOpenTerms}>Cashback terms</button>
                 {onOpenRefund && (

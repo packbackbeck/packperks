@@ -25,6 +25,10 @@ export const DEFAULT_REGIONS = {
     map: { lat: 52.13, lng: 5.29, zoom: 7 },
     collectLabel: 'Collect via Tikkie', // customer "collect your cashback" CTA
     payoutNoun: 'Tikkie link',          // inline copy: "we'll send you a …"
+    // 'link' regions promise a link to collect; 'direct' regions promise only
+    // that the cashback reaches the customer, because the mechanism (hosted
+    // link vs push to a wallet/account) isn't settled yet. See payoutCopy().
+    payoutStyle: 'link',
     enabled: true,
   },
   AE: {
@@ -40,6 +44,11 @@ export const DEFAULT_REGIONS = {
     map: { lat: 24.2, lng: 54.4, zoom: 7 },
     collectLabel: 'Collect your cashback', // provider-neutral (no NL "Tikkie")
     payoutNoun: 'payment link',            // provider-neutral inline copy
+    /* The UAE adapter supports BOTH a hosted link and a direct push to the
+     * customer (payments.js `models`), and which one goes live isn't decided.
+     * Promising "a payment link" would be a claim we can't keep, so AE copy
+     * says only that the cashback is sent — no mechanism, no false detail. */
+    payoutStyle: 'direct',
     enabled: true,
   },
 };
@@ -135,4 +144,34 @@ export function formatCurrency(amount, currency = 'EUR', locale = 'en-IE') {
 export function formatMoney(amount, regionKey = DEFAULT_REGION) {
   const r = getRegion(regionKey);
   return formatCurrency(amount, r.currency, r.currencyLocale);
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────
+ * payoutCopy — how this region promises to pay the customer.
+ *
+ * Two shapes, because two things are genuinely different:
+ *   link   — we hand over something to collect from ("a Tikkie link").
+ *   direct — we just send it; the mechanism isn't the customer's problem
+ *            and, in the UAE, isn't finalised either.
+ *
+ * `send` completes "…once your receipt is approved, {send}."
+ * `sendAmount(x)` completes the same sentence with the figure in it.
+ * ───────────────────────────────────────────────────────────────────── */
+export function payoutCopy(regionKey) {
+  const r = getRegion(regionKey);
+  if (r.payoutStyle === 'direct') {
+    return {
+      style: 'direct',
+      noun: r.payoutNoun,
+      send: "we'll send your cashback to you",
+      sendAmount: (amount) => `we'll send your ${amount} cashback to you`,
+    };
+  }
+  return {
+    style: 'link',
+    noun: r.payoutNoun,
+    send: `we'll send you a ${r.payoutNoun} to collect it`,
+    sendAmount: (amount) => `we'll send you a ${r.payoutNoun} to collect your ${amount} cashback`,
+  };
 }

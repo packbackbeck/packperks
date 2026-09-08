@@ -1099,7 +1099,7 @@ export default function App({ consentReady = true } = {}) {
    * the right currency. `focusRegion` is the customer's own preference from
    * onboarding (country), used to order + zoom the Stores hub even before they
    * pick a venue; it falls back to the active org's region, then the default. */
-  const { setRegion, payoutNoun } = useRegion();
+  const { setRegion, payout } = useRegion();
   // Account-level region — the customer's chosen "home" region. It drives the
   // display currency, the payout method, the applied data policy, and the
   // Stores hub focus/ordering. Stored on the device (like onboarding) and
@@ -2367,7 +2367,7 @@ export default function App({ consentReady = true } = {}) {
               <li>To claim, add and <strong>verify your email</strong> (we send a 6-digit code), then upload a clear photo of the <strong>printed store receipt</strong> for the reward item.</li>
               <li>We accept genuine printed store/till receipts that clearly show the reward item and are dated within the last 30 days.</li>
               <li>We <strong>can’t accept</strong> screenshots, photos of a screen, edited or AI-generated images, blurry or unreadable photos, receipts that don’t show the reward item, or receipts dated before you collected your cups. Each receipt can be used once.</li>
-              <li>An automated check pre-screens your photo, but a person makes the final call. Once approved, we send a <strong>{payoutNoun}</strong> to collect your cashback yourself, usually within a few days, no later than 7. We never ask for your bank details; collect it promptly as links expire.</li>
+              <li>An automated check pre-screens your photo, but a person makes the final call. Once approved, {payout.send}, usually within a few days, no later than 7.{payout.style === 'link' ? ' We never ask for your bank details; collect it promptly as links expire.' : ' We never ask for your bank details.'}</li>
               <li>Prefer not to take cashback? You can <strong>donate</strong> your cups to a good cause instead.</li>
               <li>Cups are saved separately at each venue, and you can switch your reward goal any time before claiming.</li>
             </ul>

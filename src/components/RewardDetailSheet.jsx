@@ -29,7 +29,7 @@ const InfoIcon = () => (
 
 export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked, isByo = false }) {
   const money = useMoney();
-  const { payoutNoun } = useRegion();
+  const { payout } = useRegion();
   if (!reward) return null;
 
   const isUnlocked = cupCount >= reward.cupsNeeded;
@@ -121,7 +121,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               <li className="rds-step">
                 <span className="rds-step__num">3</span>
                 <span className="rds-step__text">
-                  Upload a <strong>photo of your receipt</strong>. Once it's verified, we'll send your {money(reward.euros)} cashback via a <strong>{payoutNoun}</strong>, usually within a few days.
+                  Upload a <strong>photo of your receipt</strong>. Once it's verified, {payout.sendAmount(money(reward.euros))}, usually within a few days.
                 </span>
               </li>
             </ol>

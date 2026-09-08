@@ -13,7 +13,7 @@
  * ───────────────────────────────────────────────────────────────────── */
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { getRegion, formatMoney, setRegions, DEFAULT_REGION } from './regions';
+import { getRegion, formatMoney, setRegions, DEFAULT_REGION, payoutCopy } from './regions';
 import { supabase } from './supabase';
 
 const RegionContext = createContext(null);
@@ -26,6 +26,7 @@ function valueFor(region, setRegion, rev) {
     symbol: r.symbol,
     collectLabel: r.collectLabel, // provider-neutral "collect your cashback" CTA
     payoutNoun: r.payoutNoun,     // inline copy noun ("Tikkie link" / "payment link")
+    payout: payoutCopy(r.key),    // full phrases — see payoutCopy() in regions.js
     money: (n) => formatMoney(n, r.key),
     setRegion,
     _rev: rev, // bumps when the overlay loads so consumers re-read the registry

@@ -6,7 +6,7 @@
    track's clipping lives on .stc__track and the knob is its sibling:
    overflow:hidden on the outer box would slice the knob's edges off. */
 .stc {
-  position: relative; height: 72px;
+  position: relative; height: 72px; border-radius: 999px;
   touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
 }
 .stc--disabled { opacity: 0.5; cursor: default; }
@@ -17,17 +17,19 @@
   background: rgba(31, 27, 22, 0.08);
 }
 
-/* Ends exactly where the knob ends — same travel, same variable.
-   77.5px = half a track cap (36) + half a knob (41.5). */
+/* Ends at the knob's CENTRE, not its leading edge: identical travel and
+   identical offset, so the fill's edge sits under the middle of the knob
+   at every position and the two read as one movement. Ending at the edge
+   made the fill look like it was running ahead of the knob. */
 .stc__fill {
   position: absolute; inset: 0 auto 0 0;
-  width: calc(77.5px + var(--stc-p, 0) * (100% - 72px));
+  width: calc(36px + var(--stc-p, 0) * (100% - 72px));
   background: var(--stc-color, #502314); opacity: 0.18;
 }
 .stc__label {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  padding-left: 62px;
+  padding-left: 84px;
   font-size: 15px; font-weight: 800; color: rgba(31, 27, 22, 0.72); pointer-events: none;
   transition: opacity 0.1s linear;
 }

@@ -195,7 +195,11 @@
 @keyframes hv-staff-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .hv__staff-note { margin: 0; font-size: 14.5px; color: rgba(31, 27, 22, 0.78); }
 .hv__staff-note strong { color: var(--black, #1F1B16); }
-.hv__staff .stc { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(8px); }
+/* The frosted panel goes on the TRACK, which is the element that carries
+   the pill rounding. Painting it on the outer .stc — which is now just a
+   positioning box for the overhanging knob — drew a square behind the
+   rounded track, hence the sharp white corners. */
+.hv__staff .stc__track { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(8px); }
 .hv__err { margin: 0; font-size: 13.5px; font-weight: 700; color: #C0392B; }
 .hv__cancel {
   align-self: center; border: none; background: none; padding: 6px 10px;

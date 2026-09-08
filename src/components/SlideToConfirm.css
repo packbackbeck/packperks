@@ -1,29 +1,45 @@
-/* SlideToConfirm — track + thumb. Colour comes from --stc-color. */
+/* SlideToConfirm — a knob riding a track. Colour comes from --stc-color,
+   position from --stc-p (0–1), set together by the component.
+
+   The knob (83px) is deliberately taller than the track (72px), so it
+   overhangs top and bottom like a physical control. That is why the
+   track's clipping lives on .stc__track and the knob is its sibling:
+   overflow:hidden on the outer box would slice the knob's edges off. */
 .stc {
-  position: relative; height: 72px; border-radius: 999px;
-  background: rgba(31, 27, 22, 0.08); overflow: hidden;
+  position: relative; height: 72px;
   touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
 }
 .stc--disabled { opacity: 0.5; cursor: default; }
-/* Ends exactly where the thumb ends — same travel, same variable. */
+
+.stc__track {
+  position: absolute; inset: 0;
+  border-radius: 999px; overflow: hidden;
+  background: rgba(31, 27, 22, 0.08);
+}
+
+/* Ends exactly where the knob ends — same travel, same variable.
+   77.5px = half a track cap (36) + half a knob (41.5). */
 .stc__fill {
   position: absolute; inset: 0 auto 0 0;
-  width: calc(68px + var(--stc-p, 0) * (100% - 72px));
+  width: calc(77.5px + var(--stc-p, 0) * (100% - 72px));
   background: var(--stc-color, #502314); opacity: 0.18;
 }
 .stc__label {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  padding-left: 52px;
+  padding-left: 62px;
   font-size: 15px; font-weight: 800; color: rgba(31, 27, 22, 0.72); pointer-events: none;
   transition: opacity 0.1s linear;
 }
+
+/* Centre travels cap-to-cap: 36px → (100% - 36px). */
 .stc__thumb {
-  position: absolute; top: 4px;
-  left: calc(4px + var(--stc-p, 0) * (100% - 72px));
-  width: 64px; height: 64px; border-radius: 50%;
+  position: absolute; top: 50%;
+  left: calc(var(--stc-p, 0) * (100% - 72px) - 5.5px);
+  width: 83px; height: 83px; border-radius: 50%;
+  transform: translateY(-50%);
   background: var(--stc-color, #502314);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 10px rgba(31, 27, 22, 0.25);
+  box-shadow: 0 3px 14px rgba(31, 27, 22, 0.3);
 }
 .stc--done .stc__fill { opacity: 0.32; }

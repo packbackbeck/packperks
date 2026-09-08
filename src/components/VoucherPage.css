@@ -16,9 +16,9 @@
   color: var(--black, #1F1B16);
   background:
     linear-gradient(180deg,
-      color-mix(in srgb, var(--pb-brown, #502314) 26%, var(--pb-cream, #F4EBDC)) 0%,
-      color-mix(in srgb, var(--pb-brown, #502314) 8%, var(--pb-cream, #F4EBDC)) 38%,
-      color-mix(in srgb, var(--pb-orange, #F58220) 16%, var(--pb-cream, #F4EBDC)) 100%);
+      color-mix(in srgb, var(--pb-brown, #502314) 11%, var(--pb-cream, #F4EBDC)) 0%,
+      color-mix(in srgb, var(--pb-brown, #502314) 3%, var(--pb-cream, #F4EBDC)) 40%,
+      color-mix(in srgb, var(--pb-orange, #F58220) 7%, var(--pb-cream, #F4EBDC)) 100%);
   overflow: hidden;
 }
 
@@ -28,7 +28,7 @@
 /* Two colour washes, mirrored left and right so the field stays balanced. */
 .hv__wash {
   position: absolute; top: -18vmax; width: 78vmax; height: 78vmax; border-radius: 50%;
-  filter: blur(58px); opacity: 0.5;
+  filter: blur(58px); opacity: 0.26;
 }
 .hv__wash--l {
   left: -34vmax;
@@ -135,12 +135,15 @@
 .hv__name { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; }
 .hv__amount { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; }
 
+/* Square by construction — the QR sits in a true panel rather than a
+   letterbox, and the card grows to hold it. */
 .hv__qr-wrap {
   position: relative; z-index: 2; margin-top: 16px; padding: 12px;
   background: #fff; border-radius: 18px;
-  display: flex; justify-content: center;
+  aspect-ratio: 1 / 1;
+  display: flex; align-items: center; justify-content: center;
 }
-.hv__qr { display: block; width: 148px; height: 148px; }
+.hv__qr { display: block; width: 78%; height: auto; aspect-ratio: 1 / 1; }
 
 /* Foil: a rainbow that lives under fine holo lines; it slides with the
    light. color-dodge keeps it a sheen, not a paint job. */

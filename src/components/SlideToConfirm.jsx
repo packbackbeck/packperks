@@ -11,7 +11,13 @@ import './SlideToConfirm.css';
  * slide is not a confirmation.
  * ───────────────────────────────────────────────────────────────────── */
 
+/* Track geometry, shared with the CSS through --stc-p so the fill and the
+ * thumb are derived from ONE number and cannot drift apart:
+ *   thumb left  = PAD + p * (100% - PAD*2 - THUMB)
+ *   fill  width = PAD + THUMB + p * (100% - PAD*2 - THUMB)
+ * i.e. the fill always ends exactly at the thumb's right edge. */
 const THUMB = 64;   // px, matches the CSS
+const PAD   = 4;    // px inset at each end of the track
 const DONE  = 0.88; // fraction of the track that counts as committed
 
 export default function SlideToConfirm({ label, color, disabled = false, onProgress, onComplete }) {
@@ -26,7 +32,8 @@ export default function SlideToConfirm({ label, color, disabled = false, onProgr
     const el = trackRef.current;
     if (!el) return 0;
     const r = el.getBoundingClientRect();
-    return Math.min(1, Math.max(0, (clientX - r.left - THUMB / 2) / (r.width - THUMB)));
+    const travel = r.width - PAD * 2 - THUMB;
+    return Math.min(1, Math.max(0, (clientX - r.left - PAD - THUMB / 2) / travel));
   }
   function onDown(e) {
     if (done || disabled) return;
@@ -63,11 +70,11 @@ export default function SlideToConfirm({ label, color, disabled = false, onProgr
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(progress * 100)}
-      style={{ '--stc-color': color }}
+      style={{ '--stc-color': color, '--stc-p': progress }}
     >
-      <div className="stc__fill" style={{ width: `${progress * 100}%` }} />
+      <div className="stc__fill" />
       <span className="stc__label" style={{ opacity: Math.max(0, 1 - progress * 1.6) }}>{label}</span>
-      <div className="stc__thumb" style={{ left: `calc(${progress} * (100% - ${THUMB}px))` }}>
+      <div className="stc__thumb">
         {done ? (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
         ) : (

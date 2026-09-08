@@ -1907,6 +1907,7 @@ export default function App({ consentReady = true } = {}) {
         org={activeOrg}
         userId={userId}
         profile={profile}
+        cupCount={cupCount}
         onBack={() => setPage('home')}
         onDone={handleVoucherRedeemed}
       />
@@ -2298,8 +2299,12 @@ export default function App({ consentReady = true } = {}) {
         />
       )}
 
-      {/* Grouped org → a "back to all stores" affordance above everything. */}
-      {groupCtx && (
+      {/* Grouped org → a "back to all stores" affordance above everything.
+          A venue can hide it (settings.hideStoresLink) when it is presented
+          as a destination rather than one of many; the spacer keeps the
+          header sitting at the same height either way. */}
+      {groupCtx && liveSettings.hideStoresLink && <div className="app__see-stores-spacer" aria-hidden="true" />}
+      {groupCtx && !liveSettings.hideStoresLink && (
         <button type="button" className="app__see-stores" onClick={() => { if (groupCtx?.group?.slug) window.location.href = `/${groupCtx.group.slug}`; else setPage('stores'); }}>
           <svg className="app__see-stores-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <circle cx="5" cy="5" r="2" /><circle cx="12" cy="5" r="2" /><circle cx="19" cy="5" r="2" />

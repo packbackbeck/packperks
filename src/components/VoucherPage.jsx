@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCodeLib from 'qrcode';
 import { useMoney } from '../lib/RegionContext';
+import { animalForProfile } from '../lib/animals';
 import { redeemVoucher } from '../lib/api';
 import SlideToConfirm from './SlideToConfirm';
 import './VoucherPage.css';
@@ -110,7 +111,9 @@ function useClock() {
   return now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export default function VoucherPage({ reward, org, userId, onDone, onBack }) {
+const AVATAR_KEY = 'packperks_profile_avatar';
+
+export default function VoucherPage({ reward, org, userId, profile, cupCount = 0, onDone, onBack }) {
   const money = useMoney();
   const clock = useClock();
   const cardRef = useRef(null);
@@ -123,6 +126,11 @@ export default function VoucherPage({ reward, org, userId, onDone, onBack }) {
 
   const cups = reward?.cupsNeeded || 0;
   const amount = Number(reward?.euros ?? 0);
+  const animal = useMemo(() => animalForProfile(profile), [profile]);
+  // The same photo the profile page uses, if this device has one set.
+  const avatarUrl = useMemo(() => {
+    try { return localStorage.getItem(AVATAR_KEY) || null; } catch { return null; }
+  }, []);
 
   // A reference, not a secret: who and what. No amount, no account.
   const payload = useMemo(
@@ -188,14 +196,37 @@ export default function VoucherPage({ reward, org, userId, onDone, onBack }) {
     <div className="hv" style={style}>
       {/* ── Quiet background: hairlines, rules, drifting rings ── */}
       <div className="hv__bg" aria-hidden="true">
-        <span className="hv__lines" />
-        <span className="hv__rule hv__rule--1" />
-        <span className="hv__rule hv__rule--2" />
-        <svg className="hv__rings hv__rings--a" viewBox="0 0 400 400">
-          {[60, 100, 140, 180, 220, 260, 300].map(r => <circle key={r} cx="200" cy="200" r={r} />)}
+        {/* Symmetrical, printed-security feel: a centred rosette of rings and
+            spokes, a mirrored pair of arcs top and bottom, a crosshatch
+            lattice, and two colour washes. Only the rosette turns. */}
+        <span className="hv__wash hv__wash--l" />
+        <span className="hv__wash hv__wash--r" />
+        <span className="hv__lattice" />
+        <svg className="hv__rosette" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet">
+          <g className="hv__rosette-spin">
+            {[52, 78, 104, 130, 156, 182].map(r => <circle key={r} cx="200" cy="200" r={r} />)}
+            {Array.from({ length: 24 }, (_, i) => {
+              const a = (i * Math.PI * 2) / 24;
+              return (
+                <line
+                  key={i}
+                  x1={200 + Math.cos(a) * 52} y1={200 + Math.sin(a) * 52}
+                  x2={200 + Math.cos(a) * 182} y2={200 + Math.sin(a) * 182}
+                />
+              );
+            })}
+          </g>
+          <circle className="hv__rosette-hub" cx="200" cy="200" r="30" />
         </svg>
-        <svg className="hv__rings hv__rings--b" viewBox="0 0 400 400">
-          {[50, 90, 130, 170, 210, 250].map(r => <circle key={r} cx="200" cy="200" r={r} />)}
+        <svg className="hv__arcs" viewBox="0 0 400 200" preserveAspectRatio="none">
+          {[0, 1, 2, 3].map(i => (
+            <path key={i} d={`M0 ${40 + i * 22} Q200 ${-40 + i * 22} 400 ${40 + i * 22}`} />
+          ))}
+        </svg>
+        <svg className="hv__arcs hv__arcs--b" viewBox="0 0 400 200" preserveAspectRatio="none">
+          {[0, 1, 2, 3].map(i => (
+            <path key={i} d={`M0 ${160 - i * 22} Q200 ${240 - i * 22} 400 ${160 - i * 22}`} />
+          ))}
         </svg>
         <span className="hv__grain" />
       </div>
@@ -226,6 +257,22 @@ export default function VoucherPage({ reward, org, userId, onDone, onBack }) {
             <div className="hv__qr-wrap">
               {qr ? <img className="hv__qr" src={qr} alt="Voucher code" /> : <div className="hv__qr" />}
             </div>
+
+            {/* Whose voucher it is, and what it leaves behind — so staff can
+                match the phone to the person in front of them. */}
+            <div className="hv__holder">
+              <div className="hv__who">
+                <span className="hv__avatar" style={avatarUrl ? undefined : { background: animal.bg }}>
+                  {avatarUrl
+                    ? <img className="hv__avatar-img" src={avatarUrl} alt="" />
+                    : <span aria-hidden="true">{animal.emoji}</span>}
+                </span>
+                <span className="hv__holder-name">{profile?.displayName || 'PackPerks member'}</span>
+              </div>
+              <span className="hv__balance">
+                <strong>{cupCount}</strong> cup{cupCount === 1 ? '' : 's'}
+              </span>
+            </div>
             <span className="hv__foil" aria-hidden="true" />
             <span className="hv__glare" aria-hidden="true" />
             <span className="hv__edge" aria-hidden="true" />
@@ -249,11 +296,6 @@ export default function VoucherPage({ reward, org, userId, onDone, onBack }) {
               onComplete={handleComplete}
             />
             {error && <p className="hv__err">{error}</p>}
-            {!busy && (
-              <button type="button" className="hv__cancel" onClick={() => { setStaffStep(false); setProgress(0); }}>
-                Not now
-              </button>
-            )}
           </div>
         )}
       </main>

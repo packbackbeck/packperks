@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRegion } from '../lib/RegionContext';
 import { getFailureCopy } from '../admin/lib/aiVerdictLabels';
+import CollectSheet from './CollectSheet';
 import './ActivityDetailModal.css';
 
 /* Claim "phase" views. A single receipt claim shows up in Activity as up to
@@ -77,10 +78,12 @@ function liveStatusForClaim(item, userClaims) {
       // auto-passed (completed, but no link yet) is still under human review.
       if (tikkieUrl) {
         return bestMatch.tikkie_status === 'redeemed'
-          ? { label: 'Collected', color: '#1A8737', tikkieUrl, expired }
-          : { label: 'Ready to collect', color: '#1A8737', tikkieUrl, expired };
+          ? { label: 'Collected', color: '#1A8737', tikkieUrl, expired, claim: bestMatch }
+          : { label: 'Ready to collect', color: '#1A8737', tikkieUrl, expired, claim: bestMatch };
       }
-      return { label: 'In review by our team', color: '#B8922A' };
+      /* A 'direct' region has no link to wait for — an approved claim is
+       * collectable through our own sheet, so say so. */
+      return { label: 'In review by our team', color: '#B8922A', claim: bestMatch };
     case 'failed':
       return { label: 'Not approved', color: '#C73E1D' };
     case 'pending':
@@ -108,7 +111,8 @@ function ToneIcon({ icon }) {
 
 export default function ActivityDetailModal({ item, profile, userClaims, onClose }) {
   const cardRef = useRef(null);
-  const { collectLabel } = useRegion();
+  const { collectLabel, payout } = useRegion();
+  const [collectOpen, setCollectOpen] = useState(false);
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose?.(); }
@@ -141,7 +145,15 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
 
   // The payout link is shown ONLY for the approved verdict (and for legacy
   // non-phase reward_claimed taps) — never on the submission or a rejection.
-  const showCollect = (phase === 'approved' || !phaseMeta) && !!liveStatus?.tikkieUrl;
+  const approvedView = phase === 'approved' || !phaseMeta;
+  const showCollect = approvedView && !!liveStatus?.tikkieUrl;
+  /* Regions with no hosted provider page (payoutStyle 'direct') collect
+   * inside the app instead — see CollectSheet. Gated on the same approved
+   * view, so a submission or a rejection never offers it. */
+  const showDirectCollect = approvedView
+    && payout?.style === 'direct'
+    && !liveStatus?.tikkieUrl
+    && liveStatus?.claim?.status === 'completed';
   // Rejection reasons, mapped from the claim's failure codes to friendly copy.
   const failureCodes = phase === 'rejected' ? (item._failureCodes || []) : [];
 
@@ -244,6 +256,26 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
               <p className="adm-collect-note">If this link no longer opens, it may have expired. Contact us and we’ll reissue it.</p>
             )}
           </div>
+        )}
+
+        {showDirectCollect && (
+          <div className="adm-collect-wrap">
+            <button type="button" className="adm-collect" onClick={() => setCollectOpen(true)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              </svg>
+              {collectLabel || 'Collect your cashback'}
+            </button>
+          </div>
+        )}
+
+        {collectOpen && (
+          <CollectSheet
+            amount={Number(liveStatus?.claim?.payout_amount || 0)}
+            rewardName={item.rewardName || item.title || null}
+            reference={refId}
+            onClose={() => setCollectOpen(false)}
+          />
         )}
 
         <div className="adm-actions">

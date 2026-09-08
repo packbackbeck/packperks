@@ -1,0 +1,96 @@
+/* CollectSheet — the collect-your-cashback panel for regions with no
+   hosted provider page. Voucher shape: coloured head, torn edge, body. */
+
+.collect {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5000;
+  height: 100vh; height: 100dvh;      /* clears iOS Safari's bottom bar */
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.collect__backdrop { position: absolute; inset: 0; background: rgba(31, 27, 22, 0.5); }
+.collect__card {
+  position: relative;
+  width: 100%; max-width: 420px; box-sizing: border-box;
+  background: #fff; border-radius: 22px 22px 0 0;
+  max-height: 92dvh; overflow-y: auto;
+  animation: collect-up 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes collect-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .collect__card { animation: none; } }
+
+.collect__close {
+  position: absolute; top: 14px; right: 14px; z-index: 3;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: rgba(255, 255, 255, 0.25); color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+
+/* ── Head ── */
+.collect__head {
+  border-radius: 22px 22px 0 0;
+  padding: 30px 22px 26px;
+  color: #fff; text-align: center;
+}
+.collect__eyebrow {
+  display: block; font-size: 12px; font-weight: 800;
+  letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.8;
+}
+.collect__amount {
+  margin-top: 6px;
+  font-size: 42px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1;
+}
+.collect__reward { display: block; margin-top: 4px; font-size: 13.5px; opacity: 0.85; }
+
+/* The torn edge sits flush under the head, so the two read as one ticket. */
+.collect__zigzag { display: block; width: 100%; height: 12px; margin-top: -1px; }
+
+/* ── Body ── */
+.collect__body { padding: 18px 22px calc(env(safe-area-inset-bottom, 0px) + 22px); text-align: center; }
+.collect__qr-wrap {
+  display: inline-flex; padding: 12px;
+  background: #fff; border: 1.5px solid #EDE6D8; border-radius: 16px;
+}
+.collect__qr { display: block; width: 168px; height: 168px; }
+.collect__qr--empty { background: #F4EFE4; border-radius: 8px; }
+.collect__qr-note { margin: 10px 0 0; font-size: 13.5px; color: #3F3830; }
+
+.collect__or {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0 16px; color: #A79E90; font-size: 12px; font-weight: 700;
+}
+.collect__or::before, .collect__or::after {
+  content: ''; flex: 1; height: 1px; background: #EDE6D8;
+}
+
+/* ── Slide to send ── */
+.collect__slide {
+  position: relative; height: 56px; border-radius: 999px;
+  background: #F4EFE4; overflow: hidden;
+  touch-action: none; user-select: none; cursor: grab;
+}
+.collect__slide-fill { position: absolute; inset: 0 auto 0 0; opacity: 0.16; }
+.collect__slide-label {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14.5px; font-weight: 800; color: #6C6259; pointer-events: none;
+}
+.collect__slide-thumb {
+  position: absolute; top: 4px; width: 48px; height: 48px; margin-left: 4px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(31, 27, 22, 0.22);
+}
+
+.collect__fine { margin: 12px 0 0; font-size: 11.5px; color: #A79E90; }
+
+/* ── Sent ── */
+.collect__done { padding: 26px 22px calc(env(safe-area-inset-bottom, 0px) + 26px); text-align: center; }
+.collect__tick {
+  width: 54px; height: 54px; border-radius: 50%; margin: 0 auto 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.collect__done-title { margin: 0 0 8px; font-size: 20px; font-weight: 800; color: #1F1B16; }
+.collect__done-sub { margin: 0; font-size: 15px; line-height: 1.55; color: #3F3830; }
+.collect__btn {
+  margin-top: 20px; width: 100%; padding: 15px;
+  border: none; border-radius: 999px; color: #fff;
+  font-family: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer;
+}

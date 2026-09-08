@@ -8,6 +8,7 @@ import ConsentGate from './components/ConsentGate.jsx'
 import ModelChooser from './components/ModelChooser.jsx'
 import SupportForm from './components/SupportForm.jsx'
 import { RegionProvider } from './lib/RegionContext.jsx'
+import CollectPreview from './components/CollectPreview.jsx'
 
 const path = window.location.pathname
 const isAdmin = path.startsWith('/admin')
@@ -32,7 +33,13 @@ createRoot(document.getElementById('root')).render(
             ? <SupportForm audience="user" />
             : isRoot
               ? <ModelChooser />
-              : <RegionProvider><ConsentGate><App /></ConsentGate></RegionProvider>}
+              : <RegionProvider>
+                  <ConsentGate><App /></ConsentGate>
+                  {/* Dev-only: ?collect=<amount> previews the collect sheet
+                      over the live store, so the payout screen can be shown
+                      without an approved claim to hand. Stripped in prod. */}
+                  <CollectPreview />
+                </RegionProvider>}
   </StrictMode>,
 )
 

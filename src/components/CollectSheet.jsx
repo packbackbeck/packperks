@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import QRCodeLib from 'qrcode';
 import { useMoney, useRegion } from '../lib/RegionContext';
+import SlideToConfirm from './SlideToConfirm';
 import './CollectSheet.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -19,8 +20,6 @@ import './CollectSheet.css';
  * its way rather than claiming it has landed.
  * ───────────────────────────────────────────────────────────────────── */
 
-const SLIDE_DONE = 0.88;   // fraction of the track that counts as committed
-
 function Zigzag({ color }) {
   // The torn-ticket edge the reward card uses, redrawn here so the panel
   // reads as one voucher rather than two stacked boxes.
@@ -35,10 +34,7 @@ export default function CollectSheet({ amount, rewardName, reference, brandColor
   const money = useMoney();
   const { currency } = useRegion();
   const [qr, setQr] = useState(null);
-  const [progress, setProgress] = useState(0);
   const [sent, setSent] = useState(false);
-  const trackRef = useRef(null);
-  const draggingRef = useRef(false);
 
   /* The org's own primary, as applied to :root by applyDesignColors — so a
    * NYUAD collect screen is violet and a La Place one is green, with no
@@ -69,33 +65,6 @@ export default function CollectSheet({ amount, rewardName, reference, brandColor
       document.body.style.overflow = prev;
     };
   }, [onClose]);
-
-  /* ── Slide to send ── */
-  function pointerFraction(clientX) {
-    const el = trackRef.current;
-    if (!el) return 0;
-    const r = el.getBoundingClientRect();
-    const thumb = 56;
-    return Math.min(1, Math.max(0, (clientX - r.left - thumb / 2) / (r.width - thumb)));
-  }
-  function startDrag(e) {
-    if (sent) return;
-    draggingRef.current = true;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    setProgress(pointerFraction(e.clientX));
-  }
-  function moveDrag(e) {
-    if (!draggingRef.current || sent) return;
-    setProgress(pointerFraction(e.clientX));
-  }
-  function endDrag() {
-    if (!draggingRef.current || sent) return;
-    draggingRef.current = false;
-    setProgress((p) => {
-      if (p >= SLIDE_DONE) { setSent(true); return 1; }
-      return 0;   // snap back — an unfinished slide is not a confirmation
-    });
-  }
 
   return createPortal((
     <div className="collect" role="dialog" aria-modal="true" aria-label="Collect your cashback">
@@ -141,27 +110,11 @@ export default function CollectSheet({ amount, rewardName, reference, brandColor
 
             <div className="collect__or"><span>or</span></div>
 
-            <div
-              className="collect__slide"
-              ref={trackRef}
-              onPointerDown={startDrag}
-              onPointerMove={moveDrag}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-            >
-              <div className="collect__slide-fill" style={{ width: `${progress * 100}%`, background: primary }} />
-              <span className="collect__slide-label" style={{ opacity: 1 - progress * 1.4 }}>
-                Slide to send to my account
-              </span>
-              <div
-                className="collect__slide-thumb"
-                style={{ left: `calc(${progress} * (100% - 56px))`, background: primary }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                </svg>
-              </div>
-            </div>
+            <SlideToConfirm
+              label="Slide to send to my account"
+              color={primary}
+              onComplete={() => setSent(true)}
+            />
             <p className="collect__fine">
               Paid in {currency}. We never ask for your card details.
             </p>

@@ -95,7 +95,7 @@ export async function getAdminStats(orgIds) {
     claims.reduce((sum, c) => sum + (c.cups_redeemed || 0), 0);
 
   const totalCupsRedeemed = claims
-    .filter(c => c.type === 'cashback')
+    .filter(c => c.type === 'cashback' || c.type === 'voucher')
     .reduce((sum, c) => sum + (c.cups_redeemed || 0), 0);
   const totalCashback = claims
     .filter(c => c.status === 'completed')
@@ -962,7 +962,7 @@ export async function getUserActionStats() {
 
   // 3–5) Claim-type mix across ALL claims (reward + direct refund + donation).
   const totalClaims = claims.length;
-  const nReward   = claims.filter(c => c.type === 'cashback').length;
+  const nReward   = claims.filter(c => c.type === 'cashback' || c.type === 'voucher').length;
   const nRefund   = claims.filter(c => c.type === 'direct_refund').length;
   const nDonation = claims.filter(c => c.type === 'donation').length;
 
@@ -1122,7 +1122,7 @@ function computeMetrics({ cups, scans, claims, users, ev, rej = [] }) {
 
   // ── Claims ──
   const totalClaims    = claims.length;
-  const cashbackClaims = claims.filter(c => c.type === 'cashback').length;
+  const cashbackClaims = claims.filter(c => c.type === 'cashback' || c.type === 'voucher').length;
   const donationClaims = claims.filter(c => c.type === 'donation').length;
   const committed      = claims.filter(c => c.status === 'completed' || c.status === 'pending');
   const cupsSpent      = committed.reduce((s, c) => s + (Number(c.cups_redeemed) || 0), 0);
@@ -2787,7 +2787,7 @@ export async function getRewardBudget(orgId) {
   ]);
   const budget = budgetRes.data;
   const spent = (claimsRes.data || [])
-    .filter(c => c.type === 'cashback' && (c.status === 'completed' || c.status === 'pending'))
+    .filter(c => (c.type === 'cashback' || c.type === 'voucher') && (c.status === 'completed' || c.status === 'pending'))
     .reduce((s, c) => s + (Number(c.payout_amount) || 0), 0);
   return {
     cap: budget ? Number(budget.cap_eur) : 200,
@@ -3249,6 +3249,7 @@ export async function createOrganization(payload) {
   const settings = {
     cashbackRatePerCup: economics.cashbackRatePerCup ?? 1.25,
     refundRatePerCup:   economics.refundRatePerCup   ?? 1.00,
+    paymentMethod:      economics.paymentMethod      ?? 'tikkie',
     heroHeadline:       copy.heroHeadline       || 'Collect & Get Rewards',
     heroSubtext:        copy.heroSubtext        || 'Return your packaging and earn cashback.',
     donationRecipient:  copy.donationRecipient  || '',

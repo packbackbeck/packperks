@@ -27,7 +27,7 @@ const InfoIcon = () => (
   </svg>
 );
 
-export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked, isByo = false }) {
+export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked, isByo = false, isVoucher = false }) {
   const money = useMoney();
   const { payout } = useRegion();
   if (!reward) return null;
@@ -110,20 +110,39 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                     : <>Collect <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> to unlock this reward by returning your reusable cups at {brand}.</>}
                 </span>
               </li>
-              <li className="rds-step">
-                <span className="rds-step__num">2</span>
-                <span className="rds-step__text">
-                  {isByo
-                    ? <>Buy your <strong>{reward.name}</strong> at {brand} and keep the printed receipt.</>
-                    : <>Buy your <strong>{reward.name}</strong> at any supermarket or grocery store in the Netherlands, and keep the printed receipt.</>}
-                </span>
-              </li>
-              <li className="rds-step">
-                <span className="rds-step__num">3</span>
-                <span className="rds-step__text">
-                  Upload a <strong>photo of your receipt</strong>. Once it's verified, {payout.sendAmount(money(reward.euros))}, usually within a few days.
-                </span>
-              </li>
+              {isVoucher ? (
+                <>
+                  <li className="rds-step">
+                    <span className="rds-step__num">2</span>
+                    <span className="rds-step__text">
+                      Tap <strong>Redeem at the counter</strong> and show the voucher to the staff at {brand}.
+                    </span>
+                  </li>
+                  <li className="rds-step">
+                    <span className="rds-step__num">3</span>
+                    <span className="rds-step__text">
+                      They slide to confirm, <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> leave your balance, and your <strong>{reward.name}</strong> is yours.
+                    </span>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="rds-step">
+                    <span className="rds-step__num">2</span>
+                    <span className="rds-step__text">
+                      {isByo
+                        ? <>Buy your <strong>{reward.name}</strong> at {brand} and keep the printed receipt.</>
+                        : <>Buy your <strong>{reward.name}</strong> at any supermarket or grocery store in the Netherlands, and keep the printed receipt.</>}
+                    </span>
+                  </li>
+                  <li className="rds-step">
+                    <span className="rds-step__num">3</span>
+                    <span className="rds-step__text">
+                      Upload a <strong>photo of your receipt</strong>. Once it's verified, {payout.sendAmount(money(reward.euros))}, usually within a few days.
+                    </span>
+                  </li>
+                </>
+              )}
             </ol>
           </div>
 
@@ -150,7 +169,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                 ? `${cupsRemaining} more cup${cupsRemaining !== 1 ? 's' : ''} needed`
                 : budgetBlocked
                   ? 'Rewards paused'
-                  : 'Get cashback'}
+                  : isVoucher ? 'Redeem at the counter' : 'Get cashback'}
             </button>
           ) : isUnlocked ? (
             /* Not the current goal, but the user already has enough cups for it —
@@ -159,7 +178,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               className={`rds-btn rds-btn--primary ${budgetBlocked ? 'rds-btn--locked' : ''}`}
               onClick={budgetBlocked ? onBudgetBlocked : () => { onPick(reward.id); onClose(); onClaim?.(); }}
             >
-              {budgetBlocked ? 'Rewards paused' : 'Claim cashback'}
+              {budgetBlocked ? 'Rewards paused' : isVoucher ? 'Redeem at the counter' : 'Claim cashback'}
             </button>
           ) : (
             <button className="rds-btn rds-btn--primary" onClick={() => { onPick(reward.id); onClose(); }}>

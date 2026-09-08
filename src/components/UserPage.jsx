@@ -35,7 +35,7 @@ function activityPayload(item) {
     };
   }
   if (item.type === 'reward_claimed') {
-    return { ...item, _view: 'submitted' };
+    return { ...item, _view: item.redeemed ? 'redeemed' : 'submitted' };
   }
   return item;
 }
@@ -173,7 +173,7 @@ export default function UserPage({
   const feedItems = useMemo(() => {
     const fmtWhen = (ts) =>
       new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    const cashbackClaims = enrichedClaims.filter(c => c.type === 'cashback');
+    const cashbackClaims = enrichedClaims.filter(c => c.type === 'cashback' || c.type === 'voucher');
     const used = new Set();
     const matchClaim = (createdAt) => {
       if (!createdAt) return null;
@@ -189,10 +189,16 @@ export default function UserPage({
     const out = [];
     for (const item of history) {
       if (item.type === 'reward_claimed') {
+        const claim = matchClaim(item.createdAt);
+        // A counter voucher was settled on the spot: one row, already done.
+        if (claim?.type === 'voucher') {
+          used.add(claim.id);
+          out.push({ ...item, label: `Redeemed: ${claim.rewardName}`, redeemed: true, sortAt: item.createdAt });
+          continue;
+        }
         // 1) the receipt submission itself
         out.push({ ...item, label: 'Receipt sent for review', sortAt: item.createdAt });
         // 2) the admin/AI verdict — only once the claim has actually been ruled on
-        const claim = matchClaim(item.createdAt);
         if (claim) {
           used.add(claim.id);
           const approved = claim.status === 'completed' && !!claim.tikkie_url;
@@ -803,7 +809,12 @@ export default function UserPage({
                         <line x1="4" y1="10" x2="16" y2="10" stroke="#1A8737" strokeWidth="2.5" strokeLinecap="round"/>
                       </svg>
                     )}
-                    {item.type === 'reward_claimed' && (
+                    {item.type === 'reward_claimed' && item.redeemed && (
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                        <path d="M4 10L8 14L16 6" stroke="#1A8737" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    {item.type === 'reward_claimed' && !item.redeemed && (
                       /* "Receipt sent for review" — a send/paper-plane glyph, not
                          a check. The check is reserved for the approved verdict. */
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FEA01E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

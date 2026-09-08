@@ -21,6 +21,7 @@ export default function FeaturedReward({
   onViewDetail,
   onExplain,
   orgName,
+  isVoucher = false,
 }) {
   const money = useMoney();
   const { payout, payoutNoun } = useRegion();
@@ -136,15 +137,19 @@ export default function FeaturedReward({
           <div className="featured-reward__claim">
             <div className="featured-reward__claim-info">
               <p className="featured-reward__claim-desc">
-                {isUnlocked
+                {isVoucher ? (
+                  isUnlocked
+                    ? <>Show your voucher to the staff at <strong>{store}</strong> and enjoy it. </>
+                    : <>Once you unlock this, show your voucher to the staff at <strong>{store}</strong> and enjoy it. </>
+                ) : isUnlocked
                   ? <>Buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>
                   : <>Once you unlock this, buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>}
-                {isTikkie
+                {isVoucher ? null : isTikkie
                   ? <>We'll send your cashback via{' '}
                       <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>.</>
                   : <>We'll send your cashback to you.</>}
-                {' '}
-                <button className="featured-reward__info-link" onClick={onOpenTerms}>Cashback terms</button>
+                {isVoucher ? '' : ' '}
+                {!isVoucher && <button className="featured-reward__info-link" onClick={onOpenTerms}>Cashback terms</button>}
                 {onOpenRefund && (
                   <><span style={{ margin: '0 4px' }}>or</span>
                   <button className="featured-reward__info-link" onClick={onOpenRefund}>Get the direct refund</button></>
@@ -156,10 +161,12 @@ export default function FeaturedReward({
               className={`featured-reward__claim-btn ${(!isUnlocked || (isUnlocked && budgetBlocked)) ? 'featured-reward__claim-btn--locked' : ''}`}
               type="button"
               onClick={handleClaim}
-              aria-label={isUnlocked && budgetBlocked ? 'Rewards paused, try again later' : `Get ${money(cashbackAmount)} cashback`}
+              aria-label={isUnlocked && budgetBlocked ? 'Rewards paused, try again later' : isVoucher ? 'Redeem at the counter' : `Get ${money(cashbackAmount)} cashback`}
             >
               {isUnlocked && budgetBlocked ? (
                 'Rewards paused'
+              ) : isVoucher ? (
+                'Redeem at the counter'
               ) : (
                 <>
                   <img src={cashbackIcon} alt="" className="featured-reward__claim-btn-icon" aria-hidden="true" />

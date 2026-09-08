@@ -278,7 +278,7 @@ function ReceiptChip({ claim, onClick }) {
     </button>
   );
 
-  if (claim.type === 'direct_refund') {
+  if (claim.type === 'direct_refund' || claim.type === 'voucher') {
     return <span className="ac-receipt-chip ac-receipt-chip--na">N/A</span>;
   }
   if (claim.ai_confidence == null) {
@@ -971,6 +971,13 @@ export default function AdminClaims({ onNavigate, draftState }) {
                         <td>
                           {claim.type === 'direct_refund' ? (
                             <span className="ac-type-badge ac-type-badge--direct_refund">Direct Refund</span>
+                          ) : claim.type === 'voucher' ? (
+                            <span className="ac-voucher-cell">
+                              <span className="ac-type-badge ac-type-badge--voucher">Counter voucher</span>
+                              {rewardObj
+                                ? <button className="ac-reward-link" onClick={e => { e.stopPropagation(); onNavigate?.('rewards'); }} title="Go to reward">{rewardName}</button>
+                                : <span className="ac-muted">{rewardName}</span>}
+                            </span>
                           ) : rewardObj ? (
                             <button
                               className="ac-reward-link"

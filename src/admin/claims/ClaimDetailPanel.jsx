@@ -499,6 +499,15 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
         </button>
       </div>
 
+      {claim.type === 'voucher' && (
+        <div className="rc-detail__actions">
+          <p className="rc-detail__actions-hint">
+            Settled at the counter: a staff member slid to confirm on the customer's phone and the cups
+            left the balance there and then. No receipt, no AI check, no payout — nothing to review.
+          </p>
+        </div>
+      )}
+
       {canAct && (
         <div className="rc-detail__actions">
           {/* Approve is gated when a receipt is expected but isn't viewable.

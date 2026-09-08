@@ -567,6 +567,24 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             )}
 
             {!isTikkieOnly && (
+            <Field
+              label="Payment method"
+              hint={settings.paymentMethod === 'voucher'
+                ? 'Rewards are settled at the counter: the customer shows a live voucher, a staff member slides to confirm on their phone, and the cups leave the balance on the spot. No receipt, no AI check, no payout link.'
+                : 'Rewards are paid as cashback: the customer uploads a receipt, it is checked, and a payout link is sent through the region\u2019s provider.'}
+            >
+              <select
+                className="as-input"
+                value={settings.paymentMethod || 'tikkie'}
+                onChange={e => updateSetting('paymentMethod', e.target.value, 'Payment method')}
+              >
+                <option value="tikkie">Cashback link after review</option>
+                <option value="voucher">Counter voucher (staff slide)</option>
+              </select>
+            </Field>
+            )}
+
+            {!isTikkieOnly && (
             <Field label="Cashback rate" hint="Paid when a customer redeems for a food reward.">
               <div className="as-input-prefix-wrap">
                 <span className="as-input-prefix">€</span>

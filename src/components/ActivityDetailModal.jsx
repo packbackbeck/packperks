@@ -27,6 +27,13 @@ const CLAIM_PHASE = {
     sub: "We couldn't approve this claim. Here's what to check before trying again:",
     statusLabel: 'Not approved', statusColor: '#C73E1D',
   },
+  /* Counter voucher: settled the moment staff slid — nothing to review,
+   * nothing to collect. */
+  redeemed: {
+    title: 'Reward redeemed', tone: 'green', icon: 'check',
+    sub: 'Enjoy it — this was redeemed at the counter and the cups have left your balance.',
+    statusLabel: 'Redeemed', statusColor: '#1A8737',
+  },
 };
 
 const TYPE_META = {
@@ -52,7 +59,7 @@ function liveStatusForClaim(item, userClaims) {
   if (!item.createdAt) return null;
 
   const activityTime = new Date(item.createdAt).getTime();
-  const candidates = userClaims.filter(c => c.type === 'cashback');
+  const candidates = userClaims.filter(c => c.type === 'cashback' || c.type === 'voucher');
   if (candidates.length === 0) return null;
 
   // Pick the cashback claim whose created_at is closest to this activity entry,
@@ -71,6 +78,10 @@ function liveStatusForClaim(item, userClaims) {
 
   const tikkieUrl = bestMatch.tikkie_url || null;
   const expired = bestMatch.tikkie_status === 'expired';
+
+  if (bestMatch.type === 'voucher') {
+    return { label: 'Redeemed', color: '#1A8737', claim: bestMatch };
+  }
 
   switch (bestMatch.status) {
     case 'completed':

@@ -175,7 +175,7 @@ function buildRewardPopularity(rawClaims, draftRewards) {
 }
 
 function buildCupDistribution(rawClaims, rawBalances) {
-  const redeemed = rawClaims.filter(c => c.type === 'cashback').reduce((s, c) => s + (c.cups_redeemed || 0), 0);
+  const redeemed = rawClaims.filter(c => c.type === 'cashback' || c.type === 'voucher').reduce((s, c) => s + (c.cups_redeemed || 0), 0);
   const refunded = rawClaims.filter(c => c.type === 'direct_refund').reduce((s, c) => s + (c.cups_redeemed || 0), 0);
   const active   = (rawBalances || []).reduce((s, b) => s + (b.balance || 0), 0);
   const total    = (rawBalances || []).reduce((s, b) => s + (b.lifetime_cups || 0), 0);
@@ -219,7 +219,7 @@ const SPOTLIGHT = {
     color: '#FD6F46',
     type: 'bar',
     getData: (stats, period) => buildDailyTimeSeries(
-      (stats?.rawClaims || []).filter(c => c.type === 'cashback'), period
+      (stats?.rawClaims || []).filter(c => c.type === 'cashback' || c.type === 'voucher'), period
     ),
   },
   'stat-cashback': {

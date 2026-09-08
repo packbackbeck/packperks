@@ -74,6 +74,7 @@ import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, ge
 import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
 import TikkieHomePage from './components/TikkieHomePage';
+import VoucherPage from './components/VoucherPage';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
 
@@ -251,6 +252,10 @@ export default function App({ consentReady = true } = {}) {
     featureDonations: true,
     featureDirectRefunds: true,
     maintenanceMode: false,
+    // 'tikkie' = the region's payout provider (a link after review);
+    // 'voucher' = settled at the counter with the slider — no receipt,
+    // no AI check, no link. Set per org in Settings → Payment method.
+    paymentMethod: 'tikkie',
   });
 
   /* ── Active organisation (multi-org) ──
@@ -1468,6 +1473,7 @@ export default function App({ consentReady = true } = {}) {
     // A verified email is REQUIRED to claim cashback (that's how we pay it out
     // and reach the customer). No email yet → open the sign-in sheet; once the
     // email verifies we continue straight to the receipt step (onVerified).
+    if (isVoucher) { setPage('voucher'); return; }
     if (!(authEmail || profile?.email)) {
       setClaimAfterSignIn(true);
       setShowSignIn(true);
@@ -1476,6 +1482,29 @@ export default function App({ consentReady = true } = {}) {
     // No IBAN step anymore — go straight to the receipt scan. Cashback is
     // paid via a Tikkie link after the claim is reviewed.
     setPage('receipt');
+  };
+
+  /* ── Counter voucher ──
+   * Nothing to review and nothing to pay out, so no email is needed either:
+   * the reward is settled when staff slide on the customer's own phone. */
+  const isVoucher = liveSettings.paymentMethod === 'voucher';
+  const handleVoucherRedeemed = (res) => {
+    const newCount = Number.isFinite(res?.newBalance) ? res.newBalance : Math.max(0, cupCount - selectedReward.cupsNeeded);
+    track(EVENTS.REWARD_CLAIM_SUCCESS, {
+      reward_id: selectedRewardId, reward_name: selectedReward.name, cup_count: cupCount, method: 'voucher',
+    });
+    // The RPC already wrote the server row; mirror it locally WITH its
+    // timestamp so the activity list can pair it with the voucher claim
+    // straight away (the pairing is by created_at proximity).
+    const at = res?.claim?.created_at || new Date().toISOString();
+    setHistory((prev) => [...prev, {
+      type: 'reward_claimed', label: `Redeemed: ${selectedReward.name}`,
+      time: formatTime(new Date(at).getTime()), createdAt: at,
+    }]);
+    setCupCount(newCount);
+    if (res?.claim) setUserClaims((prev) => [res.claim, ...prev]);
+    setPage('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   /* ── Receipt submission → AI verification ─────────────────────────────
@@ -1636,6 +1665,7 @@ export default function App({ consentReady = true } = {}) {
   const handleViewDetail = (reward) => setDetailReward(reward);
   const handleClaimFromDetail = async () => {
     if (!(await ensureRewardBudgetOk())) return;
+    if (isVoucher) { setDetailReward(null); setPage('voucher'); return; }
     // Same email gate as the main claim button.
     if (!(authEmail || profile?.email)) {
       setDetailReward(null);
@@ -1859,6 +1889,19 @@ export default function App({ consentReady = true } = {}) {
         onTryAgain={() => { setCupScanError(null); setPage('cup-scan'); }}
         onClose={() => { setCupScanError(null); setPage('home'); }}
         orgName={activeOrg?.partner_brand_name || activeOrg?.name}
+      />
+    );
+  }
+
+  if (page === 'voucher') {
+    return (
+      <VoucherPage
+        reward={selectedReward}
+        org={activeOrg}
+        userId={userId}
+        profile={profile}
+        onBack={() => setPage('home')}
+        onDone={handleVoucherRedeemed}
       />
     );
   }
@@ -2313,6 +2356,7 @@ export default function App({ consentReady = true } = {}) {
         onViewDetail={() => handleViewDetail(selectedReward)}
         onExplain={handleLockedClaim}
         orgName={activeOrg?.partner_brand_name || activeOrg?.name}
+        isVoucher={isVoucher}
       />
 
       <GoalSection
@@ -2334,6 +2378,7 @@ export default function App({ consentReady = true } = {}) {
           onClose={() => setDetailReward(null)}
           orgName={activeOrg?.partner_brand_name || activeOrg?.name}
           isByo={isByo}
+          isVoucher={isVoucher}
         />
       )}
 

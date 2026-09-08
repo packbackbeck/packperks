@@ -1339,3 +1339,20 @@ export async function submitStoreRequest(name, { region = null, orgId = null } =
   }
   return true
 }
+
+// Counter voucher: settle a reward at the till in ONE atomic step (see
+// migration 040 — balance locked, cups taken, claim + activity written, or
+// nothing). Throws 'insufficient_cups' / 'no_balance' / the budget-cap error
+// straight through so the voucher screen can say the right thing.
+export async function redeemVoucher(userId, { orgId, rewardId, cups, amount, label }) {
+  const { data, error } = await supabase.rpc('redeem_voucher', {
+    p_user_id: userId,
+    p_org_id: orgId ?? null,
+    p_reward_id: rewardId ?? null,
+    p_cups: cups,
+    p_amount: amount ?? 0,
+    p_label: label ?? null,
+  })
+  if (error) throw error
+  return data // { claim_id, new_balance, redeemed_at }
+}

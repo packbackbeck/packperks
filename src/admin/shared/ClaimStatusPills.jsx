@@ -25,6 +25,7 @@ import './ClaimStatusPills.css';
  * mode adds labels for the detail panel. */
 
 const VALIDATION = {
+  counter:    { label: 'At counter',   tone: 'muted' },
   passed:     { label: 'AI passed',    tone: 'pass' },
   uncertain:  { label: 'AI uncertain', tone: 'warn' },
   failed:     { label: 'AI failed',    tone: 'fail' },
@@ -32,11 +33,13 @@ const VALIDATION = {
   pending:    { label: 'Not checked',  tone: 'muted' },
 };
 const REVIEW = {
+  redeemed:   { label: 'Redeemed', tone: 'pass' },
   pending:    { label: 'Pending',  tone: 'warn' },
   approved:   { label: 'Approved', tone: 'pass' },
   rejected:   { label: 'Rejected', tone: 'fail' },
 };
 const PAYOUT = {
+  counter:    { label: 'Settled at counter', tone: 'pass' },
   not_queued: { label: '—',        tone: 'muted' },
   queued:     { label: 'Queued',   tone: 'warn' },
   sent:       { label: 'Paid',     tone: 'pass' },
@@ -48,6 +51,7 @@ const PAYOUT = {
  * 50% confidence threshold used by ClaimDetailPanel + AdminClaims so
  * the three surfaces tell the admin the same story. */
 function deriveValidation(claim) {
+  if (claim.type === 'voucher') return 'counter';
   if (claim.type === 'direct_refund') return 'skipped';
   if (!claim.verified_at) return 'pending';
   const conf = claim.ai_confidence ?? 0;
@@ -57,6 +61,7 @@ function deriveValidation(claim) {
 }
 
 function deriveReview(claim) {
+  if (claim.type === 'voucher') return 'redeemed';
   if (claim.status === 'completed') return 'approved';
   if (claim.status === 'failed')    return 'rejected';
   return 'pending';
@@ -69,6 +74,7 @@ function deriveReview(claim) {
  * refunds are paid via Tikkie just like cashback — no "paid at claim time"
  * shortcut (that was a pre-Tikkie leftover). */
 function derivePayout(claim) {
+  if (claim.type === 'voucher') return 'counter';   // no money moves: staff slid, cups left
   if (claim.status === 'pending' || claim.status === 'failed') return 'not_queued';
   if (claim.payout_status === 'refunded') return 'refunded';
   if (claim.tikkie_url && claim.tikkie_status !== 'failed') return 'sent';
@@ -83,6 +89,7 @@ export function isClaimPaid(claim) {
   return p === 'sent' || p === 'refunded';
 }
 export function isPayoutActionable(claim) {
+  if (claim.type === 'voucher') return false;                   // settled at the counter, nothing to do
   if (claim.status === 'pending') return true;                  // awaiting review
   if (claim.status === 'completed') return !isClaimPaid(claim); // approved but not yet paid, or failed → retry
   return false;                                                 // rejected: nothing to do

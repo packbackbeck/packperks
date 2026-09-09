@@ -1,5 +1,5 @@
 import './RefundSuccessPage.css';
-import { useMoney } from '../lib/RegionContext';
+import { useMoney, useRegion } from '../lib/RegionContext';
 
 function formatDate(d = new Date()) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -17,6 +17,10 @@ const Row = ({ label, value, bold, green }) => (
 
 export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone }) {
   const money = useMoney();
+  // How this region promises to pay — NL hands over a Tikkie link, the UAE
+  // only promises the cashback is sent (see payoutCopy in regions.js).
+  const { payout } = useRegion();
+  const isLinkPayout = payout.style === 'link';
   const now = new Date();
   const refundId = 'RF-' + Date.now().toString(36).toUpperCase().slice(-6);
   // C.2: the amount is computed by App from the venue's configured refund rate
@@ -38,10 +42,13 @@ export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone 
         </svg>
       </div>
 
-      {/* Text — C.3: refunds are collected via a Tikkie link, not a bank deposit. */}
+      {/* Text — C.3: in NL a refund is collected via a Tikkie link, not a bank
+             deposit; other regions promise only that we send it. */}
       <div className="rsp__text">
         <h1 className="rsp__title">Refund submitted</h1>
-        <p className="rsp__subtitle">We’ll send you a Tikkie link to collect it 💸</p>
+        <p className="rsp__subtitle">
+          {isLinkPayout ? 'We’ll send you a Tikkie link to collect it 💸' : 'We’ll send it straight to you 💸'}
+        </p>
       </div>
 
       {/* Receipt card */}
@@ -71,14 +78,17 @@ export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone 
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A8737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
           </svg>
-          Tikkie link arrives within <strong>7 days</strong>
+          {isLinkPayout ? <>Tikkie link arrives</> : <>Cashback arrives</>} within <strong>7 days</strong>
         </div>
       </div>
 
       <button className="rsp__btn" onClick={onDone}>Back to home</button>
 
       <span className="rsp__note">
-        We’ll review your refund and send a Tikkie link to collect your money. Open it to get paid. Your cup balance has been reset to zero.
+        {isLinkPayout
+          ? 'We’ll review your refund and send a Tikkie link to collect your money. Open it to get paid. '
+          : 'We’ll review your refund and send your money to you. '}
+        Your cup balance has been reset to zero.
       </span>
     </div>
   );

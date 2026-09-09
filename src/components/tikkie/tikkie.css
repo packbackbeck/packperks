@@ -57,6 +57,9 @@
 .tk-btn:disabled { opacity: 0.5; cursor: default; }
 .tk-btn--primary { background: #1A8737; color: #fff; }
 .tk-btn--tikkie { background: #47478A; border-color: #47478A; color: #fff; }
+/* Regions without Tikkie get the PackBack red instead of Tikkie's purple —
+   still the obvious primary action, but not another brand's colour. */
+.tk-btn--collect { background: var(--pb-red, #E24400); border-color: var(--pb-red, #E24400); color: #fff; }
 .tk-btn--full { width: 100%; margin-top: 12px; box-sizing: border-box; }
 .tk-link {
   border: none; background: none; padding: 0;
@@ -111,6 +114,11 @@
 .tk-explain__text li { font-size: 13px; line-height: 1.4; color: #5F584F; }
 .tk-explain__text li::marker { color: #47478A; }
 .tk-explain__text strong { color: #1F1B16; }
+/* The direct variant carries no provider screenshot, so the text owns the
+   whole width instead of sitting in a narrow column beside an image. */
+.tk-explain--direct { display: block; }
+.tk-explain__note { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: #6B655C; }
+
 .tk-explain__shot {
   flex-shrink: 0;
   height: 208px; width: auto;

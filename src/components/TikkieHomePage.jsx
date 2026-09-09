@@ -7,6 +7,7 @@ import {
   scanBackupCups, redeemWallet, setEmail, savePendingEmail, checkBatch,
 } from '../lib/tikkieWallet';
 import { animalForProfile } from '../lib/animals';
+import { useRegion } from '../lib/RegionContext';
 import { TikkieExplainer, Sheet, LoginSheet } from './tikkie/TikkieBits';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import CupScanPage from './CupScanPage';
@@ -241,6 +242,12 @@ function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy }) {
 }
 
 export default function TikkieHomePage({ org, settings = {}, batchId = '', cupIds = [], consentReady = true }) {
+  // Currency AND payout copy follow the active region: a UAE venue shows
+  // AED and never names Tikkie, which is a Dutch product with no UAE
+  // equivalent wired up yet (payments.js). `isLinkPayout` gates every
+  // sentence that only makes sense when we hand over a Tikkie link.
+  const { money, collectLabel, payout } = useRegion();
+  const isLinkPayout = payout.style === 'link';
   const [profile, setProfile] = useState(() => {
     if (DEMO && DEMO !== 'empty') return DEMO_WALLET.profile;
     if (DEMO) return null;
@@ -390,7 +397,9 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       type: 'error',
       message: data?.error === 'no_balance'
         ? 'There’s nothing to collect yet. Return some cups first.'
-        : 'We couldn’t create your Tikkie link right now. Your balance is safe — please try again in a moment.',
+        : isLinkPayout
+          ? 'We couldn’t create your Tikkie link right now. Your balance is safe — please try again in a moment.'
+          : 'We couldn’t start your payout right now. Your balance is safe — please try again in a moment.',
     });
     refreshWallet();
   }
@@ -467,9 +476,9 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       >
         <div className="tikkie-home__hero-copy">
           <span className="tikkie-home__hero-label">Available to collect</span>
-          <div className="tikkie-home__hero-amount">€{shownBalance.toFixed(2)}</div>
+          <div className="tikkie-home__hero-amount">{money(shownBalance)}</div>
           <span className="tikkie-home__hero-cta">
-            {balance > 0 || outstanding ? 'Collect via Tikkie' : 'Scan a receipt'}
+            {balance > 0 || outstanding ? collectLabel : 'Scan a receipt'}
           </span>
         </div>
         <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
@@ -507,7 +516,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                 <div className="tikkie-home__row-main">
                   <span className="tikkie-home__row-title">
                     {h.kind === 'payout'
-                      ? 'Collected via Tikkie'
+                      ? (isLinkPayout ? 'Collected via Tikkie' : 'Cashback sent')
                       : h.kind === 'pending'
                         ? 'Scanned and held for a review'
                         : `${h.cups} cup${h.cups === 1 ? '' : 's'} returned`}
@@ -524,7 +533,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                   <span className="tikkie-home__row-amount tikkie-home__row-amount--wait">Pending</span>
                 ) : (
                   <span className={`tikkie-home__row-amount${h.kind === 'payout' ? ' tikkie-home__row-amount--out' : ''}`}>
-                    {h.kind === 'payout' ? '−' : '+'}€{Number(h.amount || 0).toFixed(2)}
+                    {h.kind === 'payout' ? '−' : '+'}{money(Number(h.amount || 0))}
                   </span>
                 )}
               </li>
@@ -533,7 +542,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         )}
       </section>
 
-      {/* ── How Tikkie works (static) ── */}
+      {/* ── How the customer gets paid (region-aware, static) ── */}
       <section className="tikkie-home__section">
         <h2 className="tikkie-home__section-title">How you get paid</h2>
         <TikkieExplainer />
@@ -571,9 +580,9 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           <div className="tk-icon tk-icon--ok" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
           </div>
-          <h2 className="tk-sheet__title">€{Number(popup.amount).toFixed(2)} added</h2>
+          <h2 className="tk-sheet__title">{money(Number(popup.amount))} added</h2>
           <p className="tk-sheet__sub">
-            {popup.cups} cup{popup.cups === 1 ? '' : 's'} returned. Your balance is €{balance.toFixed(2)} —
+            {popup.cups} cup{popup.cups === 1 ? '' : 's'} returned. Your balance is {money(balance)} —
             collect it whenever you like from the orange tile.
           </p>
           <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Nice</button>
@@ -621,11 +630,13 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         <Sheet onClose={() => setPopup(null)} label="Collect your balance">
           <h2 className="tk-sheet__title">Collect your balance</h2>
           <div className="tk-sheet__amount">
-            €{(outstanding && balance === 0 ? outstanding.amount : balance).toFixed(2)}
+            {money(outstanding && balance === 0 ? outstanding.amount : balance)}
           </div>
           {outstanding && balance === 0 ? (
             <p className="tk-sheet__sub">
-              Your Tikkie link is ready — open it to finish collecting this amount.
+              {isLinkPayout
+                ? 'Your Tikkie link is ready — open it to finish collecting this amount.'
+                : 'Your cashback is on its way — we’ll let you know as soon as it’s sent.'}
             </p>
           ) : (
             <TikkieExplainer />
@@ -636,11 +647,11 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
             </button>
             <button
               type="button"
-              className="tk-btn tk-btn--tikkie tk-btn--full"
+              className={`tk-btn tk-btn--full ${isLinkPayout ? 'tk-btn--tikkie' : 'tk-btn--collect'}`}
               onClick={handleOpenTikkie}
               disabled={redeeming || (balance === 0 && !outstanding)}
             >
-              {redeeming ? 'Preparing…' : 'Open Tikkie'}
+              {redeeming ? 'Preparing…' : isLinkPayout ? 'Open Tikkie' : collectLabel}
             </button>
           </div>
           {balance === 0 && !outstanding && (

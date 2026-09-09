@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { loginRequest, loginVerify, storeProfile } from '../../lib/tikkieWallet';
 import tikkieClaimShot from '../../assets/images/tikkie-claim-screen.png';
+import { useRegion } from '../../lib/RegionContext';
 import './tikkie.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -10,9 +11,34 @@ import './tikkie.css';
  * is their only consumer now.
  * ───────────────────────────────────────────────────────────────────── */
 
-/* ── What Tikkie is + how to use it. One block, text left, the real
-   Tikkie page right. ── */
+/* ── How the customer gets paid. Two shapes, because the regions genuinely
+   differ (see payoutCopy in regions.js):
+
+     link   — NL. We hand over a Tikkie link, so we can name the provider,
+              show its real page and walk through the IBAN steps.
+     direct — UAE. The payout adapter isn’t live and the mechanism (hosted
+              link vs push to the customer) isn’t settled, so this copy
+              promises only that the cashback is sent. No provider name, no
+              IBAN, and no Dutch Tikkie screenshot. ── */
 export function TikkieExplainer() {
+  const { payout, collectLabel } = useRegion();
+
+  if (payout.style !== 'link') {
+    return (
+      <div className="tk-explain tk-explain--direct">
+        <div className="tk-explain__text">
+          <p className="tk-explain__lead">
+            Tap <strong>{collectLabel}</strong> and we’ll send it straight to you.
+          </p>
+          <p className="tk-explain__note">
+            Nothing to upload and no link to chase. We’ll confirm where to send
+            your cashback, then let you know once it’s on the way.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="tk-explain">
       <div className="tk-explain__text">

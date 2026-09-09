@@ -81,6 +81,13 @@ export function normalizeRegion(key, r = {}) {
     },
     collectLabel: r.collectLabel ?? seed.collectLabel ?? 'Collect your cashback',
     payoutNoun: r.payoutNoun ?? seed.payoutNoun ?? 'payment link',
+    /* Must survive normalisation. The admin Regions panel round-trips every
+     * region through here and saves the result, so a field dropped here is
+     * dropped from the stored overlay for good — which is how AE lost its
+     * 'direct' style and started promising customers a payment link that no
+     * live adapter can deliver. A region we know nothing about defaults to
+     * 'direct': it promises less, and payoutCopy() can always say less. */
+    payoutStyle: r.payoutStyle ?? seed.payoutStyle ?? 'direct',
     enabled: r.enabled !== false,
   };
 }

@@ -164,6 +164,10 @@ export function hasPermission(role, action) {
       'cupqr.generate', 'export',
     ]),
     checker: new Set(['view', 'export']),
+    // Vendor: the venue's own staff. Read-only by design — they see five
+    // reporting pages and cannot approve, edit, export or invite. Every
+    // write in the dashboard is gated on a capability they don't hold.
+    vendor:  new Set(['view']),
   };
   const allowed = matrix[role];
   if (allowed === true) return true;

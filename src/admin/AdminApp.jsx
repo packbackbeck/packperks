@@ -6,6 +6,8 @@ import AdminOrganizations from './organizations/AdminOrganizations';
 import AuthGate from './auth/AuthGate';
 import AdminTopBar from './AdminTopBar';
 import AdminSidebar from './AdminSidebar';
+import { VENDOR_TABS } from './lib/roles';
+import { setAdminDemoMode } from './lib/adminApi';
 import AdminOverview from './overview/AdminOverview';
 import AdminRewards from './rewards/AdminRewards';
 import AdminUsers from './users/AdminUsers';
@@ -101,6 +103,18 @@ function readHashPage() {
   return resolved === 'org' ? 'settings' : resolved;
 }
 
+/* `#overview?as=vendor` — look at the dashboard exactly as a vendor
+ * account does. Owner/admin only, and it can only ever REMOVE access:
+ * the guard below narrows the visible pages and the shell drops to the
+ * vendor permission set, so previewing can't reveal anything the viewer
+ * couldn't already reach. It is a rehearsal of the vendor's view, not a
+ * way to grant one. */
+function readHashPreviewRole() {
+  if (typeof window === 'undefined') return null;
+  const q = (window.location.hash || '').split('?')[1] || '';
+  return new URLSearchParams(q).get('as') === 'vendor' ? 'vendor' : null;
+}
+
 // Optional cross-page scroll target carried in the hash query, e.g. a
 // notification deep-link `#users?section=merge` scrolls to the merge queue.
 function readHashSection() {
@@ -114,6 +128,19 @@ function AdminShell() {
   const draftState = useAdminDraft();
   const { profile } = useAuthRole();
   const { activeOrgId, activeOrgSlug, activeOrgMode } = useOrg();
+
+  /* Vendor-view preview (`?as=vendor`). Kept in state so leaving it is a
+   * single click rather than a URL edit. */
+  const [previewRole, setPreviewRole] = useState(readHashPreviewRole);
+
+  /* The role the dashboard actually renders as. Previewing is allowed
+   * only from a role that already outranks the one being previewed. */
+  const realRole = profile?.role || null;
+  const canPreview = realRole === 'owner' || realRole === 'admin';
+  const previewing = canPreview && previewRole === 'vendor';
+  const effectiveRole = previewing ? 'vendor' : realRole;
+  const isVendorView = effectiveRole === 'vendor';
+
   const [wizardOpen, setWizardOpen] = useState(false);
   /* When another page (e.g. Cup Scans) wants to hand off to the Users
    * page with a specific customer opened, it calls onNavigate('users',
@@ -132,6 +159,16 @@ function AdminShell() {
    * isn't checked because we only ever add, never remove. */
   const [visited, setVisited] = useState(() => new Set([page]));
 
+  /* Demo numbers: the org's own switch, and only ever for the vendor
+   * view. An owner looking at their own dashboard always sees the truth —
+   * otherwise the toggle would quietly lie to the person who set it. */
+  const demoNumbers = !!(draftState?.draft?.settings?.vendorDemoNumbers
+    ?? draftState?.published?.settings?.vendorDemoNumbers);
+  const demoActive = isVendorView && demoNumbers;
+  // Set before the pages read it. Remounting them is handled by the <main>
+  // key below, the same mechanism an org switch already uses.
+  setAdminDemoMode(demoActive);
+
   /* Wrap setPage so URL hash and visited-set stay in sync. An optional
    * second arg carries cross-page intent (currently { focusUserId }). */
   function setPage(next, opts) {
@@ -143,7 +180,7 @@ function AdminShell() {
     setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
     // Update the hash without a scroll jump.
     if (typeof window !== 'undefined') {
-      const target = '#' + next;
+      const target = '#' + next + (readHashPreviewRole() ? '?as=vendor' : '');
       if (window.location.hash !== target) {
         history.replaceState(null, '', window.location.pathname + window.location.search + target);
       }
@@ -157,6 +194,7 @@ function AdminShell() {
       const next = readHashPage();
       setPageState(next);
       setDeepSection(readHashSection());
+      setPreviewRole(readHashPreviewRole());
       setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
     }
     window.addEventListener('hashchange', onHashChange);
@@ -180,6 +218,21 @@ function AdminShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOrgMode, page]);
 
+  /* Vendor route guard. Same reasoning as the tikkie-only gate above: the
+   * sidebar hides the other tabs, but hash edits and bookmarks don't care
+   * what the sidebar renders. */
+  useEffect(() => {
+    if (isVendorView && !VENDOR_TABS.includes(page)) setPage(VENDOR_TABS[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVendorView, page]);
+
+  function exitVendorPreview() {
+    setPreviewRole(null);
+    if (typeof window !== 'undefined') {
+      history.replaceState(null, '', window.location.pathname + window.location.search + '#' + page);
+    }
+  }
+
   function handlePreview() {
     // Multi-org: open the active org's user app slug so the preview
     // matches what's actually being edited.
@@ -190,7 +243,21 @@ function AdminShell() {
 
 
   return (
-    <div className="admin-app">
+    <div className={`admin-app${previewing ? ' admin-app--previewing' : ''}`}>
+      {previewing && (
+        <div className="vendor-preview-bar" role="status">
+          <span className="vendor-preview-bar__dot" aria-hidden="true" />
+          <span className="vendor-preview-bar__text">
+            Viewing as a <strong>vendor</strong> — five pages, read-only.
+            {demoNumbers
+              ? ' Demo numbers are on, so these figures are illustrative.'
+              : ' Demo numbers are off, so these are your real figures.'}
+          </span>
+          <button type="button" className="vendor-preview-bar__exit" onClick={exitVendorPreview}>
+            Back to my view
+          </button>
+        </div>
+      )}
       <AdminTopBar
         draftState={draftState}
         onNavigate={setPage}
@@ -202,14 +269,14 @@ function AdminShell() {
           activePage={page}
           onNavigate={setPage}
           draftState={draftState}
-          role={profile?.role}
+          role={effectiveRole}
           onAddOrg={() => setWizardOpen(true)}
         />
         {/* Keying <main> by activeOrgId forces every admin page to
             remount + re-fetch whenever the user switches orgs. The
             top-level shell (topbar, sidebar) stays mounted so the
             switch feels instant and doesn't lose hash routing. */}
-        <main className="admin-app__main" key={activeOrgId || 'bootstrap'}>
+        <main className="admin-app__main" key={`${activeOrgId || 'bootstrap'}${demoActive ? ':demo' : ''}`}>
           <KeepAlive id="overview" activeId={page} visited={visited}>
             <AdminOverview draftState={draftState} onNavigate={setPage} />
           </KeepAlive>

@@ -9,6 +9,7 @@ const ROLE_COPY = {
   admin:   'Full operational access — invite teammates, edit org, approve claims.',
   manager: 'Approve claims, generate cup QR codes, and edit rewards.',
   checker: 'Read-only access — view dashboards and export reports.',
+  vendor:  'How your store is doing — overview, rewards, reports, health and behaviour.',
 };
 
 /* Brief "you're in" landing card shown the first time after sign-in

@@ -749,3 +749,7 @@
   color: #4A4A4A; cursor: pointer;
 }
 .as-btn--primary { background: var(--pb-purple-600, #6D28D9); border-color: var(--pb-purple-600, #6D28D9); color: #fff; }
+
+/* The demo-numbers pill is not a "locked/always on" state like the green
+   one — it names WHO the switch affects, so it reads as scope, not status. */
+.as-flag-row__lock--demo { color: #8A4B12; background: #FBEAD3; }

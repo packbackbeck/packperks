@@ -5,6 +5,34 @@ import { fmtDuration } from './behaviourFormat';
 import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
 import { EMAIL_TEMPLATE_KEY } from './emailTemplates';
 import { providerForCountry } from '../../lib/payments';
+import { demoAdminStatsRows, demoHealthRows, demoBehaviourRows, resetDemoWorld } from './demoData';
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Demo numbers (Settings → Feature flags → "Demo numbers for vendors").
+ *
+ * A module-level switch rather than a prop threaded through five pages:
+ * the three analytics readers below swap their FETCHED ROWS for the
+ * generated ones and then run their normal maths, so a demo dashboard is
+ * arithmetically identical in construction to a real one. Only the
+ * dashboard shell decides when this is on — see AdminApp.
+ * ───────────────────────────────────────────────────────────────────── */
+let DEMO_MODE = false;
+
+export function setAdminDemoMode(on) {
+  const next = !!on;
+  if (next === DEMO_MODE) return;
+  DEMO_MODE = next;
+  resetDemoWorld();
+}
+
+export function isAdminDemoMode() { return DEMO_MODE; }
+
+/* The org the demo world is seeded from. An explicit scope wins so group
+ * analytics stay stable; otherwise the active org. */
+function demoSeed(orgIds) {
+  if (Array.isArray(orgIds) && orgIds.length) return orgIds.slice().sort().join('|');
+  return getActiveOrgId() || 'packperks';
+}
 
 /* Multi-regional payout routing: resolve which payment provider (and edge
  * function) pays out a claim, from its org's country/region. NL → Tikkie (live);
@@ -53,12 +81,22 @@ export async function getAdminStats(orgIds) {
     applyOrgFilter(supabase.from('activity_history').select('id, type, created_at, user_id').eq('type', 'cup_added'), orgIds),
   ]);
 
-  const users    = usersRes.data || [];
-  const balances = balancesRes.data || [];
-  const claims   = claimsRes.data || [];
-  const scans    = scansRes.data || [];
-  const recentActivity = historyRes.data || [];
-  const cupActivity    = cupActivityRes.data || [];
+  const real = {
+    users: usersRes.data || [],
+    balances: balancesRes.data || [],
+    claims: claimsRes.data || [],
+    scans: scansRes.data || [],
+    recentActivity: historyRes.data || [],
+    cupActivity: cupActivityRes.data || [],
+  };
+  // Demo mode substitutes the rows, never the arithmetic below.
+  const src = DEMO_MODE ? demoAdminStatsRows(demoSeed(orgIds)) : real;
+  const users    = src.users;
+  const balances = src.balances;
+  const claims   = src.claims;
+  const scans    = src.scans;
+  const recentActivity = src.recentActivity;
+  const cupActivity    = src.cupActivity;
 
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
@@ -200,10 +238,11 @@ export async function getStatsMetrics({ fromTs = null, toTs = null, orgIds } = {
   if (toTs)   cliQ = cliQ.lte('created_at', new Date(toTs).toISOString());
 
   const [scansRes, cupsRes, sysRes, cliRes] = await Promise.all([scanQ, cupsQ, sysQ, cliQ]);
-  const scans     = scansRes.data || [];
-  const cups      = cupsRes.data  || [];
-  const sysEvents = sysRes.data   || [];
-  const cliEvents = cliRes.data   || [];
+  const demo = DEMO_MODE ? demoHealthRows(demoSeed(orgIds), fromTs, toTs) : null;
+  const scans     = demo ? demo.scans     : (scansRes.data || []);
+  const cups      = demo ? demo.cups      : (cupsRes.data  || []);
+  const sysEvents = demo ? demo.sysEvents : (sysRes.data   || []);
+  const cliEvents = demo ? demo.cliEvents : (cliRes.data   || []);
 
   const total = scans.length;
   const isSuccess = (s) => s.status === 'success';
@@ -1478,6 +1517,7 @@ function makeDailyBuckets(fromMs, toMs) {
 /* Load every behaviour-relevant table for the active org (or an explicit
  * group scope via orgIds), once. */
 async function fetchBehaviourRows(orgIds) {
+  if (DEMO_MODE) return demoBehaviourRows(demoSeed(orgIds));
   const [cupsRes, scansRes, claimsRes, usersRes, cliRes, rejRes] = await Promise.all([
     applyOrgFilter(supabase.from('cups').select('id, batch_id, status, source, created_at'), orgIds),
     applyOrgFilter(supabase.from('cup_scans').select('id, user_id, status, batch_id, source, cups_awarded, scanned_at'), orgIds),

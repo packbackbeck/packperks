@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import ProfileMenu from './auth/ProfileMenu';
 import OrgSwitcher from './context/OrgSwitcher';
 import { useOrg } from './context/OrgContext';
+import { VENDOR_TABS } from './lib/roles';
 import { getPendingCounts } from './lib/adminApi';
 import { logAction } from './auth/actionLog';
 import './AdminSidebar.css';
@@ -259,6 +260,9 @@ const ROLE_VISIBLE_TABS = {
   // PermissionGate so they're disabled.
   manager: new Set(['overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'transactions', 'cupqr', 'donations', 'byorequests', 'futurevendors', 'reports', 'stats', 'behaviour', 'tikkielog', 'backupcups']),
   checker: new Set(['overview', 'users', 'claims', 'cupscans', 'transactions', 'donations', 'byorequests', 'reports', 'stats', 'behaviour', 'tikkielog', 'backupcups']),
+  // Vendor sees performance, nothing operational: no customer records, no
+  // claim queue, no settings. Five pages, all read-only.
+  vendor:  new Set(VENDOR_TABS),
 };
 
 export default function AdminSidebar({ activePage, onNavigate, draftState, role, onAddOrg }) {

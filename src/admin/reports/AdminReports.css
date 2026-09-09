@@ -625,9 +625,76 @@
 
 /* Two digest blocks side by side (2 columns, 1 row); the log spans below. */
 .rep-digest-wrap { display: flex; flex-direction: column; }
-.rep-digest-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.rep-digest-cols .rep-auto { margin-top: 22px; }
-@media (max-width: 1000px) { .rep-digest-cols { grid-template-columns: 1fr; } }
+/* One digest per row. They were side by side, which halved the width each
+   had for its metric picker and left no room for a preview — and the two
+   are independent letters, not a comparison. */
+.rep-digest-rows { display: flex; flex-direction: column; }
+.rep-digest-rows .rep-auto { margin-top: 22px; }
+
+/* Config on the left, the email preview on the right. */
+.rep-digest__split {
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px; align-items: start;
+}
+@media (max-width: 1180px) { .rep-digest__split { grid-template-columns: 1fr; } }
+
+/* ── Email preview ──────────────────────────────────────────────────
+   A scaled rendering of what send-digest actually mails: same cream
+   ground, same white card, same accent badge, same 3-up metric grid. */
+.rep-prev {
+  border: 1px solid #E7E0D2; border-radius: 14px; overflow: hidden;
+  background: #fff; position: sticky; top: 12px;
+}
+.rep-prev__bar {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; border-bottom: 1px solid #EFE9DC; background: #FBF8F2;
+}
+.rep-prev__bar-label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #8B8577;
+}
+.rep-prev__bar-note { font-size: 10.5px; color: #ADA598; }
+.rep-prev__page { background: #F5ECDD; padding: 12px 10px; }
+.rep-prev__brand { font-size: 11px; font-weight: 800; color: #6C4CE0; margin: 0 2px 8px; }
+.rep-prev__card {
+  background: #fff; border: 1px solid #ECE5D8; border-radius: 12px; padding: 13px 12px;
+}
+.rep-prev__badge {
+  display: inline-block; color: #fff; font-size: 8.5px; font-weight: 800;
+  letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px;
+}
+.rep-prev__meta {
+  font-size: 8.5px; font-weight: 700; color: #8B8577;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-top: 8px;
+}
+.rep-prev__title {
+  margin: 3px 0 3px; font-size: 13.5px; font-weight: 800; color: #14100A;
+  line-height: 1.25; overflow-wrap: anywhere;
+}
+.rep-prev__intro {
+  margin: 0 0 10px; font-size: 10.5px; line-height: 1.45; color: #5A554F;
+  overflow-wrap: anywhere; min-height: 15px;
+}
+.rep-prev__empty {
+  margin: 0; padding: 12px 10px; border: 1px dashed #E3DBCB; border-radius: 9px;
+  font-size: 10.5px; line-height: 1.45; color: #9A9284; text-align: center;
+}
+.rep-prev__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.rep-prev__tile {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  background: #FBF7F0; border: 1px solid #ECE5D8; border-radius: 7px; padding: 6px 6px 7px;
+}
+.rep-prev__tile-label {
+  font-size: 7.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  line-height: 1.25; overflow-wrap: anywhere;
+}
+.rep-prev__tile-val {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px; font-weight: 800; color: #14100A; font-variant-numeric: tabular-nums;
+}
+.rep-prev__foot {
+  margin: 9px 4px 2px; font-size: 8.5px; line-height: 1.5; color: #B4AC9E; text-align: center;
+}
 /* Colour-key by audience via the header icon only (no top stroke). */
 .rep-digest--vendor .rep-auto__title svg { color: #C0451F; }
 .rep-digest--admin  .rep-auto__title svg { color: #5333A5; }

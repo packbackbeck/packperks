@@ -909,6 +909,27 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 </label>
               ))}
 
+              <label className="as-flag-row">
+                <div className="as-flag-row__info">
+                  <div className="as-flag-row__label">
+                    Demo numbers for vendors
+                    <span className="as-flag-row__lock as-flag-row__lock--demo">Vendor accounts only</span>
+                  </div>
+                  <div className="as-flag-row__desc">
+                    Show vendor accounts a complete, healthy example programme instead of this
+                    store's real figures — for demos and pitches, where a store that went live
+                    last week would otherwise show an empty dashboard. It changes the five
+                    vendor pages only. Owners, admins, managers and checkers always see the real
+                    numbers, and nothing about the underlying data changes.
+                  </div>
+                </div>
+                <ToggleSwitch
+                  checked={!!settings.vendorDemoNumbers}
+                  onChange={v => updateSetting('vendorDemoNumbers', v)}
+                  ariaLabel="Demo numbers for vendors toggle"
+                />
+              </label>
+
               {activeGroupId && (
                 <label className="as-flag-row">
                   <div className="as-flag-row__info">

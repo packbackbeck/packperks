@@ -104,3 +104,26 @@ body:has(.admin-app) {
 .admin-app .sup-input:focus-visible {
   outline: none;
 }
+
+/* ── Vendor-view preview bar (#overview?as=vendor) ────────────────────
+   A persistent, unmistakable strip: an owner who forgets they are in the
+   vendor view would otherwise file bugs about missing pages. */
+.vendor-preview-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 18px;
+  background: #2A2432; color: #F3EFE7;
+  font-size: 13px; line-height: 1.4;
+  border-bottom: 1px solid #1B1720;
+}
+.vendor-preview-bar__dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: #F0A93B; box-shadow: 0 0 0 3px rgba(240, 169, 59, 0.22);
+}
+.vendor-preview-bar__text { flex: 1; min-width: 0; }
+.vendor-preview-bar__text strong { font-weight: 700; color: #F0A93B; }
+.vendor-preview-bar__exit {
+  flex: none; border: 1px solid rgba(243, 239, 231, 0.28); background: none;
+  color: #F3EFE7; font: inherit; font-weight: 600;
+  padding: 5px 12px; border-radius: 999px; cursor: pointer;
+}
+.vendor-preview-bar__exit:hover { background: rgba(243, 239, 231, 0.1); }

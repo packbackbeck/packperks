@@ -19,7 +19,7 @@
 //
 // Body: {
 //   email?:      string                   // required when method='email'
-//   role:        'admin'|'manager'|'checker'
+//   role:        'admin'|'manager'|'checker'|'vendor'
 //   method?:     'email' | 'link'         // default 'email'
 //   single_use?: boolean                  // default true (only meaningful for link mode)
 // }
@@ -44,7 +44,7 @@ const CORS_HEADERS = {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ALLOWED_ROLES = new Set(["admin", "manager", "checker"]);
+const ALLOWED_ROLES = new Set(["admin", "manager", "checker", "vendor"]);
 const ALLOWED_METHODS = new Set(["email", "link"]);
 
 function jsonResponse(body: unknown, status = 200) {

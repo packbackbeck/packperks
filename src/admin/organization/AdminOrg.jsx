@@ -29,6 +29,7 @@ const ROLE_LABELS = {
   admin:   { label: 'Admin',   color: '#FD6F46', desc: 'Full operational access' },
   manager: { label: 'Manager', color: '#5333A5', desc: 'Approve claims, edit rewards' },
   checker: { label: 'Checker', color: '#7A7166', desc: 'Read-only + exports' },
+  vendor:  { label: 'Vendor',  color: '#C0451F', desc: 'The five performance pages, read-only' },
 };
 
 export default function AdminOrg({ onNavigate, embedded = false }) {
@@ -596,6 +597,7 @@ function TeamSection({ org, team, invitations, canManage, currentRole, currentUs
                     <option value="admin">Admin</option>
                     <option value="manager">Manager</option>
                     <option value="checker">Checker</option>
+                    <option value="vendor">Vendor</option>
                   </select>
                 ) : (
                   <RoleBadge role={m.role} />
@@ -687,13 +689,15 @@ function TeamSection({ org, team, invitations, canManage, currentRole, currentUs
  * the inviter can see exactly what they're handing out before sending.
  * Order matches the permission tiers; ✓ = granted, — = not granted.   */
 const ROLE_FEATURE_MATRIX = [
-  { feature: 'View dashboards + reports',  admin: '✓', manager: '✓', checker: '✓' },
-  { feature: 'Approve / reject claims',    admin: '✓', manager: '✓', checker: '—' },
-  { feature: 'Manage rewards',             admin: '✓', manager: '✓', checker: '—' },
-  { feature: 'Generate cup QR codes',      admin: '✓', manager: '✓', checker: '—' },
-  { feature: 'Invite team / change roles', admin: '✓', manager: '—', checker: '—' },
-  { feature: 'Edit organisation + locations', admin: '✓', manager: '—', checker: '—' },
-  { feature: 'View action log',            admin: '✓', manager: '—', checker: '—' },
+  { feature: 'Overview, rewards, reports, health, behaviour', admin: '✓', manager: '✓', checker: '✓', vendor: '✓' },
+  { feature: 'Customer records + claim queue', admin: '✓', manager: '✓', checker: '✓', vendor: '—' },
+  { feature: 'Export reports',             admin: '✓', manager: '✓', checker: '✓', vendor: '—' },
+  { feature: 'Approve / reject claims',    admin: '✓', manager: '✓', checker: '—', vendor: '—' },
+  { feature: 'Manage rewards',             admin: '✓', manager: '✓', checker: '—', vendor: '—' },
+  { feature: 'Generate cup QR codes',      admin: '✓', manager: '✓', checker: '—', vendor: '—' },
+  { feature: 'Invite team / change roles', admin: '✓', manager: '—', checker: '—', vendor: '—' },
+  { feature: 'Edit organisation + locations', admin: '✓', manager: '—', checker: '—', vendor: '—' },
+  { feature: 'View action log',            admin: '✓', manager: '—', checker: '—', vendor: '—' },
 ];
 
 function RoleIcon({ role, size = 28 }) {
@@ -704,6 +708,15 @@ function RoleIcon({ role, size = 28 }) {
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6Z" />
         <path d="m9 12 2 2 4-4" />
+      </svg>
+    );
+  if (role === 'vendor')
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9.5 4.8 4h14.4L21 9.5" />
+        <path d="M3 9.5a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+        <path d="M5 12v8h14v-8" />
+        <path d="M10 20v-5h4v5" />
       </svg>
     );
   if (role === 'manager')
@@ -867,7 +880,7 @@ function InviteModal({ onClose, onInvited, allowAdmin, org }) {
           <div className="invite-field">
             <span className="invite-field__label">Role</span>
             <div className="invite-role-grid" role="radiogroup">
-              {['checker', 'manager', 'admin'].map(r => (
+              {['vendor', 'checker', 'manager', 'admin'].map(r => (
                 <button
                   key={r}
                   type="button"
@@ -894,6 +907,7 @@ function InviteModal({ onClose, onInvited, allowAdmin, org }) {
               <thead>
                 <tr>
                   <th></th>
+                  <th className={role === 'vendor' ? 'invite-matrix__th--active' : ''}>Vendor</th>
                   <th className={role === 'checker' ? 'invite-matrix__th--active' : ''}>Checker</th>
                   <th className={role === 'manager' ? 'invite-matrix__th--active' : ''}>Manager</th>
                   <th className={role === 'admin'   ? 'invite-matrix__th--active' : ''}>Admin</th>
@@ -903,6 +917,7 @@ function InviteModal({ onClose, onInvited, allowAdmin, org }) {
                 {ROLE_FEATURE_MATRIX.map(row => (
                   <tr key={row.feature}>
                     <td className="invite-matrix__feature">{row.feature}</td>
+                    <td className={`invite-matrix__cell invite-matrix__cell--${row.vendor === '✓' ? 'yes' : 'no'} ${role === 'vendor' ? 'invite-matrix__cell--active' : ''}`}>{row.vendor}</td>
                     <td className={`invite-matrix__cell invite-matrix__cell--${row.checker === '✓' ? 'yes' : 'no'} ${role === 'checker' ? 'invite-matrix__cell--active' : ''}`}>{row.checker}</td>
                     <td className={`invite-matrix__cell invite-matrix__cell--${row.manager === '✓' ? 'yes' : 'no'} ${role === 'manager' ? 'invite-matrix__cell--active' : ''}`}>{row.manager}</td>
                     <td className={`invite-matrix__cell invite-matrix__cell--${row.admin === '✓' ? 'yes' : 'no'} ${role === 'admin' ? 'invite-matrix__cell--active' : ''}`}>{row.admin}</td>

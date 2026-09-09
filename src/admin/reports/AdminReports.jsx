@@ -808,12 +808,72 @@ function SearchableMetrics({ catalog, selected, onChange, disabled }) {
   );
 }
 
+/* Illustrative values for the preview, one per metric id in the catalogs.
+ * They are labelled as a sample in the UI and never leave this component —
+ * their only job is to show the shape and density of the real email, which
+ * a row of "—" placeholders cannot do. */
+const PREVIEW_VALUES = {
+  new_users: '48', active_users: '212', returning_users: '96', repeat_rate: '45%',
+  scans_total: '734', cups_period: '1,486', avg_cups_user: '7.0', byo_scans: '318',
+  top_location: 'Central', busiest_day: 'Thursday', top_reward: 'Flat white',
+  unique_rewards: '6', cups_redeemed: '890', redemption_rate: '60%',
+  cashback_paid: '€400.50', avg_cashback: '€2.25', co2_avoided: '107 kg',
+  total_users: '412', total_cups_lifetime: '9,340', cups_redeemed_all: '5,120',
+  total_cashback: '€2,304.00', approved_claims: '981', failed_claims: '34',
+  pending_claims: '7', rejection_rate: '3.4%', ai_pass_rate: '96%',
+  avg_ai_confidence: '0.94', pending_merges: '0', merges_period: '2',
+  stores_count: '3', active_stores: '3',
+};
+
+/* A faithful, scaled-down rendering of the email this digest will send —
+ * same shell, same accent, same three-cards-per-row grid as
+ * supabase/functions/send-digest. The point is that an admin choosing
+ * eleven metrics can see they have made a wall of numbers before the
+ * vendor receives one. */
+function DigestPreview({ accent, badge, aud, catalog, orgName }) {
+  const byId = new Map(catalog.map((m) => [m.id, m]));
+  const cells = (aud.metrics || []).map((id) => byId.get(id)).filter(Boolean);
+  const period = (aud.frequency || 'weekly') === 'monthly' ? 'Last 30 days' : 'Last 7 days';
+  return (
+    <aside className="rep-prev" aria-label={`${badge} email preview`}>
+      <div className="rep-prev__bar">
+        <span className="rep-prev__bar-label">Preview</span>
+        <span className="rep-prev__bar-note">Sample figures</span>
+      </div>
+      <div className="rep-prev__page">
+        <div className="rep-prev__brand">🥤 PackPerks</div>
+        <div className="rep-prev__card">
+          <span className="rep-prev__badge" style={{ background: accent }}>{badge}</span>
+          <div className="rep-prev__meta">{orgName} — {period}</div>
+          <h3 className="rep-prev__title">{aud.title || 'Untitled digest'}</h3>
+          <p className="rep-prev__intro">{aud.intro || ' '}</p>
+          {cells.length === 0 ? (
+            <p className="rep-prev__empty">Pick at least one metric — an email with no numbers is never sent.</p>
+          ) : (
+            <div className="rep-prev__grid">
+              {cells.map((m) => (
+                <div className="rep-prev__tile" key={m.id}>
+                  <span className="rep-prev__tile-label" style={{ color: accent }}>{m.label}</span>
+                  <span className="rep-prev__tile-val">{PREVIEW_VALUES[m.id] || '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="rep-prev__foot">
+          You are receiving this because a digest is configured in the PackPerks dashboard.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 /* One audience's digest config: enable + title/intro + recipients + a searchable
  * metric picker + its own "Send test". */
 /* One audience's digest, rendered as its own full `rep-auto rep-digest` block:
  * enable switch + schedule + recipients + a searchable metric picker, with its
  * own Save + Send test. */
-function DigestSection({ audKey, accent, heading, sub, catalog, aud, onChange, ownEmail, canManage, onSave, saving, savedAt, onSendTest, testing, err, msg }) {
+function DigestSection({ audKey, accent, accentHex, badge, orgName, heading, sub, catalog, aud, onChange, ownEmail, canManage, onSave, saving, savedAt, onSendTest, testing, err, msg }) {
   const set = (p) => onChange({ ...aud, ...p });
   const metrics = aud.metrics || [];
   const recipients = aud.recipients || [];
@@ -838,6 +898,7 @@ function DigestSection({ audKey, accent, heading, sub, catalog, aud, onChange, o
         </label>
       </div>
 
+      <div className="rep-digest__split">
       <div className={`rep-digest__body${aud.enabled ? '' : ' rep-auto__grid--muted'}`}>
         <div className="rep-auto__grid">
           <label className="rep-auto__field rep-auto__field--wide">
@@ -882,6 +943,8 @@ function DigestSection({ audKey, accent, heading, sub, catalog, aud, onChange, o
           <SearchableMetrics catalog={catalog} selected={metrics} onChange={(v) => set({ metrics: v })} disabled={!canManage} />
         </div>
       </div>
+      <DigestPreview accent={accentHex} badge={badge} aud={aud} catalog={catalog} orgName={orgName} />
+      </div>
 
       <div className="rep-auto__foot">
         <span className="rep-auto__summary">
@@ -910,7 +973,8 @@ function DigestSection({ audKey, accent, heading, sub, catalog, aud, onChange, o
  * Two fully independent digests, each its own rep-auto block (own schedule,
  * recipients, metrics) and mailed as a separate letter. */
 function WeeklyDigest({ canManage }) {
-  const { activeOrgId } = useOrg();
+  const { activeOrgId, activeOrg } = useOrg();
+  const activeOrgName = activeOrg?.name || null;
   const { profile } = useAuth();
   const ownEmail = (profile?.email || '').toLowerCase();
   const [cfg, setCfg] = useState(WEEKLY_DIGEST_DEFAULT);
@@ -957,18 +1021,23 @@ function WeeklyDigest({ canManage }) {
     finally { setTesting(null); }
   };
 
-  const common = { ownEmail, canManage, err, msg };
+  // Accents match the sent email exactly (send-digest/index.ts) so the
+  // preview is not a different-looking approximation.
+  const orgName = activeOrgName || 'Your store';
+  const common = { ownEmail, canManage, err, msg, orgName };
   return (
     <div className="rep-digest-wrap">
-      <div className="rep-digest-cols">
+      <div className="rep-digest-rows">
         <DigestSection
-          {...common} audKey="vendor" accent="vendor" heading="Vendor digest" sub="For the store owner"
+          {...common} audKey="vendor" accent="vendor" accentHex="#C0451F" badge="Vendor digest"
+          heading="Vendor digest" sub="For the store owner"
           catalog={DIGEST_VENDOR_METRICS} aud={cfg.vendor || {}} onChange={(a) => setAud('vendor', a)}
           onSave={() => save('vendor')} saving={saving === 'vendor' || !loaded} savedAt={savedAt === 'vendor'}
           onSendTest={() => sendTest('vendor')} testing={testing === 'vendor'}
         />
         <DigestSection
-          {...common} audKey="staff" accent="admin" heading="Staff digest" sub="Everything vendors see + full platform totals"
+          {...common} audKey="staff" accent="admin" accentHex="#5333A5" badge="Staff digest"
+          heading="Staff digest" sub="Everything vendors see + full platform totals"
           catalog={DIGEST_STAFF_METRICS} aud={cfg.staff || {}} onChange={(a) => setAud('staff', a)}
           onSave={() => save('staff')} saving={saving === 'staff' || !loaded} savedAt={savedAt === 'staff'}
           onSendTest={() => sendTest('staff')} testing={testing === 'staff'}

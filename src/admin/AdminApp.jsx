@@ -7,6 +7,7 @@ import AuthGate from './auth/AuthGate';
 import AdminTopBar from './AdminTopBar';
 import AdminSidebar from './AdminSidebar';
 import { VENDOR_TABS } from './lib/roles';
+import { ViewRoleCtx, readVendorPreviewFlag } from './context/ViewRole';
 import { setAdminDemoMode } from './lib/adminApi';
 import AdminOverview from './overview/AdminOverview';
 import AdminRewards from './rewards/AdminRewards';
@@ -110,9 +111,7 @@ function readHashPage() {
  * couldn't already reach. It is a rehearsal of the vendor's view, not a
  * way to grant one. */
 function readHashPreviewRole() {
-  if (typeof window === 'undefined') return null;
-  const q = (window.location.hash || '').split('?')[1] || '';
-  return new URLSearchParams(q).get('as') === 'vendor' ? 'vendor' : null;
+  return readVendorPreviewFlag() ? 'vendor' : null;
 }
 
 // Optional cross-page scroll target carried in the hash query, e.g. a
@@ -264,6 +263,7 @@ function AdminShell() {
         onPreview={handlePreview}
         onOpenSupport={() => setPage('support')}
       />
+      <ViewRoleCtx.Provider value={{ viewRole: effectiveRole, isVendorView, previewing }}>
       <div className="admin-app__body">
         <AdminSidebar
           activePage={page}
@@ -351,6 +351,7 @@ function AdminShell() {
               land on the single Claims instance. */}
         </main>
       </div>
+      </ViewRoleCtx.Provider>
 
       {/* Create-org wizard — modal portal sibling so it overlays the
           whole shell. State lives here so the switcher (sidebar) and

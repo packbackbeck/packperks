@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import { supabase } from '../../lib/supabase';
 import { setActiveOrgId, setActiveOrgCountry } from './orgState';
 import { useAuth } from '../auth/AuthContext';
+import { readVendorPreviewFlag } from './ViewRole';
 
 /* ─────────────────────────────────────────────────────────────────────
  * OrgContext — single source of truth for the currently-active
@@ -87,6 +88,13 @@ export function OrgProvider({ children }) {
   const { profile } = useAuth();
   const isVendor = profile?.role === 'vendor';
   const vendorOrgId = isVendor ? (profile.org_id || null) : null;
+  /* `#…?as=vendor` — an owner rehearsing the vendor view. It must be a
+   * faithful rehearsal, and a vendor cannot change store, so the switcher
+   * is locked to whichever org the link opened. Reading the URL here
+   * rather than taking it from ViewRoleProvider is deliberate: this
+   * context sits ABOVE the shell that provides it. */
+  const previewingVendor = readVendorPreviewFlag();
+  const lockToActiveOrg = previewingVendor && !isVendor;
 
   const [availableOrgs, setAvailableOrgs] = useState([]);
   const [groups, setGroups]               = useState([]); // org_groups rows (id, name, slug)
@@ -121,10 +129,10 @@ export function OrgProvider({ children }) {
       // list is EMPTY, never unfiltered — falling open here would hand one
       // venue's staff every other venue's numbers.
       const orgs = isVendor ? all.filter(o => o.id === vendorOrgId) : all;
-      setAvailableOrgs(orgs);
       setGroups(grpData || []);
 
       if (orgs.length === 0) {
+        setAvailableOrgs(orgs);
         setActiveOrg(null);
         setActiveOrgId(null);
         setActiveOrgCountry(null);
@@ -145,6 +153,10 @@ export function OrgProvider({ children }) {
         (storedId   && byId(storedId))     ||
         orgs[0];
 
+      // In the vendor preview the list collapses to the chosen org, so the
+      // switcher has nothing to switch to — same as a real vendor sees.
+      setAvailableOrgs(lockToActiveOrg ? [chosen] : orgs);
+
       setActiveOrg(chosen);
       setActiveOrgId(chosen.id);
       setActiveOrgCountry(chosen.country);
@@ -156,7 +168,7 @@ export function OrgProvider({ children }) {
       setError(e.message || 'Failed to load organisations');
       setStatus('error');
     }
-  }, [isVendor, vendorOrgId]);
+  }, [isVendor, vendorOrgId, lockToActiveOrg]);
 
   // Initial fetch on mount, and again if the signed-in role resolves to a
   // vendor after the first pass (the profile arrives asynchronously).

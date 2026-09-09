@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useOrg } from './OrgContext';
-import { useAuth } from '../auth/AuthContext';
 import './OrgSwitcher.css';
+import { useViewRole } from './ViewRole';
 
 /* Small leading mark used on every dropdown row. Prefers the org's
  * uploaded logo; falls back to a colour swatch with the first letter
@@ -88,12 +88,13 @@ function GroupMark() {
 
 export default function OrgSwitcher({ onNavigate, onAddOrg }) {
   const { activeOrg, availableOrgs, switchOrg, groups } = useOrg();
-  const { profile } = useAuth();
   /* A vendor has exactly one store and none of the management actions in
    * this menu, so the switcher becomes a plain label. Rendering a
    * dropdown that only ever contains "Add organisation" would be an
-   * invitation to a page they cannot open. */
-  const isVendor = profile?.role === 'vendor';
+   * invitation to a page they cannot open. The preview counts too — a
+   * rehearsal that can still switch stores is not the vendor's view. */
+  const { isVendorView } = useViewRole();
+  const isVendor = isVendorView;
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 

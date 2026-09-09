@@ -12,6 +12,7 @@ import QuickLinks from '../shared/QuickLinks';
 import { useReorder } from './useReorder';
 import './AdminOverview.css';
 import { useAdminMoney, adminSymbol } from '../lib/adminMoney';
+import { useViewRole } from '../context/ViewRole';
 
 /* ── Data helpers ── */
 function buildDailyTimeSeries(items, days) {
@@ -493,6 +494,7 @@ function todayIso() {
 
 export default function AdminOverview({ draftState, onNavigate }) {
   const { money } = useAdminMoney();
+  const { isVendorView } = useViewRole();
   const { draft, updateDraft } = draftState;
   const blocks = draft.dashboardBlocks;
 
@@ -887,8 +889,11 @@ export default function AdminOverview({ draftState, onNavigate }) {
         );
       })()}
 
-      {/* Reward budget monitor — read-only here, edit on the Settings page. */}
-      {budget && (
+      {/* Reward budget monitor — read-only here, edit on the Settings page.
+          Hidden from vendors: it is the operator's cost ceiling, not a
+          store-performance number, and its "Manage" link goes to Settings,
+          which a vendor cannot open. */}
+      {budget && !isVendorView && (
         <div className="ov-budget-block">
           <RewardBudgetMonitor
             cap={budget.cap}

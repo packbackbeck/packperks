@@ -1,5 +1,6 @@
 import './DirectRefundSheet.css';
 import { useMoney } from '../lib/RegionContext';
+import Money from './Money';
 
 export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm, refundRate = 1.00, cashbackRate = 1.25 }) {
   const money = useMoney();
@@ -47,20 +48,20 @@ export default function DirectRefundSheet({ open, onClose, cupCount, onConfirm, 
           <div className="drs__compare">
             <div className="drs__compare-option">
               <span className="drs__compare-label">Direct refund</span>
-              <span className="drs__compare-amount drs__compare-amount--base">{money(directTotal)}</span>
-              <span className="drs__compare-rate">{money(refundRate)} per cup</span>
+              <span className="drs__compare-amount drs__compare-amount--base"><Money value={directTotal} /></span>
+              <span className="drs__compare-rate"><Money value={refundRate} /> per cup</span>
             </div>
             <div className="drs__compare-vs">vs</div>
             <div className="drs__compare-option drs__compare-option--highlight">
               <span className="drs__compare-label">Reward cashback</span>
-              <span className="drs__compare-amount drs__compare-amount--reward">{money(rewardTotal)}</span>
-              <span className="drs__compare-rate">{money(cashbackRate)} per cup</span>
+              <span className="drs__compare-amount drs__compare-amount--reward"><Money value={rewardTotal} /></span>
+              <span className="drs__compare-rate"><Money value={cashbackRate} /> per cup</span>
             </div>
           </div>
 
           {/* Difference pill */}
           <div className="drs__diff-pill">
-            You'd miss out on <strong>{money(difference)}</strong> by choosing the direct refund
+            You'd miss out on <strong><Money value={difference} /></strong> by choosing the direct refund
           </div>
 
           {/* CTAs */}

@@ -13,7 +13,7 @@
  * ───────────────────────────────────────────────────────────────────── */
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { getRegion, formatMoney, setRegions, DEFAULT_REGION, payoutCopy } from './regions';
+import { getRegion, formatMoney, moneyParts, setRegions, DEFAULT_REGION, payoutCopy } from './regions';
 import { supabase } from './supabase';
 
 const RegionContext = createContext(null);
@@ -28,6 +28,8 @@ function valueFor(region, setRegion, rev) {
     payoutNoun: r.payoutNoun,     // inline copy noun ("Tikkie link" / "payment link")
     payout: payoutCopy(r.key),    // full phrases — see payoutCopy() in regions.js
     money: (n) => formatMoney(n, r.key),
+    // Split form, for rendering the currency as a drawn mark — see <Money/>.
+    moneyParts: (n) => moneyParts(n, r.key),
     setRegion,
     _rev: rev, // bumps when the overlay loads so consumers re-read the registry
   };

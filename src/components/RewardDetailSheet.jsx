@@ -1,6 +1,7 @@
 import './RewardDetailSheet.css';
 import { rewardImageStyle } from '../utils/imageTransform';
 import { useMoney, useRegion } from '../lib/RegionContext';
+import Money from './Money';
 
 const CupIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -75,7 +76,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
           {/* Name + price row */}
           <div className="rds-title-row">
             <h2 className="rds-name">{reward.name}</h2>
-            <span className="rds-euros">{money(reward.euros)}</span>
+            <span className="rds-euros"><Money value={reward.euros} /></span>
           </div>
 
           {/* Chips: dynamic tags + cups cost */}

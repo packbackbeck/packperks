@@ -20,6 +20,10 @@
 // Body: {
 //   email?:      string                   // required when method='email'
 //   role:        'admin'|'manager'|'checker'|'vendor'
+//   org_id?:     uuid                     // the store this invite is for.
+//                                         // REQUIRED for 'vendor' (they are
+//                                         // scoped to one store); defaults to
+//                                         // the caller's org otherwise.
 //   method?:     'email' | 'link'         // default 'email'
 //   single_use?: boolean                  // default true (only meaningful for link mode)
 // }
@@ -101,7 +105,7 @@ Deno.serve(async (req) => {
   if (!await rateLimit(`invite-admin:admin:${caller.id}`, 3600, 10))
     return jsonResponse({ error: "rate_limited", detail: "Too many invitations sent this hour. Try again later." }, 429);
 
-  let body: { email?: string; role?: string; method?: string; single_use?: boolean };
+  let body: { email?: string; role?: string; method?: string; single_use?: boolean; org_id?: string };
   try { body = await req.json(); } catch { return jsonResponse({ error: "invalid_json" }, 400); }
   const role = String(body?.role || "");
   const methodRaw = String(body?.method || "email").toLowerCase();
@@ -111,6 +115,24 @@ Deno.serve(async (req) => {
   const singleUse = body?.single_use === undefined ? true : !!body.single_use;
   if (!ALLOWED_ROLES.has(role))
     return jsonResponse({ error: "invalid_role", detail: `role must be one of: ${[...ALLOWED_ROLES].join(", ")}` }, 400);
+
+  /* Which store the invitation is for. A vendor only ever sees this one
+   * org, so it must be present and must be a real, live org — an invite
+   * carrying a bad id would create an account that can see nothing, or
+   * (worse, if the client filter ever regressed) everything. */
+  const requestedOrgId = body?.org_id ? String(body.org_id) : null;
+  const orgId = requestedOrgId ?? caller.org_id ?? null;
+  if (requestedOrgId) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("id", requestedOrgId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!org) return jsonResponse({ error: "invalid_org", detail: "That organisation does not exist." }, 400);
+  }
+  if (role === "vendor" && !orgId)
+    return jsonResponse({ error: "org_required", detail: "A vendor invitation must name the store it is for." }, 400);
 
   const rawEmail = String(body?.email || "").trim().toLowerCase();
   if (method === "email" && !EMAIL_RE.test(rawEmail))
@@ -126,7 +148,7 @@ Deno.serve(async (req) => {
       .from("admin_profiles")
       .select("id")
       .eq("email", email)
-      .eq("org_id", caller.org_id)
+      .eq("org_id", orgId)
       .maybeSingle();
     if (existing)
       return jsonResponse({ error: "already_member", detail: `${email} is already on the team.` }, 409);
@@ -142,7 +164,7 @@ Deno.serve(async (req) => {
       .from("admin_invitations")
       .select("id")
       .eq("email", email)
-      .eq("org_id", caller.org_id)
+      .eq("org_id", orgId)
       .eq("status", "pending")
       .maybeSingle();
     if (pending) {
@@ -160,7 +182,7 @@ Deno.serve(async (req) => {
       const { data: inserted, error: insErr } = await supabase
         .from("admin_invitations")
         .insert({
-          org_id: caller.org_id,
+          org_id: orgId,
           email,
           role,
           token,
@@ -180,7 +202,7 @@ Deno.serve(async (req) => {
     const { data: inserted, error: insErr } = await supabase
       .from("admin_invitations")
       .insert({
-        org_id: caller.org_id,
+        org_id: orgId,
         email,
         role,
         token,
@@ -200,7 +222,7 @@ Deno.serve(async (req) => {
   if (method === "email") {
     const { error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: {
-        org_id: caller.org_id,
+        org_id: orgId,
         role,
         invited_by: caller.display_name || caller.email,
         invitation_id: invitationId,
@@ -224,7 +246,7 @@ Deno.serve(async (req) => {
     action: "team.invite",
     target_type: "admin_invitation",
     target_id: invitationId,
-    after_state: { email, role, method, single_use: singleUse },
+    after_state: { email, role, method, single_use: singleUse, org_id: orgId },
     ip: req.headers.get("x-forwarded-for") || null,
     user_agent: req.headers.get("user-agent") || null,
   });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useOrg } from './OrgContext';
+import { useAuth } from '../auth/AuthContext';
 import './OrgSwitcher.css';
 
 /* Small leading mark used on every dropdown row. Prefers the org's
@@ -87,6 +88,12 @@ function GroupMark() {
 
 export default function OrgSwitcher({ onNavigate, onAddOrg }) {
   const { activeOrg, availableOrgs, switchOrg, groups } = useOrg();
+  const { profile } = useAuth();
+  /* A vendor has exactly one store and none of the management actions in
+   * this menu, so the switcher becomes a plain label. Rendering a
+   * dropdown that only ever contains "Add organisation" would be an
+   * invitation to a page they cannot open. */
+  const isVendor = profile?.role === 'vendor';
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -151,6 +158,27 @@ export default function OrgSwitcher({ onNavigate, onAddOrg }) {
         <OrgMark org={o} />
         <span className="orgsw__item-name">{o.name}</span>
       </button>
+    );
+  }
+
+  const Chip = activeOrg.logo_url ? (
+    <img src={activeOrg.logo_url} alt="" className="orgsw__chip orgsw__chip--img" />
+  ) : (
+    <span className="orgsw__chip" style={{ background: activeOrg.brand_color || '#FD6F46' }}>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 21h18M5 21V7l8-4 8 4v14M9 9h.01M9 13h.01M9 17h.01M14 9h.01M14 13h.01M14 17h.01"/>
+      </svg>
+    </span>
+  );
+
+  if (isVendor) {
+    return (
+      <div className="orgsw orgsw--static">
+        <div className="orgsw__trigger orgsw__trigger--static" title={activeOrg.name}>
+          {Chip}
+          <span className="orgsw__name">{activeOrg.name}</span>
+        </div>
+      </div>
     );
   }
 

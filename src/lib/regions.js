@@ -153,6 +153,33 @@ export function formatMoney(amount, regionKey = DEFAULT_REGION) {
   return formatCurrency(amount, r.currency, r.currencyLocale);
 }
 
+/* Split a formatted amount into the part Intl renders as the currency and
+ * the part it renders as the number, so a UI can swap the former for a
+ * drawn glyph (see components/Money.jsx) without re-implementing
+ * locale-aware grouping and decimals.
+ *
+ * formatToParts is the reliable way to do this: the currency token's
+ * position, spacing and content all vary by locale, and slicing the
+ * string by hand gets it wrong the moment a locale puts the symbol last. */
+export function moneyParts(amount, regionKey = DEFAULT_REGION) {
+  const r = getRegion(regionKey);
+  const text = formatCurrency(amount, r.currency, r.currencyLocale);
+  let number = text;
+  let mark = r.currency;
+  try {
+    const parts = new Intl.NumberFormat(r.currencyLocale, { style: 'currency', currency: r.currency })
+      .formatToParts(Number(amount) || 0);
+    const cur = parts.find(p => p.type === 'currency');
+    if (cur) mark = cur.value;
+    number = parts
+      .filter(p => p.type !== 'currency')
+      .map(p => p.value)
+      .join('')
+      .trim();
+  } catch { /* fall back to the whole string above */ }
+  return { text, number, mark, currency: r.currency };
+}
+
 
 /* ─────────────────────────────────────────────────────────────────────
  * payoutCopy — how this region promises to pay the customer.

@@ -1,5 +1,6 @@
 import './RefundSuccessPage.css';
 import { useMoney, useRegion } from '../lib/RegionContext';
+import Money from './Money';
 
 function formatDate(d = new Date()) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -55,7 +56,7 @@ export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone 
       <div className="rsp__card">
         {/* Amount hero */}
         <div className="rsp__amount-row">
-          <span className="rsp__amount">{money(total)}</span>
+          <span className="rsp__amount"><Money value={total} /></span>
           <span className="rsp__amount-label">direct refund</span>
         </div>
 
@@ -67,12 +68,12 @@ export default function RefundSuccessPage({ cupCount, amount, userEmail, onDone 
           <Row label="Time"        value={formatTime(now)} />
           {userEmail ? <Row label="Sent to" value={userEmail} /> : null}
           <Row label="Cups refunded" value={`${cupCount} cup${cupCount !== 1 ? 's' : ''}`} />
-          <Row label="Rate"        value={`${money(perCup)} per cup`} />
+          <Row label="Rate"        value={<><Money value={perCup} /> per cup</>} />
         </div>
 
         <div className="rsp__dashed" />
 
-        <Row label="Total refund" value={money(total)} bold green />
+        <Row label="Total refund" value={<Money value={total} />} bold green />
 
         <div className="rsp__eta">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A8737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

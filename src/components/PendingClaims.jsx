@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { COLLECT_WINDOW_MS, getDismissedSet, dismissClaim } from '../lib/collectedClaims';
-import { useMoney, useRegion } from '../lib/RegionContext';
+import { useRegion } from '../lib/RegionContext';
 import { getFailureCopy, getFailureLabel } from '../admin/lib/aiVerdictLabels';
 import './PendingClaims.css';
+import Money, { DirhamMark } from './Money';
 
 /* A claim is only "ready" once an admin has approved it AND minted the Tikkie
  * link. The AI receipt check is just a pre-screen — the final verdict is a
@@ -144,11 +145,9 @@ function ReviewProgress({ claim }) {
 }
 
 function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRetry }) {
-  const money = useMoney();
-  const { symbol } = useRegion();
+  const { symbol, currency } = useRegion();
   const ready = isReady(claim);
   const rejected = isRejected(claim);
-  const amount = money(claim.payout_amount);
   const name = claim.rewardName || 'Cashback reward';
   const state = rejected ? 'rejected' : ready ? 'ready' : 'checking';
   const failedCodes = rejected ? failedCriteria(claim) : [];
@@ -163,11 +162,11 @@ function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRet
         <div className="pc-card__thumb" style={claim.rewardBg ? { background: claim.rewardBg } : undefined}>
           {claim.rewardImage
             ? <img src={claim.rewardImage} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-            : <span className="pc-card__thumb-euro">{symbol}</span>}
+            : <span className="pc-card__thumb-euro">{currency === 'AED' ? <DirhamMark /> : symbol}</span>}
         </div>
         <div className="pc-card__meta">
           <span className="pc-card__name">{name}</span>
-          <span className="pc-card__amount">{amount} cashback</span>
+          <span className="pc-card__amount"><Money value={claim.payout_amount} /> cashback</span>
         </div>
         {rejected ? (
           <span className="pc-card__badge pc-card__badge--rejected">

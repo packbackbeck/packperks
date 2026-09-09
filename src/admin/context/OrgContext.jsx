@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { setActiveOrgId } from './orgState';
+import { useAuth } from '../auth/AuthContext';
 
 /* ─────────────────────────────────────────────────────────────────────
  * OrgContext — single source of truth for the currently-active
@@ -79,6 +80,14 @@ function writeUrlOrgParam(slug) {
 }
 
 export function OrgProvider({ children }) {
+  /* A vendor is the venue's own staff, not PackPerks staff: they see one
+   * store — theirs — and the switcher has nothing to switch to. Every
+   * other role keeps cross-org access (see the Phase 7 note above; this
+   * is the first role that actually needs the filter). */
+  const { profile } = useAuth();
+  const isVendor = profile?.role === 'vendor';
+  const vendorOrgId = isVendor ? (profile.org_id || null) : null;
+
   const [availableOrgs, setAvailableOrgs] = useState([]);
   const [groups, setGroups]               = useState([]); // org_groups rows (id, name, slug)
   const [activeOrg, setActiveOrg]         = useState(null);
@@ -104,7 +113,14 @@ export function OrgProvider({ children }) {
 
       if (err) throw err;
 
-      const orgs = data || [];
+      // Scope before anything else reads the list, so the switcher, the
+      // resolution chain below and every stored/URL override all operate
+      // on the same, already-narrowed set.
+      const all = data || [];
+      // A vendor sees exactly their assigned store. If none is assigned the
+      // list is EMPTY, never unfiltered — falling open here would hand one
+      // venue's staff every other venue's numbers.
+      const orgs = isVendor ? all.filter(o => o.id === vendorOrgId) : all;
       setAvailableOrgs(orgs);
       setGroups(grpData || []);
 
@@ -138,9 +154,10 @@ export function OrgProvider({ children }) {
       setError(e.message || 'Failed to load organisations');
       setStatus('error');
     }
-  }, []);
+  }, [isVendor, vendorOrgId]);
 
-  // Initial fetch on mount.
+  // Initial fetch on mount, and again if the signed-in role resolves to a
+  // vendor after the first pass (the profile arrives asynchronously).
   useEffect(() => {
     refresh();
   }, [refresh]);

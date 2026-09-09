@@ -899,6 +899,14 @@ function InviteModal({ onClose, onInvited, allowAdmin, org }) {
                 </button>
               ))}
             </div>
+            {/* A vendor is bound to ONE store, so say which before sending —
+                it is decided here and cannot be changed by the invitee. */}
+            {role === 'vendor' && (
+              <p className="invite-scope">
+                They will see <strong>{org?.name || 'the active store'}</strong> only — the store
+                you have open now. Switch stores before inviting to bind them elsewhere.
+              </p>
+            )}
           </div>
 
           <div className="invite-matrix">

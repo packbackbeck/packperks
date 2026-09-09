@@ -109,10 +109,14 @@ Deno.serve(async (req) => {
   }
 
   // ── 2. Decide the role: invitation → founder → trusted domain → checker.
-  //    org_id stays NULL in every case — admins are global.
-  let role: "owner" | "admin" | "manager" | "checker" = "checker";
+  //    org_id stays NULL for every STAFF role — they are global. 'vendor' is
+  //    the exception and is pinned to the store its invitation names.
+  let role: "owner" | "admin" | "manager" | "checker" | "vendor" = "checker";
   let invitedBy: string | null = null;
   let consumedInvitationId: string | null = null;
+  // The store an invitation binds the new account to. Only meaningful for
+  // roles that are scoped to one org; staff stay global (null).
+  let invitedOrgId: string | null = null;
 
   const { data: invitation } = await supabase
     .from("admin_invitations")
@@ -125,10 +129,14 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (invitation) {
-    // Honour the invited role; org scoping is ignored (admins are global).
+    // Honour the invited role. Staff roles stay global (org_id null) as they
+    // always have; a VENDOR is the venue's own person and is pinned to the
+    // store the invitation names — without this they would land with no org
+    // and, by the dashboard's fail-closed rule, see nothing at all.
     role = invitation.role as typeof role;
     invitedBy = invitation.invited_by;
     consumedInvitationId = invitation.id;
+    if (role === "vendor") invitedOrgId = invitation.org_id ?? null;
   } else {
     // No invitation. If there are no admins at all yet, this user is the
     // founding owner. Otherwise, only trusted-domain staff (@packback.network)
@@ -150,12 +158,13 @@ Deno.serve(async (req) => {
       );
   }
 
-  // ── 3. Insert the profile (org_id = NULL → global admin).
+  // ── 3. Insert the profile (org_id = NULL → global admin; a vendor
+  //       carries the store its invitation named).
   const { data: profile, error: insertErr } = await supabase
     .from("admin_profiles")
     .insert({
       id: userId,
-      org_id: null,
+      org_id: invitedOrgId,
       email,
       display_name: (user.user_metadata?.full_name as string) || null,
       avatar_url: (user.user_metadata?.avatar_url as string) || null,
@@ -184,7 +193,7 @@ Deno.serve(async (req) => {
     action: "admin.signup",
     target_type: "admin_profile",
     target_id: userId,
-    after_state: { role, provider, invited: !!invitation },
+    after_state: { role, provider, invited: !!invitation, org_id: invitedOrgId },
     ip: req.headers.get("x-forwarded-for") || null,
     user_agent: req.headers.get("user-agent") || null,
   });

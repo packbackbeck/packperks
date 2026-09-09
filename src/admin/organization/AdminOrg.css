@@ -829,3 +829,11 @@
   color: #FFFFFF;
 }
 .org-invite-link-cell__copy--ok:hover { background: #15803D; }
+
+/* Vendor invites are scoped to one store — the note that says which. */
+.invite-scope {
+  margin: 10px 0 0; padding: 9px 11px;
+  background: #FBEAE3; border: 1px solid #F2D6C8; border-radius: 9px;
+  font-size: 12.5px; line-height: 1.45; color: #8A4B12;
+}
+.invite-scope strong { font-weight: 700; }

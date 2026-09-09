@@ -4626,6 +4626,11 @@ export async function inviteAdmin(emailOrOpts, roleArg) {
     single_use: opts.single_use === undefined ? true : !!opts.single_use,
   };
   if (opts.email) body.email = opts.email;
+  // A vendor is scoped to one store. Staff profiles carry no org_id, so the
+  // store has to travel with the invitation — default it to whichever org
+  // the inviter is looking at, which is what they mean by "give them access".
+  if (opts.org_id) body.org_id = opts.org_id;
+  else if (opts.role === 'vendor') body.org_id = getActiveOrgId();
   const { data, error } = await supabase.functions.invoke('invite-admin', { body });
   if (error) {
     let payload = null;

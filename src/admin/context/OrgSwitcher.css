@@ -248,3 +248,8 @@
   flex-shrink: 0;
   color: inherit;
 }
+
+/* Vendor: one store, nothing to switch to — the trigger becomes a label.
+   Same metrics as the button so the top bar doesn't shift. */
+.orgsw__trigger--static { cursor: default; background: none; }
+.orgsw__trigger--static:hover { background: none; }

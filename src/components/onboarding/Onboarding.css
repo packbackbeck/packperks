@@ -280,3 +280,10 @@
   .onb-float { transform: none !important; }
   .onb-stack__check { transition: opacity 0.2s ease; }
 }
+
+/* The currency chip holds a single glyph for € but a three-letter code for
+   AED, so it grows from a circle into a pill instead of clipping. */
+.onb-float__euro {
+  width: auto; min-width: 17px; padding: 0 5px; border-radius: 999px;
+  letter-spacing: 0.02em;
+}

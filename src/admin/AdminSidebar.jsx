@@ -6,6 +6,7 @@ import { VENDOR_TABS } from './lib/roles';
 import { getPendingCounts } from './lib/adminApi';
 import { logAction } from './auth/actionLog';
 import './AdminSidebar.css';
+import { useAdminMoney } from './lib/adminMoney';
 
 // Nav items that show a "Group" chip because they operate on the whole BYO
 // group (one shared customer base across every store), not just this store.
@@ -267,6 +268,7 @@ const ROLE_VISIBLE_TABS = {
 
 export default function AdminSidebar({ activePage, onNavigate, draftState, role, onAddOrg }) {
   const settings = draftState?.draft?.settings || {};
+  const { money } = useAdminMoney();
   const toggleFeature = draftState?.toggleFeature;
 
   // Maintenance is destructive (takes the customer app offline) so it
@@ -401,18 +403,18 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
           {isTikkieOnly ? (
             <div className="admin-sidebar__rate-item">
               <span className="admin-sidebar__rate-label">Refund</span>
-              <span className="admin-sidebar__rate-val">€{(settings.refundRatePerCup || 0.10).toFixed(2)}/cup</span>
+              <span className="admin-sidebar__rate-val">{money(settings.refundRatePerCup || 0.10)}/cup</span>
             </div>
           ) : (
             <>
               <div className="admin-sidebar__rate-item">
                 <span className="admin-sidebar__rate-label">Cashback</span>
-                <span className="admin-sidebar__rate-val">€{(settings.cashbackRatePerCup || 1.25).toFixed(2)}/cup</span>
+                <span className="admin-sidebar__rate-val">{money(settings.cashbackRatePerCup || 1.25)}/cup</span>
               </div>
               {(!isByo || settings.featureDirectRefunds) && (
                 <div className="admin-sidebar__rate-item">
                   <span className="admin-sidebar__rate-label">Refund</span>
-                  <span className="admin-sidebar__rate-val">€{(settings.refundRatePerCup || 1.00).toFixed(2)}/cup</span>
+                  <span className="admin-sidebar__rate-val">{money(settings.refundRatePerCup || 1.00)}/cup</span>
                 </div>
               )}
             </>

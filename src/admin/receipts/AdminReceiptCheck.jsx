@@ -4,6 +4,7 @@ import Spinner from '../lib/Spinner';
 import PermissionGate from '../auth/PermissionGate';
 import { logAction } from '../auth/actionLog';
 import './AdminReceiptCheck.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 // Map of the three checks the LLM runs, keyed by the slug stored in
 // claims.ai_failure_checks. Used to render the verdict panel below.
@@ -15,6 +16,7 @@ const AI_CHECK_LABELS = {
 };
 
 function AiVerdictPanel({ claim }) {
+  const { money } = useAdminMoney();
   // Only render once the AI has actually verified the claim. We key on
   // verified_at because the model sometimes omits ai_confidence even when
   // all 3 checks passed — verified_at is set unconditionally on every run.
@@ -86,7 +88,7 @@ function AiVerdictPanel({ claim }) {
       {claim.extracted_total_eur != null && (
         <div className="rc-ai-panel__row">
           <span className="rc-ai-panel__row-label">Receipt total</span>
-          <span className="rc-ai-panel__row-val">€{Number(claim.extracted_total_eur).toFixed(2)}</span>
+          <span className="rc-ai-panel__row-val">{money(Number(claim.extracted_total_eur))}</span>
         </div>
       )}
       {claim.extracted_receipt_id && (
@@ -114,7 +116,7 @@ function AiVerdictPanel({ claim }) {
             {claim.ai_verdict.items.map((it, i) => (
               <li key={i}>
                 {it.qty}× {it.name}
-                {it.price_eur != null && ` — €${Number(it.price_eur).toFixed(2)}`}
+                {it.price_eur != null && ` — ${money(Number(it.price_eur))}`}
               </li>
             ))}
           </ul>
@@ -169,6 +171,7 @@ function ReceiptThumb({ url, path }) {
 }
 
 function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
+  const { money } = useAdminMoney();
   const [lightbox, setLightbox] = useState(false);
   const [signedUrl, setSignedUrl] = useState(null);
 
@@ -288,7 +291,7 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
         </div>
         <div className="rc-detail__row">
           <span className="rc-detail__row-label">Payout</span>
-          <span className="rc-detail__row-val rc-detail__row-val--green">€{(claim.payout_amount || 0).toFixed(2)}</span>
+          <span className="rc-detail__row-val rc-detail__row-val--green">{money(claim.payout_amount || 0)}</span>
         </div>
         <div className="rc-detail__row">
           <span className="rc-detail__row-label">Submitted</span>
@@ -347,6 +350,7 @@ function DetailPanel({ claim, onApprove, onFail, updating, onNavigateClaims }) {
 }
 
 export default function AdminReceiptCheck({ onNavigate }) {
+  const { money } = useAdminMoney();
   const [claims, setClaims]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [statusFilter, setStatus] = useState('pending');
@@ -448,7 +452,7 @@ export default function AdminReceiptCheck({ onNavigate }) {
             <span className="rc-chip rc-chip--completed">{counts.completed} Approved</span>
             <span className="rc-chip rc-chip--failed">{counts.failed} Rejected</span>
             <span className="rc-chip rc-chip--neutral">{withPhoto}/{claims.length} with photo</span>
-            <span className="rc-chip rc-chip--neutral">€{totalPayout.toFixed(2)} paid out</span>
+            <span className="rc-chip rc-chip--neutral">{money(totalPayout)} paid out</span>
           </p>
         </div>
         <button className="rc-header__link" onClick={() => onNavigate?.('claims')}>
@@ -523,7 +527,7 @@ export default function AdminReceiptCheck({ onNavigate }) {
                         </div>
                       </div>
                     </td>
-                    <td className="rc-bold rc-green">€{(claim.payout_amount || 0).toFixed(2)}</td>
+                    <td className="rc-bold rc-green">{money(claim.payout_amount || 0)}</td>
                     <td className="rc-center rc-bold">{claim.cups_redeemed ?? '—'}</td>
                     <td><span className={`rc-status rc-status--${claim.status}`}>{claim.status}</span></td>
                     <td className="rc-muted rc-date">{formatDateShort(claim.created_at)}</td>

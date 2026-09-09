@@ -1,5 +1,6 @@
 import QuickLinks from '../shared/QuickLinks';
 import './AdminHistory.css';
+import { adminMoney } from '../lib/adminMoney';
 
 function formatDate(ts) {
   if (!ts) return '—';
@@ -26,10 +27,10 @@ function buildChangeSummary(version, prevSnapshot) {
 
   if (curr.settings && prev.settings) {
     if (curr.settings.cashbackRatePerCup !== prev.settings.cashbackRatePerCup) {
-      changes.push(`Cashback rate changed to €${curr.settings.cashbackRatePerCup}/cup`);
+      changes.push(`Cashback rate changed to ${adminMoney(curr.settings.cashbackRatePerCup)}/cup`);
     }
     if (curr.settings.refundRatePerCup !== prev.settings.refundRatePerCup) {
-      changes.push(`Refund rate changed to €${curr.settings.refundRatePerCup}/cup`);
+      changes.push(`Refund rate changed to ${adminMoney(curr.settings.refundRatePerCup)}/cup`);
     }
     if (curr.settings.heroHeadline !== prev.settings.heroHeadline) {
       changes.push('Hero headline updated');

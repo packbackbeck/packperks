@@ -55,7 +55,7 @@ export const DEFAULT_DASHBOARD_BLOCKS = [
   { id: 'stat-active-users',    label: 'Active Users (30d)',   type: 'stat',  visible: true,  span: 1 },
   { id: 'stat-cups-collected',  label: 'Cups Collected',       type: 'stat',  visible: true,  span: 1 },
   { id: 'stat-cups-redeemed',   label: 'Cups Redeemed',        type: 'stat',  visible: true,  span: 1 },
-  { id: 'stat-cashback',        label: 'Total Cashback (€)',   type: 'stat',  visible: true,  span: 1 },
+  { id: 'stat-cashback',        label: 'Total Cashback',       type: 'stat',  visible: true,  span: 1 },
   { id: 'stat-pending',         label: 'Pending Actions',      type: 'stat',  visible: true,  span: 1 },
   { id: 'chart-cups-per-day',   label: 'Cups Per Day',         type: 'chart', visible: true,  span: 2 },
   { id: 'chart-cup-dist',       label: 'Cup Distribution',     type: 'chart', visible: true,  span: 1 },

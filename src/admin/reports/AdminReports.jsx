@@ -7,6 +7,7 @@ import { logAction } from '../auth/actionLog';
 import { getWeeklyDigest, saveWeeklyDigest, sendDigestTest, getDigestLog, DIGEST_VENDOR_METRICS, DIGEST_STAFF_METRICS, WEEKLY_DIGEST_DEFAULT, getNotificationCenter, saveNotificationCenter, sendNotificationTest, NOTIFICATION_EVENTS, NOTIFICATION_CENTER_DEFAULT } from '../lib/adminApi';
 import QuickLinks from '../shared/QuickLinks';
 import './AdminReports.css';
+import { adminMoney, useAdminMoney } from '../lib/adminMoney';
 
 /* ── Dataset definitions ── */
 const DATASETS = {
@@ -34,7 +35,7 @@ const DATASETS = {
       { key: 'type',           label: 'Type',         type: 'text',   default: true },
       { key: 'reward_id',      label: 'Reward',       type: 'text' },
       { key: 'cups_redeemed',  label: 'Cups',         type: 'number', default: true, sum: true },
-      { key: 'payout_amount',  label: 'Payout (€)',   type: 'currency', default: true, sum: true },
+      { key: 'payout_amount',  label: 'Payout',       type: 'currency', default: true, sum: true },
       { key: 'status',         label: 'Status',       type: 'text',   default: true },
       { key: 'created_at',     label: 'Created',      type: 'date',   default: true },
     ],
@@ -102,7 +103,7 @@ function formatValue(val, type) {
     if (isNaN(d.getTime())) return val;
     return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
-  if (type === 'currency') return `€${Number(val).toFixed(2)}`;
+  if (type === 'currency') return adminMoney(Number(val));
   if (type === 'number')   return String(val);
   return String(val);
 }
@@ -190,7 +191,7 @@ async function buildPdf(rows, columns, datasetLabel, period) {
       const txt = c.type === 'date' && raw
         ? new Date(raw).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
         : c.type === 'currency' && raw != null
-          ? `€${Number(raw).toFixed(2)}`
+          ? adminMoney(Number(raw))
           : String(raw ?? '');
       doc.text(txt.slice(0, 40), margin + 6 + i * colW, y, { maxWidth: colW - 8 });
     });
@@ -693,7 +694,7 @@ export default function AdminReports({ onNavigate }) {
                           {idx === 0 && 'Total'}
                           {aggregates[c.key] !== undefined && (
                             c.type === 'currency'
-                              ? `€${aggregates[c.key].toFixed(2)}`
+                              ? adminMoney(aggregates[c.key])
                               : aggregates[c.key].toLocaleString()
                           )}
                         </td>
@@ -812,18 +813,20 @@ function SearchableMetrics({ catalog, selected, onChange, disabled }) {
  * They are labelled as a sample in the UI and never leave this component —
  * their only job is to show the shape and density of the real email, which
  * a row of "—" placeholders cannot do. */
-const PREVIEW_VALUES = {
+function previewValues(money) {
+  return {
   new_users: '48', active_users: '212', returning_users: '96', repeat_rate: '45%',
   scans_total: '734', cups_period: '1,486', avg_cups_user: '7.0', byo_scans: '318',
   top_location: 'Central', busiest_day: 'Thursday', top_reward: 'Flat white',
   unique_rewards: '6', cups_redeemed: '890', redemption_rate: '60%',
-  cashback_paid: '€400.50', avg_cashback: '€2.25', co2_avoided: '107 kg',
+  cashback_paid: money(400.5), avg_cashback: money(2.25), co2_avoided: '107 kg',
   total_users: '412', total_cups_lifetime: '9,340', cups_redeemed_all: '5,120',
-  total_cashback: '€2,304.00', approved_claims: '981', failed_claims: '34',
+  total_cashback: money(2304), approved_claims: '981', failed_claims: '34',
   pending_claims: '7', rejection_rate: '3.4%', ai_pass_rate: '96%',
   avg_ai_confidence: '0.94', pending_merges: '0', merges_period: '2',
   stores_count: '3', active_stores: '3',
-};
+  };
+}
 
 /* A faithful, scaled-down rendering of the email this digest will send —
  * same shell, same accent, same three-cards-per-row grid as
@@ -831,6 +834,8 @@ const PREVIEW_VALUES = {
  * eleven metrics can see they have made a wall of numbers before the
  * vendor receives one. */
 function DigestPreview({ accent, badge, aud, catalog, orgName }) {
+  const { money } = useAdminMoney();
+  const values = previewValues(money);
   const byId = new Map(catalog.map((m) => [m.id, m]));
   const cells = (aud.metrics || []).map((id) => byId.get(id)).filter(Boolean);
   const period = (aud.frequency || 'weekly') === 'monthly' ? 'Last 30 days' : 'Last 7 days';
@@ -854,7 +859,7 @@ function DigestPreview({ accent, badge, aud, catalog, orgName }) {
               {cells.map((m) => (
                 <div className="rep-prev__tile" key={m.id}>
                   <span className="rep-prev__tile-label" style={{ color: accent }}>{m.label}</span>
-                  <span className="rep-prev__tile-val">{PREVIEW_VALUES[m.id] || '—'}</span>
+                  <span className="rep-prev__tile-val">{values[m.id] || '—'}</span>
                 </div>
               ))}
             </div>

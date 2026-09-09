@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { setActiveOrgId } from './orgState';
+import { setActiveOrgId, setActiveOrgCountry } from './orgState';
 import { useAuth } from '../auth/AuthContext';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ export function OrgProvider({ children }) {
       const [{ data, error: err }, { data: grpData }] = await Promise.all([
         supabase
           .from('organizations')
-          .select('id, name, slug, brand_color, logo_url, partner_brand_name, email_domain_hint, group_id, group_active, created_at, updated_at')
+          .select('id, name, slug, country, brand_color, logo_url, partner_brand_name, email_domain_hint, group_id, group_active, created_at, updated_at')
           .is('deleted_at', null)
           .order('created_at', { ascending: true }),
         supabase.from('org_groups').select('id, name, slug'),
@@ -127,6 +127,7 @@ export function OrgProvider({ children }) {
       if (orgs.length === 0) {
         setActiveOrg(null);
         setActiveOrgId(null);
+        setActiveOrgCountry(null);
         setStatus('empty');
         return;
       }
@@ -146,6 +147,7 @@ export function OrgProvider({ children }) {
 
       setActiveOrg(chosen);
       setActiveOrgId(chosen.id);
+      setActiveOrgCountry(chosen.country);
       writeStoredOrgId(chosen.id);
       writeUrlOrgParam(chosen.slug);
       setStatus('ready');
@@ -224,6 +226,7 @@ export function OrgProvider({ children }) {
     }
     setActiveOrg(next);
     setActiveOrgId(next.id);
+    setActiveOrgCountry(next.country);
     writeStoredOrgId(next.id);
     writeUrlOrgParam(next.slug);
   }, [availableOrgs]);

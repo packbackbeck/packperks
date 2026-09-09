@@ -10,6 +10,7 @@ import ClaimStatusPills, { ClaimStatusPill } from '../shared/ClaimStatusPills';
 import EmptyState from '../shared/EmptyState';
 import ColumnPicker from '../shared/ColumnPicker';
 import './AdminClaims.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* Compact receipt thumbnail used in the table. Resolves a signed URL on
  * mount for claims that store the photo in private storage; falls back to
@@ -81,6 +82,7 @@ function ReceiptThumb({ claim, onZoom }) {
  * chip in the table is clicked. Rendered via portal so the fixed overlay
  * escapes any transformed ancestors. */
 function AiVerdictModal({ claim, onClose }) {
+  const { money } = useAdminMoney();
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose?.(); }
     document.addEventListener('keydown', onKey);
@@ -166,7 +168,7 @@ function AiVerdictModal({ claim, onClose }) {
                   <div className="ac-verdict-row"><span>Required item</span><strong>{claim.ai_required_item}</strong></div>
                 )}
                 {claim.extracted_total_eur != null && (
-                  <div className="ac-verdict-row"><span>Receipt total</span><strong>€{Number(claim.extracted_total_eur).toFixed(2)}</strong></div>
+                  <div className="ac-verdict-row"><span>Receipt total</span><strong>{money(Number(claim.extracted_total_eur))}</strong></div>
                 )}
                 {claim.extracted_receipt_id && (
                   <div className="ac-verdict-row"><span>Receipt #</span><strong className="ac-mono">{claim.extracted_receipt_id}</strong></div>
@@ -191,7 +193,7 @@ function AiVerdictModal({ claim, onClose }) {
                   {claim.ai_verdict.items.map((it, i) => (
                     <li key={i}>
                       {it.qty}× {it.name}
-                      {it.price_eur != null && ` — €${Number(it.price_eur).toFixed(2)}`}
+                      {it.price_eur != null && ` — ${money(Number(it.price_eur))}`}
                     </li>
                   ))}
                 </ul>
@@ -341,6 +343,7 @@ function ReceiptChip({ claim, onClick }) {
 }
 
 export default function AdminClaims({ onNavigate, draftState }) {
+  const { money } = useAdminMoney();
   const rewards = draftState?.draft?.rewards || [];
 
   const [claims, setClaims]         = useState([]);
@@ -1014,7 +1017,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                         </td>
                       )}
                       {isCol('cups')   && <td className="ac-center ac-bold">{claim.cups_redeemed ?? '—'}</td>}
-                      {isCol('amount') && <td className="ac-bold">€{(claim.payout_amount || 0).toFixed(2)}</td>}
+                      {isCol('amount') && <td className="ac-bold">{money(claim.payout_amount || 0)}</td>}
                       {isCol('tikkie') && (
                         <td onClick={e => e.stopPropagation()}>
                           {(() => {
@@ -1340,6 +1343,7 @@ function TikkieStatusModal({ claim, onClose, onRefreshed }) {
  *     actioning before committing.
  */
 function BulkConfirmModal({ newStatus, claims, updating, onCancel, onConfirm }) {
+  const { money } = useAdminMoney();
   const [reason, setReason] = useState('');
   const isReject = newStatus === 'failed';
   const canSubmit = reason.trim().length >= 3;
@@ -1376,7 +1380,7 @@ function BulkConfirmModal({ newStatus, claims, updating, onCancel, onConfirm }) 
             <p className="admin-publish-modal__sub">
               {isReject
                 ? <>The customers' reserved cups stay reserved — they can submit fresh receipts. No payouts will be sent.</>
-                : <>Releases <strong>€{totalPayout.toFixed(2)}</strong> in payouts across the selected claims. This action can't be reversed in bulk.</>
+                : <>Releases <strong>{money(totalPayout)}</strong> in payouts across the selected claims. This action can't be reversed in bulk.</>
               }
             </p>
           </div>
@@ -1390,7 +1394,7 @@ function BulkConfirmModal({ newStatus, claims, updating, onCancel, onConfirm }) 
                 <li key={i} className="wd-diff__row" style={{ gridTemplateColumns: '1fr auto' }}>
                   <span className="wd-diff__label">{name}</span>
                   <span className="wd-diff__detail">
-                    {claims[i].type?.replace('_', ' ')} · €{(claims[i].payout_amount || 0).toFixed(2)}
+                    {claims[i].type?.replace('_', ' ')} · {money(claims[i].payout_amount || 0)}
                   </span>
                 </li>
               ))}

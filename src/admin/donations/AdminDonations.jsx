@@ -14,6 +14,7 @@ import QuickLinks from '../shared/QuickLinks';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminDonations.css';
+import { adminMoney, adminSymbol } from '../lib/adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * AdminDonations — money-out audit for the donation flow.
@@ -50,7 +51,7 @@ function formatDate(iso) {
 }
 
 function formatEuro(n) {
-  return `€${(n ?? 0).toFixed(2)}`;
+  return adminMoney(n ?? 0);
 }
 
 export default function AdminDonations({ onNavigate, draftState }) {
@@ -340,7 +341,7 @@ function AddTransferCard({ defaultRecipient, outstanding, onCreated }) {
         receiptPath: path,
         receiptFilename: filename,
       });
-      setInfo(`Recorded a transfer of €${amt.toFixed(2)} to ${recipient.trim()}.`);
+      setInfo(`Recorded a transfer of ${adminMoney(amt)} to ${recipient.trim()}.`);
       onCreated?.(row);
       // Reset for the next entry.
       setAmount('');
@@ -371,7 +372,7 @@ function AddTransferCard({ defaultRecipient, outstanding, onCreated }) {
 
       <div className="ad-add__grid">
         <label className="ad-add__field">
-          <span className="ad-add__label">Amount (€)</span>
+          <span className="ad-add__label">Amount ({adminSymbol()})</span>
           <input
             type="number"
             step="0.01"

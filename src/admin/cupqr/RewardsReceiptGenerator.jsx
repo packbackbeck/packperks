@@ -6,6 +6,7 @@ import { createGeneratedReceipt, listGeneratedReceipts } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import './RewardsReceiptGenerator.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * RewardsReceiptGenerator — mints test "purchase receipt" images for the
@@ -27,6 +28,7 @@ function nowLocalDatetime() {
 }
 
 export default function RewardsReceiptGenerator() {
+  const { money, symbol } = useAdminMoney();
   const { activeOrg } = useOrg();
   const orgName = activeOrg?.partner_brand_name || activeOrg?.name || 'Partner';
 
@@ -204,7 +206,7 @@ export default function RewardsReceiptGenerator() {
                 <select className="rrg-input" value={pickId} onChange={e => setPickId(e.target.value)}>
                   <option value="">Select a reward…</option>
                   {rewards.map(r => (
-                    <option key={r.id} value={r.id}>{r.name} — €{r.euros.toFixed(2)}</option>
+                    <option key={r.id} value={r.id}>{r.name} — {money(r.euros)}</option>
                   ))}
                 </select>
                 <button className="rrg-btn rrg-btn--primary" onClick={addRewardItem} disabled={!pickId}>Add</button>
@@ -216,7 +218,7 @@ export default function RewardsReceiptGenerator() {
               <span className="rrg-field__label">Custom item (to test/trick the AI)</span>
               <div className="rrg-row">
                 <input className="rrg-input" placeholder="Item name" value={customName} onChange={e => setCustomName(e.target.value)} />
-                <input className="rrg-input rrg-input--price" type="number" step="0.01" min="0" placeholder="€" value={customPrice} onChange={e => setCustomPrice(e.target.value)} />
+                <input className="rrg-input rrg-input--price" type="number" step="0.01" min="0" placeholder={symbol} value={customPrice} onChange={e => setCustomPrice(e.target.value)} />
                 <button className="rrg-btn rrg-btn--ghost" onClick={addCustomItem} disabled={!customName.trim()}>Add</button>
               </div>
             </label>
@@ -243,13 +245,13 @@ export default function RewardsReceiptGenerator() {
                       type="number" min="1" value={it.qty}
                       onChange={e => setQty(i, parseInt(e.target.value, 10) || 1)}
                     />
-                    <span className="rrg-item__price">€{((Number(it.price) || 0) * it.qty).toFixed(2)}</span>
+                    <span className="rrg-item__price">{money((Number(it.price) || 0) * it.qty)}</span>
                     <button className="rrg-item__remove" onClick={() => removeItem(i)} aria-label="Remove">×</button>
                   </div>
                 ))}
                 <div className="rrg-item rrg-item--total">
                   <span className="rrg-item__name">Total</span>
-                  <span className="rrg-item__price">€{total.toFixed(2)}</span>
+                  <span className="rrg-item__price">{money(total)}</span>
                 </div>
               </div>
             )}
@@ -275,18 +277,18 @@ export default function RewardsReceiptGenerator() {
                   <div key={i} className="rrg-receipt__line">
                     <span className="rrg-receipt__qty">{it.qty}×</span>
                     <span className="rrg-receipt__iname">{it.name}</span>
-                    <span className="rrg-receipt__iprice">€{((Number(it.price) || 0) * it.qty).toFixed(2)}</span>
+                    <span className="rrg-receipt__iprice">{money((Number(it.price) || 0) * it.qty)}</span>
                   </div>
                 ))}
               </div>
               <div className="rrg-receipt__dashed" />
               <div className="rrg-receipt__total">
                 <span>TOTAL</span>
-                <span>€{receipt.total.toFixed(2)}</span>
+                <span>{money(receipt.total)}</span>
               </div>
               <div className="rrg-receipt__total rrg-receipt__total--sub">
                 <span>BTW 9%</span>
-                <span>€{(receipt.total * 0.09 / 1.09).toFixed(2)}</span>
+                <span>{money(receipt.total * 0.09 / 1.09)}</span>
               </div>
               <div className="rrg-receipt__dashed" />
               <div className="rrg-receipt__badge">
@@ -326,7 +328,7 @@ export default function RewardsReceiptGenerator() {
                 <tr key={r.id}>
                   <td><code>{r.token}</code></td>
                   <td>{Array.isArray(r.items) ? r.items.length : 0}</td>
-                  <td>€{Number(r.total || 0).toFixed(2)}</td>
+                  <td>{money(Number(r.total || 0))}</td>
                   <td className="rrg-log__muted">{r.receipt_date ? fmtDate(r.receipt_date) : '—'}</td>
                   <td className="rrg-log__muted">{fmtDate(r.created_at)}</td>
                 </tr>

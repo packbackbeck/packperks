@@ -4,6 +4,7 @@ import { useOrg } from '../context/OrgContext';
 import { ORG_MODELS, ORG_MODEL_ORDER } from '../lib/orgModes';
 import { getCopyPreset } from '../../lib/copyPresets';
 import './OrgOnboardingWizard.css';
+import { useAdminMoney, adminMoney } from '../lib/adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * OrgOnboardingWizard — the flow PackPerks staff use to add a client org.
@@ -731,6 +732,7 @@ function StepLocation({ data, onChange }) {
 
 /* ─── Step: cup economics ─────────────────────────────────────────── */
 function StepEconomics({ data, modelKey, features, onChange }) {
+  const { money, symbol } = useAdminMoney();
   const isTikkie = modelKey === 'tikkie_only';
   // Tikkie-only settles on ONE rate — the refund rate. bin-tikkie reads it.
   const rate = Number(isTikkie ? data.refundRatePerCup : data.cashbackRatePerCup) || 0;
@@ -746,7 +748,7 @@ function StepEconomics({ data, modelKey, features, onChange }) {
           A bin receipt is paid out as one Tikkie link: cups on the receipt × the rate below.
           Nothing else on this screen applies — there's no app, no sharing and no reward goals.
         </p>
-        <Field label="Refund per cup (€)" hint="The customer receives this for every cup on the receipt.">
+        <Field label={`Refund per cup (${symbol})`} hint="The customer receives this for every cup on the receipt.">
           <input
             type="number" step="0.05" min="0"
             value={data.refundRatePerCup}
@@ -759,7 +761,7 @@ function StepEconomics({ data, modelKey, features, onChange }) {
           {examples.map(n => (
             <div key={n} className="oow-econ-preview__row">
               <span>{n} cup{n === 1 ? '' : 's'} returned</span>
-              <strong>€{(n * rate).toFixed(2)}</strong>
+              <strong>{money(n * rate)}</strong>
             </div>
           ))}
         </div>
@@ -772,11 +774,11 @@ function StepEconomics({ data, modelKey, features, onChange }) {
     <div className="oow-form">
       <p className="oow-step-intro">How much each cup is worth, and the per-scan limits that keep abuse in check.</p>
       <div className="oow-row-2">
-        <Field label="Cashback rate (€ per cup)" hint="What a cup is worth toward a reward payout.">
+        <Field label={`Cashback rate (${symbol} per cup)`} hint="What a cup is worth toward a reward payout.">
           <input type="number" step="0.05" min="0" value={data.cashbackRatePerCup} onChange={e => onChange({ cashbackRatePerCup: parseFloat(e.target.value) || 0 })} />
         </Field>
         <Field
-          label="Refund rate (€ per cup)"
+          label={`Refund rate (${symbol} per cup)`}
           hint={features.featureDirectRefunds
             ? 'Used for the direct cash-out path (lower value, no reward unlock).'
             : 'Direct refunds are off for this model, so this rate is unused for now.'}
@@ -803,6 +805,7 @@ function StepEconomics({ data, modelKey, features, onChange }) {
 
 /* ─── Step: starter rewards ───────────────────────────────────────── */
 function StepRewards({ rewards, onChange }) {
+  const { symbol } = useAdminMoney();
   function updateAt(i, patch) {
     const next = [...rewards];
     next[i] = { ...next[i], ...patch };
@@ -836,7 +839,7 @@ function StepRewards({ rewards, onChange }) {
             </Field>
           </div>
           <div className="oow-row-2">
-            <Field label="Cashback value (€)">
+            <Field label={`Cashback value (${symbol})`}>
               <input type="number" step="0.01" min="0" value={r.euros} onChange={e => updateAt(i, { euros: parseFloat(e.target.value) || 0 })} />
             </Field>
             <Field label="Image URL">
@@ -993,8 +996,8 @@ function StepReview({ data, model, groups, steps }) {
     ['Legal name', data.legal.legal_name || '(not set)'],
     ['First location', data.location.skipped || !data.location.name ? '(skipped)' : data.location.name],
     isTikkie
-      ? ['Refund', `€${Number(data.economics.refundRatePerCup).toFixed(2)} per cup`]
-      : ['Cashback / refund', `€${Number(data.economics.cashbackRatePerCup).toFixed(2)} / €${Number(data.economics.refundRatePerCup).toFixed(2)} per cup`],
+      ? ['Refund', `${adminMoney(data.economics.refundRatePerCup)} per cup`]
+      : ['Cashback / refund', `${adminMoney(data.economics.cashbackRatePerCup)} / ${adminMoney(data.economics.refundRatePerCup)} per cup`],
     ...(steps.some(s => s.id === 'rewards')
       ? [['Starter rewards', data.rewards.length === 0 ? '(none)' : `${data.rewards.length} reward(s)`]]
       : []),

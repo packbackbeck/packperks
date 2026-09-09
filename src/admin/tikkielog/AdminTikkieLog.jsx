@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOrg } from '../context/OrgContext';
 import { listBinTikkiePayouts } from '../lib/adminApi';
 import './AdminTikkieLog.css';
+import { adminMoney } from '../lib/adminMoney';
 
 /* Tikkie payouts log — the reporting page for tikkie-only (smart-bin) orgs.
  *
@@ -32,7 +33,7 @@ function fmtDateTime(iso) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
     ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
-const fmtEur = (n) => `€${Number(n || 0).toFixed(2)}`;
+const fmtEur = (n) => adminMoney(Number(n || 0));
 
 const FILTERS = [
   { key: 'all',      label: 'All' },

@@ -13,6 +13,7 @@ import { APP_URL } from '../../lib/appUrl';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminCupQr.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* Expiry presets for the batch generation form (P-21).
  *   id    — used as React key + form state value
@@ -54,6 +55,7 @@ const PROD_URL = APP_URL;
  * the QR on screen is scannable directly.
  * ───────────────────────────────────────────────────────────────────── */
 export default function AdminCupQr({ onNavigate }) {
+  const { money } = useAdminMoney();
   const { activeOrg, activeOrgMode, activeOrgSettings } = useOrg();
   // Tikkie-only orgs print a receipt that pays out on scan — no app, no
   // rewards — so the wording and the payout figure both change.
@@ -743,7 +745,7 @@ export default function AdminCupQr({ onNavigate }) {
               </div>
               <div className="acq-receipt__footer-row">
                 <span>Total Amount:</span>
-                <span>€{refundAmount}</span>
+                <span>{money(Number(refundAmount) || 0)}</span>
               </div>
               <div className="acq-receipt__footer-row">
                 <span>Session ID:</span>

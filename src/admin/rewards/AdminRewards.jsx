@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import RewardEditPanel from './RewardEditPanel';
 import './AdminRewards.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* P-43: full status palette, with 'hidden' aliased to the paused
  * orange so legacy rows render coherently until edited. */
@@ -20,6 +21,7 @@ function RewardListCard({
   reorderMode = false, isDragging = false, isDragOver = false,
   onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }) {
+  const { money } = useAdminMoney();
   const sc = STATUS_COLORS[reward.status] || STATUS_COLORS.draft;
   return (
     <div
@@ -56,7 +58,7 @@ function RewardListCard({
         <div className="rew-card__body">
           <div className="rew-card__name">{reward.name}</div>
           <div className="rew-card__meta">
-            <span>€{reward.euros?.toFixed(2)}</span>
+            <span>{money(reward.euros || 0)}</span>
             <span>·</span>
             <span>{reward.cupsNeeded} cups</span>
             {claimCount > 0 && <><span>·</span><span className="rew-card__claims">{claimCount} claims</span></>}

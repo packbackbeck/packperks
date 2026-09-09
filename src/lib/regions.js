@@ -36,7 +36,7 @@ export const DEFAULT_REGIONS = {
     label: 'United Arab Emirates',
     flag: '🇦🇪',
     currency: 'AED',
-    symbol: 'د.إ',
+    symbol: 'AED',   // the ISO code IS the mark we show — see the note below
     currencyLocale: 'en-AE',
     provider: 'uae',                    // generic UAE adapter — see payments.js
     countries: ['AE', 'ARE'],
@@ -137,13 +137,25 @@ export function currencyForRegion(key) {
   return getRegion(key).currency;
 }
 
+/* Currencies whose everyday prices are quoted in whole units. A reward
+ * priced at 21 dirhams should read "AED 21", not "AED 21.00" — the
+ * trailing zeros are noise on a list of a dozen drinks. Amounts that are
+ * NOT whole still show both decimals, so a 0.90 balance is never rounded
+ * away. */
+const WHOLE_UNIT_CURRENCIES = new Set(['AED']);
+
 /** Pure currency formatter. Falls back to "CUR 0.00" if Intl can't help. */
 export function formatCurrency(amount, currency = 'EUR', locale = 'en-IE') {
   const n = Number(amount) || 0;
+  const whole = WHOLE_UNIT_CURRENCIES.has(currency) && Number.isInteger(n);
   try {
-    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(n);
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+    }).format(n);
   } catch {
-    return `${currency} ${n.toFixed(2)}`;
+    return `${currency} ${whole ? n : n.toFixed(2)}`;
   }
 }
 
@@ -152,34 +164,6 @@ export function formatMoney(amount, regionKey = DEFAULT_REGION) {
   const r = getRegion(regionKey);
   return formatCurrency(amount, r.currency, r.currencyLocale);
 }
-
-/* Split a formatted amount into the part Intl renders as the currency and
- * the part it renders as the number, so a UI can swap the former for a
- * drawn glyph (see components/Money.jsx) without re-implementing
- * locale-aware grouping and decimals.
- *
- * formatToParts is the reliable way to do this: the currency token's
- * position, spacing and content all vary by locale, and slicing the
- * string by hand gets it wrong the moment a locale puts the symbol last. */
-export function moneyParts(amount, regionKey = DEFAULT_REGION) {
-  const r = getRegion(regionKey);
-  const text = formatCurrency(amount, r.currency, r.currencyLocale);
-  let number = text;
-  let mark = r.currency;
-  try {
-    const parts = new Intl.NumberFormat(r.currencyLocale, { style: 'currency', currency: r.currency })
-      .formatToParts(Number(amount) || 0);
-    const cur = parts.find(p => p.type === 'currency');
-    if (cur) mark = cur.value;
-    number = parts
-      .filter(p => p.type !== 'currency')
-      .map(p => p.value)
-      .join('')
-      .trim();
-  } catch { /* fall back to the whole string above */ }
-  return { text, number, mark, currency: r.currency };
-}
-
 
 /* ─────────────────────────────────────────────────────────────────────
  * payoutCopy — how this region promises to pay the customer.

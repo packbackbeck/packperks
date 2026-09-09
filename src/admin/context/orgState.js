@@ -23,6 +23,10 @@
  * ───────────────────────────────────────────────────────────────────── */
 
 let _activeOrgId = null;
+/* The active org's country, kept here for the same reason as its id: money
+ * has to be formatted in the venue's own currency, and half the dashboard
+ * formats money from non-component modules. */
+let _activeOrgCountry = null;
 
 export function setActiveOrgId(orgId) {
   _activeOrgId = orgId || null;
@@ -30,6 +34,14 @@ export function setActiveOrgId(orgId) {
 
 export function getActiveOrgId() {
   return _activeOrgId;
+}
+
+export function setActiveOrgCountry(country) {
+  _activeOrgCountry = country || null;
+}
+
+export function getActiveOrgCountry() {
+  return _activeOrgCountry;
 }
 
 /* Helper used inside adminApi query chains to conditionally apply

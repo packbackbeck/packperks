@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadRewardImage } from '../lib/adminApi';
 import { rewardImageStyle, DEFAULT_IMAGE_FRAMING } from '../../utils/imageTransform';
 import './RewardEditPanel.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 const AVAILABLE_TAGS = ['FREE', 'PLANT-BASED', 'NEW', 'LIMITED', 'POPULAR'];
 /* P-43: full reward lifecycle enum. Previously only three states
@@ -64,6 +65,7 @@ function fromLocalDatetimeValue(local) {
 }
 
 export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArchive, cashbackRate = 1.25 }) {
+  const { money, symbol } = useAdminMoney();
   /* Edit-buffer pattern: the form holds its own internal draft so a
    * keystroke doesn't push an update to the parent on every character
    * (which would re-sort the list and thrash this panel). Instead the
@@ -259,7 +261,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
           </div>
           <div>
             <div className="rep__reward-name">{form.name || 'Untitled Reward'}</div>
-            <div className="rep__reward-meta">€{(Number(form.euros) || 0).toFixed(2)} · {parseInt(form.cupsNeeded, 10) || 0} cups</div>
+            <div className="rep__reward-meta">{money(Number(form.euros) || 0)} · {parseInt(form.cupsNeeded, 10) || 0} cups</div>
           </div>
         </div>
         <div className="rep__header-actions">
@@ -405,7 +407,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
           </div>
           <div className="rep__row">
             <div className="rep__field">
-              <label className="rep__label">Price (€)</label>
+              <label className="rep__label">Price ({symbol})</label>
               {/* Store the raw string so a number can be typed/cleared normally
                *  (the old `parseFloat(..) || 0` forced 0 and ate decimals).
                *  Required: an empty or non-positive price highlights + blocks. */}
@@ -416,7 +418,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
                 onChange={e => update('euros', e.target.value)}
                 placeholder="5.49"
               />
-              {priceInvalid && <span className="rep__field-error">Enter a price above €0.</span>}
+              {priceInvalid && <span className="rep__field-error">Enter a price above {money(0)}.</span>}
             </div>
             <div className="rep__field">
               <label className="rep__label">Cups needed</label>
@@ -432,7 +434,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
           </div>
           <div className="rep__row">
             <div className="rep__field">
-              <label className="rep__label">Cost to make (€) <span className="rep__optional">— optional</span></label>
+              <label className="rep__label">Cost to make ({symbol}) <span className="rep__optional">— optional</span></label>
               {/* COGS — the real cost to produce the product. Admin-only: it
                *  feeds Reward economics and is NEVER shown in the customer app. */}
               <input
@@ -445,7 +447,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
               />
             </div>
             <div className="rep__field">
-              <label className="rep__label">Partner subsidy (€)</label>
+              <label className="rep__label">Partner subsidy ({symbol})</label>
               <input
                 className="rep__input"
                 type="number" step="0.01" min="0" inputMode="decimal"
@@ -753,6 +755,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
  * a separate tab — economics is the most-important thing to surface
  * while someone is actually setting up the reward. */
 function RewardEconomicsPanel({ form, cashbackRate }) {
+  const { money } = useAdminMoney();
   const price = Number(form.euros) || 0;
   const cups = Number(form.cupsNeeded) || 0;
   const subsidy = Number(form.subsidy) || 0;
@@ -765,7 +768,7 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
   const cupsFunded = +(cups * cashbackRate).toFixed(2);
   const totalFunded = +(cupsFunded + subsidy).toFixed(2);
   const gap = +(price - totalFunded).toFixed(2);
-  // Tolerate tiny floating-point dust — anything within €0.05 of fully
+  // Tolerate tiny floating-point dust — anything within 0.05 of fully
   // funded counts as fully funded (avoids "0.01 underfunded" noise).
   const tone = price === 0 ? 'unset' : Math.abs(gap) <= 0.05 ? 'ok' : gap > 0 ? 'under' : 'over';
 
@@ -776,29 +779,29 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
         <span className={`rep-econ__badge rep-econ__badge--${tone}`}>
           {tone === 'unset' && 'Add a price to see the gap'}
           {tone === 'ok'    && '✓ Fully funded'}
-          {tone === 'under' && `⚠ Underfunded by €${gap.toFixed(2)}`}
-          {tone === 'over'  && `Over-funded by €${Math.abs(gap).toFixed(2)}`}
+          {tone === 'under' && `⚠ Underfunded by ${money(gap)}`}
+          {tone === 'over'  && `Over-funded by ${money(Math.abs(gap))}`}
         </span>
       </div>
 
       <div className="rep-econ__grid">
         <div className="rep-econ__cell">
           <span className="rep-econ__cell-label">Product price</span>
-          <span className="rep-econ__cell-val">€{price.toFixed(2)}</span>
+          <span className="rep-econ__cell-val">{money(price)}</span>
         </div>
         <div className="rep-econ__cell">
           <span className="rep-econ__cell-label">Cups funding</span>
-          <span className="rep-econ__cell-val">€{cupsFunded.toFixed(2)}</span>
-          <span className="rep-econ__cell-sub">{cups} × €{cashbackRate.toFixed(2)}</span>
+          <span className="rep-econ__cell-val">{money(cupsFunded)}</span>
+          <span className="rep-econ__cell-sub">{cups} × {money(cashbackRate)}</span>
         </div>
         <div className="rep-econ__cell">
           <span className="rep-econ__cell-label">Partner subsidy</span>
-          <span className="rep-econ__cell-val">€{subsidy.toFixed(2)}</span>
+          <span className="rep-econ__cell-val">{money(subsidy)}</span>
         </div>
         {hasCogs && (
           <div className="rep-econ__cell">
             <span className="rep-econ__cell-label">Cost to make</span>
-            <span className="rep-econ__cell-val">€{cogs.toFixed(2)}</span>
+            <span className="rep-econ__cell-val">{money(cogs)}</span>
             <span className="rep-econ__cell-sub">Admin only</span>
           </div>
         )}
@@ -807,7 +810,7 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
             {tone === 'under' ? 'Funding gap' : tone === 'over' ? 'Over-funded' : 'Gap'}
           </span>
           <span className="rep-econ__cell-val">
-            {tone === 'unset' ? '—' : `€${Math.abs(gap).toFixed(2)}`}
+            {tone === 'unset' ? '—' : money(Math.abs(gap))}
           </span>
           {tone === 'under' && (
             <span className="rep-econ__cell-sub">Customer absorbs this</span>
@@ -817,9 +820,9 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
 
       {tone === 'under' && (
         <p className="rep-econ__hint">
-          This reward pays €{totalFunded.toFixed(2)} cashback against a €{price.toFixed(2)} product.
+          This reward pays {money(totalFunded)} cashback against a {money(price)} product.
           Either raise cups needed, add a partner subsidy, or accept that the
-          customer covers €{gap.toFixed(2)} themselves on top of the cashback.
+          customer covers {money(gap)} themselves on top of the cashback.
         </p>
       )}
 
@@ -827,10 +830,10 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
         <p className={`rep-econ__margin rep-econ__margin--${margin >= 0 ? 'pos' : 'neg'}`}>
           <span className="rep-econ__margin-label">Gross margin</span>
           <span className="rep-econ__margin-val">
-            €{margin.toFixed(2)}{price > 0 ? ` · ${marginPct}%` : ''}
+            {money(margin)}{price > 0 ? ` · ${marginPct}%` : ''}
           </span>
           <span className="rep-econ__margin-note">
-            €{price.toFixed(2)} price − €{cogs.toFixed(2)} to make. This cost is never shown to customers.
+            {money(price)} price − {money(cogs)} to make. This cost is never shown to customers.
           </span>
         </p>
       )}

@@ -15,6 +15,7 @@ import {
 // Reuse the existing styles defined for the receipts page — they cover
 // .rc-detail, .rc-status, .rc-ai-panel, .rc-lightbox, etc.
 import '../receipts/AdminReceiptCheck.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * ClaimDetailPanel — single-claim review surface used by the Claims
@@ -82,6 +83,7 @@ function seedCriteriaMarks(claim) {
 }
 
 function AiVerdictPanel({ claim }) {
+  const { money } = useAdminMoney();
   const { activeOrg } = useOrg();
   const partnerBrand = activeOrg?.partner_brand_name || activeOrg?.name;
 
@@ -188,7 +190,7 @@ function AiVerdictPanel({ claim }) {
       {claim.extracted_total_eur != null && (
         <div className="rc-ai-panel__row">
           <span className="rc-ai-panel__row-label">Receipt total</span>
-          <span className="rc-ai-panel__row-val">€{Number(claim.extracted_total_eur).toFixed(2)}</span>
+          <span className="rc-ai-panel__row-val">{money(Number(claim.extracted_total_eur))}</span>
         </div>
       )}
       {claim.extracted_receipt_id && (
@@ -210,7 +212,7 @@ function AiVerdictPanel({ claim }) {
             {claim.ai_verdict.items.map((it, i) => (
               <li key={i}>
                 {it.qty}× {it.name}
-                {it.price_eur != null && ` — €${Number(it.price_eur).toFixed(2)}`}
+                {it.price_eur != null && ` — ${money(Number(it.price_eur))}`}
               </li>
             ))}
           </ul>
@@ -221,6 +223,7 @@ function AiVerdictPanel({ claim }) {
 }
 
 export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onClaimUpdate, updating }) {
+  const { money } = useAdminMoney();
   const { profile } = useAuth();
   const canHideImage = hasPermission(profile?.role, 'claim.hide_image');
   const [lightbox, setLightbox] = useState(false);
@@ -461,7 +464,7 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
         </div>
         <div className="rc-detail__row">
           <span className="rc-detail__row-label">Payout</span>
-          <span className="rc-detail__row-val rc-detail__row-val--green">€{(claim.payout_amount || 0).toFixed(2)}</span>
+          <span className="rc-detail__row-val rc-detail__row-val--green">{money(claim.payout_amount || 0)}</span>
         </div>
         <div className="rc-detail__row">
           <span className="rc-detail__row-label">Submitted</span>
@@ -724,6 +727,7 @@ function HideImageModal({ busy, onCancel, onConfirm }) {
  * Reason gets persisted to claim.rejection_note (existing column) and
  * to the actionLog row written by AdminClaims. */
 function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
+  const { money } = useAdminMoney();
   const { activeOrg } = useOrg();
   const partnerBrand = activeOrg?.partner_brand_name || activeOrg?.name;
   const [reason, setReason] = useState('');
@@ -779,7 +783,7 @@ function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
             <p className="admin-publish-modal__sub">
               {isReject
                 ? <>The customer's {claim?.cups_redeemed ?? 0} cup{(claim?.cups_redeemed ?? 0) === 1 ? '' : 's'} stay reserved — they can submit another receipt. No payout will be sent.</>
-                : <>This will mark the claim as paid and release €{(claim?.payout_amount || 0).toFixed(2)} to {claim?.user?.display_name || 'the customer'}.</>
+                : <>This will mark the claim as paid and release {money(claim?.payout_amount || 0)} to {claim?.user?.display_name || 'the customer'}.</>
               }
             </p>
           </div>

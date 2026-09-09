@@ -12,6 +12,7 @@ import {
   BACKUP_LIMIT_DEFAULTS,
 } from '../lib/adminApi';
 import './AdminBackupCups.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Backup Cups — the smart bin's offline fallback, and the alarm attached
@@ -80,6 +81,7 @@ function CopyButton({ value, label = 'Copy', small = false }) {
 }
 
 export default function AdminBackupCups() {
+  const { money } = useAdminMoney();
   const { activeOrgId, activeOrg } = useOrg();
   const [cups, setCups] = useState([]);
   const [uses, setUses] = useState([]);
@@ -263,7 +265,7 @@ export default function AdminBackupCups() {
           <div className="abc-tile__label">Used, all time</div>
         </div>
         <div className="abc-tile">
-          <div className="abc-tile__num">€{stats.totalEur.toFixed(2)}</div>
+          <div className="abc-tile__num">{money(stats.totalEur)}</div>
           <div className="abc-tile__label">Paid out via backups</div>
         </div>
       </div>
@@ -500,7 +502,7 @@ export default function AdminBackupCups() {
                       <td>{fmtWhen(u.used_at)}</td>
                       <td>{cup?.label || <code className="abc-item__id">{String(u.backup_cup_id).slice(0, 8)}</code>}</td>
                       <td className="abc-num">{u.cups_in_scan ?? '—'}</td>
-                      <td className="abc-num">€{Number(u.amount_eur || 0).toFixed(2)}</td>
+                      <td className="abc-num">{money(Number(u.amount_eur || 0))}</td>
                     </tr>
                   );
                 })}

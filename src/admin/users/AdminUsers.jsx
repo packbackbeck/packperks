@@ -10,6 +10,7 @@ import ColumnPicker from '../shared/ColumnPicker';
 import MergeUsersModal from './MergeUsersModal';
 import MergeRequestModal from './MergeRequestModal';
 import './AdminUsers.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 function formatDate(ts) {
   if (!ts) return '—';
@@ -100,6 +101,7 @@ const ACT_META = {
 };
 
 function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCups = false }) {
+  const { money } = useAdminMoney();
   const [activity, setActivity] = useState([]);
   const [claims, setClaims] = useState([]);
   const [adjustVal, setAdjustVal] = useState(user.cupBalance);
@@ -317,7 +319,7 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCup
                 <div key={c.id} className="udp__claim-item">
                   <span className={`udp__claim-badge udp__claim-badge--${c.status}`}>{c.status}</span>
                   <span className="udp__claim-type">{c.type === 'cashback' ? 'Cashback' : 'Refund'}</span>
-                  <span className="udp__claim-amount">€{(c.payout_amount || 0).toFixed(2)}</span>
+                  <span className="udp__claim-amount">{money(c.payout_amount || 0)}</span>
                   <span className="udp__claim-date">{formatDate(c.created_at)}</span>
                 </div>
               ))}

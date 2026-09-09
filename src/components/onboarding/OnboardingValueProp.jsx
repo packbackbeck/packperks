@@ -1,6 +1,5 @@
 import cupIcon from '../../assets/images/cup-icon.svg';
 import { useRegion } from '../../lib/RegionContext';
-import Money from '../Money';
 
 /* Screen 1 — value proposition. A dynamic product-marketing composition: a
  * central app preview with reward cards + confirmations floating around it at
@@ -21,7 +20,7 @@ export default function OnboardingValueProp({ onNext }) {
           <span className="onb-float__dot" /> +1 cup added
         </span>
         <span className="onb-float onb-float--cashback">
-          <span className="onb-float__euro">{symbol}</span> <Money value={3.2} /> cashback
+          <span className="onb-float__euro">{symbol}</span> {money(3.2)} cashback
         </span>
         <span className="onb-float onb-float--approved">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
@@ -44,7 +43,7 @@ export default function OnboardingValueProp({ onNext }) {
             <span className="onb-hero__reward-thumb">🥤</span>
             <div className="onb-hero__reward-txt">
               <strong>Verse muntthee</strong>
-              <span><Money value={3.2} /> for 8 cups</span>
+              <span>{money(3.2)} for 8 cups</span>
             </div>
             <span className="onb-hero__reward-badge">Reward</span>
           </div>

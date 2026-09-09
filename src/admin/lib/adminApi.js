@@ -6,6 +6,7 @@ import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
 import { EMAIL_TEMPLATE_KEY } from './emailTemplates';
 import { providerForCountry } from '../../lib/payments';
 import { demoAdminStatsRows, demoHealthRows, demoBehaviourRows, resetDemoWorld } from './demoData';
+import { adminMoney } from './adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Demo numbers (Settings → Feature flags → "Demo numbers for vendors").
@@ -1848,7 +1849,7 @@ function computeTikkieMetrics({ claims, users, pending, backup, rej = [] }) {
     // ── Optional ──
     { measurable: avgPayout != null, id: 'tk_avg_payout', group: 'optional', label: 'Avg payout per receipt',
         valueType: 'count', value: null, rawValue: avgPayout,
-        valueText: avgPayout != null ? `€${avgPayout.toFixed(2)}` : null,
+        valueText: avgPayout != null ? adminMoney(avgPayout) : null,
         numerator: receipts, numLabel: 'Receipts', denominator: null, denLabel: null,
         desc: 'Average euro value of a receipt — the money actually leaving the Tikkie cashback account per scan.',
         ...(avgPayout == null ? { note: 'No receipts scanned yet.' } : {}) },

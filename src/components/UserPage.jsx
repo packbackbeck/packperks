@@ -13,9 +13,9 @@ import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
 import { usePwaInstall } from '../lib/pwa';
 import { requestPushPermission, getPermissionState } from '../lib/notify';
+import { useMoney } from '../lib/RegionContext';
 import { getRegion, formatMoney } from '../lib/regions';
 import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, formatCo2, pickComparison as pickImpactComparison } from '../lib/impact';
-import Money, { MoneyIn } from './Money';
 
 const PUSH_PREF_KEY = 'packperks_push_rewards';
 
@@ -144,6 +144,7 @@ export default function UserPage({
   // that happened while the user wasn't looking get pulled in automatically.
   useEffect(() => { onRefreshClaims?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  const money = useMoney();
 
   // Secret re-open: three taps on the version within ~1.2s reopens onboarding.
   const versionTaps = useRef({ n: 0, t: null });
@@ -636,12 +637,12 @@ export default function UserPage({
               // Show a subtotal per currency, stacked.
               <span className="user-page__value-num user-page__value-num--euro user-page__value-num--multi">
                 {cashbackByRegion.map((c) => (
-                  <span key={c.region} className="user-page__value-cur"><MoneyIn region={c.region} value={c.amount} /></span>
+                  <span key={c.region} className="user-page__value-cur">{formatMoney(c.amount, c.region)}</span>
                 ))}
               </span>
             ) : (
               <span className="user-page__value-num user-page__value-num--euro">
-                <Money value={cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate ?? 1.25)} />
+                {money(cashbackTotal != null ? cashbackTotal : cupCount * (cashbackRate ?? 1.25))}
               </span>
             )}
             <span className="user-page__value-label">in cashback</span>
@@ -1092,7 +1093,11 @@ function ProfileEditModal({
                 >
                   <span className="upedit__region-flag" aria-hidden="true">{r.flag}</span>
                   <span className="upedit__region-name">{r.label}</span>
-                  <span className="upedit__region-cur">{r.symbol} {r.currency}</span>
+                  {/* Some regions' mark IS their ISO code (AED), so printing both
+                      would read "AED AED". */}
+                  <span className="upedit__region-cur">
+                    {r.symbol === r.currency ? r.currency : `${r.symbol} ${r.currency}`}
+                  </span>
                 </button>
               ))}
             </div>

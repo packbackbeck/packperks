@@ -3,7 +3,6 @@ import cupIconWhite from '../assets/images/cup-icon-white.svg';
 import { rewardImageStyle } from '../utils/imageTransform';
 import { track, EVENTS } from '../utils/analytics';
 import { useMoney } from '../lib/RegionContext';
-import Money from './Money';
 
 // Tag label colour: white by default, switching to dark only when the
 // background is very light or yellowish (where white would be unreadable).
@@ -89,7 +88,7 @@ export default function RewardCard({ reward, cupCount, onSelect, onViewDetail })
             )}
             <div className="reward-card__price">
               <span className="reward-card__price-chip">
-                <Money value={euroValue} /> for
+                {money(euroValue)} for
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
                   <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>

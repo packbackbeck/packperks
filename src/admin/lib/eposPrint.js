@@ -26,6 +26,7 @@
 
 import logoUrl from '../../assets/images/packback-print-logo.svg';
 import { getReceiptCopy } from '../cupqr/receiptCopy';
+import { adminSymbol } from './adminMoney';
 
 const DEFAULT_PRINTER_IP = '192.168.192.168';
 const IP_STORAGE_KEY = 'packperks_printer_ip';
@@ -127,15 +128,18 @@ function strokeRoundRect(ctx, x, y, w, h, r) {
 }
 
 // Simple monochrome icons that read cleanly on thermal paper (color emoji
-// would threshold to muddy blobs): banknote(€), gift box, progress bars.
+// would threshold to muddy blobs): banknote, gift box, progress bars.
 function drawFeatureIcon(ctx, idx, cx, cy) {
   ctx.save();
   ctx.strokeStyle = '#000'; ctx.fillStyle = '#000'; ctx.lineWidth = 2.5;
   if (idx === 0) {
     ctx.strokeRect(cx - 24, cy - 14, 48, 28);
-    ctx.font = 'bold 22px Arial, sans-serif';
+    // The venue's own currency mark — a euro sign on a Dubai receipt is
+    // simply wrong, and 'AED' needs a smaller face to fit the note.
+    const mark = adminSymbol();
+    ctx.font = `bold ${mark.length > 1 ? 13 : 22}px Arial, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('€', cx, cy + 1);
+    ctx.fillText(mark, cx, cy + 1);
   } else if (idx === 1) {
     ctx.strokeRect(cx - 20, cy - 6, 40, 22);          // box body
     ctx.beginPath(); ctx.moveTo(cx - 22, cy - 6); ctx.lineTo(cx + 22, cy - 6); ctx.stroke(); // lid

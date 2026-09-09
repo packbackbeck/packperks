@@ -15,7 +15,6 @@ import UserPage, { ImpactSummary, ImpactDetailModal } from './UserPage';
 import Header from './Header';
 import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
-import Money from './Money';
 
 /* ─────────────────────────────────────────────────────────────────────
  * TikkieHomePage — the WHOLE Redirect Refund experience (wallet model).
@@ -477,7 +476,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       >
         <div className="tikkie-home__hero-copy">
           <span className="tikkie-home__hero-label">Available to collect</span>
-          <div className="tikkie-home__hero-amount"><Money value={shownBalance} /></div>
+          <div className="tikkie-home__hero-amount">{money(shownBalance)}</div>
           <span className="tikkie-home__hero-cta">
             {balance > 0 || outstanding ? collectLabel : 'Scan a receipt'}
           </span>
@@ -534,7 +533,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                   <span className="tikkie-home__row-amount tikkie-home__row-amount--wait">Pending</span>
                 ) : (
                   <span className={`tikkie-home__row-amount${h.kind === 'payout' ? ' tikkie-home__row-amount--out' : ''}`}>
-                    {h.kind === 'payout' ? '−' : '+'}<Money value={Number(h.amount || 0)} />
+                    {h.kind === 'payout' ? '−' : '+'}{money(Number(h.amount || 0))}
                   </span>
                 )}
               </li>
@@ -581,9 +580,9 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           <div className="tk-icon tk-icon--ok" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
           </div>
-          <h2 className="tk-sheet__title"><Money value={Number(popup.amount)} /> added</h2>
+          <h2 className="tk-sheet__title">{money(Number(popup.amount))} added</h2>
           <p className="tk-sheet__sub">
-            {popup.cups} cup{popup.cups === 1 ? '' : 's'} returned. Your balance is <Money value={balance} /> —
+            {popup.cups} cup{popup.cups === 1 ? '' : 's'} returned. Your balance is {money(balance)} —
             collect it whenever you like from the orange tile.
           </p>
           <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Nice</button>
@@ -631,7 +630,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         <Sheet onClose={() => setPopup(null)} label="Collect your balance">
           <h2 className="tk-sheet__title">Collect your balance</h2>
           <div className="tk-sheet__amount">
-            <Money value={outstanding && balance === 0 ? outstanding.amount : balance} />
+            {money(outstanding && balance === 0 ? outstanding.amount : balance)}
           </div>
           {outstanding && balance === 0 ? (
             <p className="tk-sheet__sub">

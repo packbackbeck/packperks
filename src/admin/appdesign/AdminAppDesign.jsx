@@ -7,6 +7,7 @@ import { GUIDE_ICONS, GUIDE_ICON_KEYS } from '../../components/HowItWorks';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import './AdminAppDesign.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * AdminAppDesign — per-org "skin" editor for the user-facing web app.
@@ -851,6 +852,7 @@ function labelForKey(k) {
  * If the admin wants pixel-perfect verification, they can open the
  * customer URL at /<slug>/ in a separate tab after saving. */
 function DevicePreview({ design, org }) {
+  const { money } = useAdminMoney();
   const c = design.colors;
   const copy = design.copy;
   const sections = design.sections;
@@ -938,7 +940,7 @@ function DevicePreview({ design, org }) {
           aria-hidden="true"
           tabIndex={-1}
         >
-          Get €5.00 cashback
+          Get {money(5)} cashback
         </button>
 
         <div className="aad-preview__actions">

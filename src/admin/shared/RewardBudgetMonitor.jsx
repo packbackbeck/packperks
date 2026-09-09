@@ -1,4 +1,5 @@
 import './RewardBudgetMonitor.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* Shared admin-only reward-budget monitor: progress bar + committed/remaining
  * figures + status. Used on the Overview (with a "Manage in Settings" button)
@@ -12,6 +13,7 @@ export default function RewardBudgetMonitor({
   title = 'Reward budget',
   onManage,
 }) {
+  const { money } = useAdminMoney();
   const capNum = Math.max(0, Number(cap) || 0);
   const spentNum = Math.max(0, Number(spent) || 0);
   const pct = capNum > 0 ? Math.min(100, (spentNum / capNum) * 100) : 0;
@@ -35,8 +37,8 @@ export default function RewardBudgetMonitor({
             <div className="rbm__fill" style={{ width: `${pct}%` }} />
           </div>
           <div className="rbm__figures">
-            <span><strong>€{spentNum.toFixed(2)}</strong> committed</span>
-            <span>€{remaining.toFixed(2)} left of €{capNum.toFixed(2)}</span>
+            <span><strong>{money(spentNum)}</strong> committed</span>
+            <span>{money(remaining)} left of {money(capNum)}</span>
           </div>
           <p className="rbm__note">
             {isBlocked

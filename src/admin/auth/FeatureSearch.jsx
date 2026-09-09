@@ -167,8 +167,8 @@ const FEATURES = [
 
   // ── Settings + meta ────────────────────────────────────────────────
   { id: 'f-settings',     name: 'Settings',                desc: 'Cashback rates, features',          group: 'System',     page: 'settings', icon: Icon.settings, keywords: 'rate refund features toggle config' },
-  { id: 'f-cashback-rate',name: 'Cashback rate',           desc: '€ per cup paid to customers',       group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'rate price euros per cup cashback amount' },
-  { id: 'f-refund-rate',  name: 'Direct refund rate',      desc: '€ per cup paid as a direct refund', group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'refund rate price euros per cup direct' },
+  { id: 'f-cashback-rate',name: 'Cashback rate',           desc: 'Paid to customers, per cup',       group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'rate price euros per cup cashback amount' },
+  { id: 'f-refund-rate',  name: 'Direct refund rate',      desc: 'Paid as a direct refund, per cup', group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'refund rate price euros per cup direct' },
   { id: 'f-feat-share',   name: 'Cup sharing toggle',      desc: 'Enable/disable peer-to-peer shares',group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'cup sharing toggle on off feature flag' },
   { id: 'f-feat-donate',  name: 'Donations toggle',        desc: 'Enable/disable donate flow',        group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'donate donation charity toggle plastic soup' },
   { id: 'f-feat-direct',  name: 'Direct refund toggle',    desc: 'Enable/disable direct refunds',     group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'direct refund toggle' },

@@ -4,7 +4,6 @@ import QRCodeLib from 'qrcode';
 import { useMoney, useRegion } from '../lib/RegionContext';
 import SlideToConfirm from './SlideToConfirm';
 import './CollectSheet.css';
-import Money from './Money';
 
 /* ─────────────────────────────────────────────────────────────────────
  * CollectSheet — collecting an approved cashback in a region that has no
@@ -79,7 +78,7 @@ export default function CollectSheet({ amount, rewardName, reference, brandColor
 
         <div className="collect__head" style={{ background: primary }}>
           <span className="collect__eyebrow">{sent ? 'On its way' : 'Your cashback'}</span>
-          <div className="collect__amount"><Money value={amount} /></div>
+          <div className="collect__amount">{money(amount)}</div>
           {rewardName && <span className="collect__reward">for your {rewardName}</span>}
         </div>
         <Zigzag color={primary} />
@@ -93,7 +92,7 @@ export default function CollectSheet({ amount, rewardName, reference, brandColor
             </div>
             <h2 className="collect__done-title">Sent to your account</h2>
             <p className="collect__done-sub">
-              <Money value={amount} /> is on its way, usually within minutes. We'll email you
+              {money(amount)} is on its way, usually within minutes. We'll email you
               once your bank confirms it.
             </p>
             <button type="button" className="collect__btn" style={{ background: primary }} onClick={onClose}>

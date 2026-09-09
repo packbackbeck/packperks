@@ -11,6 +11,7 @@ import PiiMask from '../shared/PiiMask';
 import QuickLinks from '../shared/QuickLinks';
 import { useReorder } from './useReorder';
 import './AdminOverview.css';
+import { useAdminMoney, adminSymbol } from '../lib/adminMoney';
 
 /* ── Data helpers ── */
 function buildDailyTimeSeries(items, days) {
@@ -223,8 +224,8 @@ const SPOTLIGHT = {
     ),
   },
   'stat-cashback': {
-    title: 'Cashback Paid Per Day (€)',
-    unit: '€',     agg: 'sum',
+    title: 'Cashback Paid Per Day',
+    unit: 'money', agg: 'sum',
     color: '#4ADE80',
     type: 'area',
     getData: (stats, period) => buildDailySumSeries(
@@ -476,9 +477,12 @@ function canUseLog(series) {
 }
 
 /* "cups per week" / "% (avg per day)" — the reader should never have to
- * guess what the Y numbers are counting. */
+ * guess what the Y numbers are counting. The 'money' unit is resolved at
+ * render time to the active org's currency, since CHARTS is a module
+ * constant and can't know which venue is open. */
 function yAxisCaption(unit, grain, agg) {
-  return agg === 'avg' ? `${unit} (avg per ${grain.per})` : `${unit} per ${grain.per}`;
+  const u = unit === 'money' ? adminSymbol() : unit;
+  return agg === 'avg' ? `${u} (avg per ${grain.per})` : `${u} per ${grain.per}`;
 }
 
 /* Date-only "today" helper for the custom range picker — gives the
@@ -488,6 +492,7 @@ function todayIso() {
 }
 
 export default function AdminOverview({ draftState, onNavigate }) {
+  const { money } = useAdminMoney();
   const { draft, updateDraft } = draftState;
   const blocks = draft.dashboardBlocks;
 
@@ -699,7 +704,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
       id: 'stat-cashback',
       desc: 'Real money paid out to customers so far.',
       label: 'Total Cashback',
-      value: loading ? '—' : `€${(s.totalCashback || 0).toFixed(2)}`,
+      value: loading ? '—' : money(s.totalCashback || 0),
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
       color: '#4ADE80',
       // Previously this card read "@ €1.25/cup" which implied a flat
@@ -707,7 +712,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
       // cashback amount comes from the reward, not from cups×rate.
       // Honest copy: payouts approved so far.
       sub: 'Approved & paid out',
-      tooltip: 'Sum of payout_amount on completed claims (cashback + direct refund). This is the actual cash that left the programme, not an estimate based on cup rate. Each reward sets its own price, so total / total cups returned will NOT match €1.25/cup.',
+      tooltip: 'Sum of payout_amount on completed claims (cashback + direct refund). This is the actual cash that left the programme, not an estimate based on cup rate. Each reward sets its own price, so total / total cups returned will NOT match the cup rate.',
     },
     {
       id: 'stat-pending',

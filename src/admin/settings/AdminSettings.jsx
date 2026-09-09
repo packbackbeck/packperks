@@ -9,6 +9,7 @@ import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 import QuickLinks from '../shared/QuickLinks';
 import TypedConfirmModal from '../shared/TypedConfirmModal';
 import './AdminSettings.css';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* ─────────────────────────────────────────────────────────────────────
  * AdminSettings — platform configuration page.
@@ -260,6 +261,7 @@ function SectionCard({ section, children }) {
  * admin-only org_reward_budgets table directly (not the draft config), so the
  * cap takes effect immediately and the amount never ships to the customer. */
 function RewardBudgetSection() {
+  const { symbol } = useAdminMoney();
   const { activeOrg } = useOrg();
   const orgId = activeOrg?.id;
   const [loading, setLoading] = useState(true);
@@ -315,7 +317,7 @@ function RewardBudgetSection() {
         <ToggleSwitch checked={enabled} onChange={setEnabled} ariaLabel="Enable reward budget cap" />
       </Field>
 
-      <Field label="Budget cap (€)" hint="Total cashback this organisation will pay out before claiming pauses.">
+      <Field label={`Budget cap (${symbol})`} hint="Total cashback this organisation will pay out before claiming pauses.">
         <input
           className="as-input"
           type="number"
@@ -342,6 +344,7 @@ function RewardBudgetSection() {
 }
 
 export default function AdminSettings({ draftState, onNavigate, embedded = false }) {
+  const { money, symbol } = useAdminMoney();
   const { draft, updateDraft, statusLabel, published } = draftState;
   const settings = draft.settings;
 
@@ -631,10 +634,10 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                   <strong>Rate change will affect pending claims.</strong>
                   <p>
                     {cashbackChanged && (
-                      <>Cashback: €{pubCashback.toFixed(2)} → <strong>€{settings.cashbackRatePerCup.toFixed(2)}</strong>/cup. </>
+                      <>Cashback: {money(pubCashback)} → <strong>{money(settings.cashbackRatePerCup)}</strong>/cup. </>
                     )}
                     {refundChanged && (
-                      <>Refund: €{pubRefund.toFixed(2)} → <strong>€{settings.refundRatePerCup.toFixed(2)}</strong>/cup. </>
+                      <>Refund: {money(pubRefund)} → <strong>{money(settings.refundRatePerCup)}</strong>/cup. </>
                     )}
                     When you hit <strong>Publish</strong>, every claim still pending at that moment
                     will be approved at the new rate — not the rate that was live when the customer
@@ -669,7 +672,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             {!isTikkieOnly && (
             <Field label="Cashback rate" hint="Paid when a customer redeems for a food reward.">
               <div className="as-input-prefix-wrap">
-                <span className="as-input-prefix">€</span>
+                <span className="as-input-prefix">{symbol}</span>
                 <input
                   className="as-input as-input--prefix"
                   type="number"
@@ -692,7 +695,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                 : 'Paid when a customer cashes out instead of choosing a reward.'}
             >
               <div className="as-input-prefix-wrap">
-                <span className="as-input-prefix">€</span>
+                <span className="as-input-prefix">{symbol}</span>
                 <input
                   className="as-input as-input--prefix"
                   type="number"
@@ -710,10 +713,10 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
             {isTikkieOnly && (
             <Field
               label="Max payout per receipt"
-              hint="Safety ceiling for one bin receipt, whatever the cup count. The server enforces a hard €25 maximum on top of this."
+              hint={`Safety ceiling for one bin receipt, whatever the cup count. The server enforces a hard ${money(25)} maximum on top of this.`}
             >
               <div className="as-input-prefix-wrap">
-                <span className="as-input-prefix">€</span>
+                <span className="as-input-prefix">{symbol}</span>
                 <input
                   className="as-input as-input--prefix"
                   type="number" step="0.50" min="1" max="25"
@@ -752,27 +755,27 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
                   [1, 3, 6, 10].map(n => (
                     <div key={n} className="as-rate-preview__cell">
                       <span className="as-rate-preview__cell-label">{n} cup{n === 1 ? '' : 's'} returned</span>
-                      <span className="as-rate-preview__cell-val">€{(settings.refundRatePerCup * n).toFixed(2)}</span>
+                      <span className="as-rate-preview__cell-val">{money(settings.refundRatePerCup * n)}</span>
                     </div>
                   ))
                 ) : (
                   <>
                     <div className="as-rate-preview__cell">
                       <span className="as-rate-preview__cell-label">3 cups · cashback</span>
-                      <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 3).toFixed(2)}</span>
+                      <span className="as-rate-preview__cell-val">{money(settings.cashbackRatePerCup * 3)}</span>
                     </div>
                     <div className="as-rate-preview__cell">
                       <span className="as-rate-preview__cell-label">6 cups · cashback</span>
-                      <span className="as-rate-preview__cell-val">€{(settings.cashbackRatePerCup * 6).toFixed(2)}</span>
+                      <span className="as-rate-preview__cell-val">{money(settings.cashbackRatePerCup * 6)}</span>
                     </div>
                     <div className="as-rate-preview__cell as-rate-preview__cell--muted">
                       <span className="as-rate-preview__cell-label">3 cups · direct refund</span>
-                      <span className="as-rate-preview__cell-val">€{(settings.refundRatePerCup * 3).toFixed(2)}</span>
+                      <span className="as-rate-preview__cell-val">{money(settings.refundRatePerCup * 3)}</span>
                     </div>
                     <div className="as-rate-preview__cell as-rate-preview__cell--accent">
                       <span className="as-rate-preview__cell-label">Cashback uplift</span>
                       <span className="as-rate-preview__cell-val">
-                        +€{((settings.cashbackRatePerCup - settings.refundRatePerCup)).toFixed(2)}/cup
+                        +{money(settings.cashbackRatePerCup - settings.refundRatePerCup)}/cup
                       </span>
                     </div>
                   </>

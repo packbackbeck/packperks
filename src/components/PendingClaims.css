@@ -283,3 +283,6 @@
 }
 .pc-card__collect:hover { filter: brightness(0.96); }
 .pc-card__collect:active { transform: translateY(1px); }
+
+/* Same reason as the onboarding chip: "AED" has to fit where "€" did. */
+.pc-card__thumb-euro { font-size: clamp(11px, 1.05em, 20px); letter-spacing: 0.01em; }

@@ -16,6 +16,7 @@ import { MODE_META, getCopyPreset, COPY_MODES } from '../../lib/copyPresets';
 import { PAYMENT_METHODS, PAYMENT_METHOD_META, DEFAULT_PAYMENT_METHOD } from '../../lib/paymentMethods';
 import { regionForCountry } from '../../lib/regions';
 import TypedConfirmModal from '../shared/TypedConfirmModal';
+import { useAdminMoney } from '../lib/adminMoney';
 
 /* Merge a group's saved copy overrides (config.settings.copy) over its mode
  * preset → the full effective bundle. Mirrors the customer app's
@@ -105,6 +106,7 @@ function ModePreview({ mode, copy }) {
 
 /* Combined group stats — totals + per-store breakdown. */
 function GroupStats({ stats, loading }) {
+  const { money } = useAdminMoney();
   if (loading) return <p className="og-hint">Loading stats…</p>;
   if (!stats) return <p className="og-hint">No stats yet.</p>;
   const t = stats.totals;
@@ -114,7 +116,7 @@ function GroupStats({ stats, loading }) {
     { label: 'Cups now', value: t.cups },
     { label: 'Lifetime', value: t.lifetime },
     { label: 'Claims',   value: t.claims },
-    { label: 'Payout',   value: `€${(t.payout || 0).toFixed(2)}` },
+    { label: 'Payout',   value: money(t.payout || 0) },
   ];
   return (
     <div className="og-stats">
@@ -139,7 +141,7 @@ function GroupStats({ stats, loading }) {
                 <td>{s.cups}</td>
                 <td>{s.lifetime}</td>
                 <td>{s.claims}</td>
-                <td>€{(s.payout || 0).toFixed(2)}</td>
+                <td>{money(s.payout || 0)}</td>
               </tr>
             ))}
           </tbody>

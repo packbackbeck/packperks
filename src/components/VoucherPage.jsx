@@ -5,7 +5,6 @@ import { animalForProfile } from '../lib/animals';
 import { redeemVoucher } from '../lib/api';
 import SlideToConfirm from './SlideToConfirm';
 import './VoucherPage.css';
-import Money from './Money';
 
 /* ─────────────────────────────────────────────────────────────────────
  * VoucherPage — the counter-voucher way of settling a reward.
@@ -270,7 +269,7 @@ export default function VoucherPage({ reward, org, userId, profile, cupCount = 0
               <div className="hv__meta">
                 <span className="hv__eyebrow">{org?.partner_brand_name || org?.name}</span>
                 <h1 className="hv__name">{reward?.name}</h1>
-                <div className="hv__amount"><Money value={amount} /></div>
+                <div className="hv__amount">{money(amount)}</div>
               </div>
             </div>
             <div className="hv__qr-wrap">

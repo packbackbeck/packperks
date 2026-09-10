@@ -119,10 +119,6 @@
 }
 .app__see-stores-arrow { flex-shrink: 0; }
 
-/* Stands in for the hidden "More stores" button so the header keeps the
-   same breathing room at the top of the page. Matches its box height. */
-.app__see-stores-spacer { height: 37px; flex: none; }
-
 /* BYO scan-result modal: the cross-store note (A8) sits below the message. */
 .app__byo-title { margin-bottom: 6px; }
 .app__byo-crossorg {

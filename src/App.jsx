@@ -2312,9 +2312,9 @@ export default function App({ consentReady = true } = {}) {
 
       {/* Grouped org → a "back to all stores" affordance above everything.
           A venue can hide it (settings.hideStoresLink) when it is presented
-          as a destination rather than one of many; the spacer keeps the
-          header sitting at the same height either way. */}
-      {groupCtx && liveSettings.hideStoresLink && <div className="app__see-stores-spacer" aria-hidden="true" />}
+          as a destination rather than one of many. Hidden, it takes its
+          space with it: the header rises to the page's own top padding
+          rather than sitting below an empty gap. */}
       {groupCtx && !liveSettings.hideStoresLink && (
         <button type="button" className="app__see-stores" onClick={() => { if (groupCtx?.group?.slug) window.location.href = `/${groupCtx.group.slug}`; else setPage('stores'); }}>
           <svg className="app__see-stores-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

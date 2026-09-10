@@ -682,34 +682,6 @@ export default function UserPage({
 
       <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} dismissedSet={dismissedClaims} onCollect={handleCollectClaim} onDismiss={handleDismissClaim} partnerBrand={storeName} onRetry={onRetryClaim} />
 
-      {/* ── Save-your-balance prompt ──
-           This slot used to hold "Add to home screen". Installing the app is
-           a nice-to-have; losing every cup because the browser was cleared is
-           not, and an email is the only thing that survives a new phone. So
-           the prominent action here is the one that actually protects the
-           customer. It disappears the moment an email is saved — there is
-           nothing left to prompt for. ── */}
-      {!(email || authEmail) && !isVisitor && (
-        <div className="user-page__howto-group">
-          <button type="button" className="user-page__save-email" onClick={onOpenSignIn}>
-            <span className="user-page__save-email-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
-                <path d="m3.5 7 8.5 6 8.5-6" />
-              </svg>
-            </span>
-            <span className="user-page__save-email-text">
-              <span className="user-page__save-email-title">Add email to save balance</span>
-              <span className="user-page__save-email-sub">
-                Keeps your cups if you change phone or clear your browser.
-              </span>
-            </span>
-            <svg className="user-page__save-email-arrow" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="9 6 15 12 9 18" />
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* Save-your-cups prompt now lives inline on the Email row below
           (the empty-email state is an "Add email" action) — no separate banner. */}

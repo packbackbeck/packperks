@@ -105,7 +105,7 @@ function readHashPage() {
 }
 
 /* `#overview?as=vendor` — look at the dashboard exactly as a vendor
- * account does. Owner/admin only, and it can only ever REMOVE access:
+ * account does. Any staff role may use it, and it can only ever REMOVE access:
  * the guard below narrows the visible pages and the shell drops to the
  * vendor permission set, so previewing can't reveal anything the viewer
  * couldn't already reach. It is a rehearsal of the vendor's view, not a
@@ -135,7 +135,10 @@ function AdminShell() {
   /* The role the dashboard actually renders as. Previewing is allowed
    * only from a role that already outranks the one being previewed. */
   const realRole = profile?.role || null;
-  const canPreview = realRole === 'owner' || realRole === 'admin';
+  // Every staff role can see all three vendor pages already, so a preview
+  // strictly narrows what they see. Gating it to owner/admin locked out the
+  // managers who demo the product — Nida's link silently ignored ?as=vendor.
+  const canPreview = !!realRole && realRole !== 'vendor';
   const previewing = canPreview && previewRole === 'vendor';
   const effectiveRole = previewing ? 'vendor' : realRole;
   const isVendorView = effectiveRole === 'vendor';

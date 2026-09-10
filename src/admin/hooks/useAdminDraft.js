@@ -45,6 +45,17 @@ export const DEFAULT_SETTINGS = {
   featureDonations: true,
   featureDirectRefunds: true,
   maintenanceMode: false,
+  // Verification has been unconditional until now. Defaulting to true keeps
+  // every existing org exactly as it is; turning it off is a deliberate act.
+  requireEmailVerification: true,
+  // Hides the "More stores" link on a venue's home screen — for a store
+  // presented on its own rather than as one of a group.
+  hideStoresLink: false,
+  // Vendor accounts see an illustrative programme instead of this store's
+  // real figures. All three are listed here so they survive a publish: a
+  // setting absent from this object is absent from a fresh draft, and
+  // publishing that draft drops it from the stored config.
+  vendorDemoNumbers: false,
   privacyUrl: 'https://packperks.nl/privacy',
   termsUrl: 'https://packperks.nl/terms',
   cookieUrl: 'https://packperks.nl/cookies',

@@ -247,36 +247,16 @@ export default function UserPage({
     setDismissedClaims(new Set(getDismissedSet()));
   };
 
-  // ── PWA install + reward push-notification preference ──
-  // The "Add to home screen" button disappears once the app is installed; a
-  // "push notifications" toggle then appears in Edit profile (push only works
-  // from the installed app, so it's meaningless before install).
+  // ── Reward push-notification preference ──
+  // The install state is still read: push notifications only work from an
+  // installed app, so the toggle in Edit profile is gated on it. The
+  // "Add to home screen" button itself is gone — see the save-your-balance
+  // prompt below for what took its place.
   const pwa = usePwaInstall();
-  const [iosInstallHint, setIosInstallHint] = useState(false);
   const [pushRewards, setPushRewards] = useState(() => {
     try { return localStorage.getItem(PUSH_PREF_KEY) === '1' && getPermissionState() === 'granted'; }
     catch { return false; }
   });
-  const handleAddToHome = async () => {
-    // 1) Chrome / Edge / Android: fire the real one-tap install prompt.
-    const outcome = await pwa.promptInstall();
-    if (outcome !== 'unavailable') return;
-    // 2) iOS Safari (and others with no install API): open the OS share sheet,
-    //    where the user can pick "Add to Home Screen". Apple exposes no JS
-    //    install API, so this is the closest we can trigger programmatically.
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'PackPerks',
-          text: 'Save your cups by adding PackPerks to your home screen.',
-          url: window.location.origin,
-        });
-        return;
-      } catch { /* user dismissed / not permitted → fall through to steps */ }
-    }
-    // 3) No prompt and no share (Firefox / in-app browsers): show manual steps.
-    setIosInstallHint(v => !v);
-  };
   const handleTogglePush = async (checked) => {
     if (!checked) {
       setPushRewards(false);
@@ -702,37 +682,32 @@ export default function UserPage({
 
       <PendingClaims claims={enrichedClaims} collectedMap={collectedClaims} dismissedSet={dismissedClaims} onCollect={handleCollectClaim} onDismiss={handleDismissClaim} partnerBrand={storeName} onRetry={onRetryClaim} />
 
-      {/* ── Info + install section: "How does it work?" plus an "Add to home
-           screen" button that installs the app like a native one. The install
-           button disappears once the app is installed. No section title. ── */}
-      {/* "How does it work?" moved into the Help block below; only the
-           install prompt lives here now. */}
-      {!pwa.installed && (
+      {/* ── Save-your-balance prompt ──
+           This slot used to hold "Add to home screen". Installing the app is
+           a nice-to-have; losing every cup because the browser was cleared is
+           not, and an email is the only thing that survives a new phone. So
+           the prominent action here is the one that actually protects the
+           customer. It disappears the moment an email is saved — there is
+           nothing left to prompt for. ── */}
+      {!(email || authEmail) && !isVisitor && (
         <div className="user-page__howto-group">
-          {!pwa.installed && (
-            <button type="button" className="user-page__howto user-page__howto--install" onClick={handleAddToHome} aria-expanded={iosInstallHint}>
-              <span className="user-page__howto-icon user-page__howto-icon--install">
-                {/* phone + downward arrow → "install to your phone" */}
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
-                  <path d="M12 7.5v6" />
-                  <path d="M9.4 11l2.6 2.6L14.6 11" />
-                  <line x1="10.5" y1="18.5" x2="13.5" y2="18.5" />
-                </svg>
-              </span>
-              <span className="user-page__howto-text">
-                <span className="user-page__howto-title">Add to home screen</span>
-                {iosInstallHint && (
-                  <span className="user-page__howto-sub">
-                    In your browser menu, tap <strong>Share</strong> then <strong>Add to Home Screen</strong>.
-                  </span>
-                )}
-              </span>
-              <svg className="user-page__howto-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="9 6 15 12 9 18" />
+          <button type="button" className="user-page__save-email" onClick={onOpenSignIn}>
+            <span className="user-page__save-email-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+                <path d="m3.5 7 8.5 6 8.5-6" />
               </svg>
-            </button>
-          )}
+            </span>
+            <span className="user-page__save-email-text">
+              <span className="user-page__save-email-title">Add email to save balance</span>
+              <span className="user-page__save-email-sub">
+                Keeps your cups if you change phone or clear your browser.
+              </span>
+            </span>
+            <svg className="user-page__save-email-arrow" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          </button>
         </div>
       )}
 

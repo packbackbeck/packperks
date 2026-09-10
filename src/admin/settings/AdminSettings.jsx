@@ -936,6 +936,25 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               {activeGroupId && (
                 <label className="as-flag-row">
                   <div className="as-flag-row__info">
+                    <div className="as-flag-row__label">Hide the &ldquo;More stores&rdquo; link</div>
+                    <div className="as-flag-row__desc">
+                      Removes the link at the top of this store&rsquo;s home screen that takes customers
+                      to the rest of the group. For a venue presented on its own — a campus, a single
+                      partner — where the other stores aren&rsquo;t part of the story. The header keeps
+                      its spacing, so nothing shifts.
+                    </div>
+                  </div>
+                  <ToggleSwitch
+                    checked={!!settings.hideStoresLink}
+                    onChange={v => updateSetting('hideStoresLink', v)}
+                    ariaLabel="Hide the More stores link toggle"
+                  />
+                </label>
+              )}
+
+              {activeGroupId && (
+                <label className="as-flag-row">
+                  <div className="as-flag-row__info">
                     <div className="as-flag-row__label">Hide live vendors from the market page</div>
                     <div className="as-flag-row__desc">
                       Hides the currently participating venues from the multi-venue market page, so
@@ -955,17 +974,19 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
               {!isTikkieOnly && (
               <label className="as-flag-row">
                 <div className="as-flag-row__info">
-                  <div className="as-flag-row__label">Require email verification <span className="as-flag-row__lock">Always on</span></div>
+                  <div className="as-flag-row__label">Require email verification</div>
                   <div className="as-flag-row__desc">
                     Every email — the first time a customer adds one and any time they change it — must be
-                    confirmed with the 6-digit code we email. This is always enforced and can't be turned off.
+                    confirmed with the 6-digit code we send. Turning this off saves the address straight
+                    away, which is one less step at the counter but means an address is never proven to
+                    belong to the person typing it. An email that already belongs to another account here
+                    still goes through the code either way, so a duplicate can't be created.
                   </div>
                 </div>
                 <ToggleSwitch
-                  checked
-                  disabled
-                  onChange={() => {}}
-                  ariaLabel="Require email verification (always on)"
+                  checked={settings.requireEmailVerification !== false}
+                  onChange={v => updateSetting('requireEmailVerification', v)}
+                  ariaLabel="Require email verification toggle"
                 />
               </label>
               )}

@@ -2135,9 +2135,12 @@ export default function App({ consentReady = true } = {}) {
           setPage('receipt');
         }
       }}
-      /* Email verification is ALWAYS required — every email (first time or
-         changed) must be confirmed with the 6-digit code we email. */
-      requireVerification={true}
+      /* Per-org (Settings → Feature flags). Default ON: every email, first
+         time or changed, is confirmed with the 6-digit code we send. Off,
+         the email saves directly — except when it already belongs to
+         another account here, which still routes through the code so we
+         never create a duplicate (see SignInSheet). */
+      requireVerification={liveSettings.requireEmailVerification !== false}
       savedEmail={profile?.email || authEmail || null}
       privacyPolicy={liveSettings.privacyPolicyText}
       onMarketingConsent={(consent) =>

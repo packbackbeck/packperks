@@ -1825,6 +1825,26 @@ export default function App({ consentReady = true } = {}) {
     }
   };
 
+  /* ── Maintenance mode ──
+   * This has to sit ABOVE the tikkie-only return below. A Redirect Refund
+   * org returns its own whole app from there and never reaches the rest of
+   * this function, so a gate further down was unreachable for exactly the
+   * venues whose only way in is a bin receipt — the toggle saved, published,
+   * and did nothing.
+   *
+   * The two modes keep their settings in different places: the full app has
+   * resolved `liveSettings` by now, while a tikkie-only boot returns early
+   * and carries the org's published settings on `tikkieOnly` instead.
+   *
+   * Showing this page also means the receipt is never scanned, so the batch
+   * stays unclaimed and still works once the venue is live again. */
+  const maintenanceOn = tikkieOnly
+    ? !!tikkieOnly.settings?.maintenanceMode
+    : !!liveSettings.maintenanceMode;
+  if (maintenanceOn) {
+    return <MaintenancePage />;
+  }
+
   /* Tikkie-only mode: the redirect page IS the whole app for these orgs.
    * Checked before isLoading so the boot's early return lands here. */
   if (tikkieOnly) {
@@ -1874,11 +1894,6 @@ export default function App({ consentReady = true } = {}) {
 
   if (initError) {
     return <AppErrorScreen error={initError} />;
-  }
-
-  /* ── Maintenance mode ── */
-  if (liveSettings.maintenanceMode) {
-    return <MaintenancePage />;
   }
 
   /* ── Pages ── */

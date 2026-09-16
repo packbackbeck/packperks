@@ -1,4 +1,4 @@
-# Handoff — state of play, 14 September 2026
+# Handoff — state of play, 16 September 2026
 
 A snapshot for whoever picks this up next. Durable guidance lives in
 `/CLAUDE.md`; this file is the "where we are right now" half and goes stale.
@@ -7,87 +7,128 @@ A snapshot for whoever picks this up next. Durable guidance lives in
 
 ## Recent work
 
-Two threads dominated the last fortnight.
+### 1. Architecture audit and the fixes that followed (16 Sep)
 
-### 1. Slider voucher (8 Sep)
+An audit of the whole system turned up one critical problem, five high, eight
+medium and twelve low. What was done about them:
 
-A second payment method beside Tikkie cashback. The customer unlocks a reward
-and shows a full-screen holographic voucher at the counter; staff slide to
-confirm, which atomically deducts the cups.
+**Critical: the public (anon) key could move money.** Closed in two stages
+(details in `/CLAUDE.md`, *Landmines*).
+- Stage 1 is **live**: migrations `043_close_public_write_paths`,
+  `044_app_config_public_read` and `045_helper_function_grants`. Amounts are
+  priced on the server, balances only go down from the client, dashboard data
+  takes staff writes only, and `tikkie-cashback` (v17) refuses to pay more than
+  a claim's reward is worth. Tested in rolled-back transactions against the
+  live data (80/80) before applying.
+- Stage 2 is **written, tested and waiting**: `supabase/pending/046_…` binds
+  customer rows to the device header. Apply it only after the app build that
+  sends `x-device-id` is live.
+- No email is needed to collect cups. It is asked for when a customer claims
+  cashback or a refund (and verified where the venue requires it). Payout
+  links show in the app only.
 
-- `src/components/VoucherPage.jsx` — the card. Tilt runs on a single rAF loop
-  writing CSS custom properties straight to the node, with lerp damping. It is
-  written that way on purpose: tilt in React state plus a CSS `transition`
-  restarted a tween every frame and the card visibly shook.
-- `src/components/SlideToConfirm.jsx` — fill and thumb are driven by one
-  `--stc-p` so they cannot drift apart; the fill ends at the knob's *centre*.
-- `supabase/migrations/040_counter_voucher.sql` — `redeem_voucher()`, a
-  SECURITY DEFINER RPC that locks the balance row and deducts atomically.
-- Settable per org and per group; the claims page and the how-it-works guide
-  both adapt.
+**High**
+- Deleting an account now keeps the claims, anonymised, as the retention
+  schedule requires (`erase_customer_rows`).
+- Dashboard delete removes the login too: new edge function
+  `admin-delete-user`. The dashboard calls it from the next deploy on.
+- The repo can rebuild the database again: `supabase/baseline/`.
+- Push notifications are gone; customer notifications are email only.
+- Missed Vercel deploys: left as is (check the live bundle after a push).
 
-### 2. UAE, the vendor role, and the dashboard's currency (9–10 Sep)
+**Medium**
+- One set of names everywhere: Deposit Rewards, Bring Your Own, Deferred
+  Tikkie. Staff copy and the landing page describe the current flows.
+- Rates come from one place (`src/lib/rates.js`) and the database mirrors it,
+  so a rate changed in Settings shows the same everywhere and pays the same.
+- A group with no mode is Bring Your Own.
+- The UAE payout provider is labelled as unavailable until one is chosen.
+- Kept as they are: 30 map pins for 2 bins, and the Tikkie webhook (no
+  decision yet).
 
-- **UAE copy.** NYU Abu Dhabi is an AE/AED BYO venue. The app no longer names
-  Tikkie or promises a link there. Root cause of a whole class of wrong copy:
-  `normalizeRegion` was dropping `payoutStyle`.
-- **AED everywhere.** ~100 hardcoded `€` across 24 admin files now go through
-  `adminMoney`, which follows the *active organisation*. Whole dirham amounts
-  drop their decimals (`AED 21`, not `AED 21.00`); fractions keep them.
-- **Vendor role.** Read-only, three pages, pinned to one store. Needed changes
-  in `admin_profiles`/`admin_invitations` constraints, `invite-admin` (carries
-  the store), and `bootstrap-admin` (applies it on accept).
-- **Demo numbers.** An org toggle that shows vendor accounts a healthy
-  programme instead of a store that went live last week. `demoData.js`
-  fabricates *rows*, not numbers — `adminApi` swaps them in at three fetch
-  points and the real production code does all the maths, so the demo cannot
-  drift from the real dashboard and no figure can contradict another.
+**Low**
+- The three retired edge functions (`create-claim`, `delete-account`,
+  `payout`) now answer 410 and their source is removed. They still need
+  deleting in the Supabase dashboard (Edge Functions → ⋯ → Delete).
+- KFC is a Deposit Rewards venue with real menu items at 1 cup = €1.
+- Countries are stored as full names (`Netherlands`).
+- Titaan (Phase 1) is in maintenance mode.
+- `screen-audit/` is no longer versioned; the files stay on disk.
+- Unused `src/emails/tikkieReadyEmail.js` removed.
+- Emails and receipt checks use the venue's currency (AED for UAE venues).
+- Function search paths pinned (`042`, and `config_number` in `045`).
+- `.claude/launch.json` is now in the repo.
+
+### 2. Slider voucher (8 Sep)
+
+A second payment method beside Tikkie cashback: a full-screen voucher at the
+counter, slide to confirm. `VoucherPage.jsx`, `SlideToConfirm.jsx`,
+`redeem_voucher()` (now priced on the server, see above).
+
+### 3. UAE, the vendor role, the dashboard's currency (9–10 Sep)
+
+AED everywhere for UAE venues (`adminMoney`), a read-only vendor role with
+three pages, and a "Demo numbers" toggle. `normalizeRegion` dropping
+`payoutStyle` was the root of the wrong UAE copy.
 
 ---
 
 ## Live demo setup
 
-NYU Abu Dhabi is the pitch venue. Currently:
-
-- `vendorDemoNumbers: true` in its published config
-- payment method `voucher`, region AE, currency AED
-- "More stores" hidden, and the spacer that stood in for it is gone
-
-Preview link (needs a staff login — it is not shareable with NYU):
+NYU Abu Dhabi is the pitch venue: `vendorDemoNumbers: true`, payment method
+`voucher`, region AE. Preview (staff login needed):
 
 ```
 https://perks.packback.network/admin?org=nyuad#overview?as=vendor
 ```
 
-For NYU themselves: invite a real **Vendor** from Team while NYU Abu Dhabi is
-the open store. That cannot be scripted — it needs a password.
+Its logo URL (`savant.qmul.ac.uk`) now redirects to an HTML page, so the logo
+is broken in production. Upload a copy to `reward-images` and point the venue
+at it.
+
+KFC: `https://perks.packback.network/kfc/`
 
 ---
 
 ## Open items
 
-Nothing here is in flight; all of it is known and unstarted.
+**Deploy, then Stage 2.** Until the current `main` is live and 046 is applied,
+the public key can still read customer rows (emails) and serve unexpired Tikkie
+links to callers that send no device header — 39 links, about €15, on 16 Sep.
 
-**Security — CRITICAL: the anon key can move money.** Beyond reading every
-customer and email, the public key can update any balance and any claim
-(including its payout amount, which `tikkie-cashback` pays uncapped), and
-`get_customer_claims` hands out every customer's Tikkie payout link. The
-earlier note here that `claims` was fine was wrong. Details and fix in
-`/CLAUDE.md`.
+**Leaked-password protection is still off** according to Supabase's advisor
+(Authentication → Password security).
 
-**Admin delete doesn't delete.** Deleting a user from the dashboard removes the
-app rows but not the `auth.users` login, so the account and email come back on
-next sign-in with the balance gone. Needs an `admin-delete-user` edge function
-doing the purge *and* `auth.admin.deleteUser`, mirroring `delete-my-account`.
+**Three pending La Place claims will be refused at payout**, because the cap
+now pays no more than the reward is worth: two for €10.00 on a reward that is
+now €0.50, and one for €3.20. Review them by hand.
+
+**The dashboard audit log has been empty since 31 July.** Its insert rule only
+accepts rows whose `org_id` matches the admin's own, and staff admins have
+none, so every entry logged under an open venue is silently dropped.
+
+**Org isolation is still a UI convention.** A vendor account can read every
+venue's rows through the API.
+
+**Smaller**
+- The sign-in sheet's "Send me offers" box starts ticked (consent must be
+  opt-in).
+- The rejection email says the cups are still on the balance; cashback cups
+  are deducted while the claim is pending.
+- Donations are recorded as activity only, and the Donations page estimates
+  €1 per cup.
+- Voucher redemptions don't ask for an email (by design so far).
+- KFC prices are from one Amsterdam store; other stores will trip the
+  receipt price check.
+- The old screenshots are still in git history.
+- A stale dashboard draft for KFC would overwrite the menu set in SQL on its
+  next publish.
 
 **Terms copy is wrong for voucher venues.** "The fine print" still describes
-uploading receipts and collecting a Tikkie link. Untrue where the method is
-`voucher`.
+uploading receipts and collecting a Tikkie link.
 
-**PackPulse integration** — a written plan exists at
-`docs/packperks-in-packpulse.md`. Not started. It opens with the two findings
-above because they shape the design. The PackPulse side was never inspected
-(it is password-gated), so the open questions at the end are real blockers.
+**PackPulse integration** — plan at `docs/packperks-in-packpulse.md`. Not
+started.
 
 ---
 
@@ -98,7 +139,8 @@ Short version; the reasoning is in `/CLAUDE.md` under **Landmines**.
 - A push is not a deploy. Vercel has silently skipped triggers — fingerprint
   the live bundle before believing a change is out.
 - Publishing from the dashboard overwrites settings written directly in SQL.
-- `eslint` is not clean and never was (~240 errors). Compare counts, don't
+- `eslint` is not clean and never was (~230 errors). Compare counts, don't
   chase zero.
 - There is no admin test login. Verify admin work by importing `adminApi`
   through the dev server's module graph, or with a throwaway harness page.
+- Test database rules inside a transaction that ends in `rollback`.

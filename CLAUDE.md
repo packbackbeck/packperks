@@ -52,16 +52,29 @@ brand_color, logo_url, group_id, deleted_at`). Venues sharing a programme sit
 in an `org_groups` row. Config is published to `app_config` under
 `published:<orgId>`, group config under `published:group:<groupId>`.
 
-**Mode** decides which app a venue runs:
-- `standard` (Deposit Rewards) — full app: cup balance, rewards, claims
-- `tikkie_only` (Deferred Refund) — smart bin prints a receipt; scans credit a
-  wallet (`TikkieHomePage.jsx`) collected later as one Tikkie link. No rewards.
-- `byo` (Bring Your Own) — a group mode: customers bring their own cup and
-  scan the counter QR
+**Mode** decides which app a venue runs. Three modes, three names — use
+exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
+- **Deposit Rewards** (`standard`, group copy mode `deposit`) — full app: cup
+  balance, rewards, direct refunds, receipt claims
+- **Bring Your Own** (group copy mode `byo`) — customers bring their own cup
+  and scan the counter QR. A group with no mode set is Bring Your Own; a venue
+  with no group is Deposit Rewards.
+- **Deferred Tikkie** (`tikkie_only`, on the org's own config) — smart bin
+  prints a receipt; scans credit a wallet (`TikkieHomePage.jsx`) collected
+  later as one Tikkie link. No rewards.
 
-The same modes carry other names in the product — “Redirect Refund”, “Direct
-refund only”, “Titaan Direct Refund”, “Rewards only”. They are stale; prefer
-the names above.
+Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund only”,
+“Titaan Direct Refund”, “Rewards only” — are stale. The code keys stay.
+
+**Customer accounts.** No email is needed to collect cups: the device id
+(`src/lib/deviceId.js`) owns an anonymous `users` row. An email is asked for
+only when money leaves — a cashback claim or a direct refund — and is verified
+(signed in) wherever the venue has `requireEmailVerification` on. Payout links
+are shown in the app, never in the email.
+
+**Rates** (`src/lib/rates.js`, `effectiveRates`): cashback and refund per cup.
+Everything that shows or charges a rate reads it through this, and the
+database mirrors it in `venue_refund_rate()`. Change both together.
 
 **Region** (`src/lib/regions.js`) is derived from `organizations.country` and
 decides currency, map focus, payout provider and copy. NL/EUR (Tikkie, live)
@@ -96,8 +109,13 @@ access, so any staff role may use it.
 | `src/admin/lib/adminMoney.js` | `useAdminMoney()` / `adminMoney()` — dashboard currency |
 | `src/admin/lib/demoData.js` | the “Demo numbers” dataset |
 | `src/admin/context/orgState.js` | module-level active org for non-React callers |
+| `src/lib/supabase.js` | the customer client; adds `x-device-id` to database calls |
+| `src/lib/deviceId.js` | the device id that owns an anonymous customer |
+| `src/lib/rates.js` | `effectiveRates` — cashback and refund per cup |
 | `supabase/functions/` | ~30 edge functions |
-| `supabase/migrations/` | numbered SQL migrations |
+| `supabase/migrations/` | numbered SQL migrations — every schema change is one |
+| `supabase/pending/` | migrations written and tested but waiting on a deploy |
+| `supabase/baseline/` | full schema snapshot; rebuilds the database from nothing |
 
 The three analytics readers behind the dashboard, all in `adminApi.js`:
 `getAdminStats` (Overview), `getStatsMetrics` (System Health),
@@ -113,6 +131,23 @@ here (`supabase functions deploy` fails on a missing token), so deploy edge
 functions through MCP with the full file contents inline, and keep the local
 copy in `supabase/functions/` in sync in the same commit.
 
+**Every schema change is a numbered file** in `supabase/migrations/`, applied
+with `apply_migration`. Changes made straight in the dashboard are how the
+repo stopped describing the database; `supabase/baseline/` is the snapshot
+that recovered it (regenerate with `baseline/snapshot.sql` after big changes).
+
+**Test policies in a transaction you roll back.** `begin; set local role anon;
+select set_config('request.headers', '{"x-device-id":"…"}', true); …; rollback;`
+exercises RLS and triggers against real data without changing it. For a
+signed-in caller, set `role authenticated` and `request.jwt.claims`.
+
+**Who the guards trust.** Customer-facing guards (`claims_guard_client_*`,
+`users_guard_client`, `cup_balances_guard_client`, …) act only when
+`current_user` is `anon` or `authenticated`. Edge functions (service role),
+SECURITY DEFINER functions and `is_staff_writer()` (active owner, admin or
+manager) pass straight through. Checkers and vendors are read-only in the
+database, as they are in `hasPermission()`.
+
 ---
 
 ## Landmines
@@ -125,23 +160,29 @@ Things that have already cost real time. Read before touching the area.
 admin can read every org's rows. Treat org scoping as a UI convention, not a
 security boundary, and never hand out a Supabase key expecting it to filter.
 
-**The anon key can move money. CRITICAL, still open.** The anon key ships in
-the customer bundle, and with it alone anyone can:
-- read every `users` row, emails included (`anon select … true`);
-- call `get_customer_claims(ids)`, which returns each claim's `tikkie_url` —
-  so reading `claims` directly returning `[]` is **not** protection;
-- update any `claims` row (`anon update`, `true / true`), and `tikkie-cashback`
-  pays `claim.payout_amount` straight from that row with no cap;
-- call `increment_cup_balance` for any user with any delta, and update any
-  `cup_balances` row.
+**The anon key ships in the customer bundle — treat it as public.** Closing
+what it could do is split in two stages, because the live app and the database
+change at different times:
 
-The table grants allow all of it and no trigger guards it. Verified from
-policies, grants, triggers and function bodies — never exercised against
-production. Fix: drop the anon write policies on `cup_balances`, `claims`,
-`users`, `customer_identities`, `cup_scans`; route those writes through edge
-functions that check device/session ownership; derive the payout server-side;
-revoke anon EXECUTE on the balance/claim RPCs. The receipt-upload path relies
-on `claims: anon update`, so replace it before removing it.
+- **Stage 1 — live (migrations 043–045).** The key can no longer move money or
+  change dashboard data. Amounts come from the published config, never the
+  request: the `claims` insert trigger reprices every claim, balances only go
+  down from the client, and `tikkie-cashback` refuses to pay more than the
+  claim's reward is worth. Money leaves only through `create_cashback_claim`,
+  `refund_all_cups`, `donate_cups` and `redeem_voucher`, which check the caller
+  owns the account. Staff-only tables (config, venues, invitations, roles)
+  take writes from `is_staff_writer()` only.
+- **Stage 2 — waiting (`supabase/pending/046_…`).** Until it is applied, the
+  key still **reads** every `users` row (emails), balance and scan, and
+  `get_customer_claims` / `redeem_voucher` still serve callers that send no
+  device header — including unexpired Tikkie payout links. Stage 1 left those
+  open because the app build that was live then sent no header. Apply 046
+  only once the live bundle sends `x-device-id` (fingerprint it:
+  `grep -c x-device-id`), then move the file into `migrations/`.
+
+Never add an `anon`/`authenticated` write policy with `true`, and never let a
+client-sent number decide an amount. New money paths are SECURITY DEFINER
+functions that call `owns_user()` and `assert_can_claim()`.
 
 **Deploys lie.** Vercel has silently skipped deploy triggers; production sat
 two commits behind `main` for hours while the code was correct. `last-modified`
@@ -173,13 +214,17 @@ adapter could deliver.
 months, so `activeOrg.country` was undefined and every org fell back to the NL
 region. If you need a column on the active org, add it to that select.
 
-**Admin “delete user” does not delete the login.** `admin_purge_users` is a
-Postgres function; deleting an `auth.users` row needs the Auth Admin API, which
-SQL cannot call. So the app rows go, the login survives, and the next sign-in
-rebuilds the profile and copies the email back off the auth account — balance
-gone, account back. The customer's own `delete-my-account` edge function does
-it properly (`auth.admin.deleteUser`). **Still open**: an admin-side delete
-needs the same two-step in an edge function.
+**Deleting a customer is an edge function, not SQL.** Removing an
+`auth.users` login needs the Auth Admin API, which SQL cannot call. A SQL-only
+delete removed the app rows and left the login, so the next sign-in rebuilt
+the account and copied the email back, with the balance gone. Both paths now
+go through edge functions: `delete-my-account` (the customer) and
+`admin-delete-user` (the dashboard). Both call `erase_customer_rows()`, which
+deletes the person but **keeps their claims**, anonymised: they are the
+payout ledger. Erase through that function; don't write a new delete.
+
+**Customer emails are email only.** Push notifications were removed; the
+`notify_push` column stays and is always false.
 
 ---
 

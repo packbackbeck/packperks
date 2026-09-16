@@ -41,7 +41,7 @@ import './SignInSheet.css';
  * form. This is the only place in the user app where signing out is
  * exposed — outside the sheet there's no reason for them to do it.
  */
-export default function SignInSheet({ open, onClose, onLinked, onVerified, onMergeHeld, requireVerification = true, savedEmail = null, onSaveEmailDirect, onMarketingConsent, privacyPolicy = null, __devStatus = null, __devEmail = null }) {
+export default function SignInSheet({ open, onClose, onLinked, onVerified, onMergeHeld, requireVerification = true, savedEmail = null, onSaveEmailDirect, marketingConsent: savedMarketingConsent = false, onMarketingConsent, privacyPolicy = null, __devStatus = null, __devEmail = null }) {
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -59,8 +59,11 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
   const [status, setStatus] = useState(import.meta.env.DEV && __devStatus ? __devStatus : 'idle');
   const [email, setEmail] = useState(import.meta.env.DEV && __devEmail ? __devEmail : '');
   // Two consent boxes on the email form: privacy-policy acknowledgement
-  // (required to continue) and a marketing opt-in (default on per product).
-  const [marketingConsent, setMarketingConsent] = useState(true);
+  // (required to continue) and a marketing opt-in. Marketing consent has to
+  // be a deliberate tick (GDPR), so the box starts from the account's saved
+  // choice — unticked for anyone who hasn't opted in. Starting unticked for
+  // someone who had would silently withdraw their consent on submit.
+  const [marketingConsent, setMarketingConsent] = useState(!!savedMarketingConsent);
   const [privacyRead, setPrivacyRead] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -74,6 +77,14 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
 
   // When the sheet opens, find out whether the user is already signed
   // in so we render the right initial state.
+  // Each opening starts the marketing box from the saved choice (adjusted
+  // while rendering, the way React recommends for state that follows a prop).
+  const [seededForOpen, setSeededForOpen] = useState(open);
+  if (open !== seededForOpen) {
+    setSeededForOpen(open);
+    if (open) setMarketingConsent(!!savedMarketingConsent);
+  }
+
   useEffect(() => {
     if (!open) return;
     // DEV screen-audit: honour the forced __devStatus, don't reset on open.

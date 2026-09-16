@@ -22,7 +22,15 @@ export const CONSENT = {
   REJECTED: 'rejected',
 };
 
-export const DEFAULT_PREFS = { technical: true, marketing: true, analytical: true };
+// What the Customize page starts from on a first visit. Only the essential
+// category is on: optional categories need the customer to switch them on
+// (a pre-ticked box is not consent under the GDPR).
+export const DEFAULT_PREFS = { technical: true, marketing: false, analytical: false };
+
+// A Marketing choice made in the cookie banner that the account hasn't
+// recorded yet ('1' or '0'). The banner is usually answered before the
+// customer's row exists, so App.jsx picks this up once it does.
+const MARKETING_PENDING_KEY = 'packperks_marketing_choice_pending';
 
 function levelFromPrefs(p) {
   if (!p || !p.technical) return CONSENT.REJECTED;
@@ -40,7 +48,8 @@ export function getConsentPrefs() {
     if (raw) return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
     // Legacy users who chose before granular existed: derive from the level.
     const level = getConsent();
-    if (level === CONSENT.ALL) return { technical: true, marketing: true, analytical: true };
+    // The old banner never asked about offers, so it granted none.
+    if (level === CONSENT.ALL) return { technical: true, marketing: false, analytical: true };
     if (level === CONSENT.ESSENTIAL) return { technical: true, marketing: false, analytical: false };
     if (level === CONSENT.REJECTED) return { technical: false, marketing: false, analytical: false };
     return null;
@@ -48,8 +57,9 @@ export function getConsentPrefs() {
 }
 
 /** Persist the granular choice, derive + store the legacy level, and broadcast
- *  so the app (App.jsx) can sync marketing consent to the server. */
+ *  so the app (App.jsx) can record a changed marketing choice on the account. */
 export function setConsentPrefs(prefs) {
+  const before = getConsentPrefs();
   const clean = {
     technical: !!prefs?.technical,
     marketing: !!prefs?.marketing,
@@ -58,6 +68,11 @@ export function setConsentPrefs(prefs) {
   try {
     localStorage.setItem(PREFS_KEY, JSON.stringify(clean));
     localStorage.setItem(KEY, levelFromPrefs(clean));
+    // Only a change made here counts. Re-saving the same choice must not
+    // overwrite what the customer picked on the email form or in their profile.
+    if ((before?.marketing ?? false) !== clean.marketing) {
+      localStorage.setItem(MARKETING_PENDING_KEY, clean.marketing ? '1' : '0');
+    }
   } catch { /* private mode */ }
   try {
     window.dispatchEvent(new CustomEvent('packperks:consent-changed', { detail: clean }));
@@ -65,11 +80,26 @@ export function setConsentPrefs(prefs) {
   return clean;
 }
 
-/** Legacy setter (kept for any old callers) — maps a level to granular prefs. */
+/** The banner's buttons, as granular prefs. "Accept all" covers what its page
+ *  describes (essential cookies and analytics) and leaves the marketing choice
+ *  as it was: offers are only ever switched on deliberately. */
 export function setConsent(level) {
-  if (level === CONSENT.ALL) return setConsentPrefs({ technical: true, marketing: true, analytical: true });
+  if (level === CONSENT.ALL) {
+    return setConsentPrefs({ technical: true, marketing: !!getConsentPrefs()?.marketing, analytical: true });
+  }
   if (level === CONSENT.ESSENTIAL) return setConsentPrefs({ technical: true, marketing: false, analytical: false });
   return setConsentPrefs({ technical: false, marketing: false, analytical: false });
+}
+
+/** The banner's unrecorded marketing choice (true / false), or null. Reading
+ *  it clears it. */
+export function takePendingMarketingChoice() {
+  try {
+    const v = localStorage.getItem(MARKETING_PENDING_KEY);
+    if (v === null) return null;
+    localStorage.removeItem(MARKETING_PENDING_KEY);
+    return v === '1';
+  } catch { return null; }
 }
 
 export function clearConsent() {

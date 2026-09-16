@@ -7,14 +7,18 @@ import { getConsentPrefs, DEFAULT_PREFS } from '../lib/consent';
  * CookieConsent — first-run consent (GDPR items 17/18), two pages:
  *
  *   Page 1 (main):  Accept all · Essential only · Customize · policy link.
- *   Page 2 (customize): three toggles — Technical, Analytical, Marketing —
- *                  defaulting to ON, plus a single "Save" CTA. Unchecking
+ *   Page 2 (customize): three toggles — Technical, Analytical, Marketing.
+ *                  A first visit starts with only Technical on, since
+ *                  optional categories need an explicit switch-on. Plus a
+ *                  single "Save" CTA. Unchecking
  *                  Technical (or all of them) means the app can't run → the
  *                  choice resolves to "rejected" and the blocked screen shows.
  *
  * The choice is stored granularly (lib/consent) and its effects are real:
- * analytics (client_events) are only written when Analytical is on, and
- * Marketing is synced to users.marketing_consent server-side (App.jsx).
+ * analytics (client_events) are only written when Analytical is on, and a
+ * Marketing switch the customer changes here is recorded on their account
+ * (users.marketing_consent, App.jsx). "Accept all" leaves Marketing as it
+ * was: its page only describes cookies and analytics.
  * ───────────────────────────────────────────────────────────────────── */
 
 function CookieMark() {
@@ -53,7 +57,7 @@ function ToggleRow({ id, title, desc, checked, onChange }) {
 
 export default function CookieConsent({ onChoose, onCustomize, onPolicy, onDismiss }) {
   const [page, setPage] = useState('main');           // 'main' | 'customize'
-  const init = getConsentPrefs() || DEFAULT_PREFS;    // default: all ON
+  const init = getConsentPrefs() || DEFAULT_PREFS;    // first visit: essential only
   const [technical, setTechnical] = useState(init.technical);
   const [analytical, setAnalytical] = useState(init.analytical);
   const [marketing, setMarketing] = useState(init.marketing);

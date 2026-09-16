@@ -185,11 +185,12 @@ function BinMap({ bins }) {
 }
 
 /* ── The email section: save the balance to an address. Same consent
-   pattern as the sign-in sheet (privacy required, marketing optional). ── */
+   pattern as the sign-in sheet (privacy required, marketing optional and
+   unticked until the customer ticks it). ── */
 function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy }) {
   const [email, setEmailVal] = useState('');
   const [privacyOk, setPrivacyOk] = useState(false);
-  const [marketing, setMarketing] = useState(true);
+  const [marketing, setMarketing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 

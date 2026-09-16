@@ -34,7 +34,7 @@ import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
 import { getShotPreset } from './lib/shotPresets'; // DEV-only screen-audit harness
 import { track, EVENTS, setAnalyticsContext, getEntryContext, getInAppBrowserKind } from './utils/analytics';
-import { getConsentPrefs } from './lib/consent';
+import { takePendingMarketingChoice } from './lib/consent';
 import {
   getOrCreateUser,
   generateInitialProfile,
@@ -1199,24 +1199,23 @@ export default function App({ consentReady = true } = {}) {
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
-  /* Server-side consent sync: mirror the Marketing cookie choice onto the user's
-   * row (users.marketing_consent) so the choice is stored + honoured server-side.
-   * (Analytical consent already takes effect client-side — client_events are only
-   * written with analytical consent; see utils/analytics.js. Technical is the
-   * essential baseline.) Runs once the user row exists and again whenever the
-   * choice changes, writing only on an actual change so the timestamp isn't
-   * churned on every load. */
+  /* A Marketing switch the customer changes in the cookie banner is recorded on
+   * their account (users.marketing_consent). Only that change is applied — once,
+   * when the row exists — never the banner's stored state on every load, which
+   * used to overwrite the opt-in box on the email form and the Marketing emails
+   * switch in Edit profile. (Analytical consent takes effect client-side:
+   * client_events are only written with it, see utils/analytics.js. Technical
+   * is the essential baseline.) */
   useEffect(() => {
     if (!userId) return undefined;
-    const sync = (marketing) => {
-      if (marketing === profile?.marketingConsent) return;
-      updateUserProfile(userId, { marketingConsent: marketing }).catch(() => {});
+    const apply = () => {
+      const choice = takePendingMarketingChoice();
+      if (choice === null || choice === !!profile?.marketingConsent) return;
+      handleSaveProfile({ marketingConsent: choice, marketingConsentSource: 'cookie_banner' });
     };
-    const prefs = getConsentPrefs();
-    if (prefs) sync(prefs.marketing);
-    const onChange = (e) => sync(!!e.detail?.marketing);
-    window.addEventListener('packperks:consent-changed', onChange);
-    return () => window.removeEventListener('packperks:consent-changed', onChange);
+    apply();
+    window.addEventListener('packperks:consent-changed', apply);
+    return () => window.removeEventListener('packperks:consent-changed', apply);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, profile?.marketingConsent]);
 
@@ -2208,6 +2207,7 @@ export default function App({ consentReady = true } = {}) {
       requireVerification={liveSettings.requireEmailVerification !== false}
       savedEmail={profile?.email || authEmail || null}
       privacyPolicy={liveSettings.privacyPolicyText}
+      marketingConsent={!!profile?.marketingConsent}
       onMarketingConsent={(consent) =>
         handleSaveProfile({ marketingConsent: consent, marketingConsentSource: 'signin_popup' })
       }

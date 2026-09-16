@@ -68,11 +68,12 @@ the open store. That cannot be scripted — it needs a password.
 
 Nothing here is in flight; all of it is known and unstarted.
 
-**Security — anon key exposes the customer list.** `users`, `cup_scans`,
-`cup_balances` carry `anon select … true`. 468 user rows including real email
-addresses are publicly readable with the key that ships in the customer
-bundle. `claims` is fine. Fix: scope those three policies to the requesting
-device, the way `claims` already is. Details in `/CLAUDE.md`.
+**Security — CRITICAL: the anon key can move money.** Beyond reading every
+customer and email, the public key can update any balance and any claim
+(including its payout amount, which `tikkie-cashback` pays uncapped), and
+`get_customer_claims` hands out every customer's Tikkie payout link. The
+earlier note here that `claims` was fine was wrong. Details and fix in
+`/CLAUDE.md`.
 
 **Admin delete doesn't delete.** Deleting a user from the dashboard removes the
 app rows but not the `auth.users` login, so the account and email come back on

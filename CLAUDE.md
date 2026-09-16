@@ -34,7 +34,10 @@ Compare against `git stash` + rerun before claiming you introduced nothing.
 
 1. **Verify on the running dev server.** A green build is not evidence a screen
    looks right. Start `packperks-dev` (`.claude/launch.json`, port 5173) and
-   actually look at the page before saying it works.
+   actually look at the page before saying it works. `.claude/` is
+   gitignored, so on a fresh clone create that file: one configuration named
+   `packperks-dev`, `runtimeExecutable: "npm"`, `runtimeArgs: ["run","dev"]`,
+   `port: 5173`.
 2. **Push only when asked.** Commit locally freely; `git push` waits for a
    direct instruction. There are two remotes and both get pushed:
    `origin` (GitHub) and `gitlab`.
@@ -50,10 +53,15 @@ in an `org_groups` row. Config is published to `app_config` under
 `published:<orgId>`, group config under `published:group:<groupId>`.
 
 **Mode** decides which app a venue runs:
-- default — full app: cup balance, rewards, claims
-- `tikkie_only` (“Redirect Refund”) — smart bin prints a receipt, no app,
-  no rewards; the wallet home is `TikkieHomePage.jsx`
-- BYO group — customers bring their own cup, counter QR
+- `standard` (Deposit Rewards) — full app: cup balance, rewards, claims
+- `tikkie_only` (Deferred Refund) — smart bin prints a receipt; scans credit a
+  wallet (`TikkieHomePage.jsx`) collected later as one Tikkie link. No rewards.
+- `byo` (Bring Your Own) — a group mode: customers bring their own cup and
+  scan the counter QR
+
+The same modes carry other names in the product — “Redirect Refund”, “Direct
+refund only”, “Titaan Direct Refund”, “Rewards only”. They are stale; prefer
+the names above.
 
 **Region** (`src/lib/regions.js`) is derived from `organizations.country` and
 decides currency, map focus, payout provider and copy. NL/EUR (Tikkie, live)
@@ -117,11 +125,23 @@ Things that have already cost real time. Read before touching the area.
 admin can read every org's rows. Treat org scoping as a UI convention, not a
 security boundary, and never hand out a Supabase key expecting it to filter.
 
-**The anon key exposes the customer list.** `users`, `cup_scans` and
-`cup_balances` each carry an `anon select` policy with condition `true`. The
-anon key ships in the customer bundle, so all user rows including real email
-addresses are publicly readable. `claims` is correctly protected. **Still
-open** — fix by scoping those three policies to the requesting device.
+**The anon key can move money. CRITICAL, still open.** The anon key ships in
+the customer bundle, and with it alone anyone can:
+- read every `users` row, emails included (`anon select … true`);
+- call `get_customer_claims(ids)`, which returns each claim's `tikkie_url` —
+  so reading `claims` directly returning `[]` is **not** protection;
+- update any `claims` row (`anon update`, `true / true`), and `tikkie-cashback`
+  pays `claim.payout_amount` straight from that row with no cap;
+- call `increment_cup_balance` for any user with any delta, and update any
+  `cup_balances` row.
+
+The table grants allow all of it and no trigger guards it. Verified from
+policies, grants, triggers and function bodies — never exercised against
+production. Fix: drop the anon write policies on `cup_balances`, `claims`,
+`users`, `customer_identities`, `cup_scans`; route those writes through edge
+functions that check device/session ownership; derive the payout server-side;
+revoke anon EXECUTE on the balance/claim RPCs. The receipt-upload path relies
+on `claims: anon update`, so replace it before removing it.
 
 **Deploys lie.** Vercel has silently skipped deploy triggers; production sat
 two commits behind `main` for hours while the code was correct. `last-modified`

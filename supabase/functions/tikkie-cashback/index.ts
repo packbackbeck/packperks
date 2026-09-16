@@ -18,6 +18,11 @@
 // Auth: caller must be an admin (row in admin_profiles). subscribe/unsubscribe
 // are owner-only. Tikkie itself authenticates with API-Key + X-App-Token headers.
 //
+// Money checks: a claim is paid only up to what it is worth under the venue's
+// published config (the reward's price, or cups × the refund rate), whatever
+// the claim row says. The payout link lives in the app; the email only ever
+// links to the app, never to Tikkie.
+//
 // Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 //   TIKKIE_API_KEY, TIKKIE_APP_TOKEN,
 //   TIKKIE_API_BASE_URL (e.g. https://api.abnamro.com/v1/tikkie/cashback),
@@ -130,6 +135,59 @@ async function locationFor(orgId: string | null): Promise<{ locationId?: string;
   }
 }
 
+// What a claim is worth under the venue's published config, or null when it
+// can't be worked out. A reward claim is worth its reward's price, or the
+// price verify-receipt recorded when it checked the receipt if the venue has
+// since lowered it; a removed reward is capped at the venue's dearest one. A
+// claim without a reward (a direct refund, a Deferred Tikkie balance) is
+// worth its cups at the venue's refund rate.
+async function expectedPayout(claim: {
+  org_id: string | null; type: string; reward_id: string | null; cups_redeemed: number | null;
+  ai_verdict?: { price_check?: { expected?: unknown } } | null;
+}): Promise<number | null> {
+  if (!claim.org_id) return null;
+  const { data } = await supabase.from("app_config")
+    .select("value").eq("key", `published:${claim.org_id}`).maybeSingle();
+  const value = (data?.value ?? {}) as { rewards?: Array<{ id?: string; euros?: unknown }> };
+  const rewards = Array.isArray(value.rewards) ? value.rewards : [];
+  const price = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  if (claim.type === "cashback" && claim.reward_id) {
+    const reward = rewards.find((r) => r?.id === claim.reward_id);
+    const checked = price(claim.ai_verdict?.price_check?.expected);
+    let now: number | null;
+    if (reward) {
+      now = price(reward.euros);
+    } else {
+      const prices = rewards.map((r) => price(r?.euros)).filter((n): n is number => n != null);
+      now = prices.length ? Math.max(...prices) : null;
+    }
+    if (now == null) return checked;
+    return checked == null ? now : Math.max(now, checked);
+  }
+  const cups = Number(claim.cups_redeemed);
+  if (!Number.isFinite(cups) || cups <= 0) return null;
+  const { data: rate, error } = await supabase.rpc("venue_refund_rate", { p_org_id: claim.org_id });
+  if (error || rate == null) return null;
+  return Math.round(cups * Number(rate) * 100) / 100;
+}
+
+// Money in the venue's currency. Only NL venues pay through Tikkie today; the
+// dirham branch keeps a UAE email honest if that ever changes.
+async function venueCurrency(orgId: string | null): Promise<(n: number) => string> {
+  let country = "";
+  if (orgId) {
+    const { data } = await supabase.from("organizations").select("country").eq("id", orgId).maybeSingle();
+    country = String(data?.country || "").toLowerCase();
+  }
+  if (country.includes("emirat") || country === "ae" || country === "uae") {
+    return (n: number) => `AED ${Number.isInteger(n) ? n : n.toFixed(2)}`;
+  }
+  return (n: number) => `€${n.toFixed(2)}`;
+}
+
 interface TikkieCashback {
   cashbackId: string;
   url: string;
@@ -159,8 +217,8 @@ function esc(s: unknown): string {
 /* PackPerks-branded "your cashback is ready" email. Table-based + inline styles
  * so Gmail/Outlook render it faithfully; cream canvas, DM-Sans-first stack, a
  * bulletproof orange CTA. Mirrors the in-app design language. */
-function tikkieReadyEmailHtml(opts: { name?: string; amount: number; url: string; reward?: string; orgName?: string }): string {
-  const amount = `€${(opts.amount || 0).toFixed(2)}`;
+function tikkieReadyEmailHtml(opts: { name?: string; amount: string; url: string; reward?: string; orgName?: string }): string {
+  const amount = esc(opts.amount);
   const hi = opts.name ? `Hi ${esc(opts.name)},` : "Hi there,";
   const rewardLine = opts.reward
     ? `We&rsquo;ve reviewed your receipt and approved it. Your <strong style="color:#3A342C;">${esc(opts.reward)}</strong> cashback is ready to collect.`
@@ -267,7 +325,7 @@ Deno.serve(async (req) => {
       return json({ error: "insufficient_role", detail: `role=${admin.role}` }, 403);
     }
     const { data: claim, error: cErr } = await supabase.from("claims")
-      .select("id, org_id, type, status, payout_amount, tikkie_cashback_id, tikkie_url, tikkie_status, notify_email, user_id, reward_id")
+      .select("id, org_id, type, status, payout_amount, cups_redeemed, ai_verdict, tikkie_cashback_id, tikkie_url, tikkie_status, notify_email, user_id, reward_id")
       .eq("id", body.claim_id).maybeSingle();
     if (cErr) return json({ error: "db_error", detail: cErr.message }, 500);
     if (!claim) return json({ error: "claim_not_found" }, 404);
@@ -295,6 +353,14 @@ Deno.serve(async (req) => {
     const amountInCents = Math.round(Number(claim.payout_amount) * 100);
     if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
       return json({ error: "bad_amount", detail: `payout_amount=${claim.payout_amount}` }, 400);
+    }
+    const worth = await expectedPayout(claim);
+    if (worth == null || amountInCents > Math.round(worth * 100)) {
+      console.error(`[tikkie] create REFUSED → claim=${claim.id} amount=${amountInCents}c worth=${worth}`);
+      return json({
+        error: "amount_exceeds_claim",
+        detail: `This claim is worth ${worth == null ? "an unknown amount" : worth.toFixed(2)} under the venue's current settings, but asks for ${(amountInCents / 100).toFixed(2)}.`,
+      }, 409);
     }
 
     const loc = await locationFor(claim.org_id);
@@ -399,27 +465,26 @@ Deno.serve(async (req) => {
           .select("email, display_name").eq("id", claim.user_id).maybeSingle();
         if (u?.email) {
           const amount = Number(claim.payout_amount) || 0;
-          // Link to the PackPerks app (the customer's account page, which auto-
-          // opens the pending-claim popup that carries the Tikkie collect
-          // button) instead of the raw Tikkie link. This keeps the collect
-          // flow inside the app — matching the in-app "Collect" experience — and
-          // lets us show status/expiry around the payout. Falls back to the raw
-          // Tikkie link if we can't resolve the store slug.
+          const money = await venueCurrency(claim.org_id);
+          // The email opens the customer's account in the PackPerks app, which
+          // shows the claim with its Tikkie button. The Tikkie link itself is
+          // never emailed: without a venue page to point at, send nothing.
           const appBase = (Deno.env.get("APP_BASE_URL") || "https://perks.packback.network").replace(/\/+$/, "");
-          let claimUrl = cb.url;
-          try {
-            const { data: org } = await supabase.from("organizations")
-              .select("slug").eq("id", claim.org_id).maybeSingle();
-            if (org?.slug) claimUrl = `${appBase}/${org.slug}/?claim=${claim.id}`;
-          } catch { /* fall back to the Tikkie link */ }
-          const html = tikkieReadyEmailHtml({ name: u.display_name, amount, url: claimUrl });
-          const text =
-            `${u.display_name ? `Hi ${u.display_name},` : "Hi there,"}\n\n` +
-            `Your €${amount.toFixed(2)} cashback is approved and ready. Open it in the PackPerks app to collect it through Tikkie:\n${claimUrl}\n\n` +
-            `The link is unique to you, so please don't share it, and collect it soon as cashback links expire.\n\nPackPerks`;
-          const r = await sendBrevoEmail(u.email, `Your €${amount.toFixed(2)} cashback is ready`, html, text);
-          emailSent = r.ok;
-          emailError = r.error;
+          const { data: org } = await supabase.from("organizations")
+            .select("slug").eq("id", claim.org_id).maybeSingle();
+          if (!org?.slug) {
+            emailError = "no_app_link";
+          } else {
+            const claimUrl = `${appBase}/${org.slug}/?claim=${claim.id}`;
+            const html = tikkieReadyEmailHtml({ name: u.display_name, amount: money(amount), url: claimUrl });
+            const text =
+              `${u.display_name ? `Hi ${u.display_name},` : "Hi there,"}\n\n` +
+              `Your ${money(amount)} cashback is approved and ready. Open it in the PackPerks app to collect it through Tikkie:\n${claimUrl}\n\n` +
+              `Collect it soon, as cashback links expire.\n\nPackPerks`;
+            const r = await sendBrevoEmail(u.email, `Your ${money(amount)} cashback is ready`, html, text);
+            emailSent = r.ok;
+            emailError = r.error;
+          }
         }
       }
     } catch (e) {

@@ -32,6 +32,17 @@ const fmtWhen = (ts: string | null | undefined) => (ts ? new Date(ts).toISOStrin
 
 const DATASET_LABEL: Record<string, string> = { claims: 'Reward claims', cup_scans: 'Cup scans', activity: 'Activity' };
 
+// An amount in its venue's currency: dirhams for UAE venues (whole dirhams
+// without decimals, as in the app), euros everywhere else.
+function amountIn(amount: number, country: string | null | undefined): string {
+  const c = String(country || '').toLowerCase();
+  const value = Number(amount) || 0;
+  if (c.includes('emirat') || c === 'ae' || c === 'uae') {
+    return `AED ${Number.isInteger(value) ? value : value.toFixed(2)}`;
+  }
+  return `EUR ${value.toFixed(2)}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
@@ -47,8 +58,11 @@ Deno.serve(async (req) => {
       ? (await supabase.auth.getUser(auth.replace('Bearer ', ''))).data.user?.id ?? null
       : null;
     if (!authId) return json({ error: 'forbidden' }, 403);
-    const { data: adminP } = await supabase.from('admin_profiles').select('status').eq('id', authId).maybeSingle();
+    const { data: adminP } = await supabase.from('admin_profiles').select('status, role').eq('id', authId).maybeSingle();
     if (!adminP || (adminP.status && adminP.status !== 'active')) return json({ error: 'forbidden' }, 403);
+    // The report lists customers across every store: vendors can't send it,
+    // and a test only goes to a dashboard account, never an outside address.
+    if (adminP.role === 'vendor') return json({ error: 'forbidden' }, 403);
   } else {
     const { data: secRow } = await supabase.from('app_config').select('value').eq('key', 'digest_cron').maybeSingle();
     const secret = ((secRow?.value as { secret?: string } | null)?.secret) || '';
@@ -63,8 +77,13 @@ Deno.serve(async (req) => {
   }
   const dataset = ['claims', 'cup_scans', 'activity'].includes(String(cfg.dataset)) ? String(cfg.dataset) : 'claims';
   const status = String(cfg.status || 'completed');
-  const recipient = String((isTest ? (body.to || cfg.recipient) : cfg.recipient) || '');
+  const recipient = String((isTest ? (body.to || cfg.recipient) : cfg.recipient) || '').trim();
   if (!recipient) return json({ error: 'no_recipient' }, 400);
+  if (isTest) {
+    const { data: staff } = await supabase.from('admin_profiles')
+      .select('id').ilike('email', recipient.replace(/[\\%_]/g, (c) => '\\' + c)).eq('status', 'active').limit(1);
+    if (!staff?.length) return json({ error: 'recipient_not_staff' }, 403);
+  }
 
   // Pull the last 30 days of the chosen dataset (preview of 25 rows + a count).
   const sinceIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -85,10 +104,11 @@ Deno.serve(async (req) => {
   const orgIds = [...new Set(list.map((r) => r.org_id).filter(Boolean))] as string[];
   const [uRes, oRes] = await Promise.all([
     userIds.length ? supabase.from('users').select('id, display_name').in('id', userIds) : Promise.resolve({ data: [] }),
-    orgIds.length ? supabase.from('organizations').select('id, name').in('id', orgIds) : Promise.resolve({ data: [] }),
+    orgIds.length ? supabase.from('organizations').select('id, name, country').in('id', orgIds) : Promise.resolve({ data: [] }),
   ]);
   const uMap: Record<string, string> = Object.fromEntries(((uRes.data as { id: string; display_name: string }[]) || []).map((u) => [u.id, u.display_name]));
   const oMap: Record<string, string> = Object.fromEntries(((oRes.data as { id: string; name: string }[]) || []).map((o) => [o.id, o.name]));
+  const countryOf: Record<string, string | null> = Object.fromEntries(((oRes.data as { id: string; country: string | null }[]) || []).map((o) => [o.id, o.country]));
 
   let headers: string[];
   let cells: string[][];
@@ -97,7 +117,7 @@ Deno.serve(async (req) => {
     cells = list.map((r) => [
       fmtWhen(r.created_at as string), oMap[r.org_id as string] || '', uMap[r.user_id as string] || 'Guest',
       String(r.type || ''), String(r.status || ''), String(r.cups_redeemed ?? ''),
-      r.payout_amount != null ? 'EUR ' + Number(r.payout_amount).toFixed(2) : '',
+      r.payout_amount != null ? amountIn(Number(r.payout_amount), countryOf[r.org_id as string]) : '',
     ]);
   } else if (dataset === 'cup_scans') {
     headers = ['When', 'Store', 'Customer', 'Cups', 'Status'];

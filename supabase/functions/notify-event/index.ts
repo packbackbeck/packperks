@@ -129,7 +129,12 @@ async function loadDetails(eventType: string, rowId: string | null): Promise<{ r
         rows.push(['Type', String(c.type || 'cashback').replace(/_/g, ' ')]);
         if (c.reward_id) rows.push(['Reward', String(c.reward_id)]);
         if (c.cups_redeemed != null) rows.push(['Cups spent', String(c.cups_redeemed)]);
-        if (c.payout_amount != null) rows.push(['Cashback', 'EUR ' + Number(c.payout_amount).toFixed(2)]);
+        if (c.payout_amount != null) {
+          const { data: org } = c.org_id
+            ? await supabase.from('organizations').select('country').eq('id', c.org_id).maybeSingle()
+            : { data: null };
+          rows.push(['Cashback', amountIn(Number(c.payout_amount), org?.country)]);
+        }
         if (eventType === 'claim_approved') rows.push(['Decision', 'Approved']);
         if (eventType === 'claim_rejected') rows.push(['Decision', 'Rejected']);
         if (eventType === 'payout_failed') rows.push(['Payout', 'Failed to mint']);
@@ -177,6 +182,17 @@ async function sendBrevo(recipients: string[], subject: string, html: string, te
     }),
   });
   return resp.ok ? { ok: true } : { ok: false, error: `brevo_${resp.status}` };
+}
+
+// An amount in its venue's currency: dirhams for UAE venues (whole dirhams
+// without decimals, as in the app), euros everywhere else.
+function amountIn(amount: number, country: string | null | undefined): string {
+  const c = String(country || '').toLowerCase();
+  const value = Number(amount) || 0;
+  if (c.includes('emirat') || c === 'ae' || c === 'uae') {
+    return `AED ${Number.isInteger(value) ? value : value.toFixed(2)}`;
+  }
+  return `EUR ${value.toFixed(2)}`;
 }
 
 Deno.serve(async (req) => {

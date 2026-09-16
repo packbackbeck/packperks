@@ -7,8 +7,9 @@
 //   1. If a row already exists in admin_profiles for this auth user,
 //      we're done — return it.
 //   2. Otherwise, decide what role to grant:
-//        a. If a pending admin_invitations row matches their email,
-//           consume it for the ROLE (org is ignored — admins are global).
+//        a. If a pending admin_invitations row matches their email and was
+//           created by an active owner or admin, consume it for the ROLE
+//           (and, for a vendor, the store).
 //        b. Else if NO admin exists yet at all, this user becomes the
 //           founding 'owner'.
 //        c. Else if their email is on a trusted internal domain
@@ -17,13 +18,13 @@
 //           needed. (Owners/Admins can promote them afterwards.)
 //        d. Else reject with 403 registration_locked — admin sign-up is
 //           locked to @packback.network + invited teammates.
-//   3. Insert the profile with org_id = NULL (global: every admin sees
-//      and controls all orgs), write a `user.signup` audit log entry,
+//   3. Insert the profile, write a `user.signup` audit log entry,
 //      record the first login in `admin_login_history`, and return.
 //
-// Admins are intentionally NOT tied to an org. org_id is left NULL so the
-// org-admin RLS policies ("... OR ap.org_id IS NULL") grant access to all
-// orgs' data.
+// STAFF admins are intentionally NOT tied to an org. org_id is left NULL so
+// the org-admin RLS policies ("... OR ap.org_id IS NULL") grant access to
+// all orgs' data. A VENDOR is the opposite case — the venue's own person,
+// pinned to the single store their invitation named.
 //
 // All writes use the service role since admin_profiles has RLS enabled.
 // The caller authenticates with their JWT (verify_jwt = true on this fn)
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
   // roles that are scoped to one org; staff stay global (null).
   let invitedOrgId: string | null = null;
 
-  const { data: invitation } = await supabase
+  const { data: found } = await supabase
     .from("admin_invitations")
     .select("id, org_id, role, invited_by")
     .eq("email", email)
@@ -127,6 +128,23 @@ Deno.serve(async (req) => {
     .order("invited_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // An invitation only counts if an active owner or admin created it.
+  // invite-admin is its only writer; this makes a row planted any other way
+  // worthless. (Until migration 043 any signed-in customer could insert one.)
+  let invitation = found;
+  if (invitation) {
+    const { data: inviter } = invitation.invited_by
+      ? await supabase.from("admin_profiles")
+        .select("role, status").eq("id", invitation.invited_by).maybeSingle()
+      : { data: null };
+    const inviterMayInvite = !!inviter && inviter.status === "active"
+      && (inviter.role === "owner" || inviter.role === "admin");
+    if (!inviterMayInvite) {
+      console.warn(`[bootstrap-admin] ignored invitation ${invitation.id}: not created by an owner or admin`);
+      invitation = null;
+    }
+  }
 
   if (invitation) {
     // Honour the invited role. Staff roles stay global (org_id null) as they

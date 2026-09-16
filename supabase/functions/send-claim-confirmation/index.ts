@@ -49,7 +49,9 @@ function currency(country: string | null): { sym: string; before: boolean } {
 }
 function money(amount: number, country: string | null): string {
   const cur = currency(country);
-  const n = (Number(amount) || 0).toFixed(2);
+  const value = Number(amount) || 0;
+  // Whole dirhams drop their decimals (AED 21, not AED 21.00), as in the app.
+  const n = cur.sym.startsWith('AED') && Number.isInteger(value) ? String(value) : value.toFixed(2);
   return cur.before ? `${cur.sym}${n}` : `${n}${cur.sym}`;
 }
 

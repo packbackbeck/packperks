@@ -1,4 +1,4 @@
-// PackPerks — verify-receipt Edge Function (v10 — customer-facing; org-scoped item lookup)
+// PackPerks — verify-receipt Edge Function (v11 — currency-aware; org-scoped item lookup)
 //
 // Single Claude call that runs THREE sequential checks against the receipt
 // image and SHORT-CIRCUITS. Persists verdict + status to the claims row.
@@ -158,8 +158,14 @@ const VERIFY_TOOL = {
       },
       venue: { type: ["string", "null"] },
       datetime_iso: { type: ["string", "null"] },
-      total_eur: { type: ["number", "null"] },
-      currency: { type: ["string", "null"] },
+      total_eur: {
+        type: ["number", "null"],
+        description: "The receipt total EXACTLY as printed, in the receipt's own currency. Never convert between currencies — a receipt in AED is reported in AED. (The field name is historical.)",
+      },
+      currency: {
+        type: ["string", "null"],
+        description: "ISO code of the currency printed on the receipt, e.g. EUR or AED.",
+      },
       items: {
         type: "array",
         items: {
@@ -167,7 +173,10 @@ const VERIFY_TOOL = {
           properties: {
             name: { type: "string" },
             qty: { type: "number" },
-            price_eur: { type: ["number", "null"] },
+            price_eur: {
+              type: ["number", "null"],
+              description: "Line price exactly as printed, in the receipt's own currency. Never convert.",
+            },
           },
           required: ["name", "qty"],
         },
@@ -194,17 +203,20 @@ const VERIFY_TOOL = {
   },
 };
 
-function buildSystemPrompt(requiredItem: string, requiredQty = 1, venueName = "a participating venue", maxAgeDays = DEFAULT_RECEIPT_MAX_AGE_DAYS) {
+function buildSystemPrompt(requiredItem: string, requiredQty = 1, venueName = "a participating venue", maxAgeDays = DEFAULT_RECEIPT_MAX_AGE_DAYS, venueCountry: string | null = null) {
   const qtyClause = requiredQty > 1
     ? `
 
 QUANTITY REQUIREMENT: the customer must have bought AT LEAST ${requiredQty} of this item. Add up the qty of every matching line item. PASS only when the total matched quantity is ${requiredQty} or more. If fewer are present, FAIL this check and state how many you found (for example "found 1, requires ${requiredQty}").`
     : "";
-  return _buildSystemPrompt(requiredItem, qtyClause, venueName, maxAgeDays);
+  return _buildSystemPrompt(requiredItem, qtyClause, venueName, maxAgeDays, venueCountry);
 }
 
-function _buildSystemPrompt(requiredItem: string, qtyClause: string, venueName: string, maxAgeDays: number) {
-  return `You are a receipt verification assistant for PackPerks, a reusable-cup rewards program in the Netherlands. Customers collect cups at a participating venue and submit a purchase receipt to claim a reward.
+function _buildSystemPrompt(requiredItem: string, qtyClause: string, venueName: string, maxAgeDays: number, venueCountry: string | null) {
+  const where = venueCountry ? ` The venue is in ${venueCountry}.` : "";
+  return `You are a receipt verification assistant for PackPerks, a reusable-cup rewards program. Customers collect cups at a participating venue and submit a purchase receipt to claim a reward.${where}
+
+AMOUNTS: report every price and total exactly as printed, in the receipt's own currency, and set the currency field to match. Never convert between currencies.
 
 EXPECTED VENUE: "${venueName}". The receipt should look like it came from this venue (or another real retail venue selling the item). Do not reject a receipt merely because the branding is a different real venue — brand-matching is advisory, authenticity is what matters.
 
@@ -311,7 +323,8 @@ async function blobToBase64(blob: Blob): Promise<string> {
 interface RequiredItem {
   name: string;
   requiredQty: number;
-  // The reward's expected price in € (the reward's `euros`), for the price-match
+  // The reward's expected price in the venue's currency (the reward's `euros`
+  // field — named before AED existed), for the price-match
   // check. null when unknown.
   euros: number | null;
   // Cups needed to unlock the reward, for the unlock-date check. null when unknown.
@@ -382,18 +395,33 @@ async function lookupRequiredItem(rewardId: string | null, orgId: string | null)
 // The venue the receipt is expected to be from — used in the prompt instead of
 // a hard-coded brand, so verification is per-venue rather than locked to the
 // original Burger King test setup.
-async function lookupVenueName(orgId: string | null): Promise<string> {
-  if (!orgId) return "a participating venue";
+async function lookupVenue(orgId: string | null): Promise<{ name: string; country: string | null }> {
+  const fallback = { name: "a participating venue", country: null };
+  if (!orgId) return fallback;
   try {
     const { data } = await supabase
       .from("organizations")
-      .select("name, partner_brand_name")
+      .select("name, partner_brand_name, country")
       .eq("id", orgId)
       .maybeSingle();
-    return data?.partner_brand_name || data?.name || "a participating venue";
+    return {
+      name: data?.partner_brand_name || data?.name || fallback.name,
+      country: data?.country || null,
+    };
   } catch {
-    return "a participating venue";
+    return fallback;
   }
+}
+
+// Money in the venue's own currency, for the notes an admin reads. Dirham
+// amounts drop their decimals when whole, matching the app.
+function venueMoney(amount: number, country: string | null): string {
+  const c = (country || "").toLowerCase();
+  const n = Number(amount) || 0;
+  if (c.includes("emirat") || c === "ae" || c === "uae") {
+    return `AED ${Number.isInteger(n) ? n : n.toFixed(2)}`;
+  }
+  return `€${n.toFixed(2)}`;
 }
 
 // Is this org part of a BYO ("bring your own cup") group? BYO venues use the
@@ -430,7 +458,7 @@ function matchedItemQty(items: unknown, requiredItem: string): number {
   return total;
 }
 
-// Per-unit price (€) of the receipt line item that matches the required item, or
+// Per-unit price (venue currency) of the receipt line item that matches the required item, or
 // null if not found. If a line lists a total for qty>1, divide back to per-unit.
 function matchedItemPrice(items: unknown, requiredItem: string): number | null {
   if (!Array.isArray(items)) return null;
@@ -495,10 +523,11 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "rate_limited", detail: "Too many receipt verifications today. Try again tomorrow." }, 429);
 
   const { name: requiredItem, requiredQty, euros: rewardEuros, cupsNeeded: rewardCupsNeeded, maxAgeDays: receiptMaxAgeDays } = await lookupRequiredItem(claim.reward_id, claim.org_id);
-  const [venueName, byo] = await Promise.all([
-    lookupVenueName(claim.org_id),
+  const [venue, byo] = await Promise.all([
+    lookupVenue(claim.org_id),
     isByoOrg(claim.org_id),
   ]);
+  const venueName = venue.name;
 
   const { data: photoBlob, error: dlErr } = await supabase.storage
     .from("receipts")
@@ -576,7 +605,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 1024,
-        system: buildSystemPrompt(requiredItem, requiredQty, venueName, receiptMaxAgeDays),
+        system: buildSystemPrompt(requiredItem, requiredQty, venueName, receiptMaxAgeDays, venue.country),
         tools: [VERIFY_TOOL],
         tool_choice: { type: "tool", name: "record_receipt_verdict" },
         messages: [
@@ -717,7 +746,7 @@ Deno.serve(async (req) => {
       (verdict as Record<string, unknown>).price_check = { expected: rewardEuros, receipt: receiptPrice, diff };
       if (Math.abs(diff) > 0.05) { // a couple of cents of rounding/promo noise is fine
         failureChecks = ["price_mismatch", ...failureChecks];
-        const detail = `Receipt price €${receiptPrice.toFixed(2)} vs our price €${rewardEuros.toFixed(2)} (${diff > 0 ? "+" : "−"}€${Math.abs(diff).toFixed(2)}).`;
+        const detail = `Receipt price ${venueMoney(receiptPrice, venue.country)} vs our price ${venueMoney(rewardEuros, venue.country)} (${diff > 0 ? "+" : "−"}${venueMoney(Math.abs(diff), venue.country)}).`;
         postAiReason = postAiReason ? `${postAiReason} ${detail}` : detail;
       }
     }

@@ -4,15 +4,15 @@
 // forgotten). The caller must present their own Supabase auth session, so a
 // person can only ever delete their OWN footprint.
 //
-// The actual deletion is done by the purge_my_account() Postgres function, which
-// gathers EVERY users row belonging to this person via connected components —
-// by auth_user_id, by their current device_id, AND by any shared identity graph
-// (including tombstones) — then deletes activity/claims/users (cup_balances +
-// cup_scans cascade) and every customer_identity in the set (payout_details
-// cascade). This closes the "account came back after delete" bug, where the old
-// version found identities only by auth_user_id (which was null on the scattered
-// identities) and left rows + identities behind for the device to resurface.
-// Finally we remove the auth user so the email is fully forgotten.
+// purge_my_account() gathers every users row belonging to this person (by
+// login, by this device, and through their shared identity, tombstones
+// included) and erases them: profile, balances, scans, history and shared
+// identity are deleted; claims stay as the 7-year accounting record with
+// everything personal removed (migration 043, docs/RETENTION_SCHEDULE.md).
+// This function then removes their receipt and scan photos, which only the
+// Storage API can delete, and finally the login, so the email is forgotten
+// and nothing resurfaces on the next sign-in. A login that is also a
+// dashboard account is left alone.
 //
 // Body: { device_id?: string }. Auth: verify_jwt = true.
 
@@ -31,6 +31,16 @@ const CORS: Record<string, string> = {
 };
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'content-type': 'application/json' } });
+
+// Photos go through the Storage API in batches. Best-effort: a missing object
+// must not stop an erasure.
+async function removeObjects(bucket: string, paths: unknown): Promise<void> {
+  const list = (Array.isArray(paths) ? paths : [])
+    .filter((p): p is string => typeof p === 'string' && p.length > 0);
+  for (let i = 0; i < list.length; i += 100) {
+    try { await supabase.storage.from(bucket).remove(list.slice(i, i + 100)); } catch (_e) { /* best-effort */ }
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -53,12 +63,28 @@ Deno.serve(async (req) => {
       p_device: deviceId,
     });
     if (error) return json({ error: 'delete_failed', detail: error.message }, 500);
+    const result = (data ?? {}) as {
+      deleted_rows?: number; deleted_identities?: number; kept_claims?: number;
+      receipt_paths?: unknown; scan_paths?: unknown;
+    };
 
-    // Finally remove the auth user so the email is fully forgotten and can't
+    await removeObjects('receipts', result.receipt_paths);
+    await removeObjects('cup-scans', result.scan_paths);
+
+    // Finally remove the login so the email is fully forgotten and can't
     // resurface an account on next load.
-    try { await supabase.auth.admin.deleteUser(authUid); } catch (_e) { /* best-effort */ }
+    const { data: staff } = await supabase.from('admin_profiles')
+      .select('id').eq('id', authUid).maybeSingle();
+    if (!staff) {
+      try { await supabase.auth.admin.deleteUser(authUid); } catch (_e) { /* best-effort */ }
+    }
 
-    return json({ deleted: true, ...(data as Record<string, unknown>) });
+    return json({
+      deleted: true,
+      deleted_rows: result.deleted_rows ?? 0,
+      deleted_identities: result.deleted_identities ?? 0,
+      kept_claims: result.kept_claims ?? 0,
+    });
   } catch (e) {
     return json({ error: 'delete_failed', detail: String(e) }, 500);
   }

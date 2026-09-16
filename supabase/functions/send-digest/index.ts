@@ -104,6 +104,28 @@ async function rewardNameMap(orgIds: string[]): Promise<Record<string, string>> 
   return map;
 }
 
+// Money is summed per currency: a group can hold euro and dirham venues, and
+// adding those together would be meaningless. Whole dirhams drop their
+// decimals, as in the app.
+function currencyOf(country: string | null | undefined): string {
+  const c = String(country || '').toLowerCase();
+  return c.includes('emirat') || c === 'ae' || c === 'uae' ? 'AED' : 'EUR';
+}
+function fmtAmount(code: string, n: number): string {
+  const rounded = Math.round(n * 100) / 100;
+  if (code === 'AED' && Number.isInteger(rounded)) return `AED ${rounded}`;
+  return `${code} ${rounded.toFixed(2)}`;
+}
+async function currencyByOrg(orgIds: string[]): Promise<Record<string, string>> {
+  const { data } = await supabase.from('organizations').select('id, country').in('id', orgIds);
+  return Object.fromEntries(((data || []) as Array<{ id: string; country: string | null }>).map((o) => [o.id, currencyOf(o.country)]));
+}
+// "EUR 12.00 + AED 30"; zero in each of the scope's currencies when empty.
+function fmtTotals(sums: Map<string, number>, scope: string[]): string {
+  const codes = sums.size ? [...sums.keys()] : [...new Set(scope)];
+  return (codes.length ? codes : ['EUR']).map((code) => fmtAmount(code, sums.get(code) || 0)).join(' + ');
+}
+
 // Compute the display value for every requested metric id.
 async function computeMetrics(orgIds: string[], need: Set<string>, sinceIso: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
@@ -171,13 +193,23 @@ async function computeMetrics(orgIds: string[], need: Set<string>, sinceIso: str
 
   // Period completed claims.
   if (['cups_redeemed', 'cashback_paid', 'redemption_rate', 'avg_cashback', 'unique_rewards', 'top_reward'].some((m) => need.has(m))) {
-    const { data } = await supabase.from('claims').select('cups_redeemed, payout_amount, reward_id').in('org_id', orgIds).eq('status', 'completed').gte('created_at', sinceIso);
+    const { data } = await supabase.from('claims').select('org_id, cups_redeemed, payout_amount, reward_id').in('org_id', orgIds).eq('status', 'completed').gte('created_at', sinceIso);
     const rows = data || [];
     const redeemed = rows.reduce((s: number, x: { cups_redeemed: number }) => s + (x.cups_redeemed || 0), 0);
-    const paid = rows.reduce((s: number, x: { payout_amount: number }) => s + Number(x.payout_amount || 0), 0);
     if (need.has('cups_redeemed')) out.cups_redeemed = redeemed.toLocaleString();
-    if (need.has('cashback_paid')) out.cashback_paid = 'EUR ' + paid.toFixed(2);
-    if (need.has('avg_cashback')) out.avg_cashback = rows.length ? 'EUR ' + (paid / rows.length).toFixed(2) : 'EUR 0.00';
+    if (need.has('cashback_paid') || need.has('avg_cashback')) {
+      const cur = await currencyByOrg(orgIds);
+      const paid = new Map<string, number>();
+      const count = new Map<string, number>();
+      for (const r of rows as Array<{ org_id: string; payout_amount: number }>) {
+        const code = cur[r.org_id] || 'EUR';
+        paid.set(code, (paid.get(code) || 0) + Number(r.payout_amount || 0));
+        count.set(code, (count.get(code) || 0) + 1);
+      }
+      const avg = new Map([...paid].map(([code, sum]) => [code, sum / (count.get(code) || 1)]));
+      if (need.has('cashback_paid')) out.cashback_paid = fmtTotals(paid, Object.values(cur));
+      if (need.has('avg_cashback')) out.avg_cashback = fmtTotals(avg, Object.values(cur));
+    }
     if (need.has('redemption_rate')) out.redemption_rate = cupsPeriod ? `${Math.round((redeemed / cupsPeriod) * 100)}%` : '0%';
     if (need.has('unique_rewards')) out.unique_rewards = String(new Set(rows.map((r: { reward_id: string }) => r.reward_id).filter(Boolean)).size);
     if (need.has('top_reward')) {
@@ -194,9 +226,17 @@ async function computeMetrics(orgIds: string[], need: Set<string>, sinceIso: str
     const { count: approved } = await supabase.from('claims').select('id', { count: 'exact', head: true }).in('org_id', orgIds).eq('status', 'completed');
     if (need.has('approved_claims')) out.approved_claims = (approved || 0).toLocaleString();
     if (need.has('total_cashback') || need.has('cups_redeemed_all')) {
-      const { data } = await supabase.from('claims').select('cups_redeemed, payout_amount').in('org_id', orgIds).eq('status', 'completed');
+      const { data } = await supabase.from('claims').select('org_id, cups_redeemed, payout_amount').in('org_id', orgIds).eq('status', 'completed');
       const rows = data || [];
-      if (need.has('total_cashback')) out.total_cashback = 'EUR ' + rows.reduce((s: number, x: { payout_amount: number }) => s + Number(x.payout_amount || 0), 0).toFixed(2);
+      if (need.has('total_cashback')) {
+        const cur = await currencyByOrg(orgIds);
+        const total = new Map<string, number>();
+        for (const r of rows as Array<{ org_id: string; payout_amount: number }>) {
+          const code = cur[r.org_id] || 'EUR';
+          total.set(code, (total.get(code) || 0) + Number(r.payout_amount || 0));
+        }
+        out.total_cashback = fmtTotals(total, Object.values(cur));
+      }
       if (need.has('cups_redeemed_all')) out.cups_redeemed_all = rows.reduce((s: number, x: { cups_redeemed: number }) => s + (x.cups_redeemed || 0), 0).toLocaleString();
     }
     if (need.has('rejection_rate')) {
@@ -365,8 +405,22 @@ Deno.serve(async (req) => {
       ? (await supabase.auth.getUser(auth.replace('Bearer ', ''))).data.user?.id ?? null
       : null;
     if (!authId) return json({ error: 'forbidden' }, 403);
-    const { data: adminP } = await supabase.from('admin_profiles').select('status').eq('id', authId).maybeSingle();
+    const { data: adminP } = await supabase.from('admin_profiles').select('status, role, org_id').eq('id', authId).maybeSingle();
     if (!adminP || (adminP.status && adminP.status !== 'active')) return json({ error: 'forbidden' }, 403);
+    // A vendor only ever sees their own store's vendor digest.
+    if (adminP.role === 'vendor') {
+      if (!adminP.org_id || body.audience === 'staff' || (body.org_id && body.org_id !== adminP.org_id)) {
+        return json({ error: 'forbidden' }, 403);
+      }
+      body.org_id = adminP.org_id;
+    }
+    // A test goes to a dashboard account, never an outside address.
+    if (body.to) {
+      const pattern = String(body.to).trim().replace(/[\\%_]/g, (c) => '\\' + c);
+      const { data: staffRow } = await supabase.from('admin_profiles')
+        .select('id').ilike('email', pattern).eq('status', 'active').limit(1);
+      if (!staffRow?.length) return json({ error: 'recipient_not_staff' }, 403);
+    }
   } else {
     const { data: secRow } = await supabase.from('app_config').select('value').eq('key', 'digest_cron').maybeSingle();
     const cronSecret = (secRow?.value as { secret?: string } | null)?.secret || '';

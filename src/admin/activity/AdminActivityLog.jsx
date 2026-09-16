@@ -5,8 +5,8 @@ import './AdminActivityLog.css';
 
 /* AdminActivityLog — searchable, filterable view over admin_action_log.
  *
- * Owners + admins see every action in their org; other roles see only
- * their own (RLS enforces this). Each row can be expanded to inspect
+ * Owners + admins see every action for the open venue, plus the ones tied to
+ * no venue; other roles see only their own (RLS enforces this). Each row can be expanded to inspect
  * the JSON before/after diff captured at the time of the action. */
 
 const ACTION_LABELS = {

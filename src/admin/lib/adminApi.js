@@ -4742,23 +4742,30 @@ export async function getCupTransactions() {
 
 // ── Activity log ───────────────────────────────────────────────────────
 // Pulls the most recent rows from admin_action_log and joins to the
-// admin_profiles that authored them. Owners + admins see the whole org;
-// other roles only see their own actions (enforced by RLS).
+// admin_profiles that authored them. Owners + admins see the whole log;
+// other roles only see their own actions (enforced by RLS, migration 047).
 export async function getAdminActionLog(limit = 500) {
-  const { data, error } = await applyOrgFilter(
-    supabase
-      .from('admin_action_log')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit)
-  );
+  // The open venue's entries plus the ones tied to no venue (team changes,
+  // sign-ups), which belong on every venue's log.
+  const orgId = getActiveOrgId();
+  let query = supabase
+    .from('admin_action_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (orgId) query = query.or(`org_id.eq.${orgId},org_id.is.null`);
+  const { data, error } = await query;
   if (error) throw error;
 
-  const { data: admins } = await applyOrgFilter(
-    supabase
+  // Look the authors up by id. Filtering them by venue would drop every staff
+  // account, since staff have none.
+  const actorIds = [...new Set((data || []).map(r => r.actor_id).filter(Boolean))];
+  const { data: admins } = actorIds.length
+    ? await supabase
       .from('admin_profiles')
       .select('id, email, display_name, avatar_url, color, role')
-  );
+      .in('id', actorIds)
+    : { data: [] };
   const adminMap = Object.fromEntries((admins || []).map(a => [a.id, a]));
 
   return (data || []).map(row => ({

@@ -434,11 +434,11 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
           <span className="rc-detail__row-label">Payout method</span>
           <span className="rc-detail__row-val">Tikkie link</span>
         </div>
-        {(claim.notify_email || claim.notify_push) && (
+        {claim.notify_email && (
           <div className="rc-detail__row">
             <span className="rc-detail__row-label">Notify via</span>
             <span className="rc-detail__row-val rc-detail__row-val--muted">
-              {[claim.notify_email && 'Email', claim.notify_push && 'Push'].filter(Boolean).join(' + ')}
+              Email
             </span>
           </div>
         )}

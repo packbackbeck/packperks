@@ -1,4 +1,4 @@
-/* Redirect Refund home — rides the normal home's `.app` shell (cream
+/* Deferred Tikkie home — rides the normal home's `.app` shell (cream
    background, same top padding, shared <Header>). The pieces below style
    what replaces the rewards: the money tile, refund lists, and the map. */
 .tikkie-home__section { width: 100%; margin-top: 6px; }

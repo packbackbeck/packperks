@@ -42,10 +42,12 @@ import {
   updateCupBalance,
   getHistory,
   addHistoryEntry,
-  createClaim,
+  createCashbackClaim,
+  refundAllCups,
+  donateCups,
+  needsEmailFirst,
   sendClaimConfirmation,
   setClaimNotifyPrefs,
-  addDonationClaim,
   updateUserProfile,
   getUserStats,
   // Multi-org design tokens — applied as CSS variables in a useEffect
@@ -79,6 +81,7 @@ import { resolvePaymentMethod, voucherGuideSteps } from './lib/paymentMethods';
 import ActivityDetailModal from './components/ActivityDetailModal';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
+import { effectiveRates } from './lib/rates';
 
 /* Best-effort device fingerprint from the user agent. Falls back to a
  * generic string when no platform-specific token is found. Used in the
@@ -239,6 +242,10 @@ export default function App({ consentReady = true } = {}) {
   // When a claim is attempted without an email, we open the sign-in sheet and
   // remember to continue to the receipt step the moment the email verifies.
   const [claimAfterSignIn, setClaimAfterSignIn] = useState(false);
+  // Same, for a direct refund: reopen the refund sheet once the email is in.
+  const [refundAfterSignIn, setRefundAfterSignIn] = useState(false);
+  // A short message when a refund or donation didn't go through.
+  const [actionNotice, setActionNotice] = useState(null);
 
   /* ── Live config from admin publish ── */
   const [liveRewards, setLiveRewards] = useState(rewards);
@@ -721,7 +728,7 @@ export default function App({ consentReady = true } = {}) {
         const seg0 = segs[0] === 'admin' ? null : (segs[0] || null);
         const seg1 = segs[1] || null;
         // Dev-only design review: ?demo=<state> skips the whole network boot
-        // and renders the Redirect Refund pages with sample data, so state
+        // and renders the Deferred Tikkie pages with sample data, so state
         // screenshots are deterministic (headless capture can't wait for a
         // live boot). Stripped from production behaviour by the DEV gate.
         if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo')) {
@@ -1428,36 +1435,60 @@ export default function App({ consentReady = true } = {}) {
     window.history.replaceState({}, '', window.location.pathname);
     if (parsed) setTimeout(() => handleCupScan(parsed, { scanType: 'deeplink' }, userId), 50);
   };
-  const handleWithdraw = () => setDirectRefundOpen(true);
+  /* Money leaves only for an account with an email, and a verified one where
+   * the venue asks for that (Settings → Require email verification). The
+   * database applies the same rule (assert_can_claim, migration 043). */
+  const hasPayoutEmail = liveSettings.requireEmailVerification !== false
+    ? !!authEmail
+    : !!(authEmail || profile?.email);
 
-  /* ── Direct refund ── */
-  const handleDirectRefundConfirm = () => {
+  const openRefund = () => {
+    if (!hasPayoutEmail) {
+      setRefundAfterSignIn(true);
+      setShowSignIn(true);
+      return;
+    }
+    setDirectRefundOpen(true);
+  };
+  const handleWithdraw = () => openRefund();
+
+  /* ── Direct refund ──
+   * One server call empties the balance and writes the claim together, at
+   * the venue's configured rate (refund_all_cups). The label is only the
+   * customer's own history line. */
+  const handleDirectRefundConfirm = async () => {
     const count = cupCount;
-    // C.2: use the venue's CONFIGURED refund rate for the analytics figure, the
-    // history label, AND the stored payout amount — not a hardcoded €1.00. The
-    // on-screen sheet already showed this rate, so the amount paid now matches
-    // what the customer saw (was a 2.5× overpay at a €0.40 BYO venue).
-    const refundRate = liveSettings.refundRatePerCup ?? 1.00;
+    const refundRate = effectiveRates(liveSettings).refund;
     const amount = Number((count * refundRate).toFixed(2));
-    track(EVENTS.WITHDRAW_ALL_CUPS, { cups_withdrawn: count, deposit_value: amount.toFixed(2) });
     const label = `Direct refund: ${count} cup${count !== 1 ? 's' : ''}, ${formatMoney(amount, activeRegion)}`;
-    addHistory('cups_withdrawn', label);
-    setRefundCupCount(count);
-    setRefundAmount(amount);
-    setCupCount(0);
-    setClaimed(false);
     setDirectRefundOpen(false);
-    setPage('refund-success');
-
-    if (userId) {
-      const refundClaim = createClaim(userId, { type: 'direct_refund', cupsRedeemed: count, payoutAmount: amount, orgId: activeOrg?.id });
+    if (!userId) return;
+    try {
+      const res = await refundAllCups(userId, label);
+      const cups = Number(res?.cups ?? count);
+      const paid = Number(res?.amount ?? amount);
+      track(EVENTS.WITHDRAW_ALL_CUPS, { cups_withdrawn: cups, deposit_value: paid.toFixed(2) });
+      addHistory('cups_withdrawn', label);
+      setRefundCupCount(cups);
+      setRefundAmount(paid);
+      setCupCount(0);
+      setClaimed(false);
+      setPage('refund-success');
       // Same account-level notify preference as the cashback flow.
-      if (notifyOnApproval) refundClaim.then(cid => setClaimNotifyPrefs(cid, { email: true })).catch(() => {});
-      persist(
-        updateCupBalance(userId, 0),
-        refundClaim,
-        addHistoryEntry(userId, 'cups_withdrawn', label)
-      );
+      if (notifyOnApproval && res?.claim_id) setClaimNotifyPrefs(res.claim_id, { email: true }).catch(() => {});
+    } catch (err) {
+      if (needsEmailFirst(err)) {
+        setRefundAfterSignIn(true);
+        setShowSignIn(true);
+        return;
+      }
+      console.error('Direct refund failed:', err);
+      setActionNotice({
+        title: 'Refund not sent',
+        body: /no_cups/.test(err?.message || '')
+          ? 'There are no cups on this balance to refund.'
+          : 'We couldn’t process the refund just now. Your cups are still on your balance, so please try again.',
+      });
     }
   };
 
@@ -1485,7 +1516,7 @@ export default function App({ consentReady = true } = {}) {
     // email verifies we continue straight to the receipt step (onVerified).
     // iOS only grants gyroscope access from inside a tap — this one.
     if (isVoucher) { requestMotionPermission(); setPage('voucher'); return; }
-    if (!(authEmail || profile?.email)) {
+    if (!hasPayoutEmail) {
       setClaimAfterSignIn(true);
       setShowSignIn(true);
       return;
@@ -1551,22 +1582,13 @@ export default function App({ consentReady = true } = {}) {
     try {
       const compressed = await compressImage(photoDataUrl);
 
-      // 1. Create the claim row first (status='pending', no photo yet).
-      //    Use selectedReward.id (the RESOLVED reward), not the raw
-      //    selectedRewardId — the latter can still hold the cross-org
-      //    default ('chicken-sandwich') if the user never tapped a card,
-      //    which would make verify-receipt check for the wrong item.
-      const claimId = await createClaim(userId, {
-        type: 'cashback',
-        rewardId: selectedReward.id,
-        cupsRedeemed: selectedReward.cupsNeeded,
-        payoutAmount: selectedReward.euros,
-        orgId: activeOrg?.id,
-        // Set receipt_photo_path at insert time — anon users can't UPDATE
-        // claims afterwards (no SELECT policy → 0 rows updated). The upload
-        // below writes to exactly `${claimId}.jpg`.
-        attachReceiptPhoto: true,
-      });
+      // 1. Create the claim first (status='pending'). The server prices it
+      //    from the reward and points it at receipts/<id>.jpg, which the
+      //    upload below writes. Use selectedReward.id (the RESOLVED reward),
+      //    not the raw selectedRewardId — the latter can still hold the
+      //    cross-org default ('chicken-sandwich') if the user never tapped a
+      //    card, which would make verify-receipt check for the wrong item.
+      const claimId = await createCashbackClaim(userId, selectedReward.id);
       // Keep the claim ID around so the rejection page can surface it
       // (and pass it to the support mailto link).
       setLastClaimId(claimId);
@@ -1623,6 +1645,13 @@ export default function App({ consentReady = true } = {}) {
       setPage('success');
     } catch (err) {
       console.error('Receipt verification failed:', err);
+      // The account needs an email (verified, where the venue asks) first.
+      if (needsEmailFirst(err)) {
+        setPage('home');
+        setClaimAfterSignIn(true);
+        setShowSignIn(true);
+        return;
+      }
       // Budget cap reached at insert time (DB trigger) — show the paused
       // popup rather than a scary error, and never mention the amount.
       const errText = `${err?.message || ''} ${err?.detail || ''} ${err?.code || ''}`;
@@ -1673,7 +1702,7 @@ export default function App({ consentReady = true } = {}) {
   };
 
   const handleResetClaim = () => setClaimed(false);
-  const handleOpenRefund = () => { track(EVENTS.DIRECT_REFUND_OPENED, { cup_count: cupCount }); setDirectRefundOpen(true); };
+  const handleOpenRefund = () => { track(EVENTS.DIRECT_REFUND_OPENED, { cup_count: cupCount }); openRefund(); };
   const handleOpenTerms = () => { track(EVENTS.TERMS_OPENED); setTermsOpen(true); };
 
   /* ── Detail sheet ── */
@@ -1826,7 +1855,7 @@ export default function App({ consentReady = true } = {}) {
   };
 
   /* ── Maintenance mode ──
-   * This has to sit ABOVE the tikkie-only return below. A Redirect Refund
+   * This has to sit ABOVE the tikkie-only return below. A Deferred Tikkie
    * org returns its own whole app from there and never reaches the rest of
    * this function, so a gate further down was unreachable for exactly the
    * venues whose only way in is a bin receipt — the toggle saved, published,
@@ -2090,26 +2119,50 @@ export default function App({ consentReady = true } = {}) {
     <DonateSheet
       open={donateSheetOpen}
       orgName={activeOrg?.partner_brand_name || activeOrg?.name}
-      onClose={(cupsToDonate) => {
+      onClose={async (cupsToDonate) => {
         setDonateSheetOpen(false);
         // Clamp so a stale cupsToDonate can't overdraw or fabricate history.
         const actual = Math.max(0, Math.min(cupsToDonate, cupCount));
-        if (actual > 0) {
-          const newCount = cupCount - actual;
-          const label = `Donated ${actual} cup${actual !== 1 ? 's' : ''} to Plastic Soup Foundation`;
-          setCupCount(newCount);
-          setDonatedCups(actual);
-          addHistory('cups_donated', label);
+        if (actual <= 0 || !userId) return;
+        try {
+          // The server takes the cups and writes the history row together.
+          const res = await donateCups(userId, actual);
+          const given = Number(res?.cups ?? actual);
+          setCupCount(Number(res?.new_balance ?? cupCount - given));
+          setDonatedCups(given);
+          addHistory('cups_donated', `Donated ${given} cup${given !== 1 ? 's' : ''} to Plastic Soup Foundation`);
           setPage('donate-success');
-          if (userId) persist(
-            updateCupBalance(userId, newCount),
-            addHistoryEntry(userId, 'cups_donated', label),
-            addDonationClaim(userId, actual, actual * (liveSettings.refundRatePerCup || 1.00), activeOrg?.id),
-          );
+        } catch (err) {
+          console.error('Donation failed:', err);
+          setActionNotice({
+            title: 'Donation not made',
+            body: 'We couldn’t record the donation just now. Your cups are still on your balance, so please try again.',
+          });
         }
       }}
       cupCount={cupCount}
     />
+  ) : null;
+
+  /* Pick up whatever was waiting on an email. */
+  const continueAfterEmail = () => {
+    if (claimAfterSignIn) {
+      setClaimAfterSignIn(false);
+      setShowSignIn(false);
+      setDetailReward(null);
+      setPage('receipt');
+    } else if (refundAfterSignIn) {
+      setRefundAfterSignIn(false);
+      setShowSignIn(false);
+      setDirectRefundOpen(true);
+    }
+  };
+
+  const actionNoticeNode = actionNotice ? (
+    <Modal open onClose={() => setActionNotice(null)} title={actionNotice.title}>
+      <p>{actionNotice.body}</p>
+      <button className="modal-btn" onClick={() => setActionNotice(null)}>OK</button>
+    </Modal>
   ) : null;
 
   /* The sign-in / add-email sheet. Rendered on BOTH the account page and the
@@ -2119,7 +2172,7 @@ export default function App({ consentReady = true } = {}) {
   const signInSheetNode = (
     <SignInSheet
       open={showSignIn}
-      onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); }}
+      onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); setRefundAfterSignIn(false); }}
       onLinked={async (opts) => {
         try {
           // Sign-out: back to anonymous device-only mode — don't consolidate/adopt.
@@ -2139,16 +2192,13 @@ export default function App({ consentReady = true } = {}) {
           await adoptGroupIdentity(refreshed, refreshed.auth_user_id, refreshed.email);
         } catch (e) { console.error(e); }
       }}
-      /* Fired the moment the email is verified. If the user was mid-claim
-         (no email when they tapped "Get cashback"), continue straight to the
-         receipt step now that they're verified. */
-      onVerified={() => {
-        if (claimAfterSignIn) {
-          setClaimAfterSignIn(false);
-          setShowSignIn(false);
-          setDetailReward(null);
-          setPage('receipt');
-        }
+      /* Fired the moment the email is verified. If the user was mid-claim or
+         mid-refund (no email when they tapped it), continue straight on. */
+      onVerified={continueAfterEmail}
+      /* Venues that don't ask for verification save the email directly. */
+      onSaveEmailDirect={(email) => {
+        setProfile((prev) => ({ ...prev, email }));
+        continueAfterEmail();
       }}
       /* Per-org (Settings → Feature flags). Default ON: every email, first
          time or changed, is confirmed with the 6-digit code we send. Off,
@@ -2178,7 +2228,7 @@ export default function App({ consentReady = true } = {}) {
     const memberById = {};
     (groupCtx?.members || []).forEach((m) => { memberById[m.id] = m; });
     const cashbackByRegionMap = Object.entries(groupBalances).reduce((acc, [orgId, b]) => {
-      const rate = groupStores[orgId]?.cashbackRate ?? (liveSettings.cashbackRatePerCup || 1.25);
+      const rate = groupStores[orgId]?.cashbackRate ?? effectiveRates(liveSettings).cashback;
       const rKey = regionForCountry(memberById[orgId]?.country)?.key || activeRegion;
       acc[rKey] = (acc[rKey] || 0) + (b?.balance || 0) * rate;
       return acc;
@@ -2202,7 +2252,7 @@ export default function App({ consentReady = true } = {}) {
           profile={profile}
           onSaveProfile={handleSaveProfile}
           cupCount={acctCombined ? combinedBalance : cupCount}
-          cashbackRate={liveSettings.cashbackRatePerCup}
+          cashbackRate={effectiveRates(liveSettings).cashback}
           cashbackTotal={acctCombined ? combinedCashback : undefined}
           cashbackByRegion={acctCombined ? cashbackByRegion : undefined}
           history={acctCombined ? combinedHistory : history}
@@ -2257,14 +2307,15 @@ export default function App({ consentReady = true } = {}) {
           onOpenHowItWorks={() => setHowItWorksOpen(true)}
         />
         {signInSheetNode}
+        {actionNoticeNode}
         {liveSettings.featureDirectRefunds && (
           <DirectRefundSheet
             open={directRefundOpen}
             onClose={() => setDirectRefundOpen(false)}
             cupCount={cupCount}
             onConfirm={handleDirectRefundConfirm}
-            refundRate={liveSettings.refundRatePerCup}
-            cashbackRate={liveSettings.cashbackRatePerCup}
+            refundRate={effectiveRates(liveSettings).refund}
+            cashbackRate={effectiveRates(liveSettings).cashback}
           />
         )}
         {liveSettings.featureCupSharing && (
@@ -2494,13 +2545,14 @@ export default function App({ consentReady = true } = {}) {
           onClose={() => setDirectRefundOpen(false)}
           cupCount={cupCount}
           onConfirm={handleDirectRefundConfirm}
-          refundRate={liveSettings.refundRatePerCup}
-          cashbackRate={liveSettings.cashbackRatePerCup}
+          refundRate={effectiveRates(liveSettings).refund}
+          cashbackRate={effectiveRates(liveSettings).cashback}
         />
       )}
       {/* Also mount the sign-in / add-email sheet here so "Get cashback" without
           an email can open it from the store page (not just the account page). */}
       {signInSheetNode}
+      {actionNoticeNode}
     </div>
   );
 }

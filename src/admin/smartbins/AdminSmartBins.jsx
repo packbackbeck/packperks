@@ -11,9 +11,9 @@ import {
 import './AdminSmartBins.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * AdminSmartBins — the venue list behind the Redirect Refund home map.
+ * AdminSmartBins — the venue list behind the Deferred Tikkie home map.
  *
- * BYO has Future Vendors; this is its Redirect Refund counterpart, with
+ * BYO has Future Vendors; this is its Deferred Tikkie counterpart, with
  * one important difference: these venues are MACHINES. A bin is either
  * live (collecting today) or coming soon, it has an address customers
  * navigate to, and it may be tied to a machine_id in smartbin_keys.

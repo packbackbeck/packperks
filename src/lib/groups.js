@@ -14,6 +14,7 @@
 
 import { supabase } from './supabase'
 import { getCopyPreset, normalizeMode } from './copyPresets'
+import { effectiveRates } from './rates'
 
 /* Resolve a group directly by its slug (for the /<groupSlug> hub route),
  * plus its active member orgs. Returns null if no such group. */
@@ -169,9 +170,10 @@ export async function getGroupStores(orgIds) {
       out[orgId] = out[orgId] || {}
       out[orgId].featured = featured ? { name: featured.name, image: featured.image || '', cupsNeeded: featured.cupsNeeded } : null
       out[orgId].rewardCount = rewards.length
-      // Per-org cashback rate (€ per cup). Rates differ per org, not per group,
-      // so a combined balance must be valued store-by-store, not with one rate.
-      out[orgId].cashbackRate = Number(c.value?.settings?.cashbackRatePerCup) || null
+      // Per-org cashback rate per cup, in that store's currency. Rates differ
+      // per org, not per group, so a combined balance must be valued
+      // store-by-store, not with one rate.
+      out[orgId].cashbackRate = effectiveRates(c.value?.settings || {}).cashback
       // All live rewards (featured first). Carry id + bgColor + cupsNeeded so an
       // in-progress claim on the market can be matched by reward_id and show the
       // reward's picture + name (the auto-cycling thumbnail filters to images).

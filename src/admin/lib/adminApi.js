@@ -7,6 +7,7 @@ import { EMAIL_TEMPLATE_KEY } from './emailTemplates';
 import { providerForCountry } from '../../lib/payments';
 import { demoAdminStatsRows, demoHealthRows, demoBehaviourRows, resetDemoWorld } from './demoData';
 import { adminMoney } from './adminMoney';
+import { RATE_DEFAULTS } from '../../lib/rates';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Demo numbers (Settings → Feature flags → "Demo numbers for vendors").
@@ -809,7 +810,7 @@ export async function getAiAccuracy({ orgIds, fromTs, toTs } = {}) {
 
 
 /* ─────────────────────────────────────────────────────────────────────
- * getTikkieStatsMetrics — System Health for Redirect Refund orgs.
+ * getTikkieStatsMetrics — System Health for Deferred Tikkie orgs.
  *
  * Same output shape as getStatsMetrics (metrics/bands/verdict/series/
  * errors/totals) so AdminStats renders it unchanged, but measured on the
@@ -1619,7 +1620,7 @@ export async function sendTestEmail({ orgId, templateKey, subject, html, to }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * Smart-bin locations (Redirect Refund) — the pins on the customer home
+ * Smart-bin locations (Deferred Tikkie) — the pins on the customer home
  * map. The BYO equivalent is Future Vendors; this is the same idea for a
  * mode whose venues are machines, not shops.
  * ───────────────────────────────────────────────────────────────────── */
@@ -1684,7 +1685,7 @@ export async function geocodeAddress(address) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * Tikkie-only (Redirect Refund) behaviour metrics.
+ * Deferred Tikkie behaviour metrics.
  *
  * The standard funnel above is built from cups, rewards and app sessions,
  * none of which exist in this mode. Its funnel is: receipt scanned →
@@ -1922,7 +1923,7 @@ async function getTikkieBehaviourDailyHistory(range, orgIds) {
  * a date picker and default it to the full period.
  * ───────────────────────────────────────────────────────────────────── */
 export async function getUserBehaviourStats(range = null, orgIds, mode = null) {
-  // Redirect Refund orgs get their own funnel — the standard one is built
+  // Deferred Tikkie orgs get their own funnel — the standard one is built
   // from cups and rewards, which this mode doesn't have.
   if (mode === 'tikkie_only') return getTikkieBehaviourStats(range, orgIds);
   const allRows = await fetchBehaviourRows(orgIds);
@@ -2036,10 +2037,11 @@ export async function purgeOrgRecords(orgId = getActiveOrgId()) {
 /* DANGER: permanently delete the selected rows by id. Admin-gated +
  * table-whitelisted server-side. `table` must be one of:
  * 'users' | 'claims' | 'cup_scans' | 'donation_transfers'.
- * Deleting users also clears their activity history + claims. */
+ * Customers go through deleteCustomers() so their login goes too. */
 export async function deleteRecords(table, ids) {
   const list = (ids || []).filter(Boolean);
   if (list.length === 0) return { deleted: 0 };
+  if (table === 'users') return deleteCustomers(list, false);
   const { data, error } = await supabase.rpc('admin_delete_records', { p_table: table, p_ids: list });
   if (error) throw new Error(error.message);
   return data; // { deleted }
@@ -2048,13 +2050,27 @@ export async function deleteRecords(table, ids) {
 // Per-group delete: erase the WHOLE account for the given user rows — every
 // store row that shares the person's identity PLUS the shared identity itself,
 // not just the single row shown in the grouped users table. Pass every sibling
-// row id you know (memberUserIds); the RPC re-expands defensively.
+// row id you know (memberUserIds); the server re-expands defensively.
 export async function deleteGroupAccounts(userIds) {
   const list = (userIds || []).filter(Boolean);
   if (list.length === 0) return { deleted_rows: 0 };
-  const { data, error } = await supabase.rpc('admin_purge_users', { p_user_ids: list });
-  if (error) throw new Error(error.message);
-  return data; // { deleted_rows, deleted_identities }
+  return deleteCustomers(list, true);
+}
+
+/* Delete customers through admin-delete-user: their rows are erased (claims
+ * stay as the accounting record, without anything personal), their photos
+ * removed, and their login deleted, so signing in again starts a new, empty
+ * account instead of bringing the old one back. */
+async function deleteCustomers(userIds, wholeAccount) {
+  const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+    body: { user_ids: userIds, whole_account: wholeAccount },
+  });
+  if (error) {
+    let payload = null;
+    try { payload = await error.context?.json?.(); } catch { /* not JSON */ }
+    throw new Error(payload?.detail || payload?.error || error.message);
+  }
+  return data; // { deleted, deleted_rows, deleted_identities, kept_claims, logins_deleted, logins_kept }
 }
 
 // Per-group merge: combine two or more people into one across EVERY store in the
@@ -3287,9 +3303,10 @@ export async function createOrganization(payload) {
   }
 
   // 3. Published config (rewards + settings) for the new org.
+  const rateDefaults = RATE_DEFAULTS[model === 'tikkie_only' ? 'tikkie_only' : 'standard'];
   const settings = {
-    cashbackRatePerCup: economics.cashbackRatePerCup ?? 1.25,
-    refundRatePerCup:   economics.refundRatePerCup   ?? 1.00,
+    cashbackRatePerCup: economics.cashbackRatePerCup ?? rateDefaults.cashbackRatePerCup,
+    refundRatePerCup:   economics.refundRatePerCup   ?? rateDefaults.refundRatePerCup,
     paymentMethod:      economics.paymentMethod      ?? 'tikkie',
     heroHeadline:       copy.heroHeadline       || 'Collect & Get Rewards',
     heroSubtext:        copy.heroSubtext        || 'Return your packaging and earn cashback.',
@@ -4056,7 +4073,7 @@ export async function setOrgMode(orgId, mode) {
   return value;
 }
 
-/* ── Backup cups (Redirect Refund offline fallback) ────────────────────
+/* ── Backup cups (Deferred Tikkie offline fallback) ────────────────────
  * The reserved cup ids burned into the bin's config, plus the log of every
  * time one was scanned. A use means the bin was offline when it printed
  * that receipt, so the log doubles as an outage record. */

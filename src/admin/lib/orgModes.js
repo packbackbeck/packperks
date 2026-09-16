@@ -1,15 +1,22 @@
-/* Org-level operating mode (distinct from the GROUP copy mode in
- * copyPresets.js — deposit/byo stay group concepts).
+/* The three modes, and the only names they go by in the product:
  *
- *   • null / 'standard' — the full PackPerks app: rewards, accounts,
- *     receipts, claims. Every existing org.
- *   • 'tikkie_only'     — smart-bin cashback. The customer app never
- *     boots: scanning a bin receipt QR shows a tiny redirect page that
- *     turns the batch straight into a Tikkie link. No account, no
- *     rewards, no balance. The dashboard collapses to the Receipt
- *     Generator + a Tikkie payout log.
+ *   Deposit Rewards  ('standard', group copy mode 'deposit')
+ *       The full customer app: cup balance, rewards, direct refunds,
+ *       receipt claims.
+ *   Bring Your Own   (group copy mode 'byo')
+ *       Customers bring their own cup and scan the counter QR. Always
+ *       lives in a group.
+ *   Deferred Tikkie  ('tikkie_only')
+ *       Smart-bin refunds. Scanning a bin receipt adds its refund to the
+ *       customer's wallet; they collect the whole balance later as one
+ *       Tikkie link. No rewards.
  *
- * Stored on the org's published config: published:<orgId>.settings.mode.
+ * The code keys are storage and stay as they are. Anything a person reads
+ * uses the three names above — older labels ("Redirect Refund", "Direct
+ * refund only", "Rewards only") described flows that no longer exist.
+ *
+ * tikkie_only is stored on the org's own published config
+ * (published:<orgId>.settings.mode); byo/deposit live on the group.
  */
 export const ORG_MODE_TIKKIE_ONLY = 'tikkie_only';
 
@@ -18,7 +25,7 @@ export const ORG_MODE_META = {
     key: 'standard',
     label: 'Deposit Rewards',
     short: 'DR',
-    blurb: 'The full customer app: rewards, cup balance, accounts, direct refunds and receipt claims.',
+    blurb: 'The full customer app: a cup balance, rewards, direct refunds and receipt claims.',
   },
   byo: {
     key: 'byo',
@@ -28,17 +35,20 @@ export const ORG_MODE_META = {
   },
   tikkie_only: {
     key: ORG_MODE_TIKKIE_ONLY,
-    label: 'Redirect Refund',
-    short: 'RR',
-    blurb: 'Scanning a bin receipt QR goes straight to a Tikkie cashback link. No accounts, no rewards — the dashboard shows only the Receipt Generator and the payout log.',
+    label: 'Deferred Tikkie',
+    short: 'DT',
+    blurb: 'Scanning a bin receipt adds its refund to the customer\u2019s wallet. They collect the whole balance whenever they like, as one Tikkie link. No rewards.',
   },
 };
 
 /* Resolve the org's EFFECTIVE mode from the two places a mode can live:
  * the org's own published settings (tikkie_only) and its group's config
- * (byo / deposit). Deposit Rewards is the default when nothing says
- * otherwise. This is the one to use for chrome (top bar, sidebar,
+ * (byo / deposit). This is the one to use for chrome (top bar, sidebar,
  * settings shape) — activeOrgMode alone misses grouped BYO orgs. */
+/* A venue with no mode anywhere takes its group's default. A group with no
+ * mode set is Bring Your Own (see normalizeMode), and OrgContext already
+ * resolves that before it reaches here, so `groupMode` is only null for a
+ * venue that has no group at all — which is Deposit Rewards. */
 export function resolveEffectiveMode(orgMode, groupMode) {
   if (orgMode === ORG_MODE_TIKKIE_ONLY) return ORG_MODE_TIKKIE_ONLY;
   if (groupMode === 'byo') return 'byo';
@@ -54,7 +64,7 @@ export const TIKKIE_ONLY_PAGES = new Set([
   'backupcups',   // the bin's offline fallback codes + outage alarm
   'smartbins',    // the bin locations behind the customer map
   'emailtemplates', // the automated customer emails
-  // Redirect Refund has a real user base (profiles + accounts), so the
+  // Deferred Tikkie has a real user base (profiles + accounts), so the
   // audience pages are back — each one adapts itself to this mode.
   'users',        // refund profiles + accounts
   'behaviour',    // tikkie funnel metrics (links, collect rate, audience)
@@ -87,7 +97,7 @@ export const TIKKIE_ONLY_PAGES = new Set([
 export const ORG_MODELS = {
   deposit: {
     key: 'deposit',
-    label: 'Direct refund + rewards',
+    label: 'Deposit Rewards',
     tagline: 'The full SmartBin programme',
     customer: 'Customers drop their packaging in the SmartBin, scan the printed receipt, and choose: cash out straight away, or save cups toward a menu reward.',
     dashboard: 'The whole dashboard — rewards, claims review, users, cup scans and analytics.',
@@ -103,7 +113,7 @@ export const ORG_MODELS = {
   },
   byo: {
     key: 'byo',
-    label: 'Rewards only',
+    label: 'Bring Your Own',
     tagline: 'Bring your own cup',
     customer: 'Customers bring a reusable cup, scan the QR on the counter, and collect cups toward a reward. No deposit and no direct cash-out.',
     dashboard: 'Rewards, claims review, users and the BYO QR codes page.',
@@ -114,16 +124,16 @@ export const ORG_MODELS = {
       refundRatePerCup: 1.00,
       featureCupSharing: true,
       featureDonations: true,
-      // "Rewards only" is the whole point — cashing out would bypass it.
+      // Rewards are the whole point here — cashing out would bypass them.
       featureDirectRefunds: false,
     },
   },
   tikkie_only: {
     key: 'tikkie_only',
-    label: 'Direct refund only',
-    tagline: 'Smart bin → Tikkie',
-    customer: 'Scanning the bin receipt goes straight to a Tikkie cashback link. No app, no account, no rewards — the customer never sees a PackPerks screen beyond a one-second redirect.',
-    dashboard: 'Just two pages: the Receipt Generator and the Tikkie payouts log.',
+    label: 'Deferred Tikkie',
+    tagline: 'Smart bin → wallet → Tikkie',
+    customer: 'Customers drop their packaging in the SmartBin and scan the printed receipt. The refund goes into their wallet, and they collect the whole balance whenever they like as one Tikkie link. No account is needed to start; adding an email keeps the balance safe on a new phone.',
+    dashboard: 'The Receipt Generator, the Tikkie payout log, backup cups, bin locations, customer emails, customers, behaviour, system health and reports. No rewards pages.',
     group: 'never',
     steps: { rewards: false, copy: false, features: false },
     defaults: {

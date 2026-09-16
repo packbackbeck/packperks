@@ -11,13 +11,9 @@ import { getGlobalImpact, deleteMyAccount } from '../lib/api';
 import { getCollectedMap, markClaimCollected, getDismissedSet, dismissClaim } from '../lib/collectedClaims';
 import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
-import { usePwaInstall } from '../lib/pwa';
-import { requestPushPermission, getPermissionState } from '../lib/notify';
 import { useMoney } from '../lib/RegionContext';
 import { getRegion, formatMoney } from '../lib/regions';
 import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, formatCo2, pickComparison as pickImpactComparison } from '../lib/impact';
-
-const PUSH_PREF_KEY = 'packperks_push_rewards';
 
 /* Build the payload handed to ActivityDetailModal, tagging which "phase" of a
  * claim the user tapped so the modal renders a distinct view:
@@ -135,7 +131,7 @@ export default function UserPage({
   privacyPolicy,
   // Secret: tapping the build stamp 3× re-opens the onboarding flow.
   onReopenOnboarding,
-  // Redirect Refund accounts: no cup balance and no in-app activity feed —
+  // Deferred Tikkie accounts: no cup balance and no in-app activity feed —
   // hide the cups⇄value box and the history blocks (refund history lives
   // on the TikkieHomePage instead).
   tikkieOnly = false,
@@ -245,28 +241,6 @@ export default function UserPage({
     if (!claim?.id) return;
     dismissClaim(claim.id);
     setDismissedClaims(new Set(getDismissedSet()));
-  };
-
-  // ── Reward push-notification preference ──
-  // The install state is still read: push notifications only work from an
-  // installed app, so the toggle in Edit profile is gated on it. The
-  // "Add to home screen" button itself is gone — see the save-your-balance
-  // prompt below for what took its place.
-  const pwa = usePwaInstall();
-  const [pushRewards, setPushRewards] = useState(() => {
-    try { return localStorage.getItem(PUSH_PREF_KEY) === '1' && getPermissionState() === 'granted'; }
-    catch { return false; }
-  });
-  const handleTogglePush = async (checked) => {
-    if (!checked) {
-      setPushRewards(false);
-      try { localStorage.setItem(PUSH_PREF_KEY, '0'); } catch { /* ignore */ }
-      return;
-    }
-    const perm = await requestPushPermission();
-    const on = perm === 'granted';
-    setPushRewards(on);
-    try { localStorage.setItem(PUSH_PREF_KEY, on ? '1' : '0'); } catch { /* ignore */ }
   };
 
   const [email, setEmail] = useState(profile.email || '');
@@ -592,7 +566,7 @@ export default function UserPage({
 
       {/* ── Cups ⇄ value box ── cups on the left, euro equivalent on the
             right, with a subtle "≈" between (mirrors the refund compare box).
-            Hidden for Redirect Refund accounts: there is no cup balance. */}
+            Hidden for Deferred Tikkie accounts: there is no cup balance. */}
       {!tikkieOnly && (
       <div className="user-page__value-box">
         {(combined || storeName) && (
@@ -905,9 +879,6 @@ export default function UserPage({
           region={region}
           availableRegions={availableRegions}
           onChangeRegion={onChangeRegion}
-          pwaInstalled={pwa.installed}
-          pushRewards={pushRewards}
-          onTogglePush={handleTogglePush}
           browserInfo={browserInfo}
           onClose={() => setEditOpen(false)}
           onSaveName={(name) => saveProfile({ displayName: name })}
@@ -949,7 +920,7 @@ export default function UserPage({
 function ProfileEditModal({
   profile, animal, avatarUrl, email, hasEmail, marketingConsent, notifyOnApproval,
   region = 'NL', availableRegions = [], onChangeRegion,
-  pwaInstalled, pushRewards, onTogglePush, browserInfo,
+  browserInfo,
   onClose, onSaveName, onRegenerate, onUploadAvatar, onRemoveAvatar, onManageEmail, onToggleMarketing, onToggleNotify,
 }) {
   const [name, setName] = useState(profile.displayName || '');
@@ -1055,15 +1026,6 @@ function ProfileEditModal({
           <label className="upedit__toggle">
             <span>Reward approval emails</span>
             <input type="checkbox" className="user-page__switch" checked={!!notifyOnApproval} onChange={(e) => onToggleNotify?.(e.target.checked)} aria-label="Email me when a reward is approved" />
-          </label>
-        )}
-
-        {/* Push notifications only work from the installed app, so this toggle
-            appears only once PackPerks is added to the home screen. */}
-        {pwaInstalled && (
-          <label className="upedit__toggle">
-            <span>Reward push notifications</span>
-            <input type="checkbox" className="user-page__switch" checked={!!pushRewards} onChange={(e) => onTogglePush?.(e.target.checked)} aria-label="Notify me about rewards via push notification" />
           </label>
         )}
 

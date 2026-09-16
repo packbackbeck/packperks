@@ -5,7 +5,7 @@ import { useRegion } from '../../lib/RegionContext';
 import './tikkie.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * Shared Redirect Refund pieces: the Tikkie explainer, the bottom-sheet
+ * Shared Deferred Tikkie pieces: the Tikkie explainer, the bottom-sheet
  * shell every popup uses, and the email-code login sheet. Extracted from
  * the retired redirect page (archived in src/archive/) — the wallet home
  * is their only consumer now.

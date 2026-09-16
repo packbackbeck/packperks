@@ -14,6 +14,7 @@ import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
 import './AdminCupQr.css';
 import { useAdminMoney } from '../lib/adminMoney';
+import { effectiveRates } from '../../lib/rates';
 
 /* Expiry presets for the batch generation form (P-21).
  *   id    — used as React key + form state value
@@ -416,12 +417,10 @@ export default function AdminCupQr({ onNavigate }) {
     navigator.clipboard?.writeText(batch.url).catch(() => {});
   }
 
-  /* Per-cup payout. Was hardcoded at €1.00, which printed a figure no org
-   * actually pays; read the live published rate instead. Tikkie-only orgs
-   * pay the refund rate — it's the single rate bin-tikkie settles on. */
-  const ratePerCup = Number(
-    activeOrgSettings?.refundRatePerCup ?? activeOrgSettings?.cashbackRatePerCup ?? 1,
-  ) || 0;
+  /* Per-cup payout, resolved the way bin-tikkie resolves it (lib/rates.js):
+   * the published rate, else the mode's default. A fixed fallback of 1 here
+   * used to print €1.00 on receipts for venues that pay €0.10. */
+  const ratePerCup = effectiveRates(activeOrgSettings || {}).refund;
   const refundAmount = (count * ratePerCup).toFixed(2);
   const sessionId = batch?.batch_id?.slice(0, 8).toUpperCase() ?? '———';
   const generatedAt = batch?.generatedAt ?? new Date();
@@ -510,7 +509,7 @@ export default function AdminCupQr({ onNavigate }) {
       <div className="acq-layout">
         <div className="acq-controls">
           {/* Quick print — one tap mints a fresh batch of N cups and prints it.
-              Hidden for Redirect Refund orgs: the smart bin prints its own
+              Hidden for Deferred Tikkie orgs: the smart bin prints its own
               receipts, so a desk quick-print has no role there. */}
           {!isTikkieOnly && <div className="acq-card acq-quick">
             <h2 className="acq-card__title">Quick print</h2>

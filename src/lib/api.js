@@ -1,33 +1,6 @@
 import { supabase } from './supabase'
 import { generateProfile } from './animals'
-
-// ── Device identity ────────────────────────────────────────────────────────
-// The only thing that stays in localStorage: a stable device fingerprint.
-//
-// `crypto.randomUUID()` is only defined in secure contexts (HTTPS or
-// localhost/127.0.0.1). When the dev server is reached via a raw LAN IP
-// (e.g. http://10.43.22.14:5173 from a phone), the browser leaves it
-// undefined and this used to throw — which crashed init before any
-// Supabase calls fired. Fall back to a manual v4 UUID generator when
-// missing so LAN testing works without HTTPS.
-function safeUUID() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-  })
-}
-
-function getDeviceId() {
-  let id = localStorage.getItem('packperks_device_id')
-  if (!id) {
-    id = safeUUID()
-    localStorage.setItem('packperks_device_id', id)
-  }
-  return id
-}
+import { getDeviceId, newUUID } from './deviceId'
 
 // ── Profile generation (for brand-new users) ───────────────────────────────
 // A random adjective + animal (e.g. "Bouncy Axolotl"), with a matching emoji
@@ -275,9 +248,13 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
       }
     }
 
-    // (4) Mint a fresh identity from this row's profile.
+    // (4) Mint a fresh identity from this row's profile. The id is made here
+    //     and the insert asks for nothing back: the database only shows a
+    //     device the identities its own rows point at, and nothing points at
+    //     this one until the row is linked below.
     if (!identity) {
       const insert = {
+        id:           newUUID(),
         auth_user_id: authUid,
         display_name: userRow.display_name || null,
         animal_index: userRow.animal_index ?? 0,
@@ -285,8 +262,9 @@ export async function ensureIdentityForUser(userRow, opts = {}) {
         email_verified: !!userRow.email_verified_at,
         entry_org_id: userRow.org_id || null,
       }
-      const { data: created, error: createErr } = await supabase
-        .from('customer_identities').insert(insert).select('*').single()
+      const { error: createErr } = await supabase
+        .from('customer_identities').insert(insert)
+      const created = createErr ? null : insert
       if (createErr) {
         // Unique auth_user_id race (StrictMode / concurrent tab) — re-fetch.
         if (createErr.code === '23505' && authUid) {
@@ -1144,7 +1122,7 @@ export async function getMyClaims(userIds) {
   return data || []
 }
 
-// Redirect Refund home: the smart-bin pins for the map. Managed in the
+// Deferred Tikkie home: the smart-bin pins for the map. Managed in the
 // dashboard (Smart Bins page); public-readable because a bin's location is
 // a shop-window fact, not customer data.
 export async function getSmartbinLocations(orgId) {
@@ -1159,7 +1137,7 @@ export async function getSmartbinLocations(orgId) {
   return (data || []).filter(b => b.lat != null && b.lng != null)
 }
 
-// Redirect Refund home: the customer's own "in process" receipts — batches
+// Deferred Tikkie home: the customer's own "in process" receipts — batches
 // scanned before the smart bin's confirmation reached PackPerks. Same RPC
 // trust model as get_customer_claims (keyed by the device's account ids).
 export async function getMyPending(userIds) {
@@ -1172,61 +1150,68 @@ export async function getMyPending(userIds) {
 
 // Record the customer's notify-channel choice for a claim (set on the verdict
 // screen). Anon can't UPDATE claims, so this goes through a security-definer RPC.
-export async function setClaimNotifyPrefs(claimId, { email = false, push = false } = {}) {
+// Email is the only notification channel. `p_push` stays in the RPC call so
+// the database signature doesn't have to change, and is always false.
+export async function setClaimNotifyPrefs(claimId, { email = false } = {}) {
   if (!claimId) return
   const { error } = await supabase.rpc('set_claim_notify', {
-    p_claim_id: claimId, p_email: !!email, p_push: !!push,
+    p_claim_id: claimId, p_email: !!email, p_push: false,
   })
   if (error) throw error
 }
 
-// Record a completed donation claim so the admin Donations page can
-// aggregate real cup and euro totals. Unlike other claims, donations
-// are auto-completed (no admin review / receipt needed) — the user is
-// voluntarily giving up their cup value, so there's nothing to approve.
-export async function addDonationClaim(userId, cupsCount, payoutAmount, orgId) {
-  const insert = {
-    user_id: userId,
-    type: 'donation',
-    cups_redeemed: cupsCount,
-    payout_amount: payoutAmount ?? 0,
-    status: 'completed',
-  }
-  if (orgId) insert.org_id = orgId
-  const { error } = await supabase.from('claims').insert(insert)
-  if (error) throw error
+// ── Customer actions ──────────────────────────────────────────────────────
+// Each is one database call (migration 043) that checks the row belongs to
+// this device or this login, and takes every amount from the venue's
+// published config. Nothing the browser sends decides what is paid.
+//
+// A refusal comes back as the error message: verification_required ·
+// email_required · insufficient_cups · reward_unavailable · refunds_disabled ·
+// donations_disabled · no_cups · not_your_account
+
+function actionError(error) {
+  return Object.assign(new Error(error?.message || 'request_failed'), {
+    code: error?.code,
+    detail: error?.details,
+  })
 }
 
-export async function createClaim(userId, { type, rewardId, cupsRedeemed, payoutAmount, receiptPhotoUrl, receiptPhotoPath, attachReceiptPhoto, orgId }) {
-  // Generate the claim id client-side and insert WITHOUT a RETURNING
-  // select. Why: the anonymous user app has INSERT on `claims` but no
-  // SELECT policy (locked down in C-1), so `.insert().select().single()`
-  // would fail trying to read the new row back. Supplying our own id
-  // sidesteps the read entirely — anon INSERT alone is enough.
-  const id = safeUUID()
-  // Set receipt_photo_path AT INSERT TIME. An anonymous user cannot UPDATE
-  // the claim afterwards: PostgREST only mutates rows the role can also
-  // SELECT, and anon has no SELECT policy on claims (they hold payout data),
-  // so an UPDATE silently affects 0 rows and the path never sticks — which
-  // made verify-receipt report "no photo" and the whole claim fail for
-  // anonymous users. The photo path is deterministic (`<id>.jpg`, since the
-  // upload forces JPEG to exactly this key), so we can set it up front.
-  const photoPath = receiptPhotoPath ?? (attachReceiptPhoto ? `${id}.jpg` : null)
-  const insert = {
-    id,
-    user_id: userId,
-    type,
-    reward_id: rewardId ?? null,
-    cups_redeemed: cupsRedeemed,
-    payout_amount: payoutAmount,
-    receipt_photo_url: receiptPhotoUrl ?? null,
-    receipt_photo_path: photoPath,
-    status: 'pending',
-  }
-  if (orgId) insert.org_id = orgId
-  const { error } = await supabase.from('claims').insert(insert)
-  if (error) throw error
-  return id
+/** The venue wants an email (verified, where it asks for that) first. */
+export function needsEmailFirst(err) {
+  return /verification_required|email_required/.test(String(err?.message || ''))
+}
+
+/** A receipt claim for a reward. Returns the claim id; the receipt photo goes
+ *  to receipts/<claim id>.jpg, which the claim already points at. */
+export async function createCashbackClaim(userId, rewardId) {
+  const { data, error } = await supabase.rpc('create_cashback_claim', {
+    p_user_id: userId,
+    p_reward_id: rewardId,
+  })
+  if (error) throw actionError(error)
+  return data
+}
+
+/** Cash out the whole balance: the cups leave the balance and the claim is
+ *  written in the same step. Returns { claim_id, cups, amount, new_balance }. */
+export async function refundAllCups(userId, label) {
+  const { data, error } = await supabase.rpc('refund_all_cups', {
+    p_user_id: userId,
+    p_label: label ?? null,
+  })
+  if (error) throw actionError(error)
+  return data
+}
+
+/** Give cups to the venue's charity. The server writes the activity row.
+ *  Returns { cups, new_balance }. */
+export async function donateCups(userId, cups) {
+  const { data, error } = await supabase.rpc('donate_cups', {
+    p_user_id: userId,
+    p_cups: cups,
+  })
+  if (error) throw actionError(error)
+  return data
 }
 
 // Fire the customer a "we've received your cashback request" confirmation email
@@ -1291,10 +1276,9 @@ export async function uploadReceiptPhoto(claimId, photoDataUrl) {
   if (error) throw error
 
   // NOTE: we deliberately do NOT update claims.receipt_photo_path here.
-  // createClaim already set it at INSERT time (anon can't UPDATE claims —
-  // no SELECT policy means the UPDATE silently affects 0 rows). The path is
-  // deterministic (`${claimId}.jpg`), so the row written at creation already
-  // points at exactly this object.
+  // create_cashback_claim already set it (customers can't update claims).
+  // The path is deterministic (`${claimId}.jpg`), so the row written at
+  // creation already points at exactly this object.
   return path
 }
 

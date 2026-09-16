@@ -1525,6 +1525,6 @@
 }
 .upedit-confirm__go:hover { filter: brightness(1.06); }
 
-/* Redirect Refund account page: no app chrome above it, so it needs its
+/* Deferred Tikkie account page: no app chrome above it, so it needs its
    own top margin or the avatar sits against the status bar. */
 .user-page--tikkie { padding-top: calc(env(safe-area-inset-top, 0px) + 34px); }

@@ -20,11 +20,14 @@ export const PAYMENT_PROVIDERS = {
   },
   uae: {
     key: 'uae',
-    label: 'UAE payout',
-    // Generic UAE adapter. The edge function exists and routes to whichever
-    // concrete provider is configured via the UAE_PAYOUT_PROVIDER secret; until
-    // one is chosen + credentialed it returns "not configured" (live: false), so
-    // approving an AE claim never mints in the wrong currency.
+    label: 'UAE payout — not available yet',
+    // UNAVAILABLE ON PURPOSE. No UAE provider has been chosen, and the
+    // `uae-payout` edge function is written (supabase/functions/uae-payout) but
+    // NOT deployed. `live: false` is what keeps it that way: an approved AE
+    // claim surfaces "provider not configured" rather than calling a function
+    // that isn't there, and nothing ever mints in the wrong currency.
+    // To enable: pick the provider, deploy uae-payout, set its secrets, then
+    // flip `live` to true.
     edgeFunction: 'uae-payout',
     live: false,
     currencies: ['AED'],

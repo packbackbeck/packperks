@@ -291,7 +291,7 @@ function AdminShell() {
           </KeepAlive>
           <KeepAlive id="users" activeId={page} visited={visited}>
             {/* One Users page for every mode — it hides the cup/reward
-                columns for Redirect Refund (profiles + accounts). */}
+                columns for Deferred Tikkie (profiles + accounts). */}
             <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} focusSection={page === 'users' ? deepSection : null} onSectionConsumed={() => setDeepSection(null)} />
           </KeepAlive>
           <KeepAlive id="claims" activeId={page} visited={visited}>

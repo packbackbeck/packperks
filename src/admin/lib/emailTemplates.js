@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────
  * Email templates — the automated messages PackPerks sends customers in
- * Redirect Refund mode, and the defaults every one of them falls back to.
+ * Deferred Tikkie mode, and the defaults every one of them falls back to.
  *
  * This file is the single source of truth for the ADMIN side. Each edge
  * function carries the same defaults inline (they deploy independently,

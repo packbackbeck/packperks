@@ -11,8 +11,10 @@ import { supabase } from '../lib/supabase';
  * Instead the root is a minimal chooser with the three live models:
  *
  *   • Bring Your Own          → the café group hub
- *   • Titaan Rewards          → the SmartBin deposit venue (t2)
- *   • Titaan Direct Refund    → the SmartBin → Tikkie venue (t3)
+ *   • Deposit Rewards         → the SmartBin rewards venue (t2)
+ *   • Deferred Tikkie         → the SmartBin wallet venue (t3)
+ *
+ * Tile titles are the mode names, and only those — see orgModes.js.
  *
  * A venue in maintenance mode greys its tile out and makes it inert — the
  * same published settings.maintenanceMode flag that shows the maintenance
@@ -95,7 +97,7 @@ export default function ModelChooser() {
             </svg>
           </Tile>
 
-          <Tile href="/t2" variant="bin" title="Titaan Rewards" sub="SmartBin deposit · rewards" down={maint.titaan}>
+          <Tile href="/t2" variant="bin" title="Deposit Rewards" sub="SmartBin · save cups for rewards" down={maint.titaan}>
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 7h16" />
               <path d="M6 7l1 12.5a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9L20 7" />
@@ -104,7 +106,7 @@ export default function ModelChooser() {
             </svg>
           </Tile>
 
-          <Tile href="/t3" variant="refund" title="Titaan Direct Refund" sub="SmartBin · instant Tikkie refund" down={maint.t3}>
+          <Tile href="/t3" variant="refund" title="Deferred Tikkie" sub="SmartBin · collect your refund later" down={maint.t3}>
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2.5" y="5.5" width="19" height="13" rx="2.5" />
               <path d="M16 9.6a3.6 3.6 0 1 0 0 4.8" />

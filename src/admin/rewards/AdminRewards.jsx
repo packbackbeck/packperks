@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import RewardEditPanel from './RewardEditPanel';
 import './AdminRewards.css';
 import { useAdminMoney } from '../lib/adminMoney';
+import { effectiveRates } from '../../lib/rates';
 
 /* P-43: full status palette, with 'hidden' aliased to the paused
  * orange so legacy rows render coherently until edited. */
@@ -560,7 +561,7 @@ export default function AdminRewards({ draftState, onNavigate }) {
               onChange={handleUpdate}
               onSetFeatured={() => handleSetFeatured(selectedReward.id)}
               onArchive={() => handleArchive(selectedReward.id)}
-              cashbackRate={draftState?.draft?.settings?.cashbackRatePerCup || 1.25}
+              cashbackRate={effectiveRates(draftState?.draft?.settings || {}).cashback}
             />
           ) : (
             <div className="rew-editor__empty">

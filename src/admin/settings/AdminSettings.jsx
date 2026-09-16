@@ -10,6 +10,7 @@ import QuickLinks from '../shared/QuickLinks';
 import TypedConfirmModal from '../shared/TypedConfirmModal';
 import './AdminSettings.css';
 import { useAdminMoney } from '../lib/adminMoney';
+import { effectiveRates } from '../../lib/rates';
 
 /* ─────────────────────────────────────────────────────────────────────
  * AdminSettings — platform configuration page.
@@ -435,7 +436,7 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
           await setOrgGroupMembership(activeOrgId, grp.id);
         }
       } else if (target === 'tikkie_only') {
-        // Redirect Refund is never grouped — there's no app or market hub for
+        // Deferred Tikkie is never grouped — there's no app or market hub for
         // a grouped venue to redirect from. Detach first, otherwise an org
         // that passed through Bring Your Own is stuck in a group with no way
         // back to this mode.
@@ -503,8 +504,9 @@ export default function AdminSettings({ draftState, onNavigate, embedded = false
    * schema change — but the banner alone prevents the silent-money-
    * movement footgun the external review called out. */
   const publishedSettings = published?.settings;
-  const pubCashback = publishedSettings?.cashbackRatePerCup ?? settings.cashbackRatePerCup;
-  const pubRefund   = publishedSettings?.refundRatePerCup   ?? settings.refundRatePerCup;
+  const pubRates    = effectiveRates(publishedSettings || settings);
+  const pubCashback = pubRates.cashback;
+  const pubRefund   = pubRates.refund;
   const cashbackChanged = Math.abs(settings.cashbackRatePerCup - pubCashback) > 0.001;
   const refundChanged   = Math.abs(settings.refundRatePerCup   - pubRefund)   > 0.001;
   const ratesChanged = cashbackChanged || refundChanged;

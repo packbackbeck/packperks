@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import './SuccessPage.css';
 import { setClaimNotifyPrefs } from '../lib/api';
-import { requestPushPermission, isPushSupported, iosNeedsInstall, getPermissionState } from '../lib/notify';
 import { useMoney, useRegion } from '../lib/RegionContext';
 
 function formatDate(d = new Date()) {
@@ -24,8 +23,8 @@ const ReceiptRow = ({ label, value, bold, green }) => (
 /* Shown after an ACCEPTED receipt verdict. In the Tikkie model every accepted
  * claim is reviewed by a person, then we send a Tikkie link to collect the
  * cashback (within 7 days) — the customer collects it themselves via the
- * link. The customer picks how they want to be told it's ready (email
- * and/or a browser push notification); the choice is stored on the claim. */
+ * link. The customer chooses whether to be emailed when it's ready; the
+ * choice is stored on the claim. Email is the only notification channel. */
 export default function SuccessPage({ reward, onDone, userName: userNameProp, userEmail: userEmailProp, claimId, onAddEmail }) {
   const now = new Date();
   const userName = userNameProp || 'there';
@@ -34,32 +33,21 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
   const { payout } = useRegion();
   const cashback = money(reward.euros ?? reward.cupsNeeded * 1.25);
 
-  const pushSupported = isPushSupported();
-  const needsInstall = iosNeedsInstall();
   const [notifyEmail, setNotifyEmail] = useState(!!userEmail);
-  const [notifyPush, setNotifyPush] = useState(false);
-  const [pushPerm, setPushPerm] = useState(getPermissionState());
 
   // Persist the initial choice (email on if we already have one) once.
   useEffect(() => {
-    if (claimId) setClaimNotifyPrefs(claimId, { email: !!userEmail, push: false }).catch(() => {});
+    if (claimId) setClaimNotifyPrefs(claimId, { email: !!userEmail }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claimId]);
 
-  const save = (email, push) => { if (claimId) setClaimNotifyPrefs(claimId, { email, push }).catch(() => {}); };
+  const save = (email) => { if (claimId) setClaimNotifyPrefs(claimId, { email }).catch(() => {}); };
 
   const toggleEmail = () => {
     if (!userEmail) { onAddEmail?.(); return; } // no address yet → open the add-email popup
     const next = !notifyEmail;
     setNotifyEmail(next);
-    save(next, notifyPush);
-  };
-
-  const togglePush = async () => {
-    if (notifyPush) { setNotifyPush(false); save(notifyEmail, false); return; }
-    const perm = await requestPushPermission();
-    setPushPerm(perm);
-    if (perm === 'granted') { setNotifyPush(true); save(notifyEmail, true); }
+    save(next);
   };
 
   return (
@@ -127,8 +115,6 @@ export default function SuccessPage({ reward, onDone, userName: userNameProp, us
           </span>
           <span className={`sp-notify__check${notifyEmail ? ' is-on' : ''}`} aria-hidden="true" />
         </button>
-        {/* C.4: the "notify on this device" (push) option was removed — there is
-            no push sender yet, so it delivered nothing. Email works (via Brevo). */}
       </div>
 
       <button className="success-page__btn" onClick={onDone}>

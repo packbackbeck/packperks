@@ -7,6 +7,7 @@ import { getPendingCounts } from './lib/adminApi';
 import { logAction } from './auth/actionLog';
 import './AdminSidebar.css';
 import { useAdminMoney } from './lib/adminMoney';
+import { effectiveRates } from '../lib/rates';
 
 // Nav items that show a "Group" chip because they operate on the whole BYO
 // group (one shared customer base across every store), not just this store.
@@ -117,7 +118,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    // Redirect Refund orgs only: the bin's offline fallback codes + the
+    // Deferred Tikkie orgs only: the bin's offline fallback codes + the
     // alarm that fires when one gets used.
     id: 'backupcups',
     label: 'Backup Cups',
@@ -129,7 +130,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    // Redirect Refund only: the automated customer emails.
+    // Deferred Tikkie only: the automated customer emails.
     id: 'emailtemplates',
     label: 'Email Templates',
     icon: (
@@ -140,7 +141,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    // Redirect Refund only: the bin locations behind the customer map.
+    // Deferred Tikkie only: the bin locations behind the customer map.
     id: 'smartbins',
     label: 'Smart Bins',
     icon: (
@@ -280,6 +281,7 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
   const { activeOrgId, activeGroupId, activeGroup, activeOrgSharing, activeGroupMode, activeOrgMode } = useOrg();
   const isByo = activeGroupMode === 'byo';
   const isTikkieOnly = activeOrgMode === 'tikkie_only';
+  const rates = effectiveRates(settings, isTikkieOnly ? 'tikkie_only' : (isByo ? 'byo' : 'standard'));
 
   // Pending-work signal dots: claims to review, held cup scans, and account-merge
   // requests. Refetched on org switch + whenever the active page changes (a
@@ -320,7 +322,7 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
             const visible = ROLE_VISIBLE_TABS[role];
             if (!(visible === null || !visible || visible.has(item.id))) return false;
             // Tikkie-only orgs (smart-bin cashback): payouts, receipts and
-            // the offline fallback — plus, now that Redirect Refund has a
+            // the offline fallback — plus, now that Deferred Tikkie has a
             // user base, the audience pages (users, behaviour, health,
             // reports), each adapted to this mode. (Settings/history/support
             // stay reachable via the top-bar dock; see TIKKIE_ONLY_PAGES.)
@@ -398,23 +400,25 @@ export default function AdminSidebar({ activePage, onNavigate, draftState, role,
         {/* Quick-rates card — shaped by the org's programme model:
              · Deposit Rewards → both rates (cashback vs direct refund)
              · Bring Your Own  → cashback (+ refund only if that flag is on)
-             · Redirect Refund → the single refund rate, per bin receipt */}
+             · Deferred Tikkie → the single refund rate, per bin receipt */}
+        {/* The same resolution the server uses (lib/rates.js), so the chip
+            always matches what the venue actually pays. */}
         <div className="admin-sidebar__rates" onClick={() => onNavigate('settings')}>
           {isTikkieOnly ? (
             <div className="admin-sidebar__rate-item">
               <span className="admin-sidebar__rate-label">Refund</span>
-              <span className="admin-sidebar__rate-val">{money(settings.refundRatePerCup || 0.10)}/cup</span>
+              <span className="admin-sidebar__rate-val">{money(rates.refund)}/cup</span>
             </div>
           ) : (
             <>
               <div className="admin-sidebar__rate-item">
                 <span className="admin-sidebar__rate-label">Cashback</span>
-                <span className="admin-sidebar__rate-val">{money(settings.cashbackRatePerCup || 1.25)}/cup</span>
+                <span className="admin-sidebar__rate-val">{money(rates.cashback)}/cup</span>
               </div>
               {(!isByo || settings.featureDirectRefunds) && (
                 <div className="admin-sidebar__rate-item">
                   <span className="admin-sidebar__rate-label">Refund</span>
-                  <span className="admin-sidebar__rate-val">{money(settings.refundRatePerCup || 1.00)}/cup</span>
+                  <span className="admin-sidebar__rate-val">{money(rates.refund)}/cup</span>
                 </div>
               )}
             </>

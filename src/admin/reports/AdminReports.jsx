@@ -278,7 +278,7 @@ export default function AdminReports({ onNavigate }) {
   // included — only view-only checkers are locked out.
   const canManageAlerts = role !== 'checker';
 
-  // Redirect Refund orgs have no cup scans, cup balances or rewards —
+  // Deferred Tikkie orgs have no cup scans, cup balances or rewards —
   // the datasets and columns trim themselves to what that mode records.
   const datasets = useMemo(() => {
     if (!isTikkie) return DATASETS;
@@ -300,7 +300,7 @@ export default function AdminReports({ onNavigate }) {
 
   const [dataset, setDataset] = useState(canExportPii ? 'users' : 'cup_scans');
   // Snap the selection back onto an existing dataset when the mode
-  // removes the current one (e.g. cup_scans in Redirect Refund).
+  // removes the current one (e.g. cup_scans in Deferred Tikkie).
   useEffect(() => {
     if (!datasets[dataset]) setDataset(Object.keys(datasets)[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps

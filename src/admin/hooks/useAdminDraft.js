@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { saveAppConfig, getAppConfig } from '../../lib/api';
 import { useOrg } from '../context/OrgContext';
 import { stripSettingsForMode } from '../lib/orgModes';
+import { withRateDefaults } from '../../lib/rates';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Multi-org note (Phase 2): the admin draft (working copy of rewards +
@@ -60,6 +61,15 @@ export const DEFAULT_SETTINGS = {
   termsUrl: 'https://packperks.nl/terms',
   cookieUrl: 'https://packperks.nl/cookies',
 };
+
+/* Everything except the per-cup rates. Rates depend on the venue's mode and
+ * are filled by withRateDefaults (lib/rates.js), never from this object — a
+ * blanket €1.00 here is what used to overwrite a Deferred Tikkie venue's
+ * real €0.10 default. */
+const RATE_KEYS = new Set(['cashbackRatePerCup', 'refundRatePerCup']);
+const NON_RATE_DEFAULTS = Object.fromEntries(
+  Object.entries(DEFAULT_SETTINGS).filter(([k]) => !RATE_KEYS.has(k)),
+);
 
 export const DEFAULT_DASHBOARD_BLOCKS = [
   { id: 'stat-total-users',     label: 'Total Users',          type: 'stat',  visible: true,  span: 1 },
@@ -218,7 +228,10 @@ export function useAdminDraft() {
         rewards: Array.isArray(src?.rewards)
           ? src.rewards.map((r, i) => ({ ...r, order: r.order ?? i }))
           : [],
-        settings: { ...DEFAULT_SETTINGS, ...(src?.settings || {}) },
+        // Rates resolve exactly as the server resolves them (lib/rates.js), so a
+        // Deferred Tikkie venue with no rate set shows the €0.10 it really pays
+        // rather than the full app's €1.00.
+        settings: withRateDefaults({ ...NON_RATE_DEFAULTS, ...(src?.settings || {}) }),
         dashboardBlocks: Array.isArray(src?.dashboardBlocks)
           ? src.dashboardBlocks.map(b => ({ ...b }))
           : DEFAULT_DASHBOARD_BLOCKS.map(b => ({ ...b })),

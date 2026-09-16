@@ -102,7 +102,7 @@ const Icon = {
  * lands on Settings rather than scrolling Overview. Each entry has
  * generous `keywords` so partial / fuzzy queries resolve well. */
 const FEATURES = [
-  // ── Redirect Refund (smart bin) ──────────────────────────────────────
+  // ── Deferred Tikkie (smart bin) ──────────────────────────────────────
   { id: 'f-backupcups',   name: 'Backup cups',             desc: "The bin's offline fallback codes",  group: 'Smart bin',  page: 'backupcups', icon: Icon.cup,     keywords: 'backup reserve fallback offline spare emergency bin codes uuid alert outage' },
   { id: 'f-backupalert',  name: 'Backup cup alerts',       desc: 'Who gets emailed on a fallback',    group: 'Smart bin',  page: 'backupcups', icon: Icon.reports, keywords: 'alert email notify recipients subject message backup offline warning' },
   { id: 'f-tikkielog2',   name: 'Tikkie payouts',          desc: 'Every bin receipt paid via Tikkie', group: 'Smart bin',  page: 'tikkielog',  icon: Icon.reports, keywords: 'tikkie payout log cashback links redeemed expired bin receipts' },

@@ -343,8 +343,9 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
         <EditField label="Postal code"       value={draft.postal_code}        onChange={v => setDraft(d => ({ ...d, postal_code: v }))} />
         <EditField label="City"              value={draft.city}               onChange={v => setDraft(d => ({ ...d, city: v }))} />
         {/* Region drives the store's currency, payout provider, map focus and
-         *  policy copy. Stored as organizations.country; the dropdown writes the
-         *  region's canonical ISO code so downstream resolution is unambiguous. */}
+         *  policy copy. Stored as organizations.country, always as the region's
+         *  full name ("Netherlands") — the same format the new-venue wizard
+         *  writes. regionForCountry resolves names and codes alike. */}
         <div className="org-field">
           <span className="org-field__label">Region</span>
           <select
@@ -352,7 +353,7 @@ function OrgInfoCard({ org, canEdit, onSaved }) {
             value={regionForCountry(draft.country)?.key || ''}
             onChange={e => {
               const r = DEFAULT_REGIONS[e.target.value];
-              setDraft(d => ({ ...d, country: r ? r.countries[0] : d.country }));
+              setDraft(d => ({ ...d, country: r ? r.label : d.country }));
             }}
           >
             <option value="" disabled>Select a region…</option>

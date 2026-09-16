@@ -209,7 +209,7 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCup
 
       <div className="udp__body">
         <div className="udp__meta-grid">
-          {/* Redirect Refund has no cup balance to show or adjust — the
+          {/* Deferred Tikkie has no cup balance to show or adjust — the
               money goes straight out through Tikkie. */}
           {!hideCups && (
             <>
@@ -366,7 +366,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
   // Group awareness: within a BYO group, users are one shared account across
   // every store, so we load the whole group's deduped customer base.
   const { activeOrgId, activeGroupId, groupMemberIds, groupMembers, activeOrgMode } = useOrg();
-  // Redirect Refund customers have no cup balance and no rewards: the same
+  // Deferred Tikkie customers have no cup balance and no rewards: the same
   // page, minus the columns and controls that would always read zero.
   const isTikkie = activeOrgMode === 'tikkie_only';
   const grouped = !!activeGroupId && groupMembers.length > 1;

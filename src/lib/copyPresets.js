@@ -174,7 +174,11 @@ export function getCopyPreset(mode) {
   return COPY_PRESETS[mode] || COPY_PRESETS.byo;
 }
 
-/* Normalise an arbitrary value to a valid mode (D.6: unknown → byo). */
+/* Normalise an arbitrary value to a valid mode (D.6).
+ * Unknown or missing → Bring Your Own. A group is created as BYO, so that is
+ * the default for any group whose config never recorded a mode. The dashboard
+ * resolves grouped venues through this same function (OrgContext), so the two
+ * can't drift apart. */
 export function normalizeMode(mode) {
   return COPY_MODES.includes(mode) ? mode : 'byo';
 }

@@ -144,7 +144,10 @@ export default function RegionsPanel({ orgs = [], onChanged }) {
   async function assignOrg(regionKey) {
     const orgId = addSel[regionKey];
     if (!orgId) return;
-    const country = (regions[regionKey].countries[0]) || regionKey;
+    // Stored as the region's full name ("Netherlands"), the one format
+    // organizations.country uses. regionForCountry matches codes too, but
+    // two spellings of the same country in the data is how drift starts.
+    const country = regions[regionKey].label || regionKey;
     setBusy(true); setError(null);
     try {
       await setOrgRegion(orgId, country);

@@ -17,7 +17,7 @@ import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * TikkieHomePage — the WHOLE Redirect Refund experience (wallet model).
+ * TikkieHomePage — the WHOLE Deferred Tikkie experience (wallet model).
  *
  * Scanning a receipt lands here. After the cookie choice, the scan
  * credits the receipt's value to this device's wallet — the first scan

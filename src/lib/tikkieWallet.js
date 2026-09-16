@@ -2,26 +2,19 @@
  * tikkieWallet — the client of bin-tikkie's wallet model.
  *
  * One place for the device identity, the locally-remembered profile, and
- * every edge-function call the Redirect Refund home makes. Plain fetch on
+ * every edge-function call the Deferred Tikkie home makes. Plain fetch on
  * purpose: supabase.functions.invoke serialises behind the client's auth
  * lock and a single wedged request then hangs every later call.
  * ───────────────────────────────────────────────────────────────────── */
+
+import { getDeviceId } from './deviceId';
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bin-tikkie`;
 const FN_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* Same device id the rest of PackPerks uses — one profile per device. */
 export function deviceId() {
-  try {
-    let id = localStorage.getItem('packperks_device_id');
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem('packperks_device_id', id);
-    }
-    return id;
-  } catch {
-    return 'no-storage';
-  }
+  return getDeviceId();
 }
 
 const PROFILE_KEY = (orgId) => `packperks_refund_user:${orgId}`;

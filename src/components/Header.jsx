@@ -93,7 +93,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
 
       <div className="header__tiles" role="group" aria-label="Account actions">
         {/* Tile 1 — Plus button. Triggers the scan / add-more-cups flow.
-            On the Redirect Refund home it opens the same camera scanner,
+            On the Deferred Tikkie home it opens the same camera scanner,
             for adding another smart-bin receipt to the balance. */}
         {showAdd && <button
           type="button"
@@ -108,7 +108,7 @@ export default function Header({ cupCount, onBadgeClick, onAddCup, org, design, 
         </button>}
 
         {/* Tile 2 — Cup balance. Opens the profile / user-settings page.
-            Hidden on the Redirect Refund home: there is no cup balance. */}
+            Hidden on the Deferred Tikkie home: there is no cup balance. */}
         {showCups && <button
           ref={cupTileRef}
           type="button"

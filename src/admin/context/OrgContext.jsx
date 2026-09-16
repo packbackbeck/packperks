@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { setActiveOrgId, setActiveOrgCountry } from './orgState';
 import { useAuth } from '../auth/AuthContext';
 import { readVendorPreviewFlag } from './ViewRole';
+import { normalizeMode } from '../../lib/copyPresets';
 
 /* ─────────────────────────────────────────────────────────────────────
  * OrgContext — single source of truth for the currently-active
@@ -219,7 +220,11 @@ export function OrgProvider({ children }) {
       const orgCfg = (data || []).find(r => r.key === `published:${oid}`);
       const grpCfg = gid ? (data || []).find(r => r.key === `published:group:${gid}`) : null;
       setActiveOrgSharing(orgCfg?.value?.settings?.featureCupSharing === true);
-      setActiveGroupMode(grpCfg?.value?.settings?.mode || null);
+      // A grouped venue always has a group mode. A group whose config never
+      // set one is a Bring Your Own group — the same default the customer
+      // app's copy uses (normalizeMode) — so the dashboard and the app can't
+      // disagree about what the venue is.
+      setActiveGroupMode(gid ? normalizeMode(grpCfg?.value?.settings?.mode) : null);
       setActiveOrgMode(orgCfg?.value?.settings?.mode || null);
       setActiveOrgSettings(orgCfg?.value?.settings || null);
     })();
@@ -277,7 +282,7 @@ export function OrgProvider({ children }) {
     setStatsScope,
     scopeOrgIds,          // org id(s) the analytics pages should query
     activeOrgSharing,     // is cup sharing on for the active org?
-    activeGroupMode,      // 'byo' | 'deposit' | null (active org's group)
+    activeGroupMode,      // 'byo' | 'deposit' for a grouped venue, null otherwise
     activeOrgMode,        // org-level mode: 'tikkie_only' | null
     activeOrgSettings,    // the org's published settings blob (or null)
   };

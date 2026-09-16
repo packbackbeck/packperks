@@ -260,7 +260,7 @@ export default function AdminStats() {
     try {
       const r = RANGES.find(x => x.id === rangeId) || RANGES[0];
       const fromTs = r.days ? Date.now() - r.days * 24 * 60 * 60 * 1000 : null;
-      // Redirect Refund orgs: their pipeline is bin session → Tikkie link,
+      // Deferred Tikkie orgs: their pipeline is bin session → Tikkie link,
       // not QR scan → reward, and there is no receipt AI to score.
       const [result, ai] = await Promise.all([
         isTikkie

@@ -12,9 +12,9 @@ import { useAdminMoney, adminMoney } from '../lib/adminMoney';
  * The first question is the one that changes every later answer: WHICH
  * PROGRAMME MODEL is this org running?
  *
- *   • Direct refund + rewards  → deposit. SmartBin, full app.
- *   • Rewards only             → byo. Bring-your-own cup.
- *   • Direct refund only       → tikkie_only. Bin receipt → Tikkie link.
+ *   • Deposit Rewards  → deposit. SmartBin, full app.
+ *   • Bring Your Own   → byo. Bring-your-own cup.
+ *   • Deferred Tikkie  → tikkie_only. Bin receipt → wallet → Tikkie link.
  *
  * The model decides the second question (group placement) and then prunes
  * the rest of the wizard: a tikkie-only org has no rewards, no app copy

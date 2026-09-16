@@ -44,8 +44,8 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Register the service worker for the customer app only (not admin/mockup) so
-// browser push + "Add to Home Screen" install work. The SW has no fetch/cache
-// handler, so it's HMR-safe. Real push delivery is wired in Phase 2.
+// "Add to Home Screen" install works. The SW has no fetch/cache handler, so
+// it's HMR-safe, and no push handler — notifications are email only.
 if ('serviceWorker' in navigator && !isAdmin && !isMockup) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => { /* non-fatal */ })

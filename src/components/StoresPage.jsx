@@ -322,7 +322,7 @@ function MapView({ stores, notYetStores = [], highlightId, onSelectStore, onRequ
     // CARTO "Voyager" — a soft, friendly, simplified basemap (free, no key).
     /* Basemap: OSM "Humanitarian" — soft pastel palette, calm labels, and
        (unlike Carto's keyless CDN, which now stamps "API KEY REQUIRED"
-       across every tile) free with no key. The Redirect Refund bin map
+       across every tile) free with no key. The Deferred Tikkie bin map
        uses the same layer so both maps read as one product. */
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
       subdomains: 'ab',

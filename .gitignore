@@ -12,8 +12,11 @@ dist
 dist-ssr
 *.local
 
-# Claude Code internal config
-.claude/
+# Claude Code config. Local permissions and worktrees stay private, but
+# launch.json is shared: CLAUDE.md tells every session to start the dev server
+# from it, so a fresh clone needs it.
+.claude/*
+!.claude/launch.json
 .claire/
 
 # Supabase CLI local temp
@@ -32,3 +35,7 @@ mqlog.txt
 *.njsproj
 *.sln
 *.sw?
+
+# Screenshot audits are kept locally, not versioned — 14 MB of PNGs in
+# every clone for images nobody diffs.
+screen-audit/

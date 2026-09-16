@@ -10,8 +10,8 @@
 -- repo's migrations/ folder records (84 applied against 41 files, eight
 -- tables with no migration at all), so replaying migrations/ cannot rebuild
 -- it. To stand up a copy, run this file on a fresh Supabase project, then
--- any migration numbered above 045, then supabase/pending/ once its
--- conditions are met. From now on every change goes in as a numbered file.
+-- any migration numbered above 045 (deploy the app first: 046 needs its
+-- x-device-id header). From now on every change goes in as a numbered file.
 --
 -- Not included: data (app_config rows, organisations…), auth settings, edge
 -- function secrets (see docs/HANDOFF.md), and the Supabase-managed schemas.

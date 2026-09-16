@@ -20,9 +20,14 @@ medium and twelve low. What was done about them:
   takes staff writes only, and `tikkie-cashback` (v17) refuses to pay more than
   a claim's reward is worth. Tested in rolled-back transactions against the
   live data (80/80) before applying.
-- Stage 2 is **written, tested and waiting**: `supabase/pending/046_…` binds
-  customer rows to the device header. Apply it only after the app build that
-  sends `x-device-id` is live.
+- Stage 2 is **live** too (migration `046`), applied the same day once the
+  app that sends `x-device-id` was confirmed deployed: without a device
+  header the public key reads nothing, a device sees only its own rows, and
+  payout links reach only their owner. 56 of 59 rolled-back checks passed
+  before applying; the three misses were mistakes in the checks, not the
+  rules. First and returning visits on the live site worked
+  afterwards, and the API logs showed no failed requests.
+  `supabase/rollback/046_to_stage1.sql` undoes it in an emergency.
 - No email is needed to collect cups. It is asked for when a customer claims
   cashback or a refund (and verified where the venue requires it). Payout
   links show in the app only.
@@ -72,7 +77,8 @@ medium and twelve low. What was done about them:
   only describes analytics), and the banner's stored choice no longer
   overwrites the account's on every page load; only a change made in the
   banner is recorded.
-- NYU Abu Dhabi has a new logo, served from `public/brand/nyuad.png`.
+- NYU Abu Dhabi has a new logo, served from `public/brand/nyuad.png`
+  (`logo_width` 110, the height of the header buttons).
 
 ### 2. Slider voucher (8 Sep)
 
@@ -102,10 +108,6 @@ KFC: `https://perks.packback.network/kfc/`
 ---
 
 ## Open items
-
-**Deploy, then Stage 2.** Until the current `main` is live and 046 is applied,
-the public key can still read customer rows (emails) and serve unexpired Tikkie
-links to callers that send no device header — 39 links, about €15, on 16 Sep.
 
 **Leaked-password protection is still off** according to Supabase's advisor
 (Authentication → Password security).

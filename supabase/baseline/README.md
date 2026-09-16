@@ -10,9 +10,10 @@ database than were saved as files, so replaying the folder cannot rebuild it.
 1. Create a Supabase project (the file expects Supabase's roles: `anon`,
    `authenticated`, `service_role`, and the `auth`, `storage`, `cron` schemas).
 2. Run `2026-09-16_schema.sql`.
-3. Run every file in `supabase/migrations/` numbered above 045, in order.
-4. Run `supabase/pending/` files only once their stated conditions are met.
-5. Load data separately (venue settings live in `app_config`), deploy the
+3. Deploy the app, then run every file in `supabase/migrations/` numbered
+   above 045, in order. 046 relies on the `x-device-id` header the app sends;
+   without the app, customers can't see their own rows.
+4. Load data separately (venue settings live in `app_config`), deploy the
    edge functions and set their secrets: `BREVO_API_KEY`,
    `BREVO_SENDER_NAME`, `BREVO_SENDER_EMAIL` (`docs/EMAIL_SETUP.md`), the
    `TIKKIE_*` values (`docs/TIKKIE_INTEGRATION.md`), `ANTHROPIC_API_KEY`

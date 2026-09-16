@@ -20,8 +20,8 @@
 -- live today, which does not say which device is asking. It closes the
 -- takeovers, the config rewrites, balance inflation and payout tampering, and
 -- adds the device-checked calls the next app build uses. Stage 2
--- (supabase/pending/046_bind_customer_rows_to_device.sql) ties every customer
--- row to its device once that build is live.
+-- (046_bind_customer_rows_to_device.sql) ties every customer row to its
+-- device once that build is live.
 
 -- ═════════════════════════════════════════════════════════════════════════
 -- 1. Who is asking

@@ -119,7 +119,7 @@ access, so any staff role may use it.
 | `src/lib/rates.js` | `effectiveRates` — cashback and refund per cup |
 | `supabase/functions/` | ~30 edge functions |
 | `supabase/migrations/` | numbered SQL migrations — every schema change is one |
-| `supabase/pending/` | migrations written and tested but waiting on a deploy |
+| `supabase/rollback/` | emergency scripts that undo a migration |
 | `supabase/baseline/` | full schema snapshot; rebuilds the database from nothing |
 
 The three analytics readers behind the dashboard, all in `adminApi.js`:
@@ -137,7 +137,8 @@ functions through MCP with the full file contents inline, and keep the local
 copy in `supabase/functions/` in sync in the same commit.
 
 **Every schema change is a numbered file** in `supabase/migrations/`, applied
-with `apply_migration`. Changes made straight in the dashboard are how the
+with `apply_migration`. One that must wait for an app deploy waits in
+`supabase/pending/` and moves into `migrations/` when applied. Changes made straight in the dashboard are how the
 repo stopped describing the database; `supabase/baseline/` is the snapshot
 that recovered it (regenerate with `baseline/snapshot.sql` after big changes).
 
@@ -169,7 +170,7 @@ security boundary, and never hand out a Supabase key expecting it to filter.
 what it could do is split in two stages, because the live app and the database
 change at different times:
 
-- **Stage 1 — live (migrations 043–045).** The key can no longer move money or
+- **Stage 1 (migrations 043–045).** The key can no longer move money or
   change dashboard data. Amounts come from the published config, never the
   request: the `claims` insert trigger reprices every claim, balances only go
   down from the client, and `tikkie-cashback` refuses to pay more than the
@@ -177,13 +178,15 @@ change at different times:
   `refund_all_cups`, `donate_cups` and `redeem_voucher`, which check the caller
   owns the account. Staff-only tables (config, venues, invitations, roles)
   take writes from `is_staff_writer()` only.
-- **Stage 2 — waiting (`supabase/pending/046_…`).** Until it is applied, the
-  key still **reads** every `users` row (emails), balance and scan, and
-  `get_customer_claims` / `redeem_voucher` still serve callers that send no
-  device header — including unexpired Tikkie payout links. Stage 1 left those
-  open because the app build that was live then sent no header. Apply 046
-  only once the live bundle sends `x-device-id` (fingerprint it:
-  `grep -c x-device-id`), then move the file into `migrations/`.
+- **Stage 2 (migration 046).** Customer rows, balances, history and shared
+  profiles are visible and changeable only by the device that created them
+  (the `x-device-id` header) or the login and shared identity they belong to
+  (`request_user_ids()`). Without the header the key reads nothing, claims
+  can't be inserted directly, and payout links go only to their owner.
+  Both stages are live since 16 Sep 2026. Every customer database call must
+  go through `src/lib/supabase.js` so it carries the header; a client without
+  it sees an empty account. `supabase/rollback/046_to_stage1.sql` undoes
+  Stage 2 in an emergency (and reopens the reads).
 
 Never add an `anon`/`authenticated` write policy with `true`, and never let a
 client-sent number decide an amount. New money paths are SECURITY DEFINER

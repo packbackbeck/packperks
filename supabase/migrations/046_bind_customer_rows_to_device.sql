@@ -1,10 +1,9 @@
 -- 046 — Tie every customer row to its device or its login.   (STAGE 2)
 --
--- APPLY ONLY AFTER the app build that sends the x-device-id header is live
--- on perks.packback.network (src/lib/supabase.js, fingerprint the bundle for
--- "x-device-id"). An older build sends no header and would lose sight of its
--- own rows the moment this runs. Move this file into supabase/migrations/ when
--- it is applied.
+-- Applied 16 Sep 2026, after the app build that sends the x-device-id header
+-- (src/lib/supabase.js) was confirmed live on perks.packback.network. An
+-- older build sends no header and loses sight of its own rows under these
+-- rules, so any rebuild must deploy the app before this.
 --
 -- Stage 1 (043) stopped anyone from adding cups or choosing what a claim pays.
 -- This stage stops anyone from reading or spending another customer's rows:

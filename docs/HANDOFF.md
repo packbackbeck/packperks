@@ -59,6 +59,21 @@ medium and twelve low. What was done about them:
 - Function search paths pinned (`042`, and `config_number` in `045`).
 - `.claude/launch.json` is now in the repo.
 
+**Follow-ups the same day**
+- The dashboard audit log records again (migration `047`). Its rules
+  compared the entry's venue with the account's, and staff accounts have
+  none, so nothing was logged from 31 July. Staff now log under any venue, a
+  vendor only under its own, a customer login not at all; owners and admins
+  read the whole log. The activity screen also shows entries tied to no
+  venue, and staff authors' names.
+- Marketing consent is opt-in everywhere: the email form, the Deferred
+  Tikkie "save your balance" form and the cookie banner's Customize page
+  start unticked. "Accept all" no longer grants marketing emails (its page
+  only describes analytics), and the banner's stored choice no longer
+  overwrites the account's on every page load; only a change made in the
+  banner is recorded.
+- NYU Abu Dhabi has a new logo, served from `public/brand/nyuad.png`.
+
 ### 2. Slider voucher (8 Sep)
 
 A second payment method beside Tikkie cashback: a full-screen voucher at the
@@ -82,10 +97,6 @@ NYU Abu Dhabi is the pitch venue: `vendorDemoNumbers: true`, payment method
 https://perks.packback.network/admin?org=nyuad#overview?as=vendor
 ```
 
-Its logo URL (`savant.qmul.ac.uk`) now redirects to an HTML page, so the logo
-is broken in production. Upload a copy to `reward-images` and point the venue
-at it.
-
 KFC: `https://perks.packback.network/kfc/`
 
 ---
@@ -103,16 +114,17 @@ links to callers that send no device header — 39 links, about €15, on 16 Sep
 now pays no more than the reward is worth: two for €10.00 on a reward that is
 now €0.50, and one for €3.20. Review them by hand.
 
-**The dashboard audit log has been empty since 31 July.** Its insert rule only
-accepts rows whose `org_id` matches the admin's own, and staff admins have
-none, so every entry logged under an open venue is silently dropped.
+**Marketing consent recorded before 16 Sep is doubtful.** Until then the
+email form's box started ticked and "Accept all" on the cookie banner set
+marketing consent. On 16 Sep, 124 customer rows had it on (28 with an
+email): 94 from the banner (`source = 'app'`), 22 from the pre-ticked box
+(`signin_popup`), 8 from the wallet form (no source). Decide whether to reset
+those to off, or ask again, before sending any marketing email.
 
 **Org isolation is still a UI convention.** A vendor account can read every
 venue's rows through the API.
 
 **Smaller**
-- The sign-in sheet's "Send me offers" box starts ticked (consent must be
-  opt-in).
 - The rejection email says the cups are still on the balance; cashback cups
   are deducted while the claim is pending.
 - Donations are recorded as activity only, and the Donations page estimates

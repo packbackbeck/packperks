@@ -34,10 +34,8 @@ Compare against `git stash` + rerun before claiming you introduced nothing.
 
 1. **Verify on the running dev server.** A green build is not evidence a screen
    looks right. Start `packperks-dev` (`.claude/launch.json`, port 5173) and
-   actually look at the page before saying it works. `.claude/` is
-   gitignored, so on a fresh clone create that file: one configuration named
-   `packperks-dev`, `runtimeExecutable: "npm"`, `runtimeArgs: ["run","dev"]`,
-   `port: 5173`.
+   actually look at the page before saying it works. `launch.json` is the one
+   file in `.claude/` that is tracked; the rest of that folder is ignored.
 2. **Push only when asked.** Commit locally freely; `git push` waits for a
    direct instruction. There are two remotes and both get pushed:
    `origin` (GitHub) and `gitlab`.
@@ -71,6 +69,13 @@ Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund 
 only when money leaves — a cashback claim or a direct refund — and is verified
 (signed in) wherever the venue has `requireEmailVerification` on. Payout links
 are shown in the app, never in the email.
+
+**Marketing consent is opt-in.** It comes only from a box or switch the
+customer turns on: the email form, the wallet's save-your-balance form, Edit
+profile, or the cookie banner's Marketing switch (recorded only when changed
+there — `takePendingMarketingChoice` in `src/lib/consent.js`). Never pre-tick
+it, never derive it from "Accept all", and never re-apply a stored cookie
+choice onto the account on load.
 
 **Rates** (`src/lib/rates.js`, `effectiveRates`): cashback and refund per cup.
 Everything that shows or charges a rate reads it through this, and the

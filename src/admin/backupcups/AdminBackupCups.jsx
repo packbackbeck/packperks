@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle, AlertTriangle, BellRing, CalendarClock, Check, CheckCircle2, Copy, Gauge, History, KeyRound,
+  Plus, RefreshCw, Timer, Wallet, X,
+} from 'lucide-react';
 import { useOrg } from '../context/OrgContext';
 import {
   listBackupCups,
@@ -11,6 +15,7 @@ import {
   BACKUP_ALERT_DEFAULTS,
   BACKUP_LIMIT_DEFAULTS,
 } from '../lib/adminApi';
+import { Button, Card, CardBody, CardHeader, EmptyState, Field, KpiTile, PageHeader, Switch } from '../ui';
 import './AdminBackupCups.css';
 import { useAdminMoney } from '../lib/adminMoney';
 
@@ -64,9 +69,11 @@ function sinceLabel(iso) {
 function CopyButton({ value, label = 'Copy', small = false }) {
   const [done, setDone] = useState(false);
   return (
-    <button
-      type="button"
-      className={`abc-copy${small ? ' abc-copy--sm' : ''}${done ? ' abc-copy--done' : ''}`}
+    <Button
+      variant={small ? 'ghost' : 'outline'}
+      size="sm"
+      icon={done ? Check : Copy}
+      className={done ? 'abc-copy--done' : ''}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);
@@ -76,7 +83,7 @@ function CopyButton({ value, label = 'Copy', small = false }) {
       }}
     >
       {done ? 'Copied' : label}
-    </button>
+    </Button>
   );
 }
 
@@ -210,312 +217,295 @@ export default function AdminBackupCups() {
     save({ ...alerts, recipients: [...alerts.recipients, e] });
   }
 
-  return (
-    <div className="admin-backupcups">
-      <header className="abc-header">
-        <div>
-          <h1 className="abc-title">Backup cups</h1>
-          <p className="abc-sub">
-            Ten reserved cup codes the bin falls back to when it can’t reach PackPerks. They never
-            expire and pay out every time they’re scanned — so every use here means the bin was
-            offline when it printed that receipt.
-          </p>
-        </div>
-        <button className="abc-refresh" onClick={load} disabled={loading}>
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </header>
+  const kpis = [
+    { id: 'day', label: 'Used, last 24 hours', icon: Timer, tone: stats.last24h ? 'amber' : 'emerald', value: stats.last24h, description: 'Scans while the bin was offline' },
+    { id: 'month', label: 'Used, last 30 days', icon: CalendarClock, tone: 'sky', value: stats.last30d, description: 'Scans while the bin was offline' },
+    { id: 'all', label: 'Used, all time', icon: History, tone: 'violet', value: stats.totalScans, description: 'Every backup scan so far' },
+    { id: 'paid', label: 'Paid out via backups', icon: Wallet, tone: 'teal', value: money(stats.totalEur), description: 'Across all backup scans' },
+  ];
+  const statusTone = stats.totalScans === 0 ? 'quiet' : recentlyUsed ? 'hot' : 'past';
 
-      {error && <div className="abc-error">{error}</div>}
+  return (
+    <div className="ui-page abc">
+      <PageHeader
+        title="Backup cups"
+        subtitle="Ten reserved cup codes the bin falls back to when it can’t reach PackPerks. They never expire and pay out every time they’re scanned, so every use here means the bin was offline when it printed that receipt."
+      >
+        <Button icon={RefreshCw} onClick={load} disabled={loading}>
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </Button>
+      </PageHeader>
+
+      {error && (
+        <p className="abc-error" role="alert">
+          <AlertCircle size={15} aria-hidden="true" />{error}
+        </p>
+      )}
 
       {/* The alarm comes first: the list below never changes, this does. */}
-      <section className={`abc-status${recentlyUsed ? ' abc-status--hot' : ''}`}>
-        <div className="abc-status__main">
-          <span className="abc-status__dot" aria-hidden="true" />
-          <div>
-            <div className="abc-status__head">
-              {stats.totalScans === 0
-                ? 'No backup cup has ever been used'
-                : recentlyUsed
-                  ? 'A backup cup was used in the last 24 hours'
-                  : `Last used ${sinceLabel(stats.lastUsed)}`}
-            </div>
-            <div className="abc-status__note">
-              {stats.totalScans === 0
-                ? 'The bin has reached PackPerks every time it printed a receipt.'
-                : recentlyUsed
-                  ? 'The bin could not reach PackPerks. Check its network connection.'
-                  : `${fmtWhen(stats.lastUsed)} — the bin was offline at that moment.`}
-            </div>
-          </div>
+      <section className={`abc-status abc-status--${statusTone}`} aria-live="polite">
+        <span className="abc-status__icon" aria-hidden="true">
+          {recentlyUsed ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+        </span>
+        <div>
+          <h2 className="abc-status__head">
+            {stats.totalScans === 0
+              ? 'No backup cup has ever been used'
+              : recentlyUsed
+                ? 'A backup cup was used in the last 24 hours'
+                : `Last used ${sinceLabel(stats.lastUsed)}`}
+          </h2>
+          <p className="abc-status__note">
+            {stats.totalScans === 0
+              ? 'The bin has reached PackPerks every time it printed a receipt.'
+              : recentlyUsed
+                ? 'The bin could not reach PackPerks. Check its network connection.'
+                : `${fmtWhen(stats.lastUsed)} — the bin was offline at that moment.`}
+          </p>
         </div>
       </section>
 
-      <div className="abc-tiles">
-        <div className="abc-tile">
-          <div className="abc-tile__num">{stats.last24h}</div>
-          <div className="abc-tile__label">Used, last 24h</div>
-        </div>
-        <div className="abc-tile">
-          <div className="abc-tile__num">{stats.last30d}</div>
-          <div className="abc-tile__label">Used, last 30 days</div>
-        </div>
-        <div className="abc-tile">
-          <div className="abc-tile__num">{stats.totalScans}</div>
-          <div className="abc-tile__label">Used, all time</div>
-        </div>
-        <div className="abc-tile">
-          <div className="abc-tile__num">{money(stats.totalEur)}</div>
-          <div className="abc-tile__label">Paid out via backups</div>
-        </div>
+      <div className="ui-kpis abc-kpis">
+        {kpis.map((m, i) => <KpiTile key={m.id} metric={m} index={i} interactive={false} />)}
       </div>
 
       {/* ── The codes ── */}
-      <section className="abc-card">
-        <header className="abc-card__head">
-          <div>
-            <h2 className="abc-card__title">The codes</h2>
-            <p className="abc-card__desc">
-              Give these to whoever configures the bin. It stores them locally and prints one
-              (or several) when it can’t reach us. Nothing else needs setting up.
-            </p>
-          </div>
-          <CopyButton value={allIds} label="Copy all 10" />
-        </header>
-
-        <div className={`abc-master${setLive ? '' : ' abc-master--off'}`}>
-          <div>
-            <div className="abc-master__label">
-              {setLive ? 'Backup cups are accepted' : 'Backup cups are switched off'}
+      <Card>
+        <CardHeader
+          title="The codes"
+          icon={KeyRound}
+          subtitle="Give these to whoever sets up the bin. It stores them and prints one (or several) when it can’t reach us. Nothing else needs setting up."
+          actions={<CopyButton value={allIds} label="Copy all 10" />}
+        />
+        <CardBody>
+          <div className={`abc-master${setLive ? '' : ' abc-master--off'}`}>
+            <div>
+              <label className="abc-master__label" htmlFor="abc-accept">
+                {setLive ? 'Backup cups are accepted' : 'Backup cups are switched off'}
+              </label>
+              <div className="abc-master__note">
+                {setLive
+                  ? 'A scanned backup code pays out. Switch off to retire the fallback entirely.'
+                  : 'A scanned backup code pays nothing — the customer sees “this receipt is no longer valid”. The bin will keep printing them until its config is updated.'}
+              </div>
             </div>
-            <div className="abc-master__note">
-              {setLive
-                ? 'A scanned backup code pays out. Switch off to retire the fallback entirely.'
-                : 'A scanned backup code pays nothing — the customer sees “this receipt is no longer valid”. The bin will keep printing them until its config is updated.'}
-            </div>
+            <Switch
+              id="abc-accept"
+              checked={setLive}
+              label="Accept backup cups"
+              disabled={togglingSet || cups.length === 0}
+              onChange={next => toggleSet(next)}
+            />
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={setLive}
-            aria-label="Accept backup cups"
-            className={`abc-toggle${setLive ? ' abc-toggle--on' : ''}`}
-            disabled={togglingSet || cups.length === 0}
-            onClick={() => toggleSet(!setLive)}
-          >
-            <span className="abc-toggle__dot" />
-          </button>
-        </div>
 
-        {loading && cups.length === 0 ? (
-          <div className="abc-empty">Loading…</div>
-        ) : cups.length === 0 ? (
-          <div className="abc-empty">
-            No backup cups are set up for {activeOrg?.name || 'this org'}.
-          </div>
-        ) : (
-          <ul className="abc-list">
-            {cups.map(c => (
-              <li key={c.id} className={`abc-item${c.active ? '' : ' abc-item--off'}`}>
-                <span className="abc-item__label">{c.label}</span>
-                <code className="abc-item__id">{c.id}</code>
-                <span className="abc-item__used">
-                  {usesByCup[c.id]
-                    ? `${usesByCup[c.id]}× · ${sinceLabel(lastUseByCup[c.id])}`
-                    : 'never used'}
-                </span>
-                <CopyButton value={c.id} small />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          {loading && cups.length === 0 ? (
+            <p className="abc-loading">Loading…</p>
+          ) : cups.length === 0 ? (
+            <EmptyState icon={KeyRound} title="No backup cups yet">
+              No backup cups are set up for {activeOrg?.name || 'this organisation'}.
+            </EmptyState>
+          ) : (
+            <ul className="abc-list">
+              {cups.map(c => (
+                <li key={c.id} className={`abc-item${c.active ? '' : ' abc-item--off'}`}>
+                  <span className="abc-item__label">{c.label}</span>
+                  <code className="abc-item__id">{c.id}</code>
+                  <span className="abc-item__used">
+                    {usesByCup[c.id]
+                      ? `${usesByCup[c.id]}× · ${sinceLabel(lastUseByCup[c.id])}`
+                      : 'Never used'}
+                  </span>
+                  <CopyButton value={c.id} small />
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
 
       {/* ── Limits ── */}
-      <section className="abc-card">
-        <header className="abc-card__head">
-          <div>
-            <h2 className="abc-card__title">Limits</h2>
-            <p className="abc-card__desc">
-              Backup codes pay out on every scan, so these ceilings are what stand between a
-              shared receipt photo and an open tap. Changes bite on the very next scan.
-            </p>
+      <Card>
+        <CardHeader
+          title="Limits"
+          icon={Gauge}
+          subtitle="Backup codes pay out on every scan, so these ceilings are what stop a shared receipt photo from paying out again and again. Changes apply from the very next scan."
+          actions={<span className="abc-saved" role="status">{limitsSaving ? 'Saving…' : limitsSaved ? <><Check size={13} aria-hidden="true" /> Saved</> : ''}</span>}
+        />
+        <CardBody>
+          <div className="abc-limit-grid">
+            <Field
+              label="Payouts per day"
+              htmlFor="abc-lim-day"
+              hint="All backup scans at this venue together, per rolling 24 hours. Past it, every backup scan is refused until the window moves on."
+            >
+              <input
+                id="abc-lim-day"
+                className="ui-input abc-input--num"
+                type="number" min="1" max="500"
+                value={limits.dailyCap}
+                onChange={e => setLimits({ ...limits, dailyCap: e.target.value })}
+                onBlur={() => saveLimits(limits)}
+              />
+            </Field>
+            <Field
+              label="Payouts per phone per day"
+              htmlFor="abc-lim-dev"
+              hint="One person rescanning their receipt hits this long before the venue limit."
+            >
+              <input
+                id="abc-lim-dev"
+                className="ui-input abc-input--num"
+                type="number" min="1" max="50"
+                value={limits.perDeviceDaily}
+                onChange={e => setLimits({ ...limits, perDeviceDaily: e.target.value })}
+                onBlur={() => saveLimits(limits)}
+              />
+            </Field>
           </div>
-          <span className="abc-savebar">{limitsSaving ? 'Saving…' : limitsSaved ? 'Saved' : ''}</span>
-        </header>
-        <div className="abc-limit-grid">
-          <div className="abc-field">
-            <label className="abc-label" htmlFor="abc-lim-day">Payouts per day</label>
-            <input
-              id="abc-lim-day"
-              className="abc-input abc-input--num"
-              type="number" min="1" max="500"
-              value={limits.dailyCap}
-              onChange={e => setLimits({ ...limits, dailyCap: e.target.value })}
-              onBlur={() => saveLimits(limits)}
-            />
-            <p className="abc-field__hint">
-              All backup scans at this venue combined, per rolling 24&nbsp;hours. Beyond it every
-              backup scan is refused until the window moves on.
-            </p>
-          </div>
-          <div className="abc-field">
-            <label className="abc-label" htmlFor="abc-lim-dev">Payouts per device per day</label>
-            <input
-              id="abc-lim-dev"
-              className="abc-input abc-input--num"
-              type="number" min="1" max="50"
-              value={limits.perDeviceDaily}
-              onChange={e => setLimits({ ...limits, perDeviceDaily: e.target.value })}
-              onBlur={() => saveLimits(limits)}
-            />
-            <p className="abc-field__hint">
-              Per phone. One person rescanning their receipt hits this long before the venue
-              ceiling does.
-            </p>
-          </div>
+        </CardBody>
+        <div className="abc-card-note">
+          A fixed 2-minute wait between scans of the same code also applies. That one can’t be changed.
         </div>
-        <p className="abc-field__hint abc-limit-fixed">
-          A fixed 2-minute cooldown between scans of the same code also applies — that one isn’t
-          configurable.
-        </p>
-      </section>
+      </Card>
 
       {/* ── Alerts ── */}
-      <section className="abc-card">
-        <header className="abc-card__head">
-          <div>
-            <h2 className="abc-card__title">Alerts</h2>
-            <p className="abc-card__desc">
-              Emailed the moment a backup cup is scanned. Saves immediately — no publish needed.
-            </p>
-          </div>
-          <label className="abc-switch">
-            <input
-              type="checkbox"
-              checked={alerts.enabled !== false}
-              onChange={e => save({ ...alerts, enabled: e.target.checked })}
-            />
-            <span>{alerts.enabled !== false ? 'On' : 'Off'}</span>
-          </label>
-        </header>
+      <Card>
+        <CardHeader
+          title="Alerts"
+          icon={BellRing}
+          subtitle="Emailed the moment a backup cup is scanned. Saves straight away, no publish needed."
+          actions={(
+            <span className="abc-switch">
+              <span className="abc-saved" role="status">{saving ? 'Saving…' : savedAt ? <><Check size={13} aria-hidden="true" /> Saved</> : ''}</span>
+              <label htmlFor="abc-alerts-on">{alerts.enabled !== false ? 'On' : 'Off'}</label>
+              <Switch
+                id="abc-alerts-on"
+                checked={alerts.enabled !== false}
+                label="Email alerts"
+                onChange={next => save({ ...alerts, enabled: next })}
+              />
+            </span>
+          )}
+        />
+        <CardBody>
+          <div className="abc-stack">
+            <div className="ui-field">
+              <label className="ui-field__label" htmlFor="abc-recipient">Send to</label>
+              <div className="abc-chips">
+                {alerts.recipients.map(r => (
+                  <span key={r} className="abc-chip">
+                    {r}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${r}`}
+                      onClick={() => save({ ...alerts, recipients: alerts.recipients.filter(x => x !== r) })}
+                    >
+                      <X size={11} aria-hidden="true" />
+                    </button>
+                  </span>
+                ))}
+                {alerts.recipients.length === 0 && (
+                  <span className="abc-chips__empty">
+                    <AlertTriangle size={13} aria-hidden="true" /> No recipients yet, so nobody will be told.
+                  </span>
+                )}
+              </div>
+              <div className="abc-addrow">
+                <input
+                  id="abc-recipient"
+                  className="ui-input"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={recipientDraft}
+                  onChange={e => setRecipientDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(); } }}
+                />
+                <Button icon={Plus} onClick={addRecipient} disabled={!recipientDraft.includes('@')}>
+                  Add
+                </Button>
+              </div>
+            </div>
 
-        <div className="abc-field">
-          <label className="abc-label">Send to</label>
-          <div className="abc-chips">
-            {alerts.recipients.map(r => (
-              <span key={r} className="abc-chip">
-                {r}
-                <button
-                  type="button"
-                  aria-label={`Remove ${r}`}
-                  onClick={() => save({ ...alerts, recipients: alerts.recipients.filter(x => x !== r) })}
-                >×</button>
-              </span>
-            ))}
-            {alerts.recipients.length === 0 && (
-              <span className="abc-chips__empty">No recipients yet — nobody will be told.</span>
-            )}
-          </div>
-          <div className="abc-addrow">
-            <input
-              className="abc-input"
-              type="email"
-              placeholder="name@example.com"
-              value={recipientDraft}
-              onChange={e => setRecipientDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(); } }}
-            />
-            <button className="abc-btn" onClick={addRecipient} disabled={!recipientDraft.includes('@')}>
-              Add
-            </button>
-          </div>
-        </div>
+            <Field label="Subject" htmlFor="abc-subject">
+              <input
+                id="abc-subject"
+                className="ui-input"
+                value={alerts.subject}
+                onChange={e => setAlerts({ ...alerts, subject: e.target.value })}
+                onBlur={() => save(alerts)}
+              />
+            </Field>
 
-        <div className="abc-field">
-          <label className="abc-label" htmlFor="abc-subject">Subject</label>
-          <input
-            id="abc-subject"
-            className="abc-input"
-            value={alerts.subject}
-            onChange={e => setAlerts({ ...alerts, subject: e.target.value })}
-            onBlur={() => save(alerts)}
-          />
-        </div>
-
-        <div className="abc-field">
-          <label className="abc-label" htmlFor="abc-body">Message</label>
-          <textarea
-            id="abc-body"
-            className="abc-input abc-input--area"
-            rows={8}
-            value={alerts.body}
-            onChange={e => setAlerts({ ...alerts, body: e.target.value })}
-            onBlur={() => save(alerts)}
-          />
-          <div className="abc-placeholders">
-            {PLACEHOLDERS.map(([token, meaning]) => (
-              <button
-                key={token}
-                type="button"
-                className="abc-token"
-                title={`Insert ${meaning.toLowerCase()}`}
-                onClick={() => save({ ...alerts, body: `${alerts.body}${token}` })}
-              >
-                <code>{token}</code><span>{meaning}</span>
-              </button>
-            ))}
+            <Field label="Message" htmlFor="abc-body">
+              <textarea
+                id="abc-body"
+                className="ui-textarea abc-body"
+                rows={8}
+                value={alerts.body}
+                onChange={e => setAlerts({ ...alerts, body: e.target.value })}
+                onBlur={() => save(alerts)}
+              />
+              <div className="abc-placeholders" aria-label="Insert a placeholder">
+                {PLACEHOLDERS.map(([token, meaning]) => (
+                  <button
+                    key={token}
+                    type="button"
+                    className="abc-token"
+                    title={`Insert ${meaning.toLowerCase()}`}
+                    onClick={() => save({ ...alerts, body: `${alerts.body}${token}` })}
+                  >
+                    <code>{token}</code><span>{meaning}</span>
+                  </button>
+                ))}
+              </div>
+            </Field>
           </div>
-        </div>
-
-        <div className="abc-savebar">
-          {saving ? 'Saving…' : savedAt ? 'Saved' : ''}
-        </div>
-      </section>
+        </CardBody>
+      </Card>
 
       {/* ── History ── */}
-      <section className="abc-card">
-        <header className="abc-card__head">
-          <div>
-            <h2 className="abc-card__title">When they were used</h2>
-            <p className="abc-card__desc">
-              One row per scan. Each is a moment the bin printed a receipt without us.
-            </p>
-          </div>
-        </header>
-
-        {stats.scans.length === 0 ? (
-          <div className="abc-empty">
-            Nothing yet — the bin has always been able to reach us.
-          </div>
-        ) : (
-          <div className="abc-table-wrap">
-            <table className="abc-table">
-              <thead>
-                <tr><th>When</th><th>Backup cup</th><th className="abc-num">Cups</th><th className="abc-num">Paid</th></tr>
-              </thead>
-              <tbody>
-                {stats.scans.map(u => {
-                  const cup = cups.find(c => c.id === u.backup_cup_id);
-                  return (
-                    <tr key={u.id}>
-                      <td>{fmtWhen(u.used_at)}</td>
-                      <td>{cup?.label || <code className="abc-item__id">{String(u.backup_cup_id).slice(0, 8)}</code>}</td>
-                      <td className="abc-num">{u.cups_in_scan ?? '—'}</td>
-                      <td className="abc-num">{money(Number(u.amount_eur || 0))}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <Card>
+        <CardHeader
+          title="When they were used"
+          icon={History}
+          subtitle="One row per scan. Each is a moment the bin printed a receipt without us."
+          ruled
+        />
+        <CardBody flush>
+          {stats.scans.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="Nothing yet">
+              The bin has always been able to reach us.
+            </EmptyState>
+          ) : (
+            <div className="abc-table-wrap">
+              <table className="ui-table abc-table">
+                <thead>
+                  <tr><th>When</th><th>Backup cup</th><th className="ui-num">Cups</th><th className="ui-num">Paid</th></tr>
+                </thead>
+                <tbody>
+                  {stats.scans.map(u => {
+                    const cup = cups.find(c => c.id === u.backup_cup_id);
+                    return (
+                      <tr key={u.id}>
+                        <td>{fmtWhen(u.used_at)}</td>
+                        <td>{cup?.label || <code className="abc-item__id">{String(u.backup_cup_id).slice(0, 8)}</code>}</td>
+                        <td className="ui-num">{u.cups_in_scan ?? '—'}</td>
+                        <td className="ui-num">{money(Number(u.amount_eur || 0))}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       <p className="abc-foot">
         A backup receipt pays the customer exactly like a normal one, and they’re never told it came
-        from the fallback. To stop a code being accepted at all, deactivate it in the database —
-        the bin will keep printing it, but it will no longer pay.
+        from the fallback. To stop the codes paying out, switch off “Backup cups are accepted” above
+        (a single code can only be switched off in the database). The bin keeps printing them, but
+        they no longer pay.
       </p>
     </div>
   );

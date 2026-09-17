@@ -1,7 +1,7 @@
 import {
-  Activity, Blocks, CircleHelp, ClipboardList, Gauge, Gift, HandCoins, HeartHandshake,
-  History, LayoutDashboard, Mail, MapPin, Palette, QrCode, Receipt, Repeat, ScanLine, Settings,
-  ShieldCheck, Store, Users,
+  Activity, Blocks, CircleDollarSign, CircleHelp, ClipboardList, Clock, Eye, Gauge, Gift, HandCoins,
+  HeartHandshake, HeartPulse, History, LayoutDashboard, Mail, MapPin, Palette, QrCode, Receipt, Repeat, ScanLine,
+  Search, Send, Settings, ShieldCheck, Smartphone, Store, Users,
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -31,8 +31,29 @@ export const LEVELS = {
 };
 export const LEVEL_ORDER = ['master', 'manager', 'vendor'];
 
-/* app_config key holding the workspace-wide tab switches. */
+/* app_config keys for the workspace-wide switches (Master Settings →
+ * Workspace): which tabs exist, what the top bar shows, and display. */
 export const WORKSPACE_KEY = 'workspace:tabs';
+export const TOPBAR_KEY = 'workspace:topbar';
+/* How the dashboard looks for everyone: { sparklines } (mini graphs on the
+ * number tiles; on unless set to false). */
+export const DISPLAY_KEY = 'workspace:display';
+
+/* What the top bar can show. `fixed` items can't be switched off. */
+export const TOPBAR_ITEMS = [
+  { id: 'programme', label: 'Programme badge', icon: Gift,
+    description: 'Which programme the open venue runs.' },
+  { id: 'search', label: 'Search', icon: Search,
+    description: 'Find any page or setting, also with ⌘K.' },
+  { id: 'rates', label: 'Cashback and refund', icon: CircleDollarSign,
+    description: 'What a returned cup is worth at the open venue.' },
+  { id: 'timezone', label: 'Time zone', icon: Clock,
+    description: 'The time zone every time in the dashboard is shown in.' },
+  { id: 'preview', label: 'Preview', icon: Eye,
+    description: 'Opens the venue’s customer app in a new tab.' },
+  { id: 'publish', label: 'Publish', icon: Send, fixed: true,
+    description: 'Puts draft changes live. Shown to everyone who can change settings, rewards or design.' },
+];
 
 /* Old role names (before migration 048) and what they are now. */
 export function levelForLegacyRole(role) {
@@ -104,11 +125,16 @@ export const TABS = [
   { id: 'settings', label: 'Settings', group: 'workspace', icon: Settings, modes: ALL_MODES, fixed: true, editable: true,
     description: 'Features, payouts, limits, locations and the privacy policy.' },
   { id: 'master', label: 'Master settings', group: 'workspace', icon: ShieldCheck, modes: ALL_MODES, masterOnly: true, fixed: true, editable: true,
-    description: 'People, roles, organisations and workspace tabs.' },
+    description: 'People, roles, organisations, the workspace and its data.' },
   { id: 'history', label: 'Version history', group: 'workspace', icon: History, modes: ALL_MODES, editable: true,
     description: 'Everything published, and the audit log.' },
   { id: 'support', label: 'Help & support', group: 'workspace', icon: CircleHelp, modes: ALL_MODES, fixed: true, editable: false,
     description: 'Guides and the support inbox.' },
+  { id: 'mockup', label: 'MockupMaster', group: 'workspace', icon: Smartphone, modes: ALL_MODES, editable: false, href: '/mockup',
+    description: 'Build a pitch mockup of the customer app without creating an organisation. Opens in a new tab.' },
+  { id: 'packpulse', label: 'PackPulse', group: 'workspace', icon: HeartPulse, modes: ALL_MODES, editable: false,
+    href: 'https://pack-pulse-v1-5.vercel.app/',
+    description: 'The PackPulse dashboard. Opens in a new tab.' },
 ];
 
 export const TAB_BY_ID = Object.fromEntries(TABS.map(t => [t.id, t]));
@@ -128,7 +154,7 @@ export const BUILT_IN_ROLES = {
   manager: {
     key: 'manager', label: 'Manager', level: 'manager', builtIn: true,
     description: 'Runs their organisations day to day: claims, rewards, customers and settings.',
-    tabs: { ...everything('edit') },
+    tabs: { ...everything('edit'), mockup: 'hidden', packpulse: 'hidden' },
   },
   vendor: {
     key: 'vendor', label: 'Vendor', level: 'vendor', builtIn: true,
@@ -231,5 +257,5 @@ export function visibleTabs(ctx) {
 }
 
 export function firstVisibleTab(ctx) {
-  return visibleTabs(ctx)[0]?.id || 'support';
+  return visibleTabs(ctx).find(t => !t.href)?.id || 'support';
 }

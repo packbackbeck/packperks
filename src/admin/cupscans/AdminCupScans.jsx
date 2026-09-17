@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import {
+  Camera, Check, ChevronRight, CloudAlert, ExternalLink, Hourglass, Lock, PanelRight, QrCode, Rows3, Search, X,
+} from 'lucide-react';
 import { getAdminCupScans, getCupScanSignedUrl, deleteRecords, getByoRequests, approveByoRequest, denyByoRequest } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
-import EmptyState from '../shared/EmptyState';
 import ColumnPicker from '../shared/ColumnPicker';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
+import { Avatar, Lightbox, Notice, SearchBox, SortTh, SplitHandle } from '../shared/opsTable';
+import { Badge, Button, EmptyState, PageHeader, Segmented } from '../ui';
 import './AdminCupScans.css';
 
 /* Toggleable columns for the Cup Scans table. User + When + Status
@@ -38,14 +41,6 @@ function formatDate(ts) {
     + ', ' + new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-function SortIcon({ active, dir }) {
-  return (
-    <span className={`cs-sort-icon${active ? ' cs-sort-icon--active' : ''}`}>
-      {active ? (dir === 'asc' ? '↑' : '↓') : '↕'}
-    </span>
-  );
-}
-
 /* Status filter set matches what the cup_scans table actually emits.
  * Previously this included `partial`/`rejected` which never appear in
  * real data — the table showed an "All / Pending / Success / Failed"
@@ -60,6 +55,8 @@ const STATUS_OPTIONS = [
   { id: 'failed',   label: 'Failed',      desc: 'QR invalid or already claimed' },
 ];
 const TYPE_OPTIONS   = ['all', 'camera', 'gallery', 'deeplink'];
+const TYPE_LABEL = { all: 'All', camera: 'Camera', gallery: 'Gallery', deeplink: 'Deep link', byo: 'BYO QR', photo: 'Photo' };
+const TYPE_TONE = { camera: 'violet', gallery: 'sky', deeplink: 'teal', byo: 'emerald' };
 
 /* Thumbnail with on-demand signed URL — re-uses the cup-scans bucket key.
  * Falls back to the legacy receipt_photo_url for older rows. */
@@ -88,7 +85,7 @@ function ScanThumb({ scan, onZoom }) {
   if (src) {
     return (
       <button
-        className="cs-thumb"
+        className="ot-thumb"
         onClick={e => { e.stopPropagation(); onZoom?.(src); }}
         title="Click to enlarge. Photo may incidentally include the customer's hand or face — handle as personal data."
         type="button"
@@ -99,10 +96,7 @@ function ScanThumb({ scan, onZoom }) {
          *  cup itself; the dot is a constant reminder this image is
          *  customer-facing data, not a generic asset. */}
         <span className="cs-thumb__privacy" aria-hidden title="May contain personal data">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
+          <Lock size={8} strokeWidth={2.8} />
         </span>
       </button>
     );
@@ -110,12 +104,8 @@ function ScanThumb({ scan, onZoom }) {
 
   if (scan?.photo_path && signError) {
     return (
-      <div className="cs-thumb cs-thumb--empty" title="Photo missing from storage">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="1.5">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
+      <div className="ot-thumb ot-thumb--bad" title="Photo missing from storage">
+        <CloudAlert size={14} aria-hidden="true" />
       </div>
     );
   }
@@ -129,49 +119,37 @@ function ScanThumb({ scan, onZoom }) {
       ? 'Gallery upload — photo missing'
       : 'No photo';
   return (
-    <div className="cs-thumb cs-thumb--empty" title={sourceLabel}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
+    <div className="ot-thumb ot-thumb--empty" title={sourceLabel}>
+      {scan?.__held ? <QrCode size={14} aria-hidden="true" /> : <Camera size={14} aria-hidden="true" />}
     </div>
   );
 }
 
-function Lightbox({ src, onClose }) {
-  useEffect(() => {
-    function k(e) { if (e.key === 'Escape') onClose?.(); }
-    document.addEventListener('keydown', k);
-    return () => document.removeEventListener('keydown', k);
-  }, [onClose]);
-  if (!src) return null;
-  return createPortal(
-    <div className="cs-lightbox" onClick={onClose}>
-      <button className="cs-lightbox__close" onClick={e => { e.stopPropagation(); onClose(); }}>×</button>
-      <img src={src} alt="Scan enlarged" className="cs-lightbox__img" onClick={e => e.stopPropagation()} />
-    </div>,
-    document.body,
-  );
-}
+const STATUS_META = {
+  success:        { tone: 'success', label: 'Success', icon: Check },
+  partial:        { tone: 'warning', label: 'Partial' },
+  failed:         { tone: 'danger',  label: 'Failed', icon: X },
+  pending:        { tone: 'warning', label: 'Pending' },
+  pending_review: { tone: 'warning', label: 'Held · review', icon: Hourglass },
+  approved:       { tone: 'success', label: 'Approved' },
+  rejected:       { tone: 'danger',  label: 'Rejected' },
+  completed:      { tone: 'success', label: 'Completed' },
+};
 
 function StatusBadge({ status }) {
-  const cls = `cs-status cs-status--${status || 'unknown'}`;
-  const map = {
-    success: '✓ Success',
-    partial: '◐ Partial',
-    failed: '✕ Failed',
-    pending: 'Pending',
-    pending_review: 'Held · review',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    completed: 'Completed',
-  };
-  return <span className={cls}>{map[status] || status || '—'}</span>;
+  const meta = STATUS_META[status];
+  if (!meta) return <Badge tone="neutral">{status || '—'}</Badge>;
+  return <Badge tone={meta.tone} icon={meta.icon}>{meta.label}</Badge>;
 }
 
 function TypeBadge({ type }) {
-  if (!type) return <span className="cs-type cs-type--unknown">photo</span>;
-  return <span className={`cs-type cs-type--${type}`}>{type}</span>;
+  if (!type) return <span className="ui-badge ui-badge--neutral">Photo</span>;
+  const tone = TYPE_TONE[type];
+  return (
+    <span className={`ui-badge ${tone ? `ui-tone--${tone}` : 'ui-badge--neutral'}`}>
+      {TYPE_LABEL[type] || type}
+    </span>
+  );
 }
 
 /* P-28: map raw enum error codes from the claim-cups edge function
@@ -191,20 +169,20 @@ const ERROR_CODE_COPY = {
 };
 
 function ErrorCodeCell({ code, message }) {
-  if (!code) return <span className="cs-muted">—</span>;
+  if (!code) return <span className="ot-faint">—</span>;
   const friendly = ERROR_CODE_COPY[code] || code.replace(/_/g, ' ');
   return (
-    <span title={message ? `${code} — ${message}` : code}>
-      <span className="cs-error-code">{friendly}</span>
+    <span className="ui-badge ui-badge--danger cs-error-code" title={message ? `${code} — ${message}` : code}>
+      {friendly}
     </span>
   );
 }
 
 function DetailRow({ label, value, strong, mono }) {
   return (
-    <div className="cs-detail__row">
-      <span className="cs-detail__row-label">{label}</span>
-      <span className={`cs-detail__row-val${strong ? ' cs-detail__row-val--strong' : ''}${mono ? ' cs-detail__row-val--mono' : ''}`}>{value}</span>
+    <div className="ot-kv__row">
+      <span className="ot-kv__label">{label}</span>
+      <span className={`ot-kv__val${strong ? ' ot-kv__val--strong' : ''}${mono ? ' ot-kv__val--mono' : ''}`}>{value}</span>
     </div>
   );
 }
@@ -225,12 +203,10 @@ function ScanDetailPanel({ scan, onClose, onZoom, onOpenUser, onDecide, busyId }
 
   if (!scan) {
     return (
-      <div className="cs-detail cs-detail--empty">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-          <circle cx="12" cy="13" r="4" />
-        </svg>
-        <p>Select a scan on the left to see its details.</p>
+      <div className="ot-panel ot-panel--empty cs-detail cs-detail--empty">
+        <EmptyState icon={Camera} title="No scan selected">
+          Select a scan on the left to see its details.
+        </EmptyState>
       </div>
     );
   }
@@ -241,47 +217,51 @@ function ScanDetailPanel({ scan, onClose, onZoom, onOpenUser, onDecide, busyId }
   const cups = scan.cups_awarded || 1;
 
   return (
-    <div className="cs-detail">
-      <div className="cs-detail__header">
-        <div className="cs-detail__heading">
-          <div className="cs-detail__title">{isHeld ? 'Held cup request' : 'Scan detail'}</div>
-          <div className="cs-detail__id">{String(scan.id).replace('held:', '').slice(0, 8)}…</div>
+    <div className="ot-panel cs-detail">
+      <div className="ot-panel__head">
+        <div className="ot-panel__titles">
+          <h2 className="ot-panel__title">{isHeld ? 'Held cup request' : 'Scan detail'}</h2>
+          <p className="ot-panel__id">{String(scan.id).replace('held:', '').slice(0, 8)}…</p>
         </div>
         <StatusBadge status={scan.status} />
-        <button className="cs-detail__close" onClick={onClose} aria-label="Close">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <Button variant="ghost" size="sm" icon={X} aria-label="Close" onClick={onClose} />
       </div>
 
-      <div className="cs-detail__body">
+      <div className="ot-panel__body cs-detail__body">
         {isHeld && (
-          <div className="cs-detail__hold-note">
-            This customer went over the store's daily auto-credit limit, so the scan is
-            waiting for review. Approving credits {cups} cup{cups === 1 ? '' : 's'} to their
-            balance; rejecting credits nothing.
-          </div>
+          <p className="ot-callout ot-callout--info">
+            <Hourglass size={15} aria-hidden="true" />
+            <span>
+              This customer went over the store's daily auto-credit limit, so the scan is
+              waiting for review. Approving credits {cups} cup{cups === 1 ? '' : 's'} to their
+              balance; rejecting credits nothing.
+            </span>
+          </p>
         )}
 
         {photoSrc ? (
-          <button className="cs-detail__photo" onClick={() => onZoom?.(photoSrc)} title="Click to enlarge">
+          <button type="button" className="cs-detail__photo" onClick={() => onZoom?.(photoSrc)} title="Click to enlarge">
             <img src={photoSrc} alt="Scan" />
           </button>
         ) : !isHeld ? (
-          <div className="cs-detail__photo cs-detail__photo--empty">No photo for this scan</div>
+          <div className="cs-detail__photo cs-detail__photo--empty">
+            <Camera size={18} aria-hidden="true" />
+            No photo for this scan
+          </div>
         ) : null}
 
-        <button className="cs-detail__user" onClick={() => onOpenUser?.(scan.user_id)} title="Open this customer on the Users page">
-          <span className="cs-user-avatar">{(scan.user?.display_name || '?')[0].toUpperCase()}</span>
-          <span className="cs-user-info">
-            <span className="cs-user-name">{scan.user?.display_name || 'Unknown'}</span>
-            {scan.user?.email && <span className="cs-user-email">{scan.user.email}</span>}
+        <button type="button" className="cs-detail__user" onClick={() => onOpenUser?.(scan.user_id)} title="Open this customer on the Users page">
+          <Avatar name={scan.user?.display_name} seed={scan.user_id} size={34} />
+          <span className="ot-person__text">
+            <span className="ot-person__name">{scan.user?.display_name || 'Unknown'}</span>
+            {scan.user?.email && <span className="ot-person__sub">{scan.user.email}</span>}
           </span>
-          <svg className="cs-detail__user-arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <ChevronRight className="cs-detail__user-arrow" size={16} aria-hidden="true" />
         </button>
 
-        <div className="cs-detail__rows">
+        <div className="ot-kv">
           <DetailRow label="When" value={formatDate(scan.created_at)} />
-          <DetailRow label="Source" value={scan.scan_type || 'photo'} />
+          <DetailRow label="Source" value={TYPE_LABEL[scan.scan_type] || scan.scan_type || 'Photo'} />
           {!isHeld && <DetailRow label="Submitted" value={scan.requested_cup_ids?.length ?? 0} />}
           <DetailRow label={isHeld ? 'Cups to credit' : 'Cups awarded'} value={scan.cups_awarded ?? 0} strong />
           {scan.batch_id && <DetailRow label="Batch" value={`${scan.batch_id.slice(0, 8)}…`} mono />}
@@ -291,17 +271,15 @@ function ScanDetailPanel({ scan, onClose, onZoom, onOpenUser, onDecide, busyId }
       </div>
 
       {isHeld && (
-        <div className="cs-detail__actions">
+        <div className="ot-panel__foot cs-detail__actions">
           <p className="cs-detail__actions-hint">Approving credits the cup to this customer's balance.</p>
           <div className="cs-detail__btns">
-            <button className="cs-detail__btn cs-detail__btn--approve" disabled={busy} onClick={() => onDecide(scan.__reqId, 'approve')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><polyline points="20 6 9 17 4 12"/></svg>
-              {busy ? 'Working…' : 'Approve & credit'}
-            </button>
-            <button className="cs-detail__btn cs-detail__btn--reject" disabled={busy} onClick={() => onDecide(scan.__reqId, 'reject')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <Button variant="danger-ghost" icon={X} className="cs-detail__btn--reject" disabled={busy} onClick={() => onDecide(scan.__reqId, 'reject')}>
               Reject
-            </button>
+            </Button>
+            <Button variant="primary" icon={Check} disabled={busy} onClick={() => onDecide(scan.__reqId, 'approve')}>
+              {busy ? 'Working…' : 'Approve & credit'}
+            </Button>
           </div>
         </div>
       )}
@@ -497,105 +475,77 @@ export default function AdminCupScans({ onNavigate }) {
   const selectableRows = useMemo(() => filtered.filter(s => !s.__held), [filtered]);
   const sel = useBulkSelection(selectableRows);
 
-  function ThCol({ label, field, sortable = true, width }) {
-    return (
-      <th
-        style={width ? { width } : undefined}
-        className={sortable ? 'cs-th cs-th--sortable' : 'cs-th'}
-        onClick={sortable ? () => handleSort(field) : undefined}
-      >
-        {label}
-        {sortable && <SortIcon active={sortKey === field} dir={sortDir} />}
-      </th>
-    );
-  }
+  const sort = { key: sortKey, dir: sortDir };
+  const th = (label, field, { sortable = true, width, className } = {}) => (
+    <SortTh label={label} field={field} sort={sort} onSort={handleSort} sortable={sortable} style={width ? { width } : undefined} className={className} />
+  );
 
   return (
-    <div className="admin-cup-scans">
-      <div className="cs-header">
-        <div className="cs-header__left">
-          <h1 className="cs-header__title">Cup Scans</h1>
-          <p className="cs-header__sub">
-            {counts.held > 0 && (
-              <button
-                type="button"
-                className="cs-chip cs-chip--held"
-                onClick={() => { setStatus('held'); setViewMode('review'); }}
-                title="Over-limit BYO scans waiting for your review"
-              >
-                {counts.held} awaiting review
-              </button>
-            )}
-            <span className="cs-chip">{counts.total} total</span>
-            <span className="cs-chip cs-chip--success">{counts.success} success</span>
-            <span className="cs-chip cs-chip--partial">{counts.partial} partial</span>
-            <span className="cs-chip cs-chip--failed">{counts.failed} failed</span>
-            <span className="cs-chip">{counts.cupsAwarded} cups added</span>
-          </p>
-        </div>
-        <div className="cs-viewmode" role="tablist" aria-label="View mode">
+    <div className="ui-page cs-page">
+      <PageHeader
+        title="Cup scans"
+        subtitle={loading
+          ? 'Every cup scanned back, and the ones on hold.'
+          : `${counts.total} scans · ${counts.success} successful · ${counts.partial} partial · ${counts.failed} failed · ${counts.cupsAwarded} cups added`}
+      >
+        {counts.held > 0 && (
           <button
             type="button"
-            role="tab"
-            aria-selected={viewMode === 'table'}
-            className={`cs-viewmode__btn${viewMode === 'table' ? ' cs-viewmode__btn--active' : ''}`}
-            onClick={() => setViewMode('table')}
+            className="ui-btn cs-held-btn"
+            onClick={() => { setStatus('held'); setViewMode('review'); }}
+            title="Over-limit BYO scans waiting for your review"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-            Table
+            <Hourglass size={15} aria-hidden="true" />
+            {counts.held} awaiting review
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'review'}
-            className={`cs-viewmode__btn${viewMode === 'review' ? ' cs-viewmode__btn--active' : ''}`}
-            onClick={() => { setViewMode('review'); if (!selectedId && filtered[0]) setSelectedId(filtered[0].id); }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="11" height="16" rx="1.5"/><rect x="16" y="4" width="5" height="16" rx="1.5"/></svg>
-            Review
-          </button>
-        </div>
-      </div>
+        )}
+        <Segmented
+          ariaLabel="View mode"
+          value={viewMode}
+          onChange={(mode) => {
+            if (mode === 'table') { setViewMode('table'); return; }
+            setViewMode('review');
+            if (!selectedId && filtered[0]) setSelectedId(filtered[0].id);
+          }}
+          options={[
+            { id: 'table', label: 'Table', icon: Rows3 },
+            { id: 'review', label: 'Review', icon: PanelRight },
+          ]}
+        />
+      </PageHeader>
 
-      <div className="cs-toolbar">
-        <div className="cs-filter-group">
-          <span className="cs-filter-label">Status</span>
-          {STATUS_OPTIONS.map(opt => (
-            <button
-              key={opt.id}
-              type="button"
-              className={`cs-filter-btn${statusFilter === opt.id ? ' cs-filter-btn--active' : ''}`}
-              onClick={() => setStatus(opt.id)}
-              title={opt.desc}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <div className="cs-filter-group">
-          <span className="cs-filter-label">Source</span>
-          {TYPE_OPTIONS.map(t => (
-            <button
-              key={t}
-              type="button"
-              className={`cs-filter-btn${typeFilter === t ? ' cs-filter-btn--active' : ''}`}
-              onClick={() => setType(t)}
-            >
-              {t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
-        </div>
-        <div className="cs-search-wrap">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9E9A93" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            className="cs-search"
-            placeholder="Search user, batch, cup id, error…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+      <div className="ot-toolbar">
+        <div className="ot-toolbar__group">
+          <span className="ot-toolbar__label">Status</span>
+          <Segmented
+            ariaLabel="Filter by status"
+            value={statusFilter}
+            onChange={setStatus}
+            options={STATUS_OPTIONS.map(opt => ({
+              id: opt.id,
+              label: opt.label,
+              title: opt.desc,
+              count: opt.id === 'held' && counts.held > 0 ? counts.held : undefined,
+            }))}
           />
         </div>
+        <div className="ot-toolbar__group">
+          <span className="ot-toolbar__label">Source</span>
+          <Segmented
+            ariaLabel="Filter by source"
+            value={typeFilter}
+            onChange={setType}
+            options={TYPE_OPTIONS.map(t => ({ id: t, label: TYPE_LABEL[t] }))}
+          />
+        </div>
+        <span className="ot-toolbar__break" aria-hidden="true" />
+        <SearchBox
+          className="cs-search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Search user, batch, cup ID, error"
+          label="Search cup scans"
+        />
         <ColumnPicker
           columns={CS_COLUMN_CONFIG}
           visible={visibleCols}
@@ -605,25 +555,24 @@ export default function AdminCupScans({ onNavigate }) {
       </div>
 
       {(notice || actionError) && (
-        <div className={`cs-banner${actionError ? ' cs-banner--error' : ''}`}>
-          <span>{actionError || notice}</span>
-          <button className="cs-banner__x" onClick={() => { setNotice(null); setActionError(null); }} aria-label="Dismiss">×</button>
-        </div>
+        <Notice tone={actionError ? 'danger' : 'success'} onDismiss={() => { setNotice(null); setActionError(null); }}>
+          {actionError || notice}
+        </Notice>
       )}
 
       <div
         className={`cs-layout${viewMode === 'review' ? ' cs-layout--review' : ''}`}
         ref={layoutRef}
-        style={viewMode === 'review' ? { gridTemplateColumns: `minmax(420px, 1fr) 9px ${reviewSplit}px` } : undefined}
+        style={viewMode === 'review' ? { gridTemplateColumns: `minmax(360px, 1fr) 12px minmax(300px, ${reviewSplit}px)` } : undefined}
       >
-      <div className="cs-table-wrap">
+      <div className="ui-card ot-table-card cs-table-wrap">
         {loading ? (
           <Spinner label="Loading cup scans…" />
         ) : (
-          <table className="cs-table">
+          <table className="ui-table cs-table">
             <thead>
               <tr>
-                <th className="bulk-check-cell">
+                <th className="ot-check">
                   <input
                     type="checkbox"
                     checked={sel.allSelected}
@@ -632,58 +581,53 @@ export default function AdminCupScans({ onNavigate }) {
                     aria-label="Select all cup scans"
                   />
                 </th>
-                {isCol('photo')     && <ThCol label="Photo"     field="photo_path" sortable={false} width={64} />}
-                <ThCol label="User"   field="user" />
-                {isCol('source')    && <ThCol label="Source"    field="scan_type" />}
-                {isCol('batch')     && <ThCol label="Batch"     field="batch_id" sortable={false} />}
-                {isCol('submitted') && <ThCol label="Submitted" field="requested_count" sortable={false} width={80} />}
-                {isCol('awarded')   && <ThCol label="Awarded"   field="cups_awarded" width={80} />}
-                <ThCol label="Status" field="status" />
-                {isCol('error')     && <ThCol label="Error"     field="error_code" sortable={false} />}
-                <ThCol label="When"   field="created_at" />
+                {isCol('photo')     && th('Photo', 'photo_path', { sortable: false, width: 64 })}
+                {th('User', 'user')}
+                {isCol('source')    && th('Source', 'scan_type')}
+                {isCol('batch')     && th('Batch', 'batch_id', { sortable: false })}
+                {isCol('submitted') && th('Submitted', 'requested_count', { sortable: false, width: 90, className: 'ot-center' })}
+                {isCol('awarded')   && th('Awarded', 'cups_awarded', { width: 90, className: 'ot-center' })}
+                {th('Status', 'status')}
+                {isCol('error')     && th('Error', 'error_code', { sortable: false })}
+                {th('When', 'created_at')}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                // 3 always-shown columns (User, Status, When) + the
-                // currently-on toggleable ones. Was hard-coded 9
-                // before the column picker.
-                <tr><td colSpan={4 + visibleCols.size} className="cs-table__empty">
+                // 4 always-shown columns (checkbox, User, Status, When) + the
+                // currently-on toggleable ones.
+                <tr className="cs-empty-row"><td colSpan={4 + visibleCols.size}>
                   {scans.length === 0 ? (
                     <EmptyState
-                      icon={
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                          <circle cx="12" cy="13" r="4" />
-                        </svg>
-                      }
+                      icon={Camera}
                       title="No cup scans yet"
-                      body="Every QR scan attempt — successful or not — shows up here. Generate a QR receipt batch first, then scan it from the user app to see audit rows appear."
-                      tone="action"
-                      primaryAction={{ label: 'Generate QR batch →', onClick: () => onNavigate?.('cupqr') }}
-                      secondaryAction={{ label: 'Open user app', onClick: () => window.open('/', '_blank') }}
-                    />
+                      action={(
+                        <div className="cs-empty-actions">
+                          <Button variant="primary" size="sm" icon={QrCode} onClick={() => onNavigate?.('cupqr')}>Generate QR batch</Button>
+                          <Button variant="outline" size="sm" icon={ExternalLink} onClick={() => window.open('/', '_blank')}>Open user app</Button>
+                        </div>
+                      )}
+                    >
+                      Every QR scan attempt, successful or not, shows up here. Generate a QR receipt batch first, then scan it from the user app to see rows appear.
+                    </EmptyState>
                   ) : (
                     <EmptyState
-                      icon={
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="11" cy="11" r="8" />
-                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg>
-                      }
+                      icon={Search}
                       title="No scans match these filters"
-                      body={`${scans.length} scan event${scans.length === 1 ? '' : 's'} in total — broaden your filter or clear the search.`}
-                      secondaryAction={{
-                        label: 'Reset filters',
-                        onClick: () => { setStatus('all'); setType('all'); setSearch(''); },
-                      }}
-                    />
+                      action={(
+                        <Button variant="outline" size="sm" onClick={() => { setStatus('all'); setType('all'); setSearch(''); }}>
+                          Reset filters
+                        </Button>
+                      )}
+                    >
+                      {`${scans.length} scan event${scans.length === 1 ? '' : 's'} in total. Broaden your filter or clear the search.`}
+                    </EmptyState>
                   )}
                 </td></tr>
               ) : filtered.map(scan => (
                 <tr
                   key={scan.id}
-                  className={`cs-row${sel.isSelected(scan.id) ? ' cs-row--selected' : ''}${scan.__held ? ' cs-row--held' : ''}${selectedId === scan.id ? ' cs-row--active' : ''}`}
+                  className={`ot-row${sel.isSelected(scan.id) ? ' ot-row--selected' : ''}${scan.__held ? ' ot-row--flag' : ''}${selectedId === scan.id ? ' ot-row--active' : ''}`}
                   onClick={() => {
                     // Click a row → open review + select it. Click the same
                     // highlighted row again → back to the normal table view.
@@ -696,7 +640,7 @@ export default function AdminCupScans({ onNavigate }) {
                     }
                   }}
                 >
-                  <td className="bulk-check-cell" onClick={e => e.stopPropagation()}>
+                  <td className="ot-check" onClick={e => e.stopPropagation()}>
                     {!scan.__held && (
                       <input
                         type="checkbox"
@@ -706,19 +650,19 @@ export default function AdminCupScans({ onNavigate }) {
                       />
                     )}
                   </td>
-                  {isCol('photo') && <td><ScanThumb scan={scan} onZoom={setLightbox} /></td>}
+                  {isCol('photo') && <td className="cs-thumb-cell"><ScanThumb scan={scan} onZoom={setLightbox} /></td>}
 
                   <td>
                     <button
                       type="button"
-                      className="cs-user-link"
+                      className="ot-person"
                       onClick={e => { e.stopPropagation(); onNavigate?.('users', { focusUserId: scan.user_id }); }}
                       title="Open this customer on the Users page"
                     >
-                      <span className="cs-user-avatar">{(scan.user?.display_name || '?')[0].toUpperCase()}</span>
-                      <span className="cs-user-info">
-                        <span className="cs-user-name">{scan.user?.display_name || 'Unknown'}</span>
-                        {scan.user?.email && <span className="cs-user-email">{scan.user.email}</span>}
+                      <Avatar name={scan.user?.display_name} seed={scan.user_id} size={28} />
+                      <span className="ot-person__text">
+                        <span className="ot-person__name cs-user-name">{scan.user?.display_name || 'Unknown'}</span>
+                        {scan.user?.email && <span className="ot-person__sub cs-user-email">{scan.user.email}</span>}
                       </span>
                     </button>
                   </td>
@@ -730,25 +674,21 @@ export default function AdminCupScans({ onNavigate }) {
                       {scan.batch_id ? (
                         <button
                           type="button"
-                          className="cs-batch-link"
+                          className="ot-link ot-mono cs-batch-link"
                           onClick={e => { e.stopPropagation(); onNavigate?.('cupqr'); }}
-                          title="Open Cup QR Codes tab"
+                          title="Open the Receipt generator"
                         >
                           {scan.batch_id.slice(0, 8)}…
                         </button>
-                      ) : <span className="cs-muted">—</span>}
+                      ) : <span className="ot-faint">—</span>}
                     </td>
                   )}
 
-                  {/* P-32: split the legacy "0/5" cell into two
-                   *  columns — Submitted = what the customer tried to
-                   *  claim (cup IDs in the QR), Awarded = what the
-                   *  server actually credited to their balance. Makes
-                   *  "they hit a bin that only had 3 valid cups out
-                   *  of 5 advertised" much easier to spot than the old
-                   *  combined fraction. */}
+                  {/* P-32: Submitted = what the customer tried to claim (cup
+                   *  IDs in the QR), Awarded = what the server actually
+                   *  credited to their balance. */}
                   {isCol('submitted') && (
-                    <td className="cs-center">
+                    <td className="ot-center">
                       <span
                         className="cs-cups cs-cups--muted"
                         title={
@@ -762,7 +702,7 @@ export default function AdminCupScans({ onNavigate }) {
                     </td>
                   )}
                   {isCol('awarded') && (
-                    <td className="cs-center">
+                    <td className="ot-center">
                       <span
                         className="cs-cups"
                         title={
@@ -778,25 +718,25 @@ export default function AdminCupScans({ onNavigate }) {
 
                   <td>
                     {scan.__held ? (
-                      <div className="cs-held-cell">
-                        <div className="cs-held-actions" onClick={e => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="cs-act cs-act--approve"
-                            disabled={busyId === scan.__reqId}
-                            onClick={() => decideHeld(scan.__reqId, 'approve')}
-                          >
-                            {busyId === scan.__reqId ? '…' : 'Approve'}
-                          </button>
-                          <button
-                            type="button"
-                            className="cs-act cs-act--reject"
-                            disabled={busyId === scan.__reqId}
-                            onClick={() => decideHeld(scan.__reqId, 'reject')}
-                          >
-                            Reject
-                          </button>
-                        </div>
+                      <div className="cs-held-actions" onClick={e => e.stopPropagation()}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="cs-act"
+                          disabled={busyId === scan.__reqId}
+                          onClick={() => decideHeld(scan.__reqId, 'approve')}
+                        >
+                          {busyId === scan.__reqId ? '…' : 'Approve'}
+                        </Button>
+                        <Button
+                          variant="danger-ghost"
+                          size="sm"
+                          className="cs-act cs-act--reject"
+                          disabled={busyId === scan.__reqId}
+                          onClick={() => decideHeld(scan.__reqId, 'reject')}
+                        >
+                          Reject
+                        </Button>
                       </div>
                     ) : (
                       <StatusBadge status={scan.status} />
@@ -809,7 +749,7 @@ export default function AdminCupScans({ onNavigate }) {
                     </td>
                   )}
 
-                  <td className="cs-date">{formatDate(scan.created_at)}</td>
+                  <td className="ot-date">{formatDate(scan.created_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -818,17 +758,12 @@ export default function AdminCupScans({ onNavigate }) {
       </div>
 
         {viewMode === 'review' && (
-          <div
+          <SplitHandle
             className="cs-resizer"
             onMouseDown={startSplitDrag}
             onDoubleClick={() => setReviewSplit(430)}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Drag to resize the table and detail panel"
-            title="Drag to resize · double-click to reset"
-          >
-            <span className="cs-resizer__grip" aria-hidden="true" />
-          </div>
+            label="Drag to resize the table and detail panel"
+          />
         )}
 
         {viewMode === 'review' && (
@@ -854,7 +789,7 @@ export default function AdminCupScans({ onNavigate }) {
         }}
       />
 
-      <Lightbox src={lightboxSrc} onClose={() => setLightbox(null)} />
+      <Lightbox src={lightboxSrc} alt="Scan enlarged" onClose={() => setLightbox(null)} />
     </div>
   );
 }

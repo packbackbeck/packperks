@@ -14,7 +14,7 @@
 .ql {
   margin-top: 48px;
   padding-top: 32px;
-  border-top: 1px solid #EAE6E0;
+  border-top: 1px solid var(--ui-border, #E7E5EE);
 }
 
 .ql__header {
@@ -25,14 +25,14 @@
   margin: 0 0 4px;
   font-size: 14px;
   font-weight: 700;
-  color: #2A2724;
+  color: var(--ui-fg, #17151F);
   letter-spacing: -0.005em;
 }
 
 .ql__sub {
   margin: 0;
   font-size: 13px;
-  color: #8A857F;
+  color: var(--ui-muted-2, #8F8B9C);
   line-height: 1.4;
 }
 
@@ -57,7 +57,7 @@
   gap: 12px;
   padding: 14px;
   background: #FFFFFF;
-  border: 1px solid #EAE6E0;
+  border: 1px solid var(--ui-border, #E7E5EE);
   border-radius: 12px;
   cursor: pointer;
   text-align: left;
@@ -67,7 +67,7 @@
 
 .ql__card:hover {
   transform: translateY(-2px);
-  border-color: #D8D2C9;
+  border-color: var(--ui-border-2, #D9D6E4);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
@@ -96,13 +96,13 @@
 .ql__card-label {
   font-size: 13.5px;
   font-weight: 700;
-  color: #2A2724;
+  color: var(--ui-fg, #17151F);
   letter-spacing: -0.005em;
 }
 
 .ql__card-desc {
   font-size: 12px;
-  color: #8A857F;
+  color: var(--ui-muted-2, #8F8B9C);
   line-height: 1.35;
   /* Two-line clamp keeps card heights aligned across the grid. */
   display: -webkit-box;
@@ -115,23 +115,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #9E9A93;
+  color: var(--ui-muted-2, #8F8B9C);
   transition: transform 0.16s ease, color 0.14s ease;
   flex-shrink: 0;
 }
 
 .ql__card:hover .ql__card-arrow {
-  color: #2A2724;
+  color: var(--ui-fg, #17151F);
   transform: translateX(3px);
 }
 
 /* ── Per-tone icon tints ────────────────────────────────────────── */
-.ql__card--blue   .ql__card-icon { background: rgba(37, 99, 235, 0.10);  color: var(--pb-purple-600); }
-.ql__card--orange .ql__card-icon { background: rgba(253, 111, 70, 0.10);   color: var(--pb-orange-warm); }
+.ql__card--blue   .ql__card-icon { background: rgba(37, 99, 235, 0.10);  color: var(--ui-primary, #5B3FD6); }
+.ql__card--orange .ql__card-icon { background: var(--ui-primary-soft, #EEEAFD);   color: var(--ui-primary, #5B3FD6); }
 .ql__card--purple .ql__card-icon { background: rgba(124, 58, 237, 0.10); color: #7C3AED; }
-.ql__card--red    .ql__card-icon { background: rgba(220, 38, 38, 0.10);  color: #DC2626; }
+.ql__card--red    .ql__card-icon { background: rgba(220, 38, 38, 0.10);  color: var(--ui-danger, #D92D55); }
 .ql__card--teal   .ql__card-icon { background: rgba(13, 148, 136, 0.10); color: #0D9488; }
-.ql__card--green  .ql__card-icon { background: rgba(22, 163, 74, 0.10);  color: #16A34A; }
+.ql__card--green  .ql__card-icon { background: rgba(22, 163, 74, 0.10);  color: var(--ui-success, #0E9468); }
 .ql__card--gray   .ql__card-icon { background: rgba(107, 114, 128, 0.10); color: #6B7280; }
 .ql__card--indigo .ql__card-icon { background: rgba(79, 70, 229, 0.10);  color: #4F46E5; }
 .ql__card--amber  .ql__card-icon { background: rgba(217, 119, 6, 0.10);  color: #D97706; }

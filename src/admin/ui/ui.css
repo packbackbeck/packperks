@@ -167,10 +167,22 @@
   gap: 16px;
   align-items: stretch;
 }
+/* The insights card beside the trend chart: the chart sets the row's
+ * height (contain: size keeps the card's own content out of it) and the
+ * list scrolls inside. Stacked, it gets a fixed height instead. */
+.ui-grid-main > .ui-insights-card { contain: size; min-height: 340px; }
+.ui-insights-card__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border-2) transparent;
+}
 .ui-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .ui-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 1180px) {
   .ui-grid-main { grid-template-columns: minmax(0, 1fr); }
+  .ui-grid-main > .ui-insights-card { contain: none; height: 380px; min-height: 0; }
 }
 @media (max-width: 900px) {
   .ui-grid-2, .ui-grid-3 { grid-template-columns: minmax(0, 1fr); }
@@ -656,6 +668,9 @@
   z-index: 80;
   top: calc(100% + 6px);
   min-width: 220px;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 5px;
   border-radius: 12px;
   border: 1px solid var(--ui-border);

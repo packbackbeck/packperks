@@ -1,22 +1,29 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { ArrowUpDown, Check, Download, Eye, FileWarning, Gift, GripVertical, Plus, Search, Star, Trash2, Upload, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import RewardEditPanel from './RewardEditPanel';
+import { Badge, Button, Card, EmptyState, Modal, PageHeader } from '../ui';
 import './AdminRewards.css';
 import { useAdminMoney } from '../lib/adminMoney';
 import { effectiveRates } from '../../lib/rates';
 import { useViewRole } from '../context/ViewRole';
 
-/* P-43: full status palette, with 'hidden' aliased to the paused
- * orange so legacy rows render coherently until edited. */
-const STATUS_COLORS = {
-  draft:     { bg: 'rgba(255,197,47,0.12)', text: '#B8922A' },
-  scheduled: { bg: 'rgba(83, 51, 165, 0.12)', text: '#5333A5' },
-  live:      { bg: 'rgba(74,222,128,0.12)',  text: '#16A34A' },
-  paused:    { bg: 'rgba(253,111,70,0.12)',  text: '#C84A26' },
-  expired:   { bg: '#F0EDE8',                text: '#6C6259' },
-  archived:  { bg: 'rgba(156,163,175,0.15)', text: '#6B7280' },
-  hidden:    { bg: 'rgba(253,111,70,0.12)',  text: '#C84A26' },
+/* P-43: full status palette, with 'hidden' aliased to paused so legacy
+ * rows render coherently until edited. */
+const STATUS_TONE = {
+  draft:     'warning',
+  scheduled: 'primary',
+  live:      'success',
+  paused:    'warning',
+  expired:   'neutral',
+  archived:  'neutral',
+  hidden:    'warning',
 };
+
+function statusLabel(status) {
+  const s = status || 'draft';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 function RewardListCard({
   reward, isSelected, onSelect, claimCount,
@@ -24,7 +31,6 @@ function RewardListCard({
   onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }) {
   const { money } = useAdminMoney();
-  const sc = STATUS_COLORS[reward.status] || STATUS_COLORS.draft;
   return (
     <div
       className={
@@ -41,37 +47,37 @@ function RewardListCard({
       onDragEnd={reorderMode ? onDragEnd : undefined}
     >
       {reorderMode && (
-        <div className="rew-grip" aria-hidden="true" title="Drag to reorder">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>
-            <circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>
-            <circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/>
-          </svg>
-        </div>
+        <span className="rew-grip" aria-hidden="true" title="Drag to reorder">
+          <GripVertical size={16} />
+        </span>
       )}
       <button
-        className={`rew-card ${isSelected ? 'rew-card--active' : ''} ${reward.status === 'hidden' ? 'rew-card--hidden' : ''}`}
+        type="button"
+        className={`rew-card${isSelected ? ' rew-card--active' : ''}${reward.status === 'hidden' ? ' rew-card--hidden' : ''}`}
         onClick={onSelect}
+        aria-current={isSelected || undefined}
         tabIndex={reorderMode ? -1 : undefined}
       >
-        <div className="rew-card__thumb" style={{ background: reward.bgColor || '#F8F4EC' }}>
+        <span className="rew-card__thumb" style={{ background: reward.bgColor || 'var(--ui-soft)' }}>
           {reward.image && <img src={typeof reward.image === 'string' ? reward.image : ''} alt={reward.name} />}
-        </div>
-        <div className="rew-card__body">
-          <div className="rew-card__name">{reward.name}</div>
-          <div className="rew-card__meta">
+        </span>
+        <span className="rew-card__body">
+          <span className="rew-card__name">{reward.name}</span>
+          <span className="rew-card__meta">
             <span>{money(reward.euros || 0)}</span>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <span>{reward.cupsNeeded} cups</span>
-            {claimCount > 0 && <><span>·</span><span className="rew-card__claims">{claimCount} claims</span></>}
-          </div>
-        </div>
-        <div className="rew-card__right">
-          <span className="rew-card__status" style={{ background: sc.bg, color: sc.text }}>
-            {reward.status}
+            {claimCount > 0 && <><span aria-hidden="true">·</span><span className="rew-card__claims">{claimCount} claims</span></>}
           </span>
-          {reward.featured && <span className="rew-card__featured" title="Featured">★</span>}
-        </div>
+        </span>
+        <span className="rew-card__right">
+          <Badge tone={STATUS_TONE[reward.status] || 'warning'}>{statusLabel(reward.status)}</Badge>
+          {reward.featured && (
+            <span className="rew-card__featured" title="Featured">
+              <Star size={13} fill="currentColor" aria-label="Featured" />
+            </span>
+          )}
+        </span>
       </button>
     </div>
   );
@@ -104,7 +110,7 @@ function parseCSV(text) {
 
 let nextTempId = Date.now();
 
-export default function AdminRewards({ draftState, onNavigate }) {
+export default function AdminRewards({ draftState }) {
   const { draft, updateDraft } = draftState;
   const { access } = useViewRole();
   const readOnly = !!access && !access.canEdit('rewards');
@@ -122,6 +128,10 @@ export default function AdminRewards({ draftState, onNavigate }) {
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const fileInputRef = useRef(null);
+  // Dialogs: the reward waiting for a delete confirmation, and the result of
+  // a CSV import ({ title, text, ok }).
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [importNotice, setImportNotice] = useState(null);
 
   const selectedReward = rewards.find(r => r.id === selectedId) || null;
 
@@ -288,7 +298,13 @@ export default function AdminRewards({ draftState, onNavigate }) {
   }
 
   function handleArchive(rewardId) {
-    if (!window.confirm('Archive this reward? It will be hidden from users.')) return;
+    setConfirmDelete(rewards.find(r => r.id === rewardId) || { id: rewardId });
+  }
+
+  function confirmArchive() {
+    const rewardId = confirmDelete?.id;
+    setConfirmDelete(null);
+    if (!rewardId) return;
     updateDraft(prev => ({
       ...prev,
       rewards: prev.rewards.filter(r => r.id !== rewardId),
@@ -308,7 +324,11 @@ export default function AdminRewards({ draftState, onNavigate }) {
         Object.values(r).some(v => typeof v === 'string' && v.trim() !== '')
       );
       if (meaningful.length === 0) {
-        alert('No filled-in rows found. Open the template, fill in at least the "name" column for each reward, save, and upload again.');
+        setImportNotice({
+          ok: false,
+          title: 'No rewards to import',
+          text: 'No filled-in rows found. Open the template, fill in at least the “name” column for each reward, save, and upload it again.',
+        });
         return;
       }
 
@@ -368,7 +388,11 @@ export default function AdminRewards({ draftState, onNavigate }) {
       });
       updateDraft(prev => ({ ...prev, rewards: [...prev.rewards, ...newRewards] }));
       setSelectedId(newRewards[0].id);
-      alert(`Imported ${newRewards.length} reward${newRewards.length !== 1 ? 's' : ''}. Review and Publish when ready.`);
+      setImportNotice({
+        ok: true,
+        title: `Imported ${newRewards.length} reward${newRewards.length !== 1 ? 's' : ''}`,
+        text: 'They were added to your draft. Review them, then Publish when they’re ready.',
+      });
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -419,73 +443,84 @@ export default function AdminRewards({ draftState, onNavigate }) {
 
   const liveCount  = rewards.filter(r => r.status === 'live').length;
   const draftCount = rewards.filter(r => r.status === 'draft').length;
+  const filtering = filterStatus !== 'all' || !!search.trim();
 
   return (
-    <div className="admin-rewards">
-      <div className="rew-header">
-        <div>
-          <h1 className="rew-header__title">Rewards & Offers</h1>
-          <p className="rew-header__sub">
-            <span className="rew-header__chip rew-header__chip--live">{liveCount} Live</span>
-            <span className="rew-header__chip rew-header__chip--draft">{draftCount} Draft</span>
-          </p>
-        </div>
-        <div className="rew-header__actions">
-          {readOnly && <span className="rew-header__readonly">View only: your role can’t change rewards</span>}
-          {!readOnly && (<>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            style={{ display: 'none' }}
-            onChange={handleImportCSV}
-          />
-          <button className="rew-header__import" onClick={downloadTemplate} title="Download a CSV template — fill it in, then upload via Import CSV">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download template
-          </button>
-          <button className="rew-header__import" onClick={() => fileInputRef.current?.click()} title="Upload a filled-in CSV to import rewards as drafts">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            Import CSV
-          </button>
-          <button className="rew-header__add" onClick={handleAddReward}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add Reward
-          </button>
-          </>)}
-        </div>
-      </div>
+    <div className="ui-page rew-page">
+      <PageHeader
+        title="Rewards & offers"
+        subtitle="What customers can unlock with their cups. Edits save to your draft as you type; Publish puts them live."
+      >
+        {readOnly ? (
+          <Badge tone="neutral" icon={Eye} title="Your role can’t change rewards">View only</Badge>
+        ) : (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              style={{ display: 'none' }}
+              onChange={handleImportCSV}
+            />
+            <Button
+              icon={Download}
+              onClick={downloadTemplate}
+              title="Download a CSV template. Fill it in, then upload it with Import CSV."
+            >
+              Download template
+            </Button>
+            <Button
+              icon={Upload}
+              onClick={() => fileInputRef.current?.click()}
+              title="Upload a filled-in CSV to import rewards as drafts"
+            >
+              Import CSV
+            </Button>
+            <Button variant="primary" icon={Plus} onClick={handleAddReward}>
+              Add reward
+            </Button>
+          </>
+        )}
+      </PageHeader>
 
       <div className="rew-layout">
         {/* Left: reward list */}
-        <div className="rew-list">
-          {/* List controls */}
-          <div className="rew-list__controls">
-            <div className="rew-list__search-wrap">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9E9A93" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
+        <Card className="rew-list" aria-label="Rewards">
+          <div className="rew-list__head">
+            <div className="rew-list__title-row">
+              <h2 className="ui-card__title">Catalog</h2>
+              <span className="rew-list__counts">
+                <Badge tone="success">{liveCount} live</Badge>
+                <Badge tone="warning">{draftCount} draft</Badge>
+              </span>
+            </div>
+
+            <label className={`rew-search${reorderMode ? ' rew-search--off' : ''}`}>
+              <Search size={14} aria-hidden="true" />
               <input
-                className="rew-list__search"
-                placeholder="Search rewards…"
+                className="rew-search__input"
+                placeholder="Search rewards"
+                aria-label="Search rewards"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 disabled={reorderMode}
               />
-            </div>
-            <div className="rew-list__filter-row">
-              <select className="rew-list__select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} disabled={reorderMode}>
-                <option value="all">All status</option>
+              {search && !reorderMode && (
+                <button type="button" className="rew-search__clear" aria-label="Clear search" onClick={() => setSearch('')}>
+                  <X size={12} />
+                </button>
+              )}
+            </label>
+
+            <div className="rew-list__filters">
+              <select
+                className="ui-select rew-list__select"
+                aria-label="Filter by status"
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                disabled={reorderMode}
+              >
+                <option value="all">All statuses</option>
                 <option value="draft">Draft</option>
                 <option value="scheduled">Scheduled</option>
                 <option value="live">Live</option>
@@ -493,47 +528,50 @@ export default function AdminRewards({ draftState, onNavigate }) {
                 <option value="expired">Expired</option>
                 <option value="archived">Archived</option>
               </select>
-              <select className="rew-list__select" value={sortBy} onChange={e => setSortBy(e.target.value)} disabled={reorderMode}>
-                <option value="order">Default order</option>
+              <select
+                className="ui-select rew-list__select"
+                aria-label="Sort rewards"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                disabled={reorderMode}
+              >
+                <option value="order">Customer order</option>
                 <option value="name">Name A–Z</option>
-                <option value="price">Price ↓</option>
+                <option value="price">Price, high to low</option>
                 <option value="popularity">Most claimed</option>
               </select>
             </div>
+
             {rewards.length > 1 && !readOnly && (
-              <button
-                type="button"
-                className={'rew-reorder-toggle' + (reorderMode ? ' rew-reorder-toggle--active' : '')}
+              <Button
+                variant={reorderMode ? 'primary' : 'outline'}
+                size="sm"
+                block
+                icon={reorderMode ? Check : ArrowUpDown}
                 onClick={reorderMode ? exitReorderMode : enterReorderMode}
               >
-                {reorderMode ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Done reordering
-                  </>
-                ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 6 12 2 16 6"/><polyline points="8 18 12 22 16 18"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-                    Rearrange order
-                  </>
-                )}
-              </button>
+                {reorderMode ? 'Done reordering' : 'Rearrange order'}
+              </Button>
             )}
+
+            {reorderMode ? (
+              <p className="rew-list__hint rew-list__hint--active">
+                Drag the rewards into the order customers should see. Changes save to your draft; Publish puts them live.
+              </p>
+            ) : rewards.length > 1 && !readOnly ? (
+              <p className="rew-list__hint">
+                Use Rearrange order to drag rewards into the order customers see.
+              </p>
+            ) : null}
           </div>
 
-          <div className="rew-list__inner">
-            <div className="rew-list__label">
-              CATALOG ({displayRewards.length}/{rewards.length})
-            </div>
-            {reorderMode ? (
-              <div className="rew-list__reorder-hint rew-list__reorder-hint--active">
-                Drag the products into the order you want. Changes auto-save; Publish to push them live.
-              </div>
-            ) : rewards.length > 1 && !readOnly ? (
-              <div className="rew-list__reorder-hint">
-                Tip: press “Rearrange order” to drag products into the order customers see.
-              </div>
-            ) : null}
+          <div className="rew-list__meta">
+            {filtering
+              ? `Showing ${displayRewards.length} of ${rewards.length}`
+              : `${rewards.length} reward${rewards.length === 1 ? '' : 's'}`}
+          </div>
+
+          <div className="rew-list__scroll">
             {displayRewards.map(reward => (
               <RewardListCard
                 key={reward.id}
@@ -552,38 +590,65 @@ export default function AdminRewards({ draftState, onNavigate }) {
               />
             ))}
             {displayRewards.length === 0 && (
-              <div className="rew-list__empty">
-                {rewards.length === 0 ? 'No rewards yet. Add one above.' : 'No rewards match filters.'}
-              </div>
+              <EmptyState icon={rewards.length === 0 ? Gift : Search} title={rewards.length === 0 ? 'No rewards yet' : 'No matches'}>
+                {rewards.length === 0
+                  ? (readOnly ? 'This organisation has no rewards.' : 'Add one with Add reward, or import a CSV.')
+                  : 'No rewards match this search or status.'}
+              </EmptyState>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Right: edit panel */}
-        <div className="rew-editor">
+        <Card className="rew-editor" aria-label="Reward editor">
           {selectedReward ? (
-            <fieldset className="rew-editor__fieldset" disabled={readOnly}>
-              <RewardEditPanel
-                reward={selectedReward}
-                onChange={handleUpdate}
-                onSetFeatured={() => handleSetFeatured(selectedReward.id)}
-                onArchive={() => handleArchive(selectedReward.id)}
-                cashbackRate={effectiveRates(draftState?.draft?.settings || {}).cashback}
-              />
-            </fieldset>
+            <RewardEditPanel
+              reward={selectedReward}
+              onChange={handleUpdate}
+              onSetFeatured={() => handleSetFeatured(selectedReward.id)}
+              onArchive={() => handleArchive(selectedReward.id)}
+              cashbackRate={effectiveRates(draftState?.draft?.settings || {}).cashback}
+              readOnly={readOnly}
+            />
           ) : (
             <div className="rew-editor__empty">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
-                <polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/>
-                <line x1="12" y1="22" x2="12" y2="7"/>
-                <path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/>
-                <path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>
-              </svg>
-              <p>{readOnly ? 'Select a reward to see its details' : 'Select a reward to edit'}</p>
+              <EmptyState icon={Gift} title={readOnly ? 'Select a reward to see its details' : 'Select a reward to edit'}>
+                {rewards.length === 0 && !readOnly ? 'Or add your first one with Add reward.' : null}
+              </EmptyState>
             </div>
           )}
-        </div>
+        </Card>
       </div>
+
+      <Modal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title={`Delete ${confirmDelete?.name ? `“${confirmDelete.name}”` : 'this reward'}?`}
+        subtitle="It leaves your draft now and disappears for customers when you publish."
+        icon={Trash2}
+        iconTone="rose"
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+            <Button variant="danger" icon={Trash2} onClick={confirmArchive}>Delete reward</Button>
+          </>
+        )}
+      >
+        <p className="rew-modal-text">
+          If you only want it off the menu for a while, set its status to Paused instead.
+        </p>
+      </Modal>
+
+      <Modal
+        open={!!importNotice}
+        onClose={() => setImportNotice(null)}
+        title={importNotice?.title || ''}
+        icon={importNotice?.ok ? Check : FileWarning}
+        iconTone={importNotice?.ok ? 'emerald' : 'amber'}
+        footer={<Button variant="primary" onClick={() => setImportNotice(null)}>OK</Button>}
+      >
+        <p className="rew-modal-text">{importNotice?.text}</p>
+      </Modal>
     </div>
   );
 }

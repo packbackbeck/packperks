@@ -163,3 +163,8 @@
 @media (prefers-reduced-motion: reduce) {
   .sb { transition: none; }
 }
+
+/* Links that open outside the dashboard (MockupMaster). */
+.sb__item--link { box-sizing: border-box; text-decoration: none; }
+.sb__item-out { margin-left: auto; color: var(--ui-muted-2); flex: none; }
+.sb__item--link:hover .sb__item-out { color: var(--ui-primary); }

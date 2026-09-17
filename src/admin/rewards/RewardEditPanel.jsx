@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, CalendarClock, Check, Eye, Info, Plus, RotateCcw, Star, Trash2, Upload, X } from 'lucide-react';
 import { uploadRewardImage } from '../lib/adminApi';
+import { Badge, Button, Field, Switch, ToggleChip } from '../ui';
 import { rewardImageStyle, DEFAULT_IMAGE_FRAMING } from '../../utils/imageTransform';
 import './RewardEditPanel.css';
 import { useAdminMoney } from '../lib/adminMoney';
@@ -24,6 +26,19 @@ const AVAILABLE_TAGS = ['FREE', 'PLANT-BASED', 'NEW', 'LIMITED', 'POPULAR'];
  * as 'paused' by the helpers so the visual rendering stays sane until
  * an admin edits them. */
 const STATUS_OPTIONS = ['draft', 'scheduled', 'live', 'paused', 'expired', 'archived'];
+
+/* tone = the badge colour the reward list uses for the same status. */
+const STATUS_META = {
+  draft:     { label: 'Draft',     desc: 'Work in progress',             tone: 'warning' },
+  scheduled: { label: 'Scheduled', desc: 'Starts on its scheduled date', tone: 'primary' },
+  live:      { label: 'Live',      desc: 'Customers can claim it now',   tone: 'success' },
+  paused:    { label: 'Paused',    desc: 'Temporarily off the menu',     tone: 'warning' },
+  expired:   { label: 'Expired',   desc: 'Past its end date',            tone: 'neutral' },
+  archived:  { label: 'Archived',  desc: 'Retired, kept for reporting',  tone: 'neutral' },
+  // Backwards-compat alias: rows still on the old 'hidden' status
+  // render as Paused until an admin edits + saves them.
+  hidden:    { label: 'Paused',    desc: 'Temporarily off the menu',     tone: 'warning' },
+};
 
 /* P-44: tabs inside the editor. The previous single-column form was
  * a 700-pixel scroll of status → basic info → visuals → tags →
@@ -64,7 +79,7 @@ function fromLocalDatetimeValue(local) {
   return d.toISOString();
 }
 
-export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArchive, cashbackRate = 1.25 }) {
+export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArchive, cashbackRate = 1.25, readOnly = false }) {
   const { money, symbol } = useAdminMoney();
   /* Edit-buffer pattern: the form holds its own internal draft so a
    * keystroke doesn't push an update to the parent on every character
@@ -239,107 +254,98 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
     }
   }
 
-  const STATUS_META = {
-    draft:     { label: 'Draft',     desc: 'Work in progress',           color: '#B8922A' },
-    scheduled: { label: 'Scheduled', desc: 'Starts on its scheduled date', color: '#5333A5' },
-    live:      { label: 'Live',      desc: 'Customers can claim it now',   color: '#16A34A' },
-    paused:    { label: 'Paused',    desc: 'Temporarily off the menu',     color: '#FD6F46' },
-    expired:   { label: 'Expired',   desc: 'Past its end date',            color: '#7A7166' },
-    archived:  { label: 'Archived',  desc: 'Retired, kept for reporting',  color: '#6B7280' },
-    // Backwards-compat alias: rows still on the old 'hidden' status
-    // render as Paused until an admin edits + saves them.
-    hidden:    { label: 'Paused',    desc: 'Temporarily off the menu',     color: '#FD6F46' },
-  };
+  const framingIsDefault = (form.imageScale ?? 1) === 1 && (form.imageX ?? 0) === 0
+    && (form.imageY ?? 0) === 0 && (form.imageRotate ?? 0) === 0;
 
   return (
     <div className="rep">
-      {/* Header */}
-      <div className="rep__header">
-        <div className="rep__header-left">
-          <div className="rep__thumb" style={{ background: form.bgColor || '#F8F4EC' }}>
-            {form.image && <img src={typeof form.image === 'string' ? form.image : ''} alt={form.name} style={rewardImageStyle(form)} />}
+      {/* Header, save state and tabs stay in view while the form scrolls. */}
+      <div className="rep__top">
+        <div className="rep__header">
+          <div className="rep__header-left">
+            <div className="rep__thumb" style={{ background: form.bgColor || 'var(--ui-soft)' }}>
+              {form.image && <img src={typeof form.image === 'string' ? form.image : ''} alt={form.name} style={rewardImageStyle(form)} />}
+            </div>
+            <div className="rep__header-text">
+              <div className="rep__reward-name">{form.name || 'Untitled reward'}</div>
+              <div className="rep__reward-meta">{money(Number(form.euros) || 0)} · {parseInt(form.cupsNeeded, 10) || 0} cups</div>
+            </div>
           </div>
-          <div>
-            <div className="rep__reward-name">{form.name || 'Untitled Reward'}</div>
-            <div className="rep__reward-meta">{money(Number(form.euros) || 0)} · {parseInt(form.cupsNeeded, 10) || 0} cups</div>
+          <div className="rep__header-actions">
+            {form.featured ? (
+              <Badge tone="warning" icon={Star}>Featured</Badge>
+            ) : !readOnly && (
+              <Button size="sm" icon={Star} onClick={onSetFeatured} title="Set as featured reward">
+                Set featured
+              </Button>
+            )}
+            {!readOnly && (
+              <Button variant="danger-ghost" size="sm" icon={Trash2} onClick={onArchive}>
+                Delete
+              </Button>
+            )}
           </div>
         </div>
-        <div className="rep__header-actions">
-          {!form.featured && (
-            <button className="rep__btn rep__btn--ghost" onClick={onSetFeatured} title="Set as featured reward">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              </svg>
-              Set featured
-            </button>
-          )}
-          {form.featured && (
-            <span className="rep__featured-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              </svg>
-              Featured
-            </span>
-          )}
-          <button className="rep__btn rep__btn--danger" onClick={onArchive}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-              <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
-            </svg>
-            Delete
-          </button>
-        </div>
-      </div>
 
-      {/* Auto-save status. Every edit is committed to the draft on its own
-       *  (debounced, and flushed on tab switch / unmount), so there is no
-       *  manual Save button. This just shows the live state and reminds the
-       *  admin that going live still needs Publish. */}
-      <div className={`rep__save-bar${dirty ? ' rep__save-bar--saving' : ''}`}>
-        <span className="rep__save-bar__msg rep__save-bar__msg--clean">
-          {dirty ? (
-            <><span className="rep__save-bar__dot" /> Saving…</>
+        {/* Auto-save status. Every edit is committed to the draft on its own
+         *  (debounced, and flushed on tab switch / unmount), so there is no
+         *  manual Save button. This just shows the live state and reminds the
+         *  admin that going live still needs Publish. */}
+        <div className={`rep__save-bar${dirty ? ' rep__save-bar--saving' : ''}`} role="status" aria-live="polite">
+          {readOnly ? (
+            <><Eye size={14} aria-hidden="true" className="rep__save-bar__ok" /> You can view this reward but not change it.</>
+          ) : dirty ? (
+            <><span className="rep__save-bar__dot" aria-hidden="true" /> Saving…</>
           ) : (
-            '✓ All changes saved. Hit Publish to push them live.'
+            <><Check size={14} aria-hidden="true" className="rep__save-bar__ok" /> All changes saved to your draft. Publish puts them live.</>
           )}
-        </span>
+        </div>
+
+        {/* P-44: tab strip — sits between the header and the body so
+         *  the admin sees status changes before they scroll. */}
+        <div className="rep__tabs">
+          <div className="ui-tabs" role="tablist" aria-label="Reward sections">
+            {REWARD_TABS.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t.id}
+                className="ui-tabs__btn"
+                onClick={() => setActiveTab(t.id)}
+                title={t.desc}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* P-44: tab strip — sits between the header and the body so
-       *  the admin sees status changes before they scroll. */}
-      <div className="rep__tabs" role="tablist">
-        {REWARD_TABS.map(t => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={activeTab === t.id}
-            className={`rep__tab${activeTab === t.id ? ' rep__tab--active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
-            title={t.desc}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="rep__body">
+      {/* View-only roles: the form is a disabled fieldset; the tabs above
+       *  stay usable so every section can be read. */}
+      <fieldset className="rep__body" disabled={readOnly}>
        {activeTab === 'setup' && (
         <>
         {/* Status */}
         <section className="rep__section">
-          <div className="rep__section-title">Status</div>
+          <h3 className="rep__section-title">Status</h3>
           <div className="rep__status-row">
             {STATUS_OPTIONS.map(s => {
               const meta = STATUS_META[s];
+              const on = form.status === s;
               return (
                 <button
                   key={s}
                   type="button"
-                  className={`rep__status-btn ${form.status === s ? 'rep__status-btn--active' : ''}`}
-                  style={form.status === s ? { borderColor: meta.color, color: meta.color, background: `${meta.color}12` } : {}}
+                  aria-pressed={on}
+                  className={`rep__status-btn rep__status-btn--${meta.tone}${on ? ' rep__status-btn--on' : ''}`}
                   onClick={() => update('status', s)}
                 >
-                  <span className="rep__status-label">{meta.label}</span>
+                  <span className="rep__status-label">
+                    <span className="rep__status-dot" aria-hidden="true" />
+                    {meta.label}
+                  </span>
                   <span className="rep__status-desc">{meta.desc}</span>
                 </button>
               );
@@ -355,40 +361,50 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
            * has passed, and live → expired once expiresAt has. */}
           <div className="rep__schedule">
             <div className="rep__schedule-head">
-              <span className="rep__schedule-title">Release window</span>
+              <span className="rep__schedule-title">
+                <CalendarClock size={15} aria-hidden="true" />
+                Release window
+                <span className="rep__optional">optional</span>
+              </span>
               <span className="rep__schedule-sub">
-                Optional — when set, the reward auto-flips to <strong>live</strong> at the release
-                date and to <strong>expired</strong> after the expiry date passes.
+                When set, the reward switches to <strong>Live</strong> on the release date and
+                to <strong>Expired</strong> once the expiry date has passed.
               </span>
             </div>
-            <div className="rep__schedule-row">
-              <div className="rep__field rep__field--inline">
-                <label className="rep__label">Release on</label>
+            <div className="rep__grid">
+              <Field label="Release on" htmlFor="rep-release">
                 <input
+                  id="rep-release"
                   type="datetime-local"
-                  className="rep__input"
+                  className="ui-input"
                   value={toLocalDatetimeValue(form.releaseAt)}
                   onChange={e => update('releaseAt', fromLocalDatetimeValue(e.target.value))}
                 />
-              </div>
-              <div className="rep__field rep__field--inline">
-                <label className="rep__label">Expires on</label>
+              </Field>
+              <Field label="Expires on" htmlFor="rep-expires">
                 <input
+                  id="rep-expires"
                   type="datetime-local"
-                  className="rep__input"
+                  className="ui-input"
                   value={toLocalDatetimeValue(form.expiresAt)}
                   onChange={e => update('expiresAt', fromLocalDatetimeValue(e.target.value))}
                 />
-              </div>
+              </Field>
             </div>
             {form.releaseAt && new Date(form.releaseAt) > new Date() && form.status !== 'scheduled' && (
-              <p className="rep__schedule-hint">
-                Tip: switch status to <strong>Scheduled</strong> so customers don't see this reward before {new Date(form.releaseAt).toLocaleString('en-GB')}.
+              <p className="rep__callout rep__callout--info">
+                <Info size={14} aria-hidden="true" />
+                <span>
+                  Set the status to <strong>Scheduled</strong> so customers don’t see this reward before {new Date(form.releaseAt).toLocaleString('en-GB')}.
+                </span>
               </p>
             )}
             {form.expiresAt && new Date(form.expiresAt) < new Date() && form.status !== 'expired' && form.status !== 'archived' && (
-              <p className="rep__schedule-hint rep__schedule-hint--warn">
-                This reward's expiry date has passed. It will auto-flip to <strong>Expired</strong>.
+              <p className="rep__callout rep__callout--warn">
+                <AlertTriangle size={14} aria-hidden="true" />
+                <span>
+                  This reward’s expiry date has passed. It will switch to <strong>Expired</strong> on its own.
+                </span>
               </p>
             )}
           </div>
@@ -396,93 +412,98 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
 
         {/* Basic info */}
         <section className="rep__section">
-          <div className="rep__section-title">Basic Info</div>
-          <div className="rep__field">
-            <label className="rep__label">Name</label>
-            <input className="rep__input" value={form.name || ''} onChange={e => update('name', e.target.value)} placeholder="e.g. Chicken Sandwich" />
-          </div>
-          <div className="rep__field">
-            <label className="rep__label">Description</label>
-            <textarea className="rep__textarea" rows={3} value={form.description || ''} onChange={e => update('description', e.target.value)} placeholder="Short product description shown in the app…" />
-          </div>
-          <div className="rep__row">
-            <div className="rep__field">
-              <label className="rep__label">Price ({symbol})</label>
-              {/* Store the raw string so a number can be typed/cleared normally
-               *  (the old `parseFloat(..) || 0` forced 0 and ate decimals).
-               *  Required: an empty or non-positive price highlights + blocks. */}
-              <input
-                className={`rep__input${priceInvalid ? ' rep__input--error' : ''}`}
-                type="number" step="0.01" min="0" inputMode="decimal"
-                value={form.euros ?? ''}
-                onChange={e => update('euros', e.target.value)}
-                placeholder="5.49"
-              />
-              {priceInvalid && <span className="rep__field-error">Enter a price above {money(0)}.</span>}
+          <h3 className="rep__section-title">Basic info</h3>
+          <div className="rep__stack">
+            <Field label="Name" htmlFor="rep-name">
+              <input id="rep-name" className="ui-input" value={form.name || ''} onChange={e => update('name', e.target.value)} placeholder="e.g. Chicken Sandwich" />
+            </Field>
+            <Field label="Description" htmlFor="rep-desc">
+              <textarea id="rep-desc" className="ui-textarea" rows={3} value={form.description || ''} onChange={e => update('description', e.target.value)} placeholder="Short product description shown in the app…" />
+            </Field>
+            <div className="rep__grid">
+              <Field label={`Price (${symbol})`} htmlFor="rep-price">
+                {/* Store the raw string so a number can be typed/cleared normally
+                 *  (the old `parseFloat(..) || 0` forced 0 and ate decimals).
+                 *  Required: an empty or non-positive price highlights + blocks. */}
+                <input
+                  id="rep-price"
+                  className={`ui-input${priceInvalid ? ' rep__input--error' : ''}`}
+                  type="number" step="0.01" min="0" inputMode="decimal"
+                  aria-invalid={priceInvalid || undefined}
+                  value={form.euros ?? ''}
+                  onChange={e => update('euros', e.target.value)}
+                  placeholder="5.49"
+                />
+                {priceInvalid && <span className="rep__field-error">Enter a price above {money(0)}.</span>}
+              </Field>
+              <Field label="Cups needed" htmlFor="rep-cups">
+                <input
+                  id="rep-cups"
+                  className={`ui-input${cupsInvalid ? ' rep__input--error' : ''}`}
+                  type="number" min="1" max="20" inputMode="numeric"
+                  aria-invalid={cupsInvalid || undefined}
+                  value={form.cupsNeeded ?? ''}
+                  onChange={e => update('cupsNeeded', e.target.value)}
+                  placeholder="3"
+                />
+                {cupsInvalid && <span className="rep__field-error">Enter how many cups this costs.</span>}
+              </Field>
             </div>
-            <div className="rep__field">
-              <label className="rep__label">Cups needed</label>
-              <input
-                className={`rep__input${cupsInvalid ? ' rep__input--error' : ''}`}
-                type="number" min="1" max="20" inputMode="numeric"
-                value={form.cupsNeeded ?? ''}
-                onChange={e => update('cupsNeeded', e.target.value)}
-                placeholder="3"
-              />
-              {cupsInvalid && <span className="rep__field-error">Enter how many cups this costs.</span>}
+            <div className="rep__grid">
+              <Field
+                label={<>Cost to make ({symbol}) <span className="rep__optional">optional</span></>}
+                htmlFor="rep-cogs"
+              >
+                {/* COGS — the real cost to produce the product. Admin-only: it
+                 *  feeds Reward economics and is NEVER shown in the customer app. */}
+                <input
+                  id="rep-cogs"
+                  className="ui-input"
+                  type="number" step="0.01" min="0" inputMode="decimal"
+                  value={form.cogs ?? ''}
+                  onChange={e => update('cogs', e.target.value)}
+                  placeholder="1.20"
+                  title="Your actual cost to produce this reward (cost of goods). Admin only — never shown to customers. Used by Reward economics."
+                />
+              </Field>
+              <Field label={`Partner subsidy (${symbol})`} htmlFor="rep-subsidy">
+                <input
+                  id="rep-subsidy"
+                  className="ui-input"
+                  type="number" step="0.01" min="0" inputMode="decimal"
+                  value={form.subsidy ?? ''}
+                  onChange={e => update('subsidy', e.target.value)}
+                  placeholder="0.00"
+                  title="Optional cash the partner adds on top of what cups fund. Use to close the funding gap on premium rewards."
+                />
+              </Field>
             </div>
-          </div>
-          <div className="rep__row">
-            <div className="rep__field">
-              <label className="rep__label">Cost to make ({symbol}) <span className="rep__optional">— optional</span></label>
-              {/* COGS — the real cost to produce the product. Admin-only: it
-               *  feeds Reward economics and is NEVER shown in the customer app. */}
-              <input
-                className="rep__input"
-                type="number" step="0.01" min="0" inputMode="decimal"
-                value={form.cogs ?? ''}
-                onChange={e => update('cogs', e.target.value)}
-                placeholder="1.20"
-                title="Your actual cost to produce this reward (cost of goods). Admin only — never shown to customers. Used by Reward economics."
-              />
-            </div>
-            <div className="rep__field">
-              <label className="rep__label">Partner subsidy ({symbol})</label>
-              <input
-                className="rep__input"
-                type="number" step="0.01" min="0" inputMode="decimal"
-                value={form.subsidy ?? ''}
-                onChange={e => update('subsidy', e.target.value)}
-                placeholder="0.00"
-                title="Optional cash the partner adds on top of what cups fund. Use to close the funding gap on premium rewards."
-              />
-            </div>
-          </div>
 
-          {/* How many of this product the customer must buy for the cashback
-           *  receipt to validate. Optional — defaults to 1. Read by the
-           *  verify-receipt function, which sums the matching line-item
-           *  quantities and only passes when the total meets this number. */}
-          <div className="rep__field">
-            <label className="rep__label">Items required on receipt</label>
-            <input
-              className="rep__input"
-              type="number"
-              min="1"
-              max="50"
-              step="1"
-              value={form.requiredQty ?? ''}
-              onChange={e => {
-                const n = parseInt(e.target.value, 10);
-                update('requiredQty', Number.isFinite(n) && n > 0 ? n : 1);
-              }}
-              placeholder="1"
-              title="How many of this product the receipt must show to unlock the reward."
-            />
-            <p className="rep__field-hint">
-              How many of this product the receipt must show to unlock the reward.
-              Leave at 1 for a single item. Set to 2 for a “buy two” offer, and so on.
-            </p>
+            {/* How many of this product the customer must buy for the cashback
+             *  receipt to validate. Optional — defaults to 1. Read by the
+             *  verify-receipt function, which sums the matching line-item
+             *  quantities and only passes when the total meets this number. */}
+            <Field
+              label="Items required on receipt"
+              htmlFor="rep-qty"
+              hint="How many of this product the receipt must show to unlock the reward. Leave at 1 for a single item; set 2 for a “buy two” offer, and so on."
+            >
+              <input
+                id="rep-qty"
+                className="ui-input rep__input--short"
+                type="number"
+                min="1"
+                max="50"
+                step="1"
+                value={form.requiredQty ?? ''}
+                onChange={e => {
+                  const n = parseInt(e.target.value, 10);
+                  update('requiredQty', Number.isFinite(n) && n > 0 ? n : 1);
+                }}
+                placeholder="1"
+                title="How many of this product the receipt must show to unlock the reward."
+              />
+            </Field>
           </div>
 
           {/* Economics panel — surfaces the funding-gap math the
@@ -494,52 +515,53 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
 
         {/* Visuals */}
         <section className="rep__section">
-          <div className="rep__section-title">Visuals</div>
-          <div className="rep__field">
-            <label className="rep__label">Background color</label>
-            <div className="rep__color-row">
-              <input
-                type="color"
-                className="rep__color-picker"
-                value={form.bgColor || '#FEA01E'}
-                onChange={e => update('bgColor', e.target.value)}
-              />
-              <input
-                className="rep__input rep__input--mono"
-                value={form.bgColor || '#FEA01E'}
-                onChange={e => update('bgColor', e.target.value)}
-                placeholder="#FEA01E"
-              />
-              <div className="rep__color-preview" style={{ background: form.bgColor || '#FEA01E' }} />
-            </div>
-          </div>
-          <div className="rep__field">
-            <label className="rep__label">Image</label>
-            <div className="rep__image-row">
-              <input
-                className="rep__input rep__input--mono"
-                value={typeof form.image === 'string' ? form.image : ''}
-                onChange={e => update('image', e.target.value)}
-                placeholder="https://… or upload"
-              />
-              <button
-                type="button"
-                className="rep__btn rep__btn--ghost rep__image-upload"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingImage}
-                title="Upload an image from this device"
-              >
-                {uploadingImage ? 'Uploading…' : 'Upload from device'}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageFile}
-                style={{ display: 'none' }}
-              />
-            </div>
-            {imageError && <span className="rep__image-err">{imageError}</span>}
+          <h3 className="rep__section-title">Visuals</h3>
+          <div className="rep__stack">
+            <Field label="Background colour" htmlFor="rep-bg">
+              <div className="rep__color-row">
+                <input
+                  type="color"
+                  className="rep__color-picker"
+                  aria-label="Pick a background colour"
+                  value={form.bgColor || '#FEA01E'}
+                  onChange={e => update('bgColor', e.target.value)}
+                />
+                <input
+                  id="rep-bg"
+                  className="ui-input rep__input--mono"
+                  value={form.bgColor || '#FEA01E'}
+                  onChange={e => update('bgColor', e.target.value)}
+                  placeholder="#FEA01E"
+                />
+              </div>
+            </Field>
+            <Field label="Image" htmlFor="rep-image">
+              <div className="rep__image-row">
+                <input
+                  id="rep-image"
+                  className="ui-input rep__input--mono"
+                  value={typeof form.image === 'string' ? form.image : ''}
+                  onChange={e => update('image', e.target.value)}
+                  placeholder="https://… or upload"
+                />
+                <Button
+                  icon={Upload}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  title="Upload an image from this device"
+                >
+                  {uploadingImage ? 'Uploading…' : 'Upload from device'}
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFile}
+                  style={{ display: 'none' }}
+                />
+              </div>
+              {imageError && <span className="rep__field-error">{imageError}</span>}
+            </Field>
             {form.image && typeof form.image === 'string' && form.image.length > 0 && (
               <div className="rep__image-adjust">
                 {/* Sliders on the left control how the picture sits inside its
@@ -560,7 +582,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
                   </div>
                   <div className="rep__slider">
                     <div className="rep__slider-head">
-                      <label className="rep__slider-label" htmlFor="img-x">Move X</label>
+                      <label className="rep__slider-label" htmlFor="img-x">Move sideways</label>
                       <span className="rep__slider-val">{form.imageX ?? 0}%</span>
                     </div>
                     <input
@@ -572,7 +594,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
                   </div>
                   <div className="rep__slider">
                     <div className="rep__slider-head">
-                      <label className="rep__slider-label" htmlFor="img-y">Move Y</label>
+                      <label className="rep__slider-label" htmlFor="img-y">Move up or down</label>
                       <span className="rep__slider-val">{form.imageY ?? 0}%</span>
                     </div>
                     <input
@@ -594,17 +616,23 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
                       onChange={e => update('imageRotate', parseInt(e.target.value, 10))}
                     />
                   </div>
-                  <button
-                    type="button"
-                    className="rep__image-reset"
-                    onClick={() => { setForm(prev => ({ ...prev, ...DEFAULT_IMAGE_FRAMING })); setDirty(true); }}
-                    disabled={(form.imageScale ?? 1) === 1 && (form.imageX ?? 0) === 0 && (form.imageY ?? 0) === 0 && (form.imageRotate ?? 0) === 0}
-                  >
-                    Reset framing
-                  </button>
+                  <div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={RotateCcw}
+                      onClick={() => { setForm(prev => ({ ...prev, ...DEFAULT_IMAGE_FRAMING })); setDirty(true); }}
+                      disabled={framingIsDefault}
+                    >
+                      Reset framing
+                    </Button>
+                  </div>
                 </div>
-                <div className="rep__image-preview" style={{ background: form.bgColor || '#F8F4EC' }}>
-                  <img src={form.image} alt="preview" style={rewardImageStyle(form)} onError={e => e.target.style.display = 'none'} />
+                <div className="rep__image-preview-wrap">
+                  <div className="rep__image-preview" style={{ background: form.bgColor || '#F8F4EC' }}>
+                    <img src={form.image} alt="preview" style={rewardImageStyle(form)} onError={e => e.target.style.display = 'none'} />
+                  </div>
+                  <span className="rep__image-caption">As customers see it</span>
                 </div>
               </div>
             )}
@@ -618,9 +646,9 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
         <>
         {/* Tags */}
         <section className="rep__section">
-          <div className="rep__section-title">Tags</div>
-          <p className="rep__field-hint">
-            These show as pills over the description on the reward card. Add your own or tap a preset.
+          <h3 className="rep__section-title">Tags</h3>
+          <p className="rep__hint">
+            Tags show as pills over the description on the reward card. Add your own or pick a preset.
           </p>
 
           {/* Current tags — each removable. */}
@@ -638,7 +666,7 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
                     aria-label={`Remove tag ${tag}`}
                     title={`Remove "${tag}"`}
                   >
-                    ×
+                    <X size={11} aria-hidden="true" />
                   </button>
                 </span>
               ))
@@ -649,7 +677,8 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
           <div className="rep__tag-add">
             <input
               type="text"
-              className="rep__input rep__tag-add-input"
+              className="ui-input rep__tag-add-input"
+              aria-label="New tag"
               value={newTag}
               maxLength={24}
               placeholder="Add a tag (e.g. SPICY)"
@@ -658,56 +687,56 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
                 if (e.key === 'Enter') { e.preventDefault(); addTag(newTag); }
               }}
             />
-            <button
-              type="button"
-              className="rep__tag-add-btn"
-              onClick={() => addTag(newTag)}
-              disabled={!newTag.trim()}
-            >
+            <Button icon={Plus} onClick={() => addTag(newTag)} disabled={!newTag.trim()}>
               Add
-            </button>
+            </Button>
           </div>
 
           {/* Preset quick-adds. */}
           <div className="rep__tags-presets-label">Presets</div>
           <div className="rep__tags-row">
             {AVAILABLE_TAGS.map(tag => (
-              <button
+              <ToggleChip
                 key={tag}
-                type="button"
-                className={`rep__tag ${(form.tags || []).includes(tag) ? 'rep__tag--active' : ''}`}
+                pressed={(form.tags || []).includes(tag)}
                 onClick={() => toggleTag(tag)}
               >
                 {tag}
-              </button>
+              </ToggleChip>
             ))}
           </div>
         </section>
 
         {/* Partial Discount */}
-        <section className="rep__section">
+        <section className="rep__section rep__section--last">
           <div className="rep__section-title-row">
-            <div className="rep__section-title">Partial Discount</div>
-            <button
-              className={`rep__feature-toggle${form.discountEnabled ? ' rep__feature-toggle--on' : ''}`}
-              onClick={toggleDiscount}
-            >
-              {form.discountEnabled ? 'On' : 'Off'}
-            </button>
+            <div>
+              <h3 className="rep__section-title">Partial discount</h3>
+              <p className="rep__hint rep__hint--flush">Adds an “X% OFF” tag to this reward. Off by default.</p>
+            </div>
+            <Switch
+              checked={!!form.discountEnabled}
+              onChange={() => toggleDiscount()}
+              label="Partial discount"
+            />
           </div>
-          <p className="rep__field-hint">Adds a "X% OFF" tag to this reward. Off by default.</p>
           {form.discountEnabled && (
             <div className="rep__discount-row">
-              <input
-                type="number"
-                min="1"
-                max="99"
-                className="rep__input rep__input--sm"
-                style={{ width: 72 }}
-                value={form.discountPercent || 10}
-                onChange={e => updateDiscountPct(Math.min(99, Math.max(1, parseInt(e.target.value) || 10)))}
-              />
-              <span className="rep__discount-label">% off — tag: <strong>{form.discountPercent || 10}% OFF</strong></span>
+              <span className="ui-input-affix rep__discount-input">
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  className="ui-input"
+                  aria-label="Discount percentage"
+                  value={form.discountPercent || 10}
+                  onChange={e => updateDiscountPct(Math.min(99, Math.max(1, parseInt(e.target.value) || 10)))}
+                />
+                <span className="ui-input-affix__suffix">%</span>
+              </span>
+              <span className="rep__discount-label">
+                Customers see the tag <span className="rep__tag-chip rep__tag-chip--static">{form.discountPercent || 10}% OFF</span>
+              </span>
             </div>
           )}
         </section>
@@ -719,20 +748,21 @@ export default function RewardEditPanel({ reward, onChange, onSetFeatured, onArc
         <>
         {/* Allergy info */}
         <section className="rep__section rep__section--last">
-          <div className="rep__section-title">Allergen Info</div>
-          <div className="rep__field">
+          <h3 className="rep__section-title">Allergen info</h3>
+          <Field htmlFor="rep-allergy" hint="Shown to customers on the reward’s detail sheet.">
             <textarea
-              className="rep__textarea"
-              rows={2}
+              id="rep-allergy"
+              className="ui-textarea"
+              rows={3}
               value={form.allergyInfo || ''}
               onChange={e => update('allergyInfo', e.target.value)}
               placeholder="Contains: Gluten (wheat), Eggs…"
             />
-          </div>
+          </Field>
         </section>
         </>
        )}
-      </div>
+      </fieldset>
     </div>
   );
 }
@@ -776,12 +806,10 @@ function RewardEconomicsPanel({ form, cashbackRate }) {
     <div className={`rep-econ rep-econ--${tone}`}>
       <div className="rep-econ__head">
         <span className="rep-econ__title">Reward economics</span>
-        <span className={`rep-econ__badge rep-econ__badge--${tone}`}>
-          {tone === 'unset' && 'Add a price to see the gap'}
-          {tone === 'ok'    && '✓ Fully funded'}
-          {tone === 'under' && `⚠ Underfunded by ${money(gap)}`}
-          {tone === 'over'  && `Over-funded by ${money(Math.abs(gap))}`}
-        </span>
+        {tone === 'unset' && <Badge tone="neutral">Add a price to see the gap</Badge>}
+        {tone === 'ok'    && <Badge tone="success" icon={Check}>Fully funded</Badge>}
+        {tone === 'under' && <Badge tone="warning" icon={AlertTriangle}>Underfunded by {money(gap)}</Badge>}
+        {tone === 'over'  && <Badge tone="primary">Over-funded by {money(Math.abs(gap))}</Badge>}
       </div>
 
       <div className="rep-econ__grid">

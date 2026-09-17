@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, Check, CheckCircle2, Download, Inbox, LayoutGrid, QrCode, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { toPng } from 'html-to-image';
 import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT, getLocations } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import RewardsReceiptGenerator from '../cupqr/RewardsReceiptGenerator';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Field, PageHeader, Segmented } from '../ui';
 import './AdminByoRequests.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -28,6 +30,8 @@ const STATUSES = [
   { key: 'denied',   label: 'Denied' },
   { key: 'all',      label: 'All' },
 ];
+
+const STATUS_TONE = { pending: 'warning', approved: 'success', denied: 'neutral' };
 
 function fmtWhen(iso) {
   if (!iso) return '—';
@@ -239,223 +243,247 @@ export default function AdminByoRequests() {
     }
   }
 
+  const statusLabel = (st) => (st ? st.charAt(0).toUpperCase() + st.slice(1) : '');
+
   return (
-    <div className="byoreq">
-      <header className="byoreq__head">
-        <div>
-          <h1 className="byoreq__title">BYO cup requests</h1>
-          <p className="byoreq__sub">
-            Customers auto-collect up to {cap} {cap === 1 ? 'cup' : 'cups'} per 24&nbsp;hours at this store.
-            Any extra scan in that window lands here for review — approve to credit the cup, or deny.
-          </p>
-        </div>
-      </header>
+    <div className="ui-page byoreq">
+      <PageHeader
+        title="BYO QR codes"
+        subtitle={`The counter QR code customers scan with their own cup. Each customer collects up to ${cap} ${cap === 1 ? 'cup' : 'cups'} per 24 hours automatically; extra scans wait below for you to approve or deny.`}
+      />
 
       {/* Stationary counter QR — branded + per location */}
-      <section className="byoreq__qr-card">
-        <div className="byoreq__qr-left">
-          {/* Branded, downloadable QR poster. This exact node is what's exported. */}
-          <div className="byoreq__qr-brand" ref={qrCardRef}>
-            <div className="byoreq__qr-brand-head">
-              <img
-                className="byoreq__qr-logo"
-                src={activeOrg?.logo_url || packbackLogo}
-                alt=""
-                crossOrigin="anonymous"
-                onError={(e) => { e.currentTarget.src = packbackLogo; }}
-              />
+      <Card>
+        <CardHeader
+          title="Counter QR code"
+          icon={QrCode}
+          subtitle="Print it and stand it on the counter. Each scan adds one cup to the customer’s balance, and a cup earned at any location can be spent across your whole organisation."
+          ruled
+        />
+        <CardBody>
+          <div className="byoreq__qr">
+            <div className="byoreq__qr-left">
+              {/* Branded, downloadable QR poster. This exact node is what's
+                  exported, so it keeps its own colours. */}
+              <div className="byoreq__qr-stage">
+                <div className="byoreq__qr-brand" ref={qrCardRef}>
+                  <div className="byoreq__qr-brand-head">
+                    <img
+                      className="byoreq__qr-logo"
+                      src={activeOrg?.logo_url || packbackLogo}
+                      alt=""
+                      crossOrigin="anonymous"
+                      onError={(e) => { e.currentTarget.src = packbackLogo; }}
+                    />
+                  </div>
+
+                  {qrDataUrl
+                    ? <img className="byoreq__qr-img" src={qrDataUrl} alt="Counter QR" width="200" height="200" />
+                    : <div className="byoreq__qr-img byoreq__qr-img--placeholder" />}
+
+                  {/* Name + address on one line: bold venue name, then ", address". */}
+                  <div className="byoreq__qr-address">
+                    <span className="byoreq__qr-brand-name">{brandName}</span>
+                    {selectedLocation && addressLine(selectedLocation) ? <>, {addressLine(selectedLocation)}</> : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="byoreq__qr-downloads">
+                <Button
+                  icon={Download}
+                  onClick={handleDownload}
+                  disabled={!qrDataUrl || downloading}
+                >
+                  {downloading ? 'Preparing…' : 'Download PNG'}
+                </Button>
+                <Button
+                  icon={LayoutGrid}
+                  onClick={handleDownloadA4}
+                  disabled={!qrDataUrl || downloadingA4}
+                  title="An A4 sheet of 12 codes (3 × 4), each 6 cm — print and cut apart"
+                >
+                  {downloadingA4 ? 'Preparing…' : 'A4 sheet of 12'}
+                </Button>
+              </div>
             </div>
 
-            {qrDataUrl
-              ? <img className="byoreq__qr-img" src={qrDataUrl} alt="Counter QR" width="200" height="200" />
-              : <div className="byoreq__qr-img byoreq__qr-img--placeholder" />}
-
-            {/* Name + address on one line: bold venue name, then ", address". */}
-            <div className="byoreq__qr-address">
-              <span className="byoreq__qr-brand-name">{brandName}</span>
-              {selectedLocation && addressLine(selectedLocation) ? <>, {addressLine(selectedLocation)}</> : null}
-            </div>
-          </div>
-
-          <div className="byoreq__qr-downloads">
-            <button
-              type="button"
-              className="byoreq__qr-download"
-              onClick={handleDownload}
-              disabled={!qrDataUrl || downloading}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              {downloading ? 'Preparing…' : 'Download PNG'}
-            </button>
-            <button
-              type="button"
-              className="byoreq__qr-download byoreq__qr-download--a4"
-              onClick={handleDownloadA4}
-              disabled={!qrDataUrl || downloadingA4}
-              title="An A4 sheet of 12 codes (3 × 4), each 6 cm — print and cut apart"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="3" width="14" height="18" rx="2" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="9" y1="12" x2="15" y2="12" />
-              </svg>
-              {downloadingA4 ? 'Preparing…' : 'Download A4 (×12)'}
-            </button>
-          </div>
-        </div>
-
-        <div className="byoreq__qr-info">
-          <h3>Counter QR for this store</h3>
-          <p>Print this and stand it on the counter. Scanning it adds one cup to the customer’s balance — earned at any location, a cup is redeemable across your whole organisation.</p>
-
-          {/* Location picker — one counter QR per address. */}
-          <div className="byoreq__cap">
-            <label className="byoreq__cap-label" htmlFor="byo-loc">
-              Location
-              <span className="byoreq__cap-hint">
-                {locations.length
-                  ? 'Each location gets its own QR so scans are attributed to the right address.'
-                  : 'No locations yet — add them on the Organisation page. This QR works store-wide until then.'}
-              </span>
-            </label>
-            <div className="byoreq__cap-row">
-              <select
-                id="byo-loc"
-                className="byoreq__loc-select"
-                value={locId}
-                onChange={e => setLocId(e.target.value)}
-                disabled={!locations.length}
+            <div className="byoreq__qr-info">
+              {/* Location picker — one counter QR per address. */}
+              <Field
+                label="Location"
+                htmlFor="byo-loc"
+                hint={locations.length
+                  ? 'Each location has its own QR code, so scans count toward the right address.'
+                  : 'No locations yet. Add them under Settings → Locations; until then this QR code works for the whole store.'}
               >
-                <option value="">Whole store (no location)</option>
-                {locations.map(l => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}{l.city ? ` · ${l.city}` : ''}{l.status && l.status !== 'active' ? ' (inactive)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+                <select
+                  id="byo-loc"
+                  className="ui-select byoreq__loc-select"
+                  value={locId}
+                  onChange={e => setLocId(e.target.value)}
+                  disabled={!locations.length}
+                >
+                  <option value="">Whole store (no location)</option>
+                  {locations.map(l => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}{l.city ? ` · ${l.city}` : ''}{l.status && l.status !== 'active' ? ' (inactive)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-          {byoUrl
-            ? <code className="byoreq__qr-url">{byoUrl}</code>
-            : <span className="byoreq__muted">This store isn’t in a bring-your-own group yet.</span>}
+              <div className="ui-field">
+                <span className="ui-field__label">Link in the QR code</span>
+                {byoUrl
+                  ? <code className="byoreq__qr-url">{byoUrl}</code>
+                  : <span className="byoreq__muted">This store isn’t in a bring-your-own group yet.</span>}
+              </div>
 
-          {/* Per-store daily scan limit */}
-          <div className="byoreq__cap">
-            <label className="byoreq__cap-label" htmlFor="byo-cap">
-              Auto-credit limit
-              <span className="byoreq__cap-hint">Scans per customer per 24&nbsp;hours before extra scans need review.</span>
-            </label>
-            <div className="byoreq__cap-row">
-              <input
-                id="byo-cap"
-                className="byoreq__cap-input"
-                type="number" min="1" max="50" step="1"
-                value={capInput}
-                onChange={e => setCapInput(e.target.value)}
-                disabled={!activeOrgId || savingCap}
-              />
-              <button
-                type="button"
-                className="byoreq__cap-save"
-                onClick={handleSaveCap}
-                disabled={!activeOrgId || savingCap || capInput === String(cap)}
+              <div className="byoreq__divider" />
+
+              {/* Per-store daily scan limit */}
+              <Field
+                label="Automatic cups per day"
+                htmlFor="byo-cap"
+                hint="How many scans each customer gets credited per 24 hours before extra scans need your review."
               >
-                {savingCap ? 'Saving…' : 'Save limit'}
-              </button>
-              {capMsg && <span className="byoreq__cap-msg">{capMsg}</span>}
+                <div className="byoreq__cap-row">
+                  <input
+                    id="byo-cap"
+                    className="ui-input byoreq__cap-input"
+                    type="number" min="1" max="50" step="1"
+                    value={capInput}
+                    onChange={e => setCapInput(e.target.value)}
+                    disabled={!activeOrgId || savingCap}
+                  />
+                  <Button
+                    variant="primary"
+                    onClick={handleSaveCap}
+                    disabled={!activeOrgId || savingCap || capInput === String(cap)}
+                  >
+                    {savingCap ? 'Saving…' : 'Save limit'}
+                  </Button>
+                  {capMsg && (
+                    <span className={`byoreq__cap-msg${capMsg === 'Saved' ? '' : ' byoreq__cap-msg--err'}`} role="status">
+                      {capMsg === 'Saved' && <Check size={14} aria-hidden="true" />}
+                      {capMsg}
+                    </span>
+                  )}
+                </div>
+              </Field>
             </div>
           </div>
-        </div>
-      </section>
+        </CardBody>
+      </Card>
 
-      <div className="byoreq__tabs">
-        {STATUSES.map(s => (
-          <button
-            key={s.key}
-            className={`byoreq__tab ${status === s.key ? 'byoreq__tab--on' : ''}`}
-            onClick={() => setStatus(s.key)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      {/* Review queue */}
+      <Card>
+        <CardHeader
+          title="Cup requests"
+          icon={Inbox}
+          subtitle="Scans over the daily limit. Approve to credit the cup, or deny."
+          ruled
+          actions={(
+            <Segmented
+              ariaLabel="Filter requests"
+              value={status}
+              onChange={setStatus}
+              options={STATUSES.map(s => ({ id: s.key, label: s.label }))}
+            />
+          )}
+        />
+        <CardBody flush>
+          {(error || notice) && (
+            <div className="byoreq__messages">
+              {error && (
+                <p className="byoreq__msg byoreq__msg--err" role="alert">
+                  <AlertCircle size={15} aria-hidden="true" />{error}
+                </p>
+              )}
+              {notice && (
+                <p className="byoreq__msg byoreq__msg--ok" role="status">
+                  <CheckCircle2 size={15} aria-hidden="true" />{notice}
+                </p>
+              )}
+            </div>
+          )}
 
-      {error && <div className="byoreq__error">{error}</div>}
-      {notice && <div className="byoreq__notice">{notice}</div>}
-
-      {loading ? (
-        <div className="byoreq__skeleton">Loading…</div>
-      ) : rows.length === 0 ? (
-        <div className="byoreq__empty">
-          <h3>{status === 'pending' ? 'No pending requests' : 'Nothing here'}</h3>
-          <p>
-            {status === 'pending'
-              ? 'When a customer goes over the auto-credit cap, their extra cup appears here for review.'
-              : 'No requests with this status.'}
-          </p>
-        </div>
-      ) : (
-        <div className="byoreq__table-wrap">
-          <table className="byoreq__table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Cups</th>
-                <th>Requested</th>
-                <th>Status</th>
-                <th className="byoreq__th-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.id}>
-                  <td>
-                    <div className="byoreq__cust">{r.userName || 'Anonymous'}</div>
-                    {r.userEmail && <div className="byoreq__cust-sub">{r.userEmail}</div>}
-                  </td>
-                  <td>{r.cups}</td>
-                  <td className="byoreq__when">{fmtWhen(r.created_at)}</td>
-                  <td>
-                    <span className={`byoreq__pill byoreq__pill--${r.status}`}>{r.status}</span>
-                    {r.status !== 'pending' && r.decided_at && (
-                      <div className="byoreq__cust-sub">{fmtWhen(r.decided_at)}</div>
-                    )}
-                  </td>
-                  <td onClick={e => e.stopPropagation()}>
-                    {r.status === 'pending' ? (
-                      <div className="byoreq__actions">
-                        <button
-                          className="byoreq__btn byoreq__btn--approve"
-                          disabled={busyId === r.id}
-                          onClick={() => decide(r.id, 'approve')}
-                        >
-                          {busyId === r.id ? '…' : 'Approve'}
-                        </button>
-                        <button
-                          className="byoreq__btn byoreq__btn--deny"
-                          disabled={busyId === r.id}
-                          onClick={() => decide(r.id, 'deny')}
-                        >
-                          Deny
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="byoreq__muted">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+          {loading ? (
+            <p className="byoreq__loading">Loading…</p>
+          ) : rows.length === 0 ? (
+            <EmptyState icon={Inbox} title={status === 'pending' ? 'No pending requests' : 'Nothing here'}>
+              {status === 'pending'
+                ? 'When a customer goes over the daily limit, their extra cup appears here for review.'
+                : 'No requests with this status.'}
+            </EmptyState>
+          ) : (
+            <div className="byoreq__table-wrap">
+              <table className="ui-table byoreq__table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th className="ui-num">Cups</th>
+                    <th>Requested</th>
+                    <th>Status</th>
+                    <th className="byoreq__th-actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.id}>
+                      <td>
+                        <div className="byoreq__cust">{r.userName || 'Anonymous'}</div>
+                        {r.userEmail && <div className="byoreq__cust-sub">{r.userEmail}</div>}
+                      </td>
+                      <td className="ui-num">{r.cups}</td>
+                      <td className="byoreq__when">{fmtWhen(r.created_at)}</td>
+                      <td>
+                        <Badge tone={STATUS_TONE[r.status] || 'neutral'}>{statusLabel(r.status)}</Badge>
+                        {r.status !== 'pending' && r.decided_at && (
+                          <div className="byoreq__cust-sub">{fmtWhen(r.decided_at)}</div>
+                        )}
+                      </td>
+                      <td onClick={e => e.stopPropagation()}>
+                        {r.status === 'pending' ? (
+                          <div className="byoreq__actions">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              icon={Check}
+                              disabled={busyId === r.id}
+                              onClick={() => decide(r.id, 'approve')}
+                            >
+                              {busyId === r.id ? '…' : 'Approve'}
+                            </Button>
+                            <Button
+                              variant="danger-ghost"
+                              size="sm"
+                              icon={X}
+                              disabled={busyId === r.id}
+                              onClick={() => decide(r.id, 'deny')}
+                            >
+                              Deny
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="byoreq__muted byoreq__none">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       {/* ── Rewards receipt generator ── */}
-      <section className="byoreq__generator">
+      <section className="byoreq__generator" aria-labelledby="byoreq-generator-title">
         <div className="byoreq__generator-head">
-          <h2 className="byoreq__generator-title">Rewards receipt generator</h2>
-          <p className="byoreq__generator-sub">Mint a test reward receipt for this store — same tool as the main dashboard.</p>
+          <h2 className="byoreq__generator-title" id="byoreq-generator-title">Test reward receipts</h2>
+          <p className="byoreq__generator-sub">Make a test purchase receipt for this store. Same tool as Receipt generator.</p>
         </div>
         <RewardsReceiptGenerator />
       </section>

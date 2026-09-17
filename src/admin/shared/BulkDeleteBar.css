@@ -1,46 +1,51 @@
+/* Floating bulk-action bar. Tokens: ui/ui.css. */
 .bulkbar {
   position: sticky;
   bottom: 16px;
   z-index: 20;
-  margin: 16px auto 0;
   display: flex;
-  align-items: center;
-  gap: 14px;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
   width: fit-content;
   max-width: 100%;
-  padding: 10px 16px;
-  background: #1A1A1A;
-  color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  margin: 16px auto 0;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow-lg), var(--ui-shadow-sm);
+  font-family: var(--ui-font);
+  color: var(--ui-fg);
+  animation: bulkbar-in 0.18s var(--ui-ease) both;
 }
-.bulkbar__left { display: flex; align-items: center; gap: 8px; }
-.bulkbar__icon { font-size: 16px; line-height: 1; }
-.bulkbar__count { font-size: 13px; font-weight: 700; }
-.bulkbar__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.bulkbar__warn { font-size: 12px; color: #FCA5A5; margin-right: 2px; }
-.bulkbar__ghost {
-  padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3);
-  background: transparent; color: #fff; font-family: inherit; font-size: 12px;
-  font-weight: 600; cursor: pointer;
+@keyframes bulkbar-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
-.bulkbar__ghost:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
-.bulkbar__danger {
-  padding: 7px 14px; border-radius: 8px; border: none;
-  background: #DC2626; color: #fff; font-family: inherit; font-size: 12px;
-  font-weight: 700; cursor: pointer; white-space: nowrap;
+.bulkbar--confirm { border-color: #F7D9E1; }
+.bulkbar__left { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.bulkbar__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
 }
-.bulkbar__danger:hover:not(:disabled) { background: #B42318; }
-.bulkbar__primary {
-  padding: 7px 14px; border-radius: 8px; border: none;
-  background: var(--pb-purple-600); color: #fff; font-family: inherit; font-size: 12px;
-  font-weight: 700; cursor: pointer; white-space: nowrap;
-}
-.bulkbar__primary:hover:not(:disabled) { background: #472C8F; }
-.bulkbar__danger:disabled, .bulkbar__ghost:disabled, .bulkbar__primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.bulkbar__error { font-size: 12px; color: #FCA5A5; width: 100%; }
+.bulkbar--confirm .bulkbar__icon { background: var(--ui-danger-soft); color: var(--ui-danger); }
+.bulkbar__count { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.bulkbar__warn { font-size: 13px; font-weight: 600; color: var(--ui-fg-2); }
+.bulkbar__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bulkbar__delete { border: 1px solid #F3C9D3; }
+.bulkbar__error { width: 100%; padding: 0 4px 2px; font-size: 12px; color: var(--ui-danger); }
 
 /* Shared checkbox-cell sizing for the select column. */
-.bulk-check-cell { width: 36px; text-align: center; }
-.bulk-check-cell input { cursor: pointer; width: 15px; height: 15px; }
+.bulk-check-cell { width: 40px; text-align: center; }
+.bulk-check-cell input { width: 15px; height: 15px; margin: 0; vertical-align: middle; accent-color: var(--ui-primary, #5B3FD6); cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bulkbar { animation: none; }
+}

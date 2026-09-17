@@ -1,43 +1,51 @@
-/* AdminSmartBins — same visual language as Backup Cups / Future Vendors. */
-.asb { padding: 28px 32px 60px; max-width: 1040px; }
+/* Smart bins — the venue list behind the Deferred Tikkie home map.
+ * Shared pieces live in ui/ui.css. */
 
-.asb__head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-  margin-bottom: 20px;
-}
-.asb__title { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: #1F1B16; }
-.asb__sub { margin: 0; font-size: 13px; line-height: 1.55; color: #7A7166; max-width: 640px; }
+.ui-kpis.asb__kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.asb__kpis .ui-kpi { min-height: 0; }
+@media (max-width: 760px) { .ui-kpis.asb__kpis { grid-template-columns: minmax(0, 1fr); } }
 
 .asb__error {
-  margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
-  background: #FBEAE5; color: #A03A22; font-size: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid #F7D9E1;
+  background: #FDF0F3;
+  color: var(--ui-danger);
+  font-size: 13px;
 }
+.asb__error svg { flex: none; margin-top: 1px; }
 
-.asb__stats {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px; margin-bottom: 16px;
-}
-.asb__stat { background: #fff; border: 1px solid #EDE6D8; border-radius: 12px; padding: 14px 16px; }
-.asb__stat-n { display: block; font-size: 21px; font-weight: 800; color: #1F1B16; font-variant-numeric: tabular-nums; }
-.asb__stat-l {
-  margin-top: 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
-  text-transform: uppercase; color: #9A9186;
-}
-
-.asb__card {
-  background: #fff; border: 1px solid #EDE6D8; border-radius: 14px;
-  padding: 20px 22px; margin-bottom: 16px;
-}
-.asb__card-title { margin: 0 0 12px; font-size: 15.5px; font-weight: 800; color: #1F1B16; }
 .asb__count {
-  margin-left: 6px; padding: 1px 8px; border-radius: 999px;
-  background: #F3EEE4; color: #7A7166; font-size: 12px; font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--ui-soft-2);
+  color: var(--ui-muted);
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
+/* Map preview. Its own stacking context keeps Leaflet's controls
+   (z-index 1000) under the dashboard's top bar and dialogs. */
 .asb__map {
-  height: 320px; border-radius: 12px; overflow: hidden;
-  border: 1px solid #EDE6D8; background: #EAE6DB;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  height: 340px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-soft);
 }
+/* The pins mirror the customer map, so they keep its colours. */
 .asb__pin { background: none; border: none; }
 .asb__pin-dot {
   width: 28px; height: 28px; border-radius: 50%;
@@ -48,108 +56,105 @@
 }
 .asb__pin-dot--soon { background: #C98A12; }
 
-.asb__listhead {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  margin-bottom: 12px;
-}
+/* Search in the card header */
 .asb__search {
-  display: inline-flex; align-items: center; gap: 8px;
-  border: 1.5px solid #E2DACA; border-radius: 999px; padding: 7px 14px;
-  color: #9A9186;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 220px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-card);
+  color: var(--ui-muted-2);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.asb__search svg { width: 14px; height: 14px; flex-shrink: 0; }
+.asb__search:focus-within { border-color: rgba(91, 63, 214, 0.55); box-shadow: 0 0 0 3px var(--ui-ring); }
 .asb__search input {
-  border: none; outline: none; background: none;
-  font-family: inherit; font-size: 13px; color: #1F1B16; width: 180px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ui-fg);
+  font: 400 13px/1 var(--ui-font);
+}
+.asb__search-clear {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ui-soft);
+  color: var(--ui-muted);
+  cursor: pointer;
 }
 
-.asb__empty { padding: 22px 4px; font-size: 13px; color: #8A8175; }
+.asb__loading { margin: 0; padding: 22px 20px; font-size: 13px; color: var(--ui-muted); }
 
+/* Location rows */
 .asb__list { list-style: none; margin: 0; padding: 0; }
 .asb__row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 11px 4px; border-bottom: 1px solid #F5F0E6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--ui-border);
+  transition: background-color 0.12s;
 }
-.asb__row:last-child { border-bottom: none; }
-.asb__row--off { opacity: 0.55; }
+.asb__row:last-child { border-bottom: 0; }
+.asb__row:hover { background: #FBFAFD; }
+.asb__row--off > :not(.asb__rowactions) { opacity: 0.55; }
 .asb__rowpin {
-  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: #E4F5E9; color: #1A8737; font-size: 14px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
 }
-.asb__rowpin--soon { background: #FCF2D6; color: #9A6E12; }
-.asb__rowinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.asb__rowname { font-size: 13.5px; font-weight: 700; color: #1F1B16; }
+.asb__rowinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.asb__rowname { font-size: 13.5px; font-weight: 600; color: var(--ui-fg); }
 .asb__rowmeta {
-  font-size: 12px; color: #9A9186;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--ui-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.asb__warn { color: #C4472B; font-weight: 700; }
-.asb__mono { font-family: ui-monospace, monospace; font-size: 11px; }
+.asb__warn { color: var(--ui-warning); font-weight: 600; }
+.asb__mono { font-family: var(--ui-mono); font-size: 11.5px; }
+.asb__rowactions { flex: none; display: flex; gap: 4px; }
 
-.asb__badge {
-  flex-shrink: 0; padding: 3px 10px; border-radius: 999px;
-  font-size: 11px; font-weight: 800;
-}
-.asb__badge--live { background: #E4F5E9; color: #1A8737; }
-.asb__badge--soon { background: #FCF2D6; color: #9A6E12; }
-.asb__badge--off  { background: #F1EBDF; color: #8A8175; }
-
-.asb__rowactions { display: flex; gap: 6px; flex-shrink: 0; }
-.asb__iconbtn {
-  width: 30px; height: 30px; border-radius: 8px;
-  border: 1px solid #EDE6D8; background: #fff; color: #6C6259;
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-}
-.asb__iconbtn svg { width: 15px; height: 15px; }
-.asb__iconbtn:hover { background: #F7F3E9; }
-.asb__iconbtn--del:hover { background: #FBEAE5; color: #C4472B; border-color: #F0D6CE; }
-
-.asb__btn {
-  padding: 9px 18px; border-radius: 999px; border: 1.5px solid #E2DACA;
-  background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700;
-  color: #4A443C; cursor: pointer; white-space: nowrap;
-}
-.asb__btn:hover { background: #F7F3E9; }
-.asb__btn:disabled { opacity: 0.6; cursor: default; }
-.asb__btn--primary { background: #1A8737; border-color: #1A8737; color: #fff; }
-.asb__btn--primary:hover { background: #15702D; }
-.asb__btn--danger { background: #C4472B; border-color: #C4472B; color: #fff; }
-.asb__btn--danger:hover { background: #A83B22; }
-
-/* Editor sheet */
-.asb__modal { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.asb__modal-back { position: absolute; inset: 0; background: rgba(31, 27, 22, 0.45); }
-.asb__modal-card {
-  position: relative; width: 100%; max-width: 520px;
-  background: #fff; border-radius: 16px; padding: 24px 26px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
-  max-height: 90vh; overflow-y: auto;
-}
-.asb__modal-card--sm { max-width: 420px; }
-.asb__modal-title { margin: 0 0 14px; font-size: 17px; font-weight: 800; color: #1F1B16; }
-.asb__modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-
-.asb__field { display: block; margin-bottom: 12px; }
-.asb__field > span {
-  display: block; margin-bottom: 5px;
-  font-size: 11.5px; font-weight: 800; letter-spacing: 0.03em;
-  text-transform: uppercase; color: #9A9186;
-}
-.asb__field > span em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 600; }
-.asb__field input, .asb__field select {
-  width: 100%; padding: 10px 12px;
-  border: 1.5px solid #E2DACA; border-radius: 9px;
-  font-family: inherit; font-size: 13.5px; color: #1F1B16; background: #fff;
-}
-.asb__field input:focus, .asb__field select:focus { outline: none; border-color: #1A8737; }
+/* Editor dialog */
+.asb__modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ui-fg-2); }
+.asb__optional { margin-left: 4px; font-size: 11.5px; font-weight: 500; color: var(--ui-muted-2); }
+.ui-input.asb__mono-input { font-family: var(--ui-mono); font-size: 12.5px; }
 .asb__field-row { display: flex; gap: 8px; }
-.asb__field-row input { flex: 1; }
-.asb__field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.asb__hint { margin: 4px 0 12px; font-size: 12px; line-height: 1.5; color: #9A9186; }
-.asb__hint--warn { color: #C4472B; }
-.asb__check {
-  display: flex; align-items: center; gap: 9px; margin: 4px 0 0;
-  font-size: 13px; color: #4A443C; cursor: pointer;
+.asb__field-row .ui-input { flex: 1; min-width: 0; }
+.asb__field-row .ui-btn { height: 38px; }
+.asb__field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 520px) {
+  .asb__field-grid { grid-template-columns: minmax(0, 1fr); }
+  .asb__field-row { flex-direction: column; }
 }
-.asb__check input { accent-color: #1A8737; }
+.asb__hint { margin: -4px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ui-muted); }
+.ui-field .asb__hint { margin: 0; }
+.asb__hint--warn { color: var(--ui-danger); }
+.asb__hint--ok { color: var(--ui-success); }
+.asb__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  font-size: 13px;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+.asb__check input { width: 16px; height: 16px; margin: 0; accent-color: var(--ui-primary); }
+
+@media (max-width: 720px) {
+  .asb__search { width: 100%; }
+}

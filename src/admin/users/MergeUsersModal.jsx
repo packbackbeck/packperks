@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { GitMerge, TriangleAlert } from 'lucide-react';
 import { mergeUsers, mergeGroupAccounts } from '../lib/adminApi';
 import { logAction } from '../auth/actionLog';
+import { Button, Modal } from '../ui';
 import './MergeUsersModal.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -55,13 +57,6 @@ export default function MergeUsersModal({ open, users, onClose, onMerged, groupe
     }
   }, [open, initialSurvivor]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, busy, onClose]);
-
   if (!open || !users?.length) return null;
 
   const survivor = users.find(u => u.id === survivorId) || users[0];
@@ -103,98 +98,96 @@ export default function MergeUsersModal({ open, users, onClose, onMerged, groupe
     }
   }
 
+  // Escape, the scrim and the close button are ignored while a merge runs.
+  const requestClose = () => { if (!busy) onClose(); };
+
   return (
-    <div className="mum-overlay" onClick={busy ? undefined : onClose} role="presentation">
-      <div className="mum" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="mum-title">
-        <div className="mum__head">
-          <div>
-            <h2 className="mum__title" id="mum-title">Merge {users.length} accounts</h2>
-            <p className="mum__sub">
-              Fold every cup balance into one survivor. The other accounts are kept
-              for audit, marked as merged, and won't be hit by future reads.
-            </p>
-          </div>
-          <button className="mum__close" onClick={onClose} disabled={busy} aria-label="Close">✕</button>
+    <Modal
+      open
+      onClose={requestClose}
+      title={`Merge ${users.length} accounts`}
+      subtitle="Fold every cup balance into one account. The other accounts are kept for the audit trail, marked as merged, and left out of everything from now on."
+      icon={GitMerge}
+      footer={!confirming ? (
+        <>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button
+            variant="primary"
+            onClick={() => setConfirming(true)}
+            disabled={busy || crossOrg || users.length < 2}
+          >
+            Continue
+          </Button>
+        </>
+      ) : (
+        <>
+          <p className="mum__confirm-text">
+            <TriangleAlert size={15} aria-hidden="true" />
+            <span>
+              Merge {absorbed.length} account{absorbed.length === 1 ? '' : 's'} into <strong>{survivor.display_name || survivor.id.slice(0, 8)}</strong>?
+              Cup totals will be combined ({absorbed.reduce((s, a) => s + (a.cupBalance || 0), 0)} cups absorbed).
+              The other accounts will be kept for audit.
+            </span>
+          </p>
+          <Button variant="outline" onClick={() => setConfirming(false)} disabled={busy}>Back</Button>
+          <Button variant="danger" icon={GitMerge} onClick={handleMerge} disabled={busy}>
+            {busy ? 'Merging…' : `Merge ${users.length} accounts`}
+          </Button>
+        </>
+      )}
+    >
+      {crossOrg && (
+        <div className="mum__error" role="alert">
+          These accounts belong to different organisations. Cross-org merges are not allowed.
         </div>
+      )}
 
-        {crossOrg && (
-          <div className="mum__error">
-            These accounts belong to different organisations. Cross-org merges are not allowed.
-          </div>
-        )}
+      <div className="mum__summary">
+        <div><span>Total cups</span><strong>{totalBalance}</strong></div>
+        <div><span>Total lifetime</span><strong>{totalLifetime}</strong></div>
+        <div><span>Accounts</span><strong>{users.length}</strong></div>
+      </div>
 
-        <div className="mum__summary">
-          <div><span>Total cups</span><strong>{totalBalance}</strong></div>
-          <div><span>Total lifetime</span><strong>{totalLifetime}</strong></div>
-          <div><span>Accounts</span><strong>{users.length}</strong></div>
-        </div>
-
+      <div>
         <p className="mum__section-title">Which account should survive?</p>
         <p className="mum__hint">
           The survivor keeps the merged balance. Profile fields (name, email, …)
           default to the most-recently-updated non-empty value across all selected accounts.
         </p>
-
-        <ul className="mum__list" role="radiogroup" aria-label="Choose the survivor">
-          {users.map(u => {
-            const selected = u.id === survivor.id;
-            return (
-              <li key={u.id}>
-                <label className={`mum__row${selected ? ' is-selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="mum-survivor"
-                    checked={selected}
-                    onChange={() => setSurvivorId(u.id)}
-                    disabled={busy || crossOrg}
-                  />
-                  <div className="mum__row-main">
-                    <div className="mum__row-name">{u.display_name || '(Unnamed)'} <span className="mum__row-id">· {u.id.slice(0, 8)}</span></div>
-                    <div className="mum__row-meta">
-                      <span>{u.email || 'no email'}</span>
-                      <span>·</span>
-                      <span>{u.device || 'no device'}</span>
-                    </div>
-                  </div>
-                  <div className="mum__row-stats">
-                    <div><strong>{u.cupBalance || 0}</strong> cups</div>
-                    <div className="mum__row-dim">Joined {fmtDate(u.created_at)} · seen {timeAgo(u.updated_at)}</div>
-                  </div>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-
-        {error && <div className="mum__error">{error}</div>}
-
-        <div className="mum__foot">
-          {!confirming ? (
-            <>
-              <button className="mum__ghost" onClick={onClose} disabled={busy}>Cancel</button>
-              <button
-                className="mum__primary"
-                onClick={() => setConfirming(true)}
-                disabled={busy || crossOrg || users.length < 2}
-              >
-                Continue
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="mum__confirm-text">
-                Merge {absorbed.length} account{absorbed.length === 1 ? '' : 's'} into <strong>{survivor.display_name || survivor.id.slice(0, 8)}</strong>?
-                Cup totals will be combined ({absorbed.reduce((s, a) => s + (a.cupBalance || 0), 0)} cups absorbed).
-                The other accounts will be kept for audit.
-              </p>
-              <button className="mum__ghost" onClick={() => setConfirming(false)} disabled={busy}>Back</button>
-              <button className="mum__primary mum__primary--strong" onClick={handleMerge} disabled={busy}>
-                {busy ? 'Merging…' : `Merge ${users.length} accounts`}
-              </button>
-            </>
-          )}
-        </div>
       </div>
-    </div>
+
+      <ul className="mum__list" role="radiogroup" aria-label="Choose the survivor">
+        {users.map(u => {
+          const selected = u.id === survivor.id;
+          return (
+            <li key={u.id}>
+              <label className={`mum__row${selected ? ' is-selected' : ''}`}>
+                <input
+                  type="radio"
+                  name="mum-survivor"
+                  checked={selected}
+                  onChange={() => setSurvivorId(u.id)}
+                  disabled={busy || crossOrg}
+                />
+                <div className="mum__row-main">
+                  <div className="mum__row-name">{u.display_name || '(Unnamed)'} <span className="mum__row-id">· {u.id.slice(0, 8)}</span></div>
+                  <div className="mum__row-meta">
+                    <span>{u.email || 'no email'}</span>
+                    <span>·</span>
+                    <span>{u.device || 'no device'}</span>
+                  </div>
+                </div>
+                <div className="mum__row-stats">
+                  <div><strong>{u.cupBalance || 0}</strong> cups</div>
+                  <div className="mum__row-dim">Joined {fmtDate(u.created_at)} · seen {timeAgo(u.updated_at)}</div>
+                </div>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+
+      {error && <div className="mum__error" role="alert">{error}</div>}
+    </Modal>
   );
 }

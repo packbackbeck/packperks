@@ -98,6 +98,9 @@ export function isPayoutActionable(claim) {
 /* Single-kind helper exported so the Claims table can render the
  * three pills as their own discrete columns instead of one combined
  * cluster. Each call returns just the pill markup for one kind. */
+/* Pill tones map onto the design system's badge tones (ui/ui.css). */
+const BADGE_TONE = { pass: 'success', warn: 'warning', fail: 'danger', muted: 'neutral' };
+
 export function ClaimStatusPill({ kind, claim }) {
   let key;
   let meta;
@@ -111,9 +114,9 @@ export function ClaimStatusPill({ kind, claim }) {
     key = derivePayout(claim);
     meta = PAYOUT[key];
   }
-  if (!meta) return <span className="csp__pill csp__pill--muted">—</span>;
+  if (!meta) return <span className="ui-badge ui-badge--neutral csp__pill csp__pill--muted">—</span>;
   return (
-    <span className={`csp__pill csp__pill--${meta.tone}`} title={`${kind}: ${key}`}>
+    <span className={`ui-badge ui-badge--${BADGE_TONE[meta.tone]} csp__pill csp__pill--${meta.tone}`} title={`${kind}: ${key}`}>
       {meta.label}
     </span>
   );
@@ -135,7 +138,7 @@ export default function ClaimStatusPills({ claim, verbose = false, className = '
       {items.map(it => (
         <div key={it.kind} className={`csp__col csp__col--${it.kind}`}>
           {verbose && <span className="csp__label">{it.label}</span>}
-          <span className={`csp__pill csp__pill--${it.meta.tone}`}>
+          <span className={`ui-badge ui-badge--${BADGE_TONE[it.meta.tone]} csp__pill csp__pill--${it.meta.tone}`}>
             {it.meta.label}
           </span>
         </div>

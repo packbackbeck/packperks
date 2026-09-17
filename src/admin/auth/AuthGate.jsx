@@ -4,7 +4,10 @@ import LoginPage from './LoginPage';
 import ResetPasswordPage from './ResetPasswordPage';
 import ProfileSetup from './ProfileSetup';
 import WelcomeSplash from './WelcomeSplash';
-import Spinner from '../lib/Spinner';
+import './AuthGate.css';
+
+// Files in public/ are served from the site root, not imported.
+const packperksMark = '/favicon.svg';
 
 /* AuthGate — the single decision point in front of the admin app.
  *
@@ -42,12 +45,10 @@ export default function AuthGate({ children }) {
 
   if (status === 'loading') {
     return (
-      <div style={{
-        position: 'fixed', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#FFF8F4', zIndex: 100,
-      }}>
-        <Spinner label="Loading admin console…" />
+      <div className="ag-loading" role="status" aria-live="polite">
+        <img src={packperksMark} alt="" className="ag-loading__mark" />
+        <span className="ag-loading__bar" aria-hidden="true"><span /></span>
+        <span className="ag-loading__label">Opening the dashboard…</span>
       </div>
     );
   }

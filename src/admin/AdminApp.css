@@ -18,34 +18,39 @@ body:has(.admin-app) {
 }
 
 .admin-app {
-  /* PackBack brand palette
-   *   --pb-purple    var(--pb-purple-600)  Primary brand (Publish, links, accents)
-   *   --pb-orange    var(--pb-orange-warm)  Action / CTA (Approve, badges, BK-aligned)
-   *   --pb-cream     #ECE5D8  Soft background, hover surfaces, dividers
-   * Plus pragmatic derivatives (hover, soft, on-color) so components
-   * don't have to compute their own tints. */
-  --pb-purple:        var(--pb-purple-600);
-  --pb-purple-hover:  var(--pb-purple-700);
-  --pb-purple-soft:   rgba(83, 51, 165, 0.10);
-  --pb-orange:        var(--pb-orange-warm);
-  --pb-orange-hover:  #E55A30;
-  --pb-orange-soft:   rgba(253, 111, 70, 0.12);
-  --pb-cream:         #ECE5D8;
-  --pb-cream-soft:    #F4EFE5;
-  --pb-cream-deep:    #DCD3C1;
+  /* The old palette's names, pointed at the new one (ui/ui.css) so pages
+   * that still use them match the redesign: one violet for actions,
+   * violet-grey neutrals, green for success, rose for danger. */
+  --pb-purple-500:    #6A4FE6;
+  --pb-purple-600:    #5B3FD6;
+  --pb-purple-700:    #4C33BD;
+  --pb-purple:        #5B3FD6;
+  --pb-purple-hover:  #4C33BD;
+  --pb-purple-soft:   #EEEAFD;
+  --pb-orange-warm:   #5B3FD6;
+  --pb-orange:        #5B3FD6;
+  --pb-orange-hover:  #4C33BD;
+  --pb-orange-soft:   #EEEAFD;
+  --pb-red:           #D92D55;
+  --pb-brown:         #17151F;
+  --pb-cream:         #E7E5EE;
+  --pb-cream-soft:    #F2F1F7;
+  --pb-cream-deep:    #D9D6E4;
+  --pb-green:         #0E9468;
+  --pb-green-100:     #E4F6EE;
+  --pb-green-light:   #E4F6EE;
+  --pb-green-500:     #0E9468;
+  --pb-green-600:     #0B7A56;
 
-  /* Legacy --bk-* aliases kept so existing rules still resolve, but
-   * they now point at the PackBack palette. Treat --bk-* as deprecated;
-   * use --pb-* in new styles. */
-  --bk-red:      var(--pb-orange);
-  --bk-yellow:   #FFC52F;
-  --bk-dark:     #1A1A1A;
-  --bk-bg:       #F8F4EC;
+  --bk-red:      #5B3FD6;
+  --bk-yellow:   #E8930C;
+  --bk-dark:     #17151F;
+  --bk-bg:       #F6F5FA;
   --bk-surface:  #FFFFFF;
-  --bk-border:   #E5DECF;
-  --bk-text:     #1A1A1A;
-  --bk-muted:    #7A7166;
-  --bk-success:  #16A34A;
+  --bk-border:   #E7E5EE;
+  --bk-text:     #17151F;
+  --bk-muted:    #676374;
+  --bk-success:  #0E9468;
   /* P-40: bumped from 220 → 240 so org names like "Burger King
    * Netherlands" don't truncate to "Burger King Netherlan…" in the
    * sidebar footer. Costs us 20px of content width per page, which is
@@ -104,7 +109,6 @@ body:has(.admin-app) {
 .admin-app .au-search-input:focus-visible,
 .admin-app .cs-search:focus-visible,
 .admin-app .acq-input:focus-visible,
-.admin-app .admin-publish-modal__input:focus-visible,
 .admin-app .sup-input:focus-visible {
   outline: none;
 }
@@ -116,19 +120,21 @@ body:has(.admin-app) {
   position: sticky; top: var(--topbar-h); z-index: 120;
   display: flex; align-items: center; gap: 10px;
   padding: 9px 22px;
-  background: #221D2E; color: #F3EFE7;
+  background: #1E1840; color: #EEEAFD;
+  font-family: var(--ui-font);
   font-size: 13px; line-height: 1.4;
-  border-bottom: 1px solid #16121F;
+  border-bottom: 1px solid #140F2E;
 }
 .vendor-preview-bar__dot {
   width: 7px; height: 7px; border-radius: 50%; flex: none;
-  background: #F0A93B; box-shadow: 0 0 0 3px rgba(240, 169, 59, 0.22);
+  background: #FFB688; box-shadow: 0 0 0 3px rgba(242, 100, 58, 0.3);
 }
 .vendor-preview-bar__text { flex: 1; min-width: 0; }
-.vendor-preview-bar__text strong { font-weight: 700; color: #F0A93B; }
+.vendor-preview-bar__text strong { font-weight: 700; color: #FFB688; }
 .vendor-preview-bar__exit {
-  flex: none; border: 1px solid rgba(243, 239, 231, 0.28); background: none;
-  color: #F3EFE7; font: inherit; font-weight: 600;
-  padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  flex: none; height: 30px; padding: 0 12px;
+  border: 1px solid rgba(238, 234, 253, 0.3); border-radius: 9px;
+  background: none; color: #FFFFFF;
+  font: inherit; font-weight: 600; cursor: pointer;
 }
-.vendor-preview-bar__exit:hover { background: rgba(243, 239, 231, 0.1); }
+.vendor-preview-bar__exit:hover { background: rgba(238, 234, 253, 0.12); }

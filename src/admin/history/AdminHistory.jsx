@@ -1,4 +1,6 @@
-import QuickLinks from '../shared/QuickLinks';
+import { useState } from 'react';
+import { History, RotateCcw } from 'lucide-react';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Modal, PageHeader } from '../ui';
 import './AdminHistory.css';
 import { adminMoney } from '../lib/adminMoney';
 
@@ -13,30 +15,31 @@ function formatDate(ts) {
 function timeAgo(ts) {
   if (!ts) return '';
   const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`;
+  const d = Math.floor(diff / 86400);
+  return `${d} day${d === 1 ? '' : 's'} ago`;
 }
 
 function buildChangeSummary(version, prevSnapshot) {
-  if (!prevSnapshot) return ['Initial publish'];
+  if (!prevSnapshot) return ['First publish'];
   const changes = [];
   const curr = version.snapshot;
   const prev = prevSnapshot;
 
   if (curr.settings && prev.settings) {
     if (curr.settings.cashbackRatePerCup !== prev.settings.cashbackRatePerCup) {
-      changes.push(`Cashback rate changed to ${adminMoney(curr.settings.cashbackRatePerCup)}/cup`);
+      changes.push(`Cashback rate changed to ${adminMoney(curr.settings.cashbackRatePerCup)} per cup`);
     }
     if (curr.settings.refundRatePerCup !== prev.settings.refundRatePerCup) {
-      changes.push(`Refund rate changed to ${adminMoney(curr.settings.refundRatePerCup)}/cup`);
+      changes.push(`Refund rate changed to ${adminMoney(curr.settings.refundRatePerCup)} per cup`);
     }
     if (curr.settings.heroHeadline !== prev.settings.heroHeadline) {
-      changes.push('Hero headline updated');
+      changes.push('Home page headline updated');
     }
     if (curr.settings.maintenanceMode !== prev.settings.maintenanceMode) {
-      changes.push(curr.settings.maintenanceMode ? 'Maintenance mode enabled' : 'Maintenance mode disabled');
+      changes.push(curr.settings.maintenanceMode ? 'Maintenance mode switched on' : 'Maintenance mode switched off');
     }
   }
 
@@ -54,101 +57,111 @@ function buildChangeSummary(version, prevSnapshot) {
     });
   }
 
-  return changes.length > 0 ? changes : ['Minor updates'];
+  return changes.length > 0 ? changes : ['Smaller changes'];
 }
 
-export default function AdminHistory({ draftState, onNavigate }) {
-  const { versions, restoreVersion, published } = draftState;
+export default function AdminHistory({ draftState }) {
+  const { versions, restoreVersion } = draftState;
+  const [confirming, setConfirming] = useState(null); // version id
 
-  if (versions.length === 0) {
-    return (
-      <div className="admin-history">
-        <div className="ah-header">
-          <h1 className="ah-header__title">History</h1>
-          <p className="ah-header__sub">No versions published yet. Hit Publish to create the first version.</p>
-        </div>
-        <div className="ah-empty">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
-            <polyline points="12 8 12 12 14 14"/>
-            <path d="M3.05 11a9 9 0 1.5-4.5"/>
-            <polyline points="3 3 3 9 9 9"/>
-          </svg>
-          <p>Your version history will appear here after your first Publish.</p>
-        </div>
-
-        <QuickLinks currentPage="history" onNavigate={onNavigate} />
-      </div>
-    );
-  }
+  const count = versions.length;
 
   return (
-    <div className="admin-history">
-      <div className="ah-header">
-        <div>
-          <h1 className="ah-header__title">Version History</h1>
-          <p className="ah-header__sub">{versions.length} published version{versions.length !== 1 ? 's' : ''}</p>
-        </div>
-      </div>
+    <div className="ui-page ah-page">
+      <PageHeader
+        title="Version history"
+        subtitle="Every time this venue’s settings and rewards were published, newest first. Restore a version to load it into your draft."
+      >
+        {count > 0 && <Badge tone="neutral">{count} published version{count !== 1 ? 's' : ''}</Badge>}
+      </PageHeader>
 
-      <div className="ah-timeline">
-        {versions.map((version, index) => {
-          const prevSnapshot = versions[index + 1]?.snapshot || null;
-          const changes = buildChangeSummary(version, prevSnapshot);
-          const isLatest = index === 0;
+      {count === 0 ? (
+        <Card>
+          <EmptyState icon={History} title="Nothing published yet">
+            Your version history starts the first time you press Publish.
+          </EmptyState>
+        </Card>
+      ) : (
+        <Card className="ah-card">
+          <CardHeader
+            title="Published versions"
+            icon={History}
+            subtitle="What changed in each publish, compared with the one before it."
+            ruled
+          />
+          <CardBody flush>
+            <ol className="ah-timeline">
+              {versions.map((version, index) => {
+                const prevSnapshot = versions[index + 1]?.snapshot || null;
+                const changes = buildChangeSummary(version, prevSnapshot);
+                const isLatest = index === 0;
+                return (
+                  <li key={version.id} className={`ah-version${isLatest ? ' ah-version--live' : ''}`}>
+                    <div className="ah-version__rail" aria-hidden="true">
+                      <span className="ah-version__dot" />
+                      {index < count - 1 && <span className="ah-version__line" />}
+                    </div>
 
-          return (
-            <div key={version.id} className={`ah-version ${isLatest ? 'ah-version--latest' : ''}`}>
-              <div className="ah-version__line-wrap">
-                <div className={`ah-version__dot ${isLatest ? 'ah-version__dot--latest' : ''}`} />
-                {index < versions.length - 1 && <div className="ah-version__line" />}
-              </div>
+                    <div className="ah-version__main">
+                      <div className="ah-version__head">
+                        <div className="ah-version__title">
+                          <span className="ah-version__id">{version.id}</span>
+                          {isLatest && <Badge tone="success">Live</Badge>}
+                        </div>
+                        <div className="ah-version__when">
+                          <span>{timeAgo(version.publishedAt)}</span>
+                          <span className="ah-version__date">{formatDate(version.publishedAt)}</span>
+                        </div>
+                      </div>
 
-              <div className="ah-version__card">
-                <div className="ah-version__card-header">
-                  <div className="ah-version__meta">
-                    <span className="ah-version__number">{version.id}</span>
-                    {isLatest && <span className="ah-version__live-badge">Live</span>}
-                    <span className="ah-version__time">{timeAgo(version.publishedAt)}</span>
-                  </div>
-                  <div className="ah-version__date">{formatDate(version.publishedAt)}</div>
-                </div>
+                      {version.note && <p className="ah-version__note">“{version.note}”</p>}
 
-                {version.note && (
-                  <div className="ah-version__note">"{version.note}"</div>
-                )}
+                      <ul className="ah-version__changes">
+                        {changes.map((c, i) => (
+                          <li key={i}>{c}</li>
+                        ))}
+                      </ul>
 
-                <ul className="ah-version__changes">
-                  {changes.map((c, i) => (
-                    <li key={i} className="ah-version__change-item">
-                      <span className="ah-version__change-dot" />
-                      {c}
-                    </li>
-                  ))}
-                </ul>
+                      <div className="ah-version__actions">
+                        <Button size="sm" icon={RotateCcw} onClick={() => setConfirming(version.id)}>
+                          Restore to draft
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </CardBody>
+        </Card>
+      )}
 
-                <div className="ah-version__actions">
-                  <button
-                    className="ah-version__restore-btn"
-                    onClick={() => {
-                      if (window.confirm(`Restore ${version.id} to draft? You can review and re-publish.`)) {
-                        restoreVersion(version.id);
-                      }
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <polyline points="1 4 1 10 7 10"/>
-                      <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
-                    </svg>
-                    Restore to draft
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <QuickLinks currentPage="history" onNavigate={onNavigate} />
+      <Modal
+        open={!!confirming}
+        onClose={() => setConfirming(null)}
+        title={`Restore ${confirming || ''} to your draft?`}
+        subtitle="Your current draft is replaced by this version."
+        icon={RotateCcw}
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => setConfirming(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              icon={RotateCcw}
+              onClick={() => {
+                restoreVersion(confirming);
+                setConfirming(null);
+              }}
+            >
+              Restore to draft
+            </Button>
+          </>
+        )}
+      >
+        <p className="ah-modal-text">
+          Nothing changes for customers yet. Check the draft, then publish it when you’re happy.
+        </p>
+      </Modal>
     </div>
   );
 }

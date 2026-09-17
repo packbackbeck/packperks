@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Eye } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { logAction } from '../auth/actionLog';
 import './PiiMask.css';
@@ -94,12 +95,7 @@ export default function PiiMask({
       title={revealed ? 'Click to hide' : 'Click to reveal — this view is logged'}
     >
       <span className="pii-mask__value">{display}</span>
-      {!revealed && (
-        <svg className="pii-mask__icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      )}
+      {!revealed && <Eye className="pii-mask__icon" size={12} aria-hidden="true" />}
     </button>
   );
 }

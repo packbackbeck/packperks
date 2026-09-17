@@ -1,7 +1,8 @@
-import { useId } from 'react';
+import { useContext, useId } from 'react';
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import { InfoTip } from './primitives';
 import { deltaParts, unitFamily } from './metrics';
+import { TileDisplayContext } from './tileDisplay';
 
 /* ─────────────────────────────────────────────────────────────────────
  * KPI tiles.
@@ -47,6 +48,8 @@ export function KpiTile({
   onClick, sparkline, interactive = true,
 }) {
   const Icon = metric.icon;
+  const display = useContext(TileDisplayContext);
+  const showSpark = display ? !!display.sparklines : sparkline;
   const na = metric.value == null || !!metric.unavailable;
   const delta = na ? null : deltaParts(metric);
   const DeltaIcon = delta?.dir === 'up' ? TrendingUp : delta?.dir === 'down' ? TrendingDown : Minus;
@@ -90,7 +93,7 @@ export function KpiTile({
           <p className={`ui-kpi__value${na ? ' ui-kpi__value--na' : ''}`}>{value}</p>
           {metric.description && <p className="ui-kpi__desc">{na && metric.unavailable ? metric.unavailable : metric.description}</p>}
         </div>
-        {sparkline && !na && (
+        {showSpark && !na && (
           <Sparkline values={(metric.series || []).map(p => p.value)} color={TONE_COLOR[metric.tone] || TONE_COLOR.violet} />
         )}
       </div>

@@ -1,4 +1,4 @@
-import { CircleDollarSign, CupSoda, Gift, Pause, WalletCards } from 'lucide-react';
+import { CircleDollarSign, Clock, CupSoda, Gift, Pause, WalletCards } from 'lucide-react';
 import FeatureSearch from './auth/FeatureSearch';
 import WorkflowDock from './auth/WorkflowDock';
 import { useOrg } from './context/OrgContext';
@@ -50,7 +50,8 @@ function RatesBadge({ settings, mode, onOpen }) {
   );
 }
 
-export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenSupport, allowedPages, canSeeSettings, canPublish }) {
+export default function AdminTopBar({ draftState, onNavigate, onPreview, allowedPages, canSeeSettings, canPublish, topbar = {} }) {
+  const shows = (id) => topbar[id] !== false;
   const { publishError, clearPublishError } = draftState || {};
   const { activeOrgMode, activeGroupMode } = useOrg();
   const mode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
@@ -68,7 +69,7 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenS
 
       <header className={`admin-topbar${maintenance ? ' admin-topbar--maintenance' : ''}`}>
         <div className="admin-topbar__left">
-          <ModeChip mode={mode} />
+          {shows('programme') && <ModeChip mode={mode} />}
           {maintenance && (
             <span
               className="tb-paused"
@@ -81,21 +82,21 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenS
         </div>
 
         <div className="admin-topbar__center">
-          <FeatureSearch onNavigate={onNavigate} allowedPages={allowedPages} />
+          {shows('search') && <FeatureSearch onNavigate={onNavigate} allowedPages={allowedPages} />}
         </div>
 
         <div className="admin-topbar__right">
-          <RatesBadge
-            settings={settings}
-            mode={mode}
-            onOpen={canSeeSettings ? () => onNavigate?.('settings', { section: 'payouts' }) : undefined}
-          />
-          <TimezoneHint />
+          {shows('rates') && (
+            <RatesBadge
+              settings={settings}
+              mode={mode}
+              onOpen={canSeeSettings ? () => onNavigate?.('settings', { section: 'payouts' }) : undefined}
+            />
+          )}
+          {shows('timezone') && <TimezoneHint />}
           <WorkflowDock
             draftState={draftState}
-            onPreview={onPreview}
-            onOpenHistory={allowedPages?.has('history') ? () => onNavigate?.('history') : undefined}
-            onOpenSupport={onOpenSupport}
+            onPreview={shows('preview') ? onPreview : undefined}
             canPublish={canPublish}
           />
         </div>
@@ -104,24 +105,35 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenS
   );
 }
 
-/* The browser's time zone: every time in the dashboard is shown in it. */
+/* Short codes for the cities a time zone is named after. */
+const CITY_CODES = {
+  Amsterdam: 'AMS', Dubai: 'DXB', London: 'LON', Paris: 'PAR', Berlin: 'BER', Brussels: 'BRU',
+  Madrid: 'MAD', Lisbon: 'LIS', Rome: 'ROM', Zurich: 'ZRH', Vienna: 'VIE', Stockholm: 'STO',
+  Copenhagen: 'CPH', Oslo: 'OSL', Dublin: 'DUB', New_York: 'NYC', Los_Angeles: 'LAX',
+  Chicago: 'CHI', Toronto: 'YTO', Singapore: 'SIN', Tokyo: 'TYO', Sydney: 'SYD',
+};
+
+/* The browser's time zone, short ("AMS · UTC+2"): every time in the
+ * dashboard is shown in it. */
 function TimezoneHint() {
-  let label = 'Local time';
+  let code = '';
   let long = '';
-  let offsetLabel = '';
+  let offsetLabel = 'Local time';
   try {
     long = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const city = long.split('/').slice(-1)[0] || '';
+    code = CITY_CODES[city] || city.replace(/_/g, '').slice(0, 3).toUpperCase();
     const offset = -new Date().getTimezoneOffset();
     const sign = offset >= 0 ? '+' : '−';
     const h = Math.floor(Math.abs(offset) / 60);
     const m = Math.abs(offset) % 60;
     offsetLabel = `UTC${sign}${h}${m ? `:${String(m).padStart(2, '0')}` : ''}`;
-    label = long.split('/').slice(-1)[0]?.replace(/_/g, ' ') || label;
   } catch { /* keep the defaults */ }
   return (
-    <span className="admin-topbar__tz" title={`Times are shown in your browser's time zone${long ? ` (${long})` : ''}.`}>
-      {label}
-      {offsetLabel && <span className="admin-topbar__tz-offset">{offsetLabel}</span>}
+    <span className="admin-topbar__tz" title={`Times are shown in your browser's time zone${long ? ` (${long.replace(/_/g, ' ')})` : ''}.`}>
+      <Clock size={13} aria-hidden="true" />
+      {code && <span className="admin-topbar__tz-code">{code}</span>}
+      <span className="admin-topbar__tz-offset">{offsetLabel}</span>
     </span>
   );
 }

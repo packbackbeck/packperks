@@ -1,0 +1,57 @@
+/* The dashboard's loading screen, shown while the session is checked. */
+.ag-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(50% 40% at 50% 38%, rgba(91, 63, 214, 0.10), transparent 70%),
+    #F6F5FA;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: ag-in 0.3s ease 0.15s both;
+}
+@keyframes ag-in { from { opacity: 0; } to { opacity: 1; } }
+
+.ag-loading__mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  box-shadow: 0 14px 30px -14px rgba(91, 63, 214, 0.7);
+  animation: ag-breathe 1.8s ease-in-out infinite;
+}
+@keyframes ag-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.ag-loading__bar {
+  position: relative;
+  width: 140px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #ECEAF4;
+}
+.ag-loading__bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8B6CFF, #5B3FD6);
+  animation: ag-slide 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes ag-slide {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(260%); }
+}
+
+.ag-loading__label { font-size: 13px; font-weight: 500; color: #676374; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-loading, .ag-loading__mark { animation: none; }
+  .ag-loading__bar span { animation-duration: 3s; }
+}

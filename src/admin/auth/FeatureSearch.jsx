@@ -233,6 +233,9 @@ const FEATURES = [
   { id: 'f-privacy',      name: 'Privacy policy',          desc: 'The policy customers read in the app', group: 'Settings', page: 'settings', section: 'legal', icon: Icon.settings, keywords: 'privacy policy legal gdpr cookies terms text' },
   { id: 'f-roles',        name: 'Roles & permissions',     desc: 'What each role sees and changes',   group: 'Master',     page: 'master', section: 'roles', icon: Icon.user, keywords: 'roles permissions access tabs hidden view edit master manager vendor custom role' },
   { id: 'f-workspace',    name: 'Workspace tabs',          desc: 'Switch a tab off for everyone',     group: 'Master',     page: 'master', section: 'workspace', icon: Icon.settings, keywords: 'workspace tabs hide disable everyone sidebar' },
+  { id: 'f-topbar',       name: 'Top bar',                 desc: 'What the bar above every page shows', group: 'Master',   page: 'master', section: 'workspace', icon: Icon.settings, keywords: 'top bar header search time zone preview rates programme badge hide show' },
+  { id: 'f-sparklines',   name: 'Mini graphs on tiles',    desc: 'Turn the tile graphs on or off',    group: 'Master',     page: 'master', section: 'workspace', icon: Icon.settings, keywords: 'sparkline mini graph chart tiles numbers kpi display' },
+  { id: 'f-delete-data',  name: 'Delete data',             desc: 'Remove an organisation’s records',  group: 'Master',     page: 'master', section: 'data', icon: Icon.settings, keywords: 'delete purge wipe clear remove scans claims events data records reset' },
   { id: 'f-merge-limit',  name: 'Weekly merge limit',      desc: 'Merges per customer per week',      group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'merge limit weekly per customer per week account 0 zero hold review' },
 
   // ── Merge + open a customer (Users) ────────────────────────────────

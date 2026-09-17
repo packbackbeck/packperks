@@ -12,7 +12,7 @@ import { ViewRoleCtx, readVendorPreviewFlag } from './context/ViewRole';
 import { setAdminDemoMode } from './lib/adminApi';
 import { resolveEffectiveMode } from './lib/orgModes';
 import { LEVELS, TABS, TAB_ALIASES, TAB_BY_ID, previewAccess, tabAvailability } from './lib/access';
-import { Button, Card, EmptyState } from './ui';
+import { Button, Card, EmptyState, TileDisplayContext } from './ui';
 import AdminOverview from './overview/AdminOverview';
 import AdminRewards from './rewards/AdminRewards';
 import AdminUsers from './users/AdminUsers';
@@ -72,7 +72,8 @@ const SIDEBAR_KEY = 'pp_admin_sidebar_collapsed';
 
 function resolvePage(raw) {
   const id = TAB_ALIASES[raw] || raw;
-  return TAB_BY_ID[id] ? id : null;
+  // Tabs that are links (MockupMaster) open elsewhere, never as a page.
+  return TAB_BY_ID[id] && !TAB_BY_ID[id].href ? id : null;
 }
 
 function readHash() {
@@ -98,8 +99,8 @@ function AdminShell() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const draftState = useAdminDraft();
   const { profile } = useAuthRole();
-  const { access, roles, workspace } = useAccess();
-  const { activeOrg, activeOrgId, activeOrgSlug, activeOrgMode, activeGroupMode, status: orgStatus } = useOrg();
+  const { access, roles, workspace, topbar, display } = useAccess();
+  const { activeOrg, activeOrgId, activeOrgSlug, activeOrgMode, activeGroupMode, modeReady, status: orgStatus } = useOrg();
 
   /* Vendor preview (`?as=vendor`): a staff account looking at the dashboard
    * exactly as a vendor does. It can only narrow what is shown. */
@@ -111,6 +112,8 @@ function AdminShell() {
     [previewing, access, roles],
   );
   const isVendorView = effectiveAccess?.level === 'vendor';
+  // Mini graphs on number tiles, for everyone (Master Settings → Workspace).
+  const tileDisplay = useMemo(() => ({ sparklines: display?.sparklines !== false }), [display?.sparklines]);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [focusUserId, setFocusUserId] = useState(null);
@@ -126,8 +129,8 @@ function AdminShell() {
     workspace,
   };
   const tabs = TABS.filter(t => tabAvailability(t, availabilityCtx).visible);
-  const allowedPages = new Set(tabs.map(t => t.id));
-  const firstTab = tabs[0]?.id || 'support';
+  const allowedPages = new Set(tabs.filter(t => !t.href).map(t => t.id));
+  const firstTab = tabs.find(t => !t.href)?.id || 'support';
   const current = tabAvailability(TAB_BY_ID[page], availabilityCtx);
 
   /* Demo numbers: the venue's switch, only ever in the vendor view. */
@@ -171,8 +174,10 @@ function AdminShell() {
 
   /* A page this venue's programme doesn't have (a Deferred Tikkie venue on
    * Claims, say) just moves to the first page it does have. A page switched
-   * off for this account or venue shows why instead (below). */
-  const shouldRedirect = orgStatus === 'ready' && !current.visible
+   * off for this account or venue shows why instead (below). Waits for the
+   * venue's programme to load, or a reload on a Deferred Tikkie page would
+   * leave it while the programme still reads as the default. */
+  const shouldRedirect = orgStatus === 'ready' && modeReady && !current.visible
     && (current.reason === 'mode' || current.reason === 'group' || current.reason === 'unknown');
   if (shouldRedirect && firstTab !== page) {
     setPageState(firstTab);
@@ -229,124 +234,126 @@ function AdminShell() {
         draftState={draftState}
         onNavigate={setPage}
         onPreview={handlePreview}
-        onOpenSupport={() => setPage('support')}
         allowedPages={allowedPages}
+        topbar={topbar}
         canSeeSettings={allowedPages.has('settings')}
         canPublish={['settings', 'rewards', 'appdesign'].some(t => effectiveAccess?.canEdit?.(t))}
       />
       <ViewRoleCtx.Provider value={{ viewRole: isVendorView ? 'vendor' : profile?.role, isVendorView, previewing, access: effectiveAccess, allowedPages }}>
-        <div className="admin-app__body">
-          {previewing && (
-            <div className="vendor-preview-bar" role="status">
-              <span className="vendor-preview-bar__dot" aria-hidden="true" />
-              <span className="vendor-preview-bar__text">
-                Viewing as a <strong>vendor</strong>: {tabs.length} page{tabs.length === 1 ? '' : 's'}, read-only.
-                {demoNumbers
-                  ? ' Demo numbers are on, so these figures are illustrative.'
-                  : ' Demo numbers are off, so these are the real figures.'}
-              </span>
-              <button type="button" className="vendor-preview-bar__exit" onClick={exitVendorPreview}>
-                Back to my view
-              </button>
-            </div>
-          )}
-          <main className="admin-app__main" key={`${activeOrgId || 'bootstrap'}${demoActive ? ':demo' : ''}`}>
-            {blocked ? (
-              <PageUnavailable
-                tab={TAB_BY_ID[page]}
-                reason={current.reason}
-                roleLabel={effectiveAccess?.role?.label}
-                orgName={activeOrg?.name}
-                onBack={() => setPage(firstTab)}
-                backLabel={TAB_BY_ID[firstTab]?.label}
-              />
-            ) : (
-              <>
-                <KeepAlive id="overview" activeId={page} visited={visited}>
-                  <AdminOverview draftState={draftState} onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="rewards" activeId={page} visited={visited}>
-                  <AdminRewards draftState={draftState} onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="appdesign" activeId={page} visited={visited}>
-                  <AdminAppDesign draftState={draftState} />
-                </KeepAlive>
-                <KeepAlive id="users" activeId={page} visited={visited}>
-                  <AdminUsers
-                    onNavigate={setPage}
-                    focusUserId={focusUserId}
-                    onFocusConsumed={() => setFocusUserId(null)}
-                    focusSection={page === 'users' ? section : null}
-                    onSectionConsumed={() => setSection(null)}
-                  />
-                </KeepAlive>
-                <KeepAlive id="claims" activeId={page} visited={visited}>
-                  <AdminClaims onNavigate={setPage} draftState={draftState} />
-                </KeepAlive>
-                <KeepAlive id="cupscans" activeId={page} visited={visited}>
-                  <AdminCupScans onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="cupqr" activeId={page} visited={visited}>
-                  <AdminReceiptGenerator onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="transactions" activeId={page} visited={visited}>
-                  <AdminTransactions onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="settings" activeId={page} visited={visited}>
-                  <AdminSettingsPage
-                    draftState={draftState}
-                    onNavigate={setPage}
-                    section={page === 'settings' ? section : null}
-                  />
-                </KeepAlive>
-                <KeepAlive id="master" activeId={page} visited={visited}>
-                  <AdminMasterSettings
-                    draftState={draftState}
-                    onNavigate={setPage}
-                    onAddOrg={() => setWizardOpen(true)}
-                    section={page === 'master' ? section : null}
-                  />
-                </KeepAlive>
-                <KeepAlive id="history" activeId={page} visited={visited}>
-                  <AdminHistory draftState={draftState} onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="reports" activeId={page} visited={visited}>
-                  <AdminReports onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="stats" activeId={page} visited={visited}>
-                  <AdminStats onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="behaviour" activeId={page} visited={visited}>
-                  <AdminUserBehaviour onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="donations" activeId={page} visited={visited}>
-                  <AdminDonations onNavigate={setPage} draftState={draftState} />
-                </KeepAlive>
-                <KeepAlive id="byorequests" activeId={page} visited={visited}>
-                  <AdminByoRequests onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="futurevendors" activeId={page} visited={visited}>
-                  <AdminFutureVendors onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="tikkielog" activeId={page} visited={visited}>
-                  <AdminTikkieLog onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="smartbins" activeId={page} visited={visited}>
-                  <AdminSmartBins />
-                </KeepAlive>
-                <KeepAlive id="emailtemplates" activeId={page} visited={visited}>
-                  <AdminEmailTemplates />
-                </KeepAlive>
-                <KeepAlive id="backupcups" activeId={page} visited={visited}>
-                  <AdminBackupCups onNavigate={setPage} />
-                </KeepAlive>
-                <KeepAlive id="support" activeId={page} visited={visited}>
-                  <AdminSupport onNavigate={setPage} />
-                </KeepAlive>
-              </>
+        <TileDisplayContext.Provider value={tileDisplay}>
+          <div className="admin-app__body">
+            {previewing && (
+              <div className="vendor-preview-bar" role="status">
+                <span className="vendor-preview-bar__dot" aria-hidden="true" />
+                <span className="vendor-preview-bar__text">
+                  Viewing as a <strong>vendor</strong>: {tabs.length} page{tabs.length === 1 ? '' : 's'}, read-only.
+                  {demoNumbers
+                    ? ' Demo numbers are on, so these figures are illustrative.'
+                    : ' Demo numbers are off, so these are the real figures.'}
+                </span>
+                <button type="button" className="vendor-preview-bar__exit" onClick={exitVendorPreview}>
+                  Back to my view
+                </button>
+              </div>
             )}
-          </main>
-        </div>
+            <main className="admin-app__main" key={`${activeOrgId || 'bootstrap'}${demoActive ? ':demo' : ''}`}>
+              {blocked ? (
+                <PageUnavailable
+                  tab={TAB_BY_ID[page]}
+                  reason={current.reason}
+                  roleLabel={effectiveAccess?.role?.label}
+                  orgName={activeOrg?.name}
+                  onBack={() => setPage(firstTab)}
+                  backLabel={TAB_BY_ID[firstTab]?.label}
+                />
+              ) : (
+                <>
+                  <KeepAlive id="overview" activeId={page} visited={visited}>
+                    <AdminOverview draftState={draftState} onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="rewards" activeId={page} visited={visited}>
+                    <AdminRewards draftState={draftState} onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="appdesign" activeId={page} visited={visited}>
+                    <AdminAppDesign draftState={draftState} />
+                  </KeepAlive>
+                  <KeepAlive id="users" activeId={page} visited={visited}>
+                    <AdminUsers
+                      onNavigate={setPage}
+                      focusUserId={focusUserId}
+                      onFocusConsumed={() => setFocusUserId(null)}
+                      focusSection={page === 'users' ? section : null}
+                      onSectionConsumed={() => setSection(null)}
+                    />
+                  </KeepAlive>
+                  <KeepAlive id="claims" activeId={page} visited={visited}>
+                    <AdminClaims onNavigate={setPage} draftState={draftState} />
+                  </KeepAlive>
+                  <KeepAlive id="cupscans" activeId={page} visited={visited}>
+                    <AdminCupScans onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="cupqr" activeId={page} visited={visited}>
+                    <AdminReceiptGenerator onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="transactions" activeId={page} visited={visited}>
+                    <AdminTransactions onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="settings" activeId={page} visited={visited}>
+                    <AdminSettingsPage
+                      draftState={draftState}
+                      onNavigate={setPage}
+                      section={page === 'settings' ? section : null}
+                    />
+                  </KeepAlive>
+                  <KeepAlive id="master" activeId={page} visited={visited}>
+                    <AdminMasterSettings
+                      draftState={draftState}
+                      onNavigate={setPage}
+                      onAddOrg={() => setWizardOpen(true)}
+                      section={page === 'master' ? section : null}
+                    />
+                  </KeepAlive>
+                  <KeepAlive id="history" activeId={page} visited={visited}>
+                    <AdminHistory draftState={draftState} onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="reports" activeId={page} visited={visited}>
+                    <AdminReports onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="stats" activeId={page} visited={visited}>
+                    <AdminStats onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="behaviour" activeId={page} visited={visited}>
+                    <AdminUserBehaviour onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="donations" activeId={page} visited={visited}>
+                    <AdminDonations onNavigate={setPage} draftState={draftState} />
+                  </KeepAlive>
+                  <KeepAlive id="byorequests" activeId={page} visited={visited}>
+                    <AdminByoRequests onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="futurevendors" activeId={page} visited={visited}>
+                    <AdminFutureVendors onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="tikkielog" activeId={page} visited={visited}>
+                    <AdminTikkieLog onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="smartbins" activeId={page} visited={visited}>
+                    <AdminSmartBins />
+                  </KeepAlive>
+                  <KeepAlive id="emailtemplates" activeId={page} visited={visited}>
+                    <AdminEmailTemplates />
+                  </KeepAlive>
+                  <KeepAlive id="backupcups" activeId={page} visited={visited}>
+                    <AdminBackupCups onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="support" activeId={page} visited={visited}>
+                    <AdminSupport onNavigate={setPage} />
+                  </KeepAlive>
+                </>
+              )}
+            </main>
+          </div>
+        </TileDisplayContext.Provider>
       </ViewRoleCtx.Provider>
 
       {wizardOpen && (

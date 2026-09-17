@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { ListChecks, Trash2, TriangleAlert } from 'lucide-react';
+import { Button } from '../ui';
 import './BulkDeleteBar.css';
 
 /* Floating action bar shown when ≥1 row is selected in an admin table.
@@ -15,7 +17,9 @@ export default function BulkDeleteBar({ count, noun = 'records', onDelete, onCle
   const [error, setError] = useState(null);
 
   if (count <= 0) return null;
-  const label = `${count} ${noun}${count === 1 ? '' : ''}`;
+  // Nouns are passed plural ("users", "batches"); use the singular for one.
+  const singular = /(ch|sh|x)es$/.test(noun) ? noun.slice(0, -2) : noun.replace(/s$/, '');
+  const label = `${count} ${count === 1 ? singular : noun}`;
 
   async function doDelete() {
     setBusy(true);
@@ -31,41 +35,47 @@ export default function BulkDeleteBar({ count, noun = 'records', onDelete, onCle
   }
 
   return (
-    <div className="bulkbar" role="region" aria-label="Bulk actions">
+    <div className={`bulkbar${confirming ? ' bulkbar--confirm' : ''}`} role="region" aria-label="Bulk actions">
       <div className="bulkbar__left">
-        <span className="bulkbar__icon" aria-hidden="true">⚠️</span>
-        <span className="bulkbar__count">{label} selected</span>
+        <span className="bulkbar__icon" aria-hidden="true">
+          {confirming ? <TriangleAlert size={15} /> : <ListChecks size={15} />}
+        </span>
+        {!confirming ? (
+          <span className="bulkbar__count">{label} selected</span>
+        ) : (
+          <span className="bulkbar__warn">
+            Permanently delete {label}? This can’t be undone.
+          </span>
+        )}
       </div>
 
       {!confirming ? (
         <div className="bulkbar__actions">
-          <button className="bulkbar__ghost" onClick={onClear} disabled={busy}>Clear</button>
+          <Button variant="ghost" size="sm" onClick={onClear} disabled={busy}>Clear</Button>
           {extraAction && (extraAction.visible !== false) && (
-            <button
-              className="bulkbar__primary"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={extraAction.onClick}
               disabled={busy || extraAction.disabled}
             >
               {extraAction.label}
-            </button>
+            </Button>
           )}
-          <button className="bulkbar__danger" onClick={() => setConfirming(true)} disabled={busy}>
+          <Button variant="danger-ghost" size="sm" icon={Trash2} className="bulkbar__delete" onClick={() => setConfirming(true)} disabled={busy}>
             Delete selected
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="bulkbar__actions">
-          <span className="bulkbar__warn">
-            Permanently delete {label}? This can’t be undone.
-          </span>
-          <button className="bulkbar__ghost" onClick={() => setConfirming(false)} disabled={busy}>Cancel</button>
-          <button className="bulkbar__danger" onClick={doDelete} disabled={busy}>
+          <Button variant="outline" size="sm" onClick={() => setConfirming(false)} disabled={busy}>Cancel</Button>
+          <Button variant="danger" size="sm" icon={Trash2} onClick={doDelete} disabled={busy}>
             {busy ? 'Deleting…' : 'Confirm delete'}
-          </button>
+          </Button>
         </div>
       )}
 
-      {error && <span className="bulkbar__error">{error}</span>}
+      {error && <span className="bulkbar__error" role="alert">{error}</span>}
     </div>
   );
 }

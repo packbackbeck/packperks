@@ -1,29 +1,28 @@
 import { useEffect } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { useOrg } from '../context/OrgContext';
 import packperksLogo from '../../assets/images/packperks-logo.svg';
 import './WelcomeSplash.css';
 
-const ROLE_COPY = {
-  owner:   'Full control — the buck stops with you.',
-  admin:   'Full operational access — invite teammates, edit org, approve claims.',
-  manager: 'Approve claims, generate cup QR codes, and edit rewards.',
-  checker: 'Read-only access — view dashboards and export reports.',
-  vendor:  'How your store is doing — overview, rewards, reports, health and behaviour.',
+/* What each level can do, in one line. The role name comes from the
+ * account; older accounts only carry the old role name. */
+const LEVEL_COPY = {
+  master: { label: 'Master', copy: 'Everything, including people, roles and organisations.' },
+  manager: { label: 'Manager', copy: 'Runs your organisations: claims, rewards, customers and settings, as your role allows.' },
+  vendor: { label: 'Vendor', copy: 'How your venue is doing: the dashboard, reports and customer behaviour.' },
 };
+const LEGACY_LEVEL = { owner: 'master', admin: 'master', manager: 'manager', checker: 'manager', vendor: 'vendor' };
 
-/* Brief "you're in" landing card shown the first time after sign-in
- * (right after ProfileSetup, or right after sign-in for returning
- * users on first session). Auto-dismisses after a few seconds so it
- * doesn't get in the way of the dashboard. */
+/* Brief "you're in" card shown once, right after the first-run profile
+ * setup. Auto-dismisses after a few seconds. Rendered before the dashboard
+ * shell (and its organisation context), so it only uses the account. */
 export default function WelcomeSplash({ onDone, autoMs = 3500 }) {
   const { profile } = useAuth();
-  const { activeOrg } = useOrg();
   const name = profile?.display_name || profile?.email?.split('@')[0] || 'there';
-  const brandLabel = activeOrg?.partner_brand_name || activeOrg?.name || 'PackPerks';
+  const level = LEVEL_COPY[profile?.access_role === 'master' ? 'master' : LEGACY_LEVEL[profile?.role]] || null;
 
   useEffect(() => {
-    if (!autoMs) return;
+    if (!autoMs) return undefined;
     const t = setTimeout(() => onDone?.(), autoMs);
     return () => clearTimeout(t);
   }, [autoMs, onDone]);
@@ -31,41 +30,25 @@ export default function WelcomeSplash({ onDone, autoMs = 3500 }) {
   return (
     <div className="ws-page">
       <div className="ws-card">
-        <div className="ws-brands">
-          <img src={packperksLogo} alt="PackPerks" className="ws-brands__pp" />
-          {activeOrg?.logo_url ? (
-            <>
-              <span className="ws-brands__x">×</span>
-              <img src={activeOrg.logo_url} alt={brandLabel} className="ws-brands__bk" />
-            </>
-          ) : null}
+        <img src={packperksLogo} alt="PackPerks" className="ws-logo" />
+
+        <div className="ws-avatar" style={{ background: profile?.color || '#5B3FD6' }}>
+          {profile?.avatar_url ? <img src={profile.avatar_url} alt="" /> : <span>{(name || '?')[0].toUpperCase()}</span>}
         </div>
 
-        <div
-          className="ws-avatar"
-          style={{ background: profile?.color || '#FD6F46' }}
-        >
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="" />
-          ) : (
-            <span>{(name || '?')[0].toUpperCase()}</span>
-          )}
-        </div>
+        <h1 className="ws-title">Welcome, {name}</h1>
+        <p className="ws-sub">You’re signed in to the PackPerks dashboard.</p>
 
-        <h1 className="ws-title">Welcome, {name}!</h1>
-        <p className="ws-sub">
-          You're now signed in to the <strong>{brandLabel}</strong> admin console.
-        </p>
-
-        {profile?.role && (
+        {level && (
           <div className="ws-role">
-            <span className="ws-role__pill">{profile.role}</span>
-            <span className="ws-role__copy">{ROLE_COPY[profile.role]}</span>
+            <span className="ws-role__pill">{level.label}</span>
+            <span className="ws-role__copy">{level.copy}</span>
           </div>
         )}
 
         <button type="button" className="ws-btn" onClick={onDone}>
-          Continue to dashboard →
+          Go to the dashboard
+          <ArrowRight size={16} aria-hidden="true" />
         </button>
       </div>
     </div>

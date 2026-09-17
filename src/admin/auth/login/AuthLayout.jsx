@@ -1,15 +1,19 @@
+import { useRef } from 'react';
 import packperksLogo from '../../../assets/images/packperks-logo.svg';
-import PulseCanvas from './PulseCanvas';
+import ReturnLoopCanvas from './ReturnLoopCanvas';
 import ProductShowcase from './ProductShowcase';
 import '../../ui/ui.css';
 import '../LoginPage.css';
 
 /* The two-column frame of the admin sign-in and reset-password screens.
  * Left: logo, the form (children) centred, footer. Right, from 1024px up: a
- * violet night with the pulse animation, a headline and the product
- * showcase. The right panel is decoration only, so it is hidden from
- * assistive tech. `.pp-login` also carries the admin design tokens. */
+ * violet night with the return-loop animation (kept clear of the copy), a
+ * headline and the product showcase. The right panel is decoration only, so
+ * it is hidden from assistive tech. `.pp-login` also carries the admin
+ * design tokens. */
 export default function AuthLayout({ children }) {
+  const copyRef = useRef(null);
+  const stageRef = useRef(null);
   return (
     <div className="pp-login">
       <div className="pp-login__grid">
@@ -34,20 +38,19 @@ export default function AuthLayout({ children }) {
 
         <aside className="pp-login__aside" aria-hidden="true">
           <div className="pp-login__glow" />
-          <PulseCanvas className="pp-login__canvas" />
+          <ReturnLoopCanvas className="pp-login__canvas" clearOf={copyRef} above={stageRef} />
           <div className="pp-login__fade" />
           <div className="pp-login__content">
-            <div className="pp-login__copy">
+            <div className="pp-login__copy" ref={copyRef}>
               <p className="pp-login__headline">
                 Every cup back, every reward <span className="pp-login__accent">earned.</span>
               </p>
               <p className="pp-login__lede">
-                See cups returned, rewards claimed and cashback paid out for every
-                venue, in one place. Review claims, update rewards and watch the
-                impact add up.
+                Track the cups coming back, review claims and pay out cashback
+                for every venue, all in one place.
               </p>
             </div>
-            <div className="pp-login__stage">
+            <div className="pp-login__stage" ref={stageRef}>
               <ProductShowcase />
             </div>
           </div>

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { AlertCircle, FileDown, ImageDown, ListPlus, Plus, ReceiptText, X } from 'lucide-react';
 import { toJpeg, toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { getAppConfig } from '../../lib/api';
 import { createGeneratedReceipt, listGeneratedReceipts } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
+import { Button, Card, CardBody, CardHeader, EmptyState, Field } from '../ui';
 import './RewardsReceiptGenerator.css';
 import { useAdminMoney } from '../lib/adminMoney';
 
@@ -172,99 +174,123 @@ export default function RewardsReceiptGenerator() {
 
   return (
     <div className="rrg">
-      <div className="rrg-header">
-        <div>
-          <h2 className="rrg-header__title">Rewards Receipt Generator</h2>
-          <p className="rrg-header__sub">
-            Build a test purchase receipt for <strong>{orgName}</strong>. Generated receipts carry a
-            PackPerks verification token and are auto-accepted by receipt verification — so testers can
-            complete the redemption flow without a real purchase. Add custom items to probe the AI vision.
-          </p>
-        </div>
-        <div className="rrg-header__actions">
-          <button className="rrg-btn rrg-btn--ghost" onClick={() => downloadImage('jpg')} disabled={!receipt || !!exporting}>
-            {exporting === 'jpg' ? 'Saving…' : 'JPG'}
-          </button>
-          <button className="rrg-btn rrg-btn--ghost" onClick={() => downloadImage('png')} disabled={!receipt || !!exporting}>
-            {exporting === 'png' ? 'Saving…' : 'PNG'}
-          </button>
-          <button className="rrg-btn rrg-btn--ghost" onClick={() => downloadImage('pdf')} disabled={!receipt || !!exporting}>
-            {exporting === 'pdf' ? 'Saving…' : 'PDF'}
-          </button>
-        </div>
-      </div>
-
       <div className="rrg-layout">
         {/* Controls */}
         <div className="rrg-controls">
-          <div className="rrg-card">
-            <h3 className="rrg-card__title">Add items</h3>
-
-            <label className="rrg-field">
-              <span className="rrg-field__label">From this org's rewards</span>
-              <div className="rrg-row">
-                <select className="rrg-input" value={pickId} onChange={e => setPickId(e.target.value)}>
-                  <option value="">Select a reward…</option>
-                  {rewards.map(r => (
-                    <option key={r.id} value={r.id}>{r.name} — {money(r.euros)}</option>
-                  ))}
-                </select>
-                <button className="rrg-btn rrg-btn--primary" onClick={addRewardItem} disabled={!pickId}>Add</button>
-              </div>
-              {rewards.length === 0 && <span className="rrg-field__hint">No published rewards for this org yet.</span>}
-            </label>
-
-            <label className="rrg-field">
-              <span className="rrg-field__label">Custom item (to test/trick the AI)</span>
-              <div className="rrg-row">
-                <input className="rrg-input" placeholder="Item name" value={customName} onChange={e => setCustomName(e.target.value)} />
-                <input className="rrg-input rrg-input--price" type="number" step="0.01" min="0" placeholder={symbol} value={customPrice} onChange={e => setCustomPrice(e.target.value)} />
-                <button className="rrg-btn rrg-btn--ghost" onClick={addCustomItem} disabled={!customName.trim()}>Add</button>
-              </div>
-            </label>
-          </div>
-
-          <div className="rrg-card">
-            <h3 className="rrg-card__title">Receipt details</h3>
-            <label className="rrg-field">
-              <span className="rrg-field__label">Date &amp; time</span>
-              <input className="rrg-input" type="datetime-local" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} />
-            </label>
-            <label className="rrg-field">
-              <span className="rrg-field__label">Venue / location</span>
-              <input className="rrg-input" value={venue} onChange={e => setVenue(e.target.value)} />
-            </label>
-
-            {lineItems.length > 0 && (
-              <div className="rrg-items">
-                {lineItems.map((it, i) => (
-                  <div key={i} className="rrg-item">
-                    <span className="rrg-item__name">{it.name}</span>
-                    <input
-                      className="rrg-item__qty"
-                      type="number" min="1" value={it.qty}
-                      onChange={e => setQty(i, parseInt(e.target.value, 10) || 1)}
-                    />
-                    <span className="rrg-item__price">{money((Number(it.price) || 0) * it.qty)}</span>
-                    <button className="rrg-item__remove" onClick={() => removeItem(i)} aria-label="Remove">×</button>
+          <Card>
+            <CardHeader
+              title="Add items"
+              icon={ListPlus}
+              subtitle={<>Build a test purchase receipt for <strong>{orgName}</strong>. It carries a PackPerks verification token, so receipt verification always accepts it.</>}
+            />
+            <CardBody>
+              <div className="rrg-stack">
+                <Field label="From this organisation’s rewards" htmlFor="rrg-reward" hint={rewards.length === 0 ? 'No published rewards for this organisation yet.' : undefined}>
+                  <div className="rrg-row">
+                    <select id="rrg-reward" className="ui-select" value={pickId} onChange={e => setPickId(e.target.value)}>
+                      <option value="">Select a reward…</option>
+                      {rewards.map(r => (
+                        <option key={r.id} value={r.id}>{r.name} — {money(r.euros)}</option>
+                      ))}
+                    </select>
+                    <Button icon={Plus} onClick={addRewardItem} disabled={!pickId}>Add</Button>
                   </div>
-                ))}
-                <div className="rrg-item rrg-item--total">
-                  <span className="rrg-item__name">Total</span>
-                  <span className="rrg-item__price">{money(total)}</span>
-                </div>
-              </div>
-            )}
+                </Field>
 
-            <button className="rrg-btn rrg-btn--primary rrg-btn--block" onClick={handleGenerate} disabled={generating || lineItems.length === 0}>
-              {generating ? 'Generating…' : 'Generate receipt'}
-            </button>
-            {error && <p className="rrg-error">{error}</p>}
-          </div>
+                <Field
+                  label="Custom item"
+                  htmlFor="rrg-custom"
+                  hint="Anything you like, for example to see whether the AI check can be fooled."
+                >
+                  <div className="rrg-row">
+                    <input id="rrg-custom" className="ui-input" placeholder="Item name" value={customName} onChange={e => setCustomName(e.target.value)} />
+                    <input className="ui-input rrg-input--price" aria-label={`Price in ${symbol}`} type="number" step="0.01" min="0" placeholder={symbol} value={customPrice} onChange={e => setCustomPrice(e.target.value)} />
+                    <Button icon={Plus} onClick={addCustomItem} disabled={!customName.trim()}>Add</Button>
+                  </div>
+                </Field>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Receipt details" icon={ReceiptText} />
+            <CardBody>
+              <div className="rrg-fields">
+                <Field label="Date and time" htmlFor="rrg-date">
+                  <input id="rrg-date" className="ui-input" type="datetime-local" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} />
+                </Field>
+                <Field label="Venue or location" htmlFor="rrg-venue">
+                  <input id="rrg-venue" className="ui-input" value={venue} onChange={e => setVenue(e.target.value)} />
+                </Field>
+              </div>
+
+              {lineItems.length > 0 ? (
+                <div className="rrg-items">
+                  <div className="rrg-items__head">
+                    <span>Item</span>
+                    <span>Qty</span>
+                    <span className="rrg-item__price">Price</span>
+                    <span aria-hidden="true" />
+                  </div>
+                  {lineItems.map((it, i) => (
+                    <div key={i} className="rrg-item">
+                      <span className="rrg-item__name">{it.name}</span>
+                      <input
+                        className="ui-input rrg-item__qty"
+                        aria-label={`Quantity of ${it.name}`}
+                        type="number" min="1" value={it.qty}
+                        onChange={e => setQty(i, parseInt(e.target.value, 10) || 1)}
+                      />
+                      <span className="rrg-item__price">{money((Number(it.price) || 0) * it.qty)}</span>
+                      <Button variant="danger-ghost" size="sm" icon={X} onClick={() => removeItem(i)} aria-label={`Remove ${it.name}`} />
+                    </div>
+                  ))}
+                  <div className="rrg-item rrg-item--total">
+                    <span className="rrg-item__name">Total</span>
+                    <span />
+                    <span className="rrg-item__price">{money(total)}</span>
+                    <span />
+                  </div>
+                </div>
+              ) : (
+                <p className="rrg-items-empty">No items yet. Add at least one above.</p>
+              )}
+
+              {error && (
+                <p className="rrg-error" role="alert">
+                  <AlertCircle size={14} aria-hidden="true" />
+                  {error}
+                </p>
+              )}
+            </CardBody>
+            <div className="rrg-actions">
+              <Button variant="primary" icon={ReceiptText} block onClick={handleGenerate} disabled={generating || lineItems.length === 0}>
+                {generating ? 'Generating…' : 'Generate receipt'}
+              </Button>
+            </div>
+          </Card>
         </div>
 
         {/* Receipt preview */}
-        <div className="rrg-preview-wrap">
+        <Card className="rrg-preview-card">
+          <CardHeader
+            title="Preview"
+            subtitle={receipt ? 'Exactly what the image export shows.' : 'Appears once you generate a receipt.'}
+            actions={(
+              <>
+                <Button size="sm" icon={ImageDown} onClick={() => downloadImage('jpg')} disabled={!receipt || !!exporting}>
+                  {exporting === 'jpg' ? 'Saving…' : 'JPG'}
+                </Button>
+                <Button size="sm" icon={ImageDown} onClick={() => downloadImage('png')} disabled={!receipt || !!exporting}>
+                  {exporting === 'png' ? 'Saving…' : 'PNG'}
+                </Button>
+                <Button size="sm" icon={FileDown} onClick={() => downloadImage('pdf')} disabled={!receipt || !!exporting}>
+                  {exporting === 'pdf' ? 'Saving…' : 'PDF'}
+                </Button>
+              </>
+            )}
+          />
+          <div className="rrg-preview-wrap">
           {receipt ? (
             <div className="rrg-receipt" ref={receiptRef}>
               <div className="rrg-receipt__head">
@@ -301,42 +327,57 @@ export default function RewardsReceiptGenerator() {
               <div className="rrg-receipt__foot">Generated by PackPerks dashboard · not a real purchase</div>
             </div>
           ) : (
-            <div className="rrg-receipt rrg-receipt--placeholder">
-              Add items and click <strong>Generate receipt</strong> to preview.
+            <div className="rrg-placeholder">
+              <ReceiptText size={22} aria-hidden="true" />
+              <span>Add items and press <strong>Generate receipt</strong> to see it here.</span>
             </div>
           )}
-        </div>
+          </div>
+        </Card>
       </div>
 
       {/* Log */}
-      <section className="rrg-log">
-        <header className="rrg-log__head">
-          <h3 className="rrg-log__title">Generated receipts</h3>
-          <p className="rrg-log__sub">Every receipt minted here is logged. Its token is what verification matches against.</p>
-        </header>
-        {logLoading ? (
-          <div className="rrg-log__empty">Loading…</div>
-        ) : log.length === 0 ? (
-          <div className="rrg-log__empty">No receipts generated yet.</div>
-        ) : (
-          <table className="rrg-log__table">
-            <thead>
-              <tr><th>Token</th><th>Items</th><th>Total</th><th>Receipt date</th><th>Generated</th></tr>
-            </thead>
-            <tbody>
-              {log.map(r => (
-                <tr key={r.id}>
-                  <td><code>{r.token}</code></td>
-                  <td>{Array.isArray(r.items) ? r.items.length : 0}</td>
-                  <td>{money(Number(r.total || 0))}</td>
-                  <td className="rrg-log__muted">{r.receipt_date ? fmtDate(r.receipt_date) : '—'}</td>
-                  <td className="rrg-log__muted">{fmtDate(r.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <Card>
+        <CardHeader
+          title="Generated receipts"
+          ruled
+          subtitle="Every receipt made here is logged. Verification matches a receipt by its token."
+        />
+        <CardBody flush>
+          {logLoading && log.length === 0 ? (
+            <p className="rrg-log__loading">Loading…</p>
+          ) : log.length === 0 ? (
+            <EmptyState icon={ReceiptText} title="No receipts yet">
+              Receipts you generate appear here with their token.
+            </EmptyState>
+          ) : (
+            <div className="rrg-table-wrap">
+              <table className="ui-table rrg-table">
+                <thead>
+                  <tr>
+                    <th>Token</th>
+                    <th className="ui-num">Items</th>
+                    <th className="ui-num">Total</th>
+                    <th>Receipt date</th>
+                    <th>Generated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {log.map(r => (
+                    <tr key={r.id}>
+                      <td><code className="rrg-token">{r.token}</code></td>
+                      <td className="ui-num">{Array.isArray(r.items) ? r.items.length : 0}</td>
+                      <td className="ui-num">{money(Number(r.total || 0))}</td>
+                      <td className="rrg-muted">{r.receipt_date ? fmtDate(r.receipt_date) : '—'}</td>
+                      <td className="rrg-muted">{fmtDate(r.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }

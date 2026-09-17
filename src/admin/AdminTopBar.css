@@ -9,47 +9,29 @@
   align-items: center;
   gap: 10px;
   padding: 10px 20px;
-  background: #2D1A1A;
-  border-bottom: 1px solid rgba(248,113,113,0.3);
-  color: #F87171;
-  font-size: 12px;
+  border-bottom: 1px solid #F5CCD7;
+  background: var(--ui-danger-soft, #FDE9EE);
+  color: var(--ui-danger, #D92D55);
+  font-family: var(--ui-font);
+  font-size: 12.5px;
 }
-.admin-publish-error-bar strong { color: #FCA5A5; }
+.admin-publish-error-bar strong { color: #A8173C; }
 .admin-publish-error-bar span:first-of-type { flex: 1; }
-.admin-publish-error-bar__sql {
-  cursor: pointer;
-  background: rgba(248,113,113,0.15);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background 0.15s;
-}
-.admin-publish-error-bar__sql:hover { background: rgba(248,113,113,0.25); }
 .admin-publish-error-bar__close {
-  background: none; border: none; color: #F87171; cursor: pointer;
-  font-size: 16px; line-height: 1; padding: 0 4px;
-}
-
-.admin-topbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  background: var(--pb-purple-600);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.14);
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  gap: 16px;
-  z-index: 200;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
  * Top bar — light, inside the content column (the sidebar carries the
  * brand now). Left: programme model + pause state. Centre: search.
- * Right: what a cup pays, the time zone, help, history, preview, publish.
+ * Right: what a cup pays, the time zone, preview, publish. Master
+ * Settings → Workspace decides which of these show.
  * ───────────────────────────────────────────────────────────────────── */
 .admin-topbar {
   position: fixed;
@@ -173,17 +155,19 @@
   align-items: center;
   gap: 5px;
   height: 30px;
-  padding: 0 10px;
-  border-radius: 9px;
+  padding: 0 9px;
   border: 1px solid var(--ui-border);
-  background: #fff;
+  border-radius: 9px;
+  background: var(--ui-card);
   color: var(--ui-muted);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;
   cursor: default;
 }
-.admin-topbar__tz-offset { opacity: 0.7; font-weight: 500; }
+.admin-topbar__tz svg { color: var(--ui-muted-2); }
+.admin-topbar__tz-code { color: var(--ui-fg-2); font-weight: 700; letter-spacing: 0.02em; }
+.admin-topbar__tz-offset { font-weight: 500; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 1320px) {
   .admin-topbar__tz { display: none; }
@@ -198,137 +182,3 @@
   .tb-paused { animation: none; }
   .admin-topbar { transition: none; }
 }
-
-/* Publish modal */
-.admin-publish-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Light, on-brand confirm dialog — matches the white admin cards/tables rather
- * than the old dark sheet. Also used by the Claims approve/reject + bulk modals. */
-.admin-publish-modal {
-  background: #FFFFFF;
-  border: 1px solid #E8E6E1;
-  border-radius: 18px;
-  padding: 26px;
-  width: 440px;
-  max-width: calc(100vw - 40px);
-  box-shadow: 0 24px 64px rgba(40, 30, 15, 0.22);
-}
-
-.admin-publish-modal__header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 22px;
-}
-
-.admin-publish-modal__icon {
-  width: 40px;
-  height: 40px;
-  background: rgba(214, 35, 0, 0.10);
-  border: 1px solid rgba(214, 35, 0, 0.22);
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--pb-orange-warm);
-  flex-shrink: 0;
-}
-
-.admin-publish-modal__title {
-  color: #1A1A1A;
-  font-size: 16px;
-  font-weight: 800;
-  margin: 0 0 4px;
-}
-
-.admin-publish-modal__sub {
-  color: #6C6259;
-  font-size: 13px;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.admin-publish-modal__label {
-  display: block;
-  color: #8A8175;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 8px;
-}
-
-.admin-publish-modal__input {
-  width: 100%;
-  background: #FBF9F5;
-  border: 1px solid #E6DECE;
-  border-radius: 10px;
-  padding: 11px 14px;
-  color: #1A1A1A;
-  font-size: 14px;
-  font-family: inherit;
-  margin-bottom: 20px;
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.15s, background 0.15s;
-}
-.admin-publish-modal__input:focus {
-  border-color: var(--pb-orange-warm);
-  background: #FFFFFF;
-}
-.admin-publish-modal__input::placeholder {
-  color: #B0A99C;
-}
-
-.admin-publish-modal__actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.admin-publish-modal__cancel {
-  padding: 10px 18px;
-  background: #FFFFFF;
-  border: 1px solid #E2DDD2;
-  border-radius: 10px;
-  color: #6C6259;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s, color 0.15s;
-}
-.admin-publish-modal__cancel:hover {
-  background: #F8F4EC;
-  color: #2A2724;
-}
-
-.admin-publish-modal__confirm {
-  padding: 10px 20px;
-  background: var(--pb-orange-warm);
-  border: none;
-  border-radius: 10px;
-  color: #FFFFFF;
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-  font-family: inherit;
-  transition: filter 0.15s;
-}
-.admin-publish-modal__confirm:hover {
-  filter: brightness(1.06);
-}
-.admin-publish-modal__confirm:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-

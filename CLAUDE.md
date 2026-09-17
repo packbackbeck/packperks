@@ -16,7 +16,7 @@ There are two apps in one codebase:
 ```bash
 npm run dev        # Vite dev server on :5173  (use this, not a bare `vite`)
 npm run build      # what Vercel runs — plain `vite build`, no lint step
-npm run lint       # eslint . — src/ alone has ~205 pre-existing errors
+npm run lint       # eslint . — src/ alone has ~150 pre-existing errors
 ```
 
 `npm run lint` is **not** clean and never has been. Judge your work by whether
@@ -96,8 +96,8 @@ org → group → default.
 account holds one role from `admin_roles`; a role has a **level** and, per
 dashboard tab, `hidden`, `view` or `edit`:
 - **master** — PackBack staff. Every organisation, every tab, and Master
-  Settings (people, roles, organisations, groups, regions, workspace tabs).
-  Only masters add people, roles or organisations.
+  Settings (people, roles, organisations, groups, regions, workspace, data).
+  Only masters add people, roles or organisations, or delete records.
 - **manager** — runs the organisations on their account (`org_ids`, or all of
   them with `all_orgs`). Built-in roles: Manager (changes everything) and
   Viewer (views everything).
@@ -105,7 +105,11 @@ dashboard tab, `hidden`, `view` or `edit`:
 
 Masters add roles of the manager or vendor level in Master Settings → Roles &
 permissions. `workspace:tabs` in `app_config` switches a tab off for
-everyone. A setting with a tab (cup sharing, donations) hides that tab when it
+everyone, `workspace:topbar` hides top-bar items (Publish can't be
+hidden) and `workspace:display` holds display switches (`sparklines: false`
+turns the mini graphs off on every number tile); all three are set in
+Master Settings → Workspace. A tab with an `href`
+(MockupMaster) is a sidebar link to another app, never a dashboard page. A setting with a tab (cup sharing, donations) hides that tab when it
 is off. `tabAvailability()` is the one place that decides whether a tab
 shows, and why not.
 
@@ -138,7 +142,7 @@ access, so any account above vendor may use it.
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
 | `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |
-| `src/admin/master/` | Master Settings: people, roles, organisations, workspace |
+| `src/admin/master/` | Master Settings: people, roles, organisations, groups, regions, workspace, data |
 | `src/admin/lib/adminMoney.js` | `useAdminMoney()` / `adminMoney()` — dashboard currency |
 | `src/admin/lib/demoData.js` | the “Demo numbers” dataset |
 | `src/admin/context/orgState.js` | module-level active org for non-React callers |
@@ -269,6 +273,14 @@ go through edge functions: `delete-my-account` (the customer) and
 `admin-delete-user` (the dashboard). Both call `erase_customer_rows()`, which
 deletes the person but **keeps their claims**, anonymised: they are the
 payout ledger. Erase through that function; don't write a new delete.
+
+**Deleting an organisation's records is one master-only function.**
+Master Settings → Data calls `admin_purge_org_data(org, kinds, from, to)`
+(migration 049): it deletes only the listed kinds of activity record (cup
+scans, claims, customer history, charity transfers, bin sessions, app and
+system events) for one organisation. Customers, balances, rewards and
+printed cups are never deleted there. Add a kind in the function's list and
+in `ORG_DATA_TIME_COLUMN` (adminApi.js) together.
 
 **Customer emails are email only.** Push notifications were removed; the
 `notify_push` column stays and is always false.

@@ -1,12 +1,17 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Check, Dot, ExternalLink, Eye, Gift, GitMerge, Heart, Monitor, Plus, Search, Send, Smartphone, Tablet,
+  Undo2, UserCheck, Users, X,
+} from 'lucide-react';
 import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, deleteGroupAccounts, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
 import PiiMask from '../shared/PiiMask';
-import EmptyState from '../shared/EmptyState';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
 import ColumnPicker from '../shared/ColumnPicker';
+import { Avatar, Notice, SearchBox, SortTh, SplitHandle } from '../shared/opsTable';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, Segmented, Switch } from '../ui';
 import MergeUsersModal from './MergeUsersModal';
 import MergeRequestModal from './MergeRequestModal';
 import './AdminUsers.css';
@@ -30,42 +35,26 @@ function timeAgo(ts) {
  * displayable category + colour. Robust to nulls (legacy rows have no
  * device captured) — those render as a "Unknown" pill. */
 function classifyDevice(device) {
-  if (!device) return { kind: 'unknown', label: '—', tone: 'gray' };
+  if (!device) return { kind: 'unknown', label: '—', tone: 'neutral' };
   const d = device.toLowerCase();
-  if (d.includes('ipad'))      return { kind: 'tablet',  label: device, tone: 'blue' };
-  if (d.includes('iphone'))    return { kind: 'iphone',  label: device, tone: 'blue' };
-  if (d.includes('android'))   return { kind: 'android', label: device, tone: 'green' };
-  if (d.includes('mac'))       return { kind: 'mac',     label: device, tone: 'gray' };
-  if (d.includes('windows'))   return { kind: 'windows', label: device, tone: 'gray' };
-  if (d.includes('linux'))     return { kind: 'linux',   label: device, tone: 'gray' };
-  if (d.includes('web'))       return { kind: 'web',     label: device, tone: 'gray' };
-  return { kind: 'other', label: device, tone: 'gray' };
+  if (d.includes('ipad'))      return { kind: 'tablet',  label: device, tone: 'info' };
+  if (d.includes('iphone'))    return { kind: 'iphone',  label: device, tone: 'info' };
+  if (d.includes('android'))   return { kind: 'android', label: device, tone: 'success' };
+  if (d.includes('mac'))       return { kind: 'mac',     label: device, tone: 'neutral' };
+  if (d.includes('windows'))   return { kind: 'windows', label: device, tone: 'neutral' };
+  if (d.includes('linux'))     return { kind: 'linux',   label: device, tone: 'neutral' };
+  if (d.includes('web'))       return { kind: 'web',     label: device, tone: 'neutral' };
+  return { kind: 'other', label: device, tone: 'neutral' };
 }
+
+const DEVICE_ICON = { iphone: Smartphone, android: Smartphone, tablet: Tablet };
 
 function DeviceBadge({ device }) {
   const meta = classifyDevice(device);
+  const Icon = DEVICE_ICON[meta.kind] || Monitor;
   return (
-    <span className={`au-device au-device--${meta.tone}`} title={device || ''}>
-      {meta.kind === 'iphone' && (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="7" y="2" width="10" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
-        </svg>
-      )}
-      {meta.kind === 'tablet' && (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="4" y="3" width="16" height="18" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
-        </svg>
-      )}
-      {meta.kind === 'android' && (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="7" y="2" width="10" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
-        </svg>
-      )}
-      {(meta.kind === 'mac' || meta.kind === 'windows' || meta.kind === 'linux' || meta.kind === 'web' || meta.kind === 'unknown' || meta.kind === 'other') && (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-      )}
+    <span className={`ui-badge ui-badge--${meta.tone} au-device`} title={device || ''}>
+      <Icon size={11} aria-hidden="true" />
       <span className="au-device__label">{meta.label}</span>
     </span>
   );
@@ -73,31 +62,28 @@ function DeviceBadge({ device }) {
 
 function TypeTag({ visitor }) {
   return (
-    <span className={`au-type au-type--${visitor ? 'visitor' : 'user'}`} title={visitor ? 'Opened the app but took no action yet' : 'Did something real (cup, scan, email, or reward)'}>
-      {visitor ? (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-      ) : (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
-      )}
+    <Badge
+      tone={visitor ? 'neutral' : 'success'}
+      icon={visitor ? Eye : UserCheck}
+      title={visitor ? 'Opened the app but took no action yet' : 'Did something real (cup, scan, email, or reward)'}
+    >
       {visitor ? 'Visitor' : 'User'}
-    </span>
-  );
-}
-
-function SortIcon({ active, dir }) {
-  return (
-    <span className={`au-sort-icon${active ? ' au-sort-icon--active' : ''}`}>
-      {active ? (dir === 'asc' ? '↑' : '↓') : '↕'}
-    </span>
+    </Badge>
   );
 }
 
 const ACT_META = {
-  cup_added:      { color: '#4ADE80', symbol: '+' },
-  reward_claimed: { color: '#FFC52F', symbol: '✓' },
-  cups_withdrawn: { color: '#60A5FA', symbol: '−' },
-  cups_shared:    { color: '#A78BFA', symbol: '→' },
-  cups_donated:   { color: '#4ADE80', symbol: '♥' },
+  cup_added:      { tone: 'emerald', icon: Plus },
+  reward_claimed: { tone: 'amber',   icon: Gift },
+  cups_withdrawn: { tone: 'sky',     icon: Undo2 },
+  cups_shared:    { tone: 'violet',  icon: Send },
+  cups_donated:   { tone: 'rose',    icon: Heart },
+};
+
+const CLAIM_STATUS = {
+  pending:   { tone: 'warning', label: 'Pending' },
+  completed: { tone: 'success', label: 'Approved' },
+  failed:    { tone: 'danger',  label: 'Rejected' },
 };
 
 function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCups = false }) {
@@ -189,37 +175,33 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCup
   }
 
   return (
-    <div className="udp">
-      <div className="udp__header">
-        <div className="udp__avatar">{(user.display_name || '?')[0].toUpperCase()}</div>
+    <div className="ot-panel udp">
+      <div className="ot-panel__head udp__header">
+        <Avatar name={user.display_name} seed={user.id} size={40} />
         <div className="udp__info">
-          <div className="udp__name">{user.display_name || 'Unknown'}</div>
+          <p className="udp__name">{user.display_name || 'Unknown'}</p>
           <div className="udp__email">
             {user.email
               ? <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
               : 'No email'}
           </div>
         </div>
-        <button className="udp__close" onClick={onClose}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        <Button variant="ghost" size="sm" icon={X} aria-label="Close" onClick={onClose} />
       </div>
 
-      <div className="udp__body">
+      <div className="ot-panel__body udp__body">
         <div className="udp__meta-grid">
           {/* Deferred Tikkie has no cup balance to show or adjust — the
               money goes straight out through Tikkie. */}
           {!hideCups && (
             <>
               <div className="udp__meta-item">
-                <span className="udp__meta-label">Cup Balance</span>
+                <span className="udp__meta-label">Cup balance</span>
                 <span className="udp__meta-val udp__meta-val--big">{user.cupBalance}</span>
               </div>
               <div className="udp__meta-item">
-                <span className="udp__meta-label">Lifetime Cups</span>
-                <span className="udp__meta-val">{user.lifetimeCups || 0}</span>
+                <span className="udp__meta-label">Lifetime cups</span>
+                <span className="udp__meta-val udp__meta-val--big udp__meta-val--plain">{user.lifetimeCups || 0}</span>
               </div>
             </>
           )}
@@ -228,123 +210,131 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCup
             <span className="udp__meta-val">{formatDate(user.created_at)}</span>
           </div>
           <div className="udp__meta-item">
-            <span className="udp__meta-label">Last Active</span>
+            <span className="udp__meta-label">Last active</span>
             <span className="udp__meta-val">{timeAgo(user.updated_at)}</span>
           </div>
           <div className="udp__meta-item udp__meta-item--wide">
-            <span className="udp__meta-label">Device / Browser</span>
-            <span className="udp__meta-val udp__meta-val--muted">{user.device || 'Not detected'}</span>
+            <span className="udp__meta-label">Device / browser</span>
+            <span className={`udp__meta-val${user.device ? '' : ' udp__meta-val--muted'}`}>{user.device || 'Not detected'}</span>
           </div>
-          <div className="udp__meta-item udp__meta-item--wide">
-            <span className="udp__meta-label">Marketing email</span>
-            <label className="udp__consent">
-              <input
-                type="checkbox"
-                className="udp__consent-switch"
-                checked={!!user.marketing_consent}
-                onChange={handleToggleMarketing}
-                aria-label="Marketing email consent"
-              />
+          <div className="udp__meta-item udp__meta-item--wide udp__meta-item--row">
+            <span className="udp__consent-text">
+              <span className="udp__meta-label">Marketing email</span>
               <span className="udp__consent-state">{user.marketing_consent ? 'Opted in' : 'Not opted in'}</span>
-            </label>
+            </span>
+            <Switch
+              checked={!!user.marketing_consent}
+              onChange={handleToggleMarketing}
+              label="Marketing email consent"
+            />
           </div>
         </div>
 
         {/* Edit user info */}
-        <div className="udp__section">
+        <section className="udp__section">
           <div className="udp__section-header">
-            <span className="udp__section-title">User Info</span>
+            <h3 className="udp__section-title">User info</h3>
             {!editMode ? (
-              <button className="udp__section-btn" onClick={() => setEditMode(true)}>Edit</button>
+              <Button variant="ghost" size="sm" onClick={() => setEditMode(true)}>Edit</Button>
             ) : (
-              <button className="udp__section-btn udp__section-btn--cancel" onClick={() => { setEditMode(false); setEditError(null); }}>Cancel</button>
+              <Button variant="ghost" size="sm" onClick={() => { setEditMode(false); setEditError(null); }}>Cancel</Button>
             )}
           </div>
           {editMode ? (
-            <div className="udp__edit-form">
-              {editError && <div className="udp__edit-error">{editError}</div>}
-              <label className="udp__edit-label">Display Name</label>
-              <input className="udp__edit-input" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Display name" />
-              <label className="udp__edit-label">Email</label>
-              <input className="udp__edit-input" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email address" type="email" />
-              <button className="udp__adjust-confirm" style={{ width: '100%', marginTop: 4 }} onClick={handleEditSave} disabled={editSaving}>
-                {editSaving ? 'Saving…' : 'Save Changes'}
-              </button>
+            <div className="udp__box">
+              {editError && <div className="udp__edit-error" role="alert">{editError}</div>}
+              <label className="udp__edit-label" htmlFor={`udp-name-${user.id}`}>Display name</label>
+              <input id={`udp-name-${user.id}`} className="ui-input" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Display name" />
+              <label className="udp__edit-label" htmlFor={`udp-email-${user.id}`}>Email</label>
+              <input id={`udp-email-${user.id}`} className="ui-input" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email address" type="email" />
+              <Button variant="primary" size="sm" block className="udp__box-submit" onClick={handleEditSave} disabled={editSaving}>
+                {editSaving ? 'Saving…' : 'Save changes'}
+              </Button>
             </div>
           ) : null}
-        </div>
+        </section>
 
         {/* Balance adjust */}
-        {!hideCups && <div className="udp__section">
+        {!hideCups && <section className="udp__section">
           <div className="udp__section-header">
-            <span className="udp__section-title">Balance</span>
-            <button className="udp__section-btn" onClick={() => setAdjustOpen(v => !v)}>
+            <h3 className="udp__section-title">Balance</h3>
+            <Button variant="ghost" size="sm" onClick={() => setAdjustOpen(v => !v)} aria-expanded={adjustOpen}>
               Adjust manually
-            </button>
+            </Button>
           </div>
           {adjustOpen && (
-            <div className="udp__adjust">
+            <div className="udp__box">
               <div className="udp__adjust-row">
                 <input
                   type="number"
                   min="0"
-                  className="udp__adjust-input"
+                  className="ui-input udp__adjust-input"
                   value={adjustVal}
                   onChange={e => setAdjustVal(parseInt(e.target.value) || 0)}
+                  aria-label="New cup balance"
                 />
                 <span className="udp__adjust-label">cups</span>
               </div>
               <input
-                className="udp__adjust-reason"
+                className="ui-input"
                 placeholder="Reason for adjustment (required)"
                 value={adjustReason}
                 onChange={e => setAdjustReason(e.target.value)}
+                aria-label="Reason for adjustment"
               />
               <div className="udp__adjust-actions">
-                <button className="udp__adjust-cancel" onClick={() => setAdjustOpen(false)}>Cancel</button>
-                <button className="udp__adjust-confirm" onClick={handleAdjust} disabled={!adjustReason.trim() || saving}>
+                <Button variant="outline" size="sm" onClick={() => setAdjustOpen(false)}>Cancel</Button>
+                <Button variant="primary" size="sm" onClick={handleAdjust} disabled={!adjustReason.trim() || saving}>
                   {saving ? 'Saving…' : 'Confirm'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
-        </div>}
+        </section>}
 
         {/* Claims */}
-        <div className="udp__section">
-          <div className="udp__section-title">Claims ({claims.length})</div>
-          {claims.length === 0 ? <div className="udp__empty">No claims yet</div> : (
-            <div className="udp__claim-list">
-              {claims.map(c => (
-                <div key={c.id} className="udp__claim-item">
-                  <span className={`udp__claim-badge udp__claim-badge--${c.status}`}>{c.status}</span>
-                  <span className="udp__claim-type">{c.type === 'cashback' ? 'Cashback' : 'Refund'}</span>
-                  <span className="udp__claim-amount">{money(c.payout_amount || 0)}</span>
-                  <span className="udp__claim-date">{formatDate(c.created_at)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Activity */}
-        <div className="udp__section">
-          <div className="udp__section-title">Activity ({activity.length})</div>
-          {activity.length === 0 ? <div className="udp__empty">No activity yet</div> : (
-            <div className="udp__activity-list">
-              {activity.slice(0, 10).map((item, i) => {
-                const meta = ACT_META[item.type] || { color: '#9E9A93', symbol: '·' };
+        <section className="udp__section">
+          <div className="udp__section-header">
+            <h3 className="udp__section-title">Claims <span className="udp__count">{claims.length}</span></h3>
+          </div>
+          {claims.length === 0 ? <p className="udp__empty">No claims yet</p> : (
+            <ul className="udp__list">
+              {claims.map(c => {
+                const st = CLAIM_STATUS[c.status] || { tone: 'neutral', label: c.status };
                 return (
-                  <div key={i} className="udp__activity-item">
-                    <span className="udp__activity-dot" style={{ background: `${meta.color}20`, color: meta.color }}>{meta.symbol}</span>
-                    <span className="udp__activity-label">{item.label || item.type}</span>
-                    <span className="udp__activity-time">{timeAgo(item.created_at)}</span>
-                  </div>
+                  <li key={c.id} className="udp__claim-item">
+                    <Badge tone={st.tone}>{st.label}</Badge>
+                    <span className="udp__claim-type">{c.type === 'cashback' ? 'Cashback' : 'Refund'}</span>
+                    <span className="udp__claim-amount">{money(c.payout_amount || 0)}</span>
+                    <span className="udp__claim-date">{formatDate(c.created_at)}</span>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
-        </div>
+        </section>
+
+        {/* Activity */}
+        <section className="udp__section">
+          <div className="udp__section-header">
+            <h3 className="udp__section-title">Activity <span className="udp__count">{activity.length}</span></h3>
+          </div>
+          {activity.length === 0 ? <p className="udp__empty">No activity yet</p> : (
+            <ul className="udp__list">
+              {activity.slice(0, 10).map((item, i) => {
+                const meta = ACT_META[item.type] || { tone: 'slate', icon: Dot };
+                const Icon = meta.icon;
+                return (
+                  <li key={i} className="udp__activity-item">
+                    <span className={`udp__activity-dot ui-tone--${meta.tone}`} aria-hidden="true"><Icon size={12} /></span>
+                    <span className="udp__activity-label">{item.label || item.type}</span>
+                    <span className="udp__activity-time">{timeAgo(item.created_at)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -524,71 +514,55 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
     (isCol('lifetime') ? 1 : 0) + (isCol('joined') ? 1 : 0) + (isCol('active') ? 1 : 0);
   const tableColSpan = 2 + valueColCount;
 
-  function ThCol({ label, sortKey: sk, style }) {
-    return (
-      <th style={style} className="au-th--sortable" onClick={() => handleSort(sk)}>
-        {label} <SortIcon active={sortKey === sk} dir={sortDir} />
-      </th>
-    );
-  }
+  const sort = { key: sortKey, dir: sortDir };
+  const th = (label, sk, style, className) => <SortTh label={label} field={sk} sort={sort} onSort={handleSort} style={style} className={className} />;
 
   return (
-    <div className="admin-users">
-      <div className="au-header">
-        <div>
-          <h1 className="au-header__title">Users</h1>
-          <p className="au-header__sub">
-            {loading ? 'Loading…' : `${userCount} user${userCount === 1 ? '' : 's'} · ${visitorCount} visitor${visitorCount === 1 ? '' : 's'}`}
-          </p>
-        </div>
-        <div className="au-header__actions">
-          <label className="au-visitor-toggle" title="Visitors opened the app but took no action yet">
-            <span>Show visitors</span>
-            <input
-              type="checkbox"
-              className="au-switch-input"
-              checked={showVisitors}
-              onChange={e => setShowVisitors(e.target.checked)}
-            />
-            <span className="au-switch" aria-hidden="true"><span className="au-switch__dot" /></span>
-          </label>
-          {grouped && (
-            <ColumnPicker
-              columns={columnConfig}
-              visible={visibleCols}
-              onToggle={toggleCol}
-              onReset={() => setVisibleCols(defaultVisibleCols())}
-            />
-          )}
-        </div>
-      </div>
+    <div className="ui-page au-page">
+      <PageHeader
+        title="Users"
+        subtitle={loading
+          ? 'Customer accounts, balances and merges. Loading…'
+          : `Customer accounts, balances and merges. ${userCount} user${userCount === 1 ? '' : 's'} · ${visitorCount} visitor${visitorCount === 1 ? '' : 's'}.`}
+      >
+        <label className="au-visitor-toggle" title="Visitors opened the app but took no action yet">
+          <span>Show visitors</span>
+          <Switch checked={showVisitors} onChange={setShowVisitors} label="Show visitors" />
+        </label>
+        {grouped && (
+          <ColumnPicker
+            columns={columnConfig}
+            visible={visibleCols}
+            onToggle={toggleCol}
+            onReset={() => setVisibleCols(defaultVisibleCols())}
+          />
+        )}
+      </PageHeader>
 
       <div
         className={`au-layout${selectedUser ? ' au-layout--review' : ''}`}
         ref={layoutRef}
-        style={selectedUser ? { gridTemplateColumns: `minmax(420px, 1fr) 9px ${reviewSplit}px` } : undefined}
+        style={selectedUser ? { gridTemplateColumns: `minmax(360px, 1fr) 12px minmax(300px, ${reviewSplit}px)` } : undefined}
       >
-        <div className="au-table-wrap">
+        <Card className="au-table-wrap">
           <div className="au-search-bar">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9E9A93" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              className="au-search-input"
-              placeholder="Search by name, email, or short ID (first 8 chars)…"
+            <SearchBox
+              className="au-search"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={setSearch}
+              placeholder="Search by name, email, or short ID (first 8 characters)"
+              label="Search users"
             />
           </div>
 
           {loading ? (
             <div className="au-loading">Loading users…</div>
           ) : (
-            <div className="au-table-scroll">
-              <table className="au-table">
+            <div className="ot-table-card au-table-scroll">
+              <table className="ui-table au-table">
                 <thead>
                   <tr>
-                    <th className="bulk-check-cell">
+                    <th className="ot-check">
                       <input
                         type="checkbox"
                         checked={sel.allSelected}
@@ -597,64 +571,54 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                         aria-label="Select all users"
                       />
                     </th>
-                    <ThCol label="User" sortKey="name" />
-                    {isCol('type') && <ThCol label="Type" sortKey="type" style={{ width: 110 }} />}
-                    {isCol('email') && <ThCol label="Email" sortKey="email" />}
-                    {isCol('marketing') && <ThCol label="Marketing" sortKey="marketing" style={{ width: 110 }} />}
-                    {isCol('device') && <ThCol label="Device" sortKey="device" style={{ width: 160 }} />}
+                    {th('User', 'name')}
+                    {isCol('type') && th('Type', 'type', { width: 110 })}
+                    {isCol('email') && th('Email', 'email')}
+                    {isCol('marketing') && th('Marketing', 'marketing', { width: 110 })}
+                    {isCol('device') && th('Device', 'device', { width: 160 })}
                     {grouped
                       ? (
                         <>
                           {orgCols.map(c => isCol(c.id) && (
-                            <ThCol key={c.id} label={c.label} sortKey={c.id} style={{ width: 92 }} />
+                            <SortTh key={c.id} label={c.label} field={c.id} sort={sort} onSort={handleSort} style={{ width: 92 }} className="ui-num" />
                           ))}
-                          {isCol('total') && <ThCol label="Total" sortKey="total" style={{ width: 80 }} />}
+                          {isCol('total') && th('Total', 'total', { width: 80 }, 'ui-num')}
                         </>
                       )
-                      : (!isTikkie && <ThCol label="Cups" sortKey="cups" style={{ width: 80 }} />)}
-                    {isCol('lifetime') && <ThCol label="Lifetime" sortKey="lifetime" style={{ width: 90 }} />}
-                    {isCol('joined') && <ThCol label="Joined" sortKey="joined" style={{ width: 120 }} />}
-                    {isCol('active') && <ThCol label="Last active" sortKey="active" style={{ width: 120 }} />}
+                      : (!isTikkie && th('Cups', 'cups', { width: 80 }, 'ui-num'))}
+                    {isCol('lifetime') && th('Lifetime', 'lifetime', { width: 90 }, 'ui-num')}
+                    {isCol('joined') && th('Joined', 'joined', { width: 120 })}
+                    {isCol('active') && th('Last active', 'active', { width: 120 })}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={tableColSpan} className="au-table__empty">
+                    <tr className="au-empty-row"><td colSpan={tableColSpan}>
                       {users.length === 0 ? (
                         <EmptyState
-                          icon={
-                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                              <circle cx="9" cy="7" r="4" />
-                              <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                              <path d="M16 3.13a4 4 0 010 7.75" />
-                            </svg>
-                          }
+                          icon={Users}
                           title="No customers yet"
-                          body="Once someone opens the user app and scans their first cup, they'll appear here. Try the customer flow yourself to seed test data."
-                          primaryAction={{ label: 'Open user app', onClick: () => window.open('/', '_blank') }}
-                        />
+                          action={<Button variant="outline" size="sm" icon={ExternalLink} onClick={() => window.open('/', '_blank')}>Open user app</Button>}
+                        >
+                          Once someone opens the customer app and scans their first cup, they appear here.
+                        </EmptyState>
                       ) : (
                         <EmptyState
-                          icon={
-                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="11" cy="11" r="8" />
-                              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
-                          }
+                          icon={Search}
                           title="No customers match your filters"
-                          body={`${users.length} customer${users.length === 1 ? '' : 's'} on file — try a shorter search or clear the filter.`}
-                          secondaryAction={{ label: 'Clear search', onClick: () => setSearch('') }}
-                        />
+                          action={<Button variant="outline" size="sm" onClick={() => setSearch('')}>Clear search</Button>}
+                        >
+                          {`${users.length} customer${users.length === 1 ? '' : 's'} on file. Try a shorter search or clear the filter.`}
+                        </EmptyState>
                       )}
                     </td></tr>
                   ) : filtered.map(user => (
                     <tr
                       key={user.id}
-                      className={`au-table__row ${selectedUser?.id === user.id ? 'au-table__row--active' : ''}`}
+                      className={`ot-row${sel.isSelected(user.id) ? ' ot-row--selected' : ''}${selectedUser?.id === user.id ? ' ot-row--active' : ''}`}
                       onClick={() => setSelectedUser(selectedUser?.id === user.id ? null : user)}
                     >
-                      <td className="bulk-check-cell" onClick={e => e.stopPropagation()}>
+                      <td className="ot-check" onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={sel.isSelected(user.id)}
@@ -663,30 +627,27 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                         />
                       </td>
                       <td>
-                        <div className="au-user-cell">
-                          <div className="au-user-avatar">{(user.display_name || '?')[0].toUpperCase()}</div>
-                          <div className="au-user-info">
-                            <span className="au-user-name">{user.display_name || 'Unknown'}</span>
-                            <span
-                              className="au-user-id"
-                              title={`Full ID: ${user.id}`}
-                            >
-                              ID: <span className="au-mono">{user.id.slice(0, 8)}</span>
+                        <div className="ot-person">
+                          <Avatar name={user.display_name} seed={user.id} size={32} />
+                          <div className="ot-person__text">
+                            <span className="ot-person__name">{user.display_name || 'Unknown'}</span>
+                            <span className="ot-person__sub au-user-id" title={`Full ID: ${user.id}`}>
+                              ID <span className="ot-mono">{user.id.slice(0, 8)}</span>
                             </span>
                           </div>
                         </div>
                       </td>
                       {isCol('type') && <td><TypeTag visitor={user.isVisitor} /></td>}
                       {isCol('email') && (
-                        <td className="au-muted" onClick={e => e.stopPropagation()}>
+                        <td className="au-email-cell" onClick={e => e.stopPropagation()}>
                           <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
                         </td>
                       )}
                       {isCol('marketing') && (
                         <td>
                           {user.marketing_consent
-                            ? <span className="au-consent au-consent--on">Opted in</span>
-                            : <span className="au-consent au-consent--off">—</span>}
+                            ? <Badge tone="success" icon={Check}>Opted in</Badge>
+                            : <span className="ot-faint">—</span>}
                         </td>
                       )}
                       {isCol('device') && (
@@ -697,38 +658,33 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                       {grouped ? (
                         <>
                           {orgCols.map(c => isCol(c.id) && (
-                            <td key={c.id}>
-                              <span className="au-cup-badge au-cup-badge--org">{user.orgBalances?.[c.orgId]?.balance || 0}</span>
+                            <td key={c.id} className="ui-num">
+                              <span className="au-cups au-cups--org">{user.orgBalances?.[c.orgId]?.balance || 0}</span>
                             </td>
                           ))}
-                          {isCol('total') && <td><span className="au-cup-badge">{user.cupBalance}</span></td>}
+                          {isCol('total') && <td className="ui-num"><span className="au-cups">{user.cupBalance}</span></td>}
                         </>
                       ) : (
-                        (!isTikkie && <td><span className="au-cup-badge">{user.cupBalance}</span></td>)
+                        (!isTikkie && <td className="ui-num"><span className="au-cups">{user.cupBalance}</span></td>)
                       )}
-                      {isCol('lifetime') && <td className="au-muted">{user.lifetimeCups || 0}</td>}
-                      {isCol('joined') && <td className="au-muted">{formatDate(user.created_at)}</td>}
-                      {isCol('active') && <td className="au-muted">{timeAgo(user.updated_at)}</td>}
+                      {isCol('lifetime') && <td className="ui-num ot-muted">{user.lifetimeCups || 0}</td>}
+                      {isCol('joined') && <td className="ot-date">{formatDate(user.created_at)}</td>}
+                      {isCol('active') && <td className="ot-date">{timeAgo(user.updated_at)}</td>}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
+        </Card>
 
         {selectedUser && (
-          <div
+          <SplitHandle
             className="au-resizer"
             onMouseDown={startSplitDrag}
             onDoubleClick={() => setReviewSplit(420)}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Drag to resize the table and detail panel"
-            title="Drag to resize · double-click to reset"
-          >
-            <span className="au-resizer__grip" aria-hidden="true" />
-          </div>
+            label="Drag to resize the table and detail panel"
+          />
         )}
 
         {selectedUser && (
@@ -784,7 +740,6 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
         }}
       />
 
-
       <MergeRequestsSection focusSection={focusSection} onSectionConsumed={onSectionConsumed} />
     </div>
   );
@@ -803,7 +758,7 @@ const MERGE_TABS = [
   { key: 'all',       label: 'All' },
 ];
 const MERGE_STATUS_TONE = {
-  pending: 'pending', approved: 'approved', rejected: 'denied', completed: 'approved', admin: 'approved',
+  pending: 'warning', approved: 'success', rejected: 'danger', completed: 'success', admin: 'success',
 };
 
 function MergeRequestsSection({ focusSection, onSectionConsumed }) {
@@ -873,57 +828,63 @@ function MergeRequestsSection({ focusSection, onSectionConsumed }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSection, loading]);
 
-  return (
-    <section className="mergereq" id="s-merge-requests" style={{ scrollMarginTop: '72px' }}>
-      <header className="mergereq__head">
-        <div>
-          <h2 className="mergereq__title">Account merge requests</h2>
-          <p className="mergereq__sub">Customers who lost their cups can merge accounts. Over the weekly limit, requests land here for review.</p>
-        </div>
-      </header>
+  const cfgDirty = !(limitInput === String(limit.weeklyLimit) && copyInput === limit.limitCopy);
 
-      {/* Per-org limit + copy */}
-      <div className="mergereq__settings">
-        <div className="mergereq__setting">
-          <label className="mergereq__label" htmlFor="merge-limit">Merges per week (per customer)</label>
-          <div className="mergereq__setting-row">
-            <input id="merge-limit" className="mergereq__num" type="number" min="0" max="20" value={limitInput}
+  return (
+    <Card as="section" className="mergereq" id="s-merge-requests" style={{ scrollMarginTop: '84px' }}>
+      <CardHeader
+        title="Account merge requests"
+        icon={GitMerge}
+        subtitle="Customers who lost their cups can merge accounts. Over the weekly limit, requests land here for review."
+        ruled
+      />
+
+      <CardBody className="mergereq__body">
+        {/* Per-org limit + copy */}
+        <div className="mergereq__settings">
+          <div className="mergereq__setting">
+            <label className="ui-field__label" htmlFor="merge-limit">Merges per customer, per week</label>
+            <input id="merge-limit" className="ui-input mergereq__num" type="number" min="0" max="20" value={limitInput}
               onChange={(e) => setLimitInput(e.target.value)} disabled={!activeOrgId || savingCfg} />
+            <span className="ui-field__hint">Above this, requests wait for review.</span>
+          </div>
+          <div className="mergereq__setting mergereq__setting--wide">
+            <label className="ui-field__label" htmlFor="merge-copy">“Limit reached” message shown to the customer</label>
+            <textarea id="merge-copy" className="ui-textarea mergereq__copy" rows={2} value={copyInput}
+              onChange={(e) => setCopyInput(e.target.value)} disabled={!activeOrgId || savingCfg}
+              placeholder={MERGE_LIMIT_DEFAULT.limitCopy} />
+          </div>
+          <div className="mergereq__settings-foot">
+            <Button variant="primary" size="sm" onClick={saveCfg}
+              disabled={!activeOrgId || savingCfg || !cfgDirty}>
+              {savingCfg ? 'Saving…' : 'Save limit'}
+            </Button>
+            {cfgMsg && <span className={`mergereq__cfg-msg${cfgMsg === 'Saved' ? '' : ' mergereq__cfg-msg--error'}`} role="status">{cfgMsg}</span>}
           </div>
         </div>
-        <div className="mergereq__setting mergereq__setting--wide">
-          <label className="mergereq__label" htmlFor="merge-copy">“Limit reached” message shown to the customer</label>
-          <textarea id="merge-copy" className="mergereq__copy" rows={2} value={copyInput}
-            onChange={(e) => setCopyInput(e.target.value)} disabled={!activeOrgId || savingCfg}
-            placeholder={MERGE_LIMIT_DEFAULT.limitCopy} />
-        </div>
-        <div className="mergereq__settings-foot">
-          {cfgMsg && <span className="mergereq__cfg-msg">{cfgMsg}</span>}
-          <button className="mergereq__save" onClick={saveCfg}
-            disabled={!activeOrgId || savingCfg || (limitInput === String(limit.weeklyLimit) && copyInput === limit.limitCopy)}>
-            {savingCfg ? 'Saving…' : 'Save limit'}
-          </button>
-        </div>
-      </div>
 
-      <div className="mergereq__tabs">
-        {MERGE_TABS.map((t) => (
-          <button key={t.key} className={`mergereq__tab${tab === t.key ? ' mergereq__tab--on' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
-        ))}
-      </div>
+        <div className="mergereq__tabs">
+          <Segmented
+            ariaLabel="Filter merge requests"
+            value={tab}
+            onChange={setTab}
+            options={MERGE_TABS.map(t => ({ id: t.key, label: t.label }))}
+          />
+        </div>
 
-      {error && <div className="mergereq__error">{error}</div>}
-      {notice && <div className="mergereq__notice">{notice}</div>}
+        {error && <Notice tone="danger">{error}</Notice>}
+        {notice && <Notice tone="success">{notice}</Notice>}
+      </CardBody>
 
       {loading ? (
-        <div className="mergereq__empty">Loading…</div>
+        <p className="mergereq__empty">Loading…</p>
       ) : rows.length === 0 ? (
-        <div className="mergereq__empty">
-          {tab === 'pending' ? 'No merge requests waiting for review.' : 'Nothing here.'}
-        </div>
+        <EmptyState icon={GitMerge} title={tab === 'pending' ? 'No merge requests waiting for review' : 'Nothing here'}>
+          {tab === 'pending' ? 'Requests over the weekly limit will show up here.' : null}
+        </EmptyState>
       ) : (
         <div className="mergereq__table-wrap">
-          <table className="mergereq__table">
+          <table className="ui-table mergereq__table">
             <thead>
               <tr>
                 <th>Customer</th><th>Accounts</th><th>Source</th><th>Reason</th><th>When</th><th>Status</th><th>Decided by</th><th className="mergereq__th-actions">Actions</th>
@@ -931,41 +892,48 @@ function MergeRequestsSection({ focusSection, onSectionConsumed }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="mergereq__row" onClick={() => setActiveReq(r)} title="Open review">
+                <tr key={r.id} className="ot-row" onClick={() => setActiveReq(r)} title="Open review">
                   <td>
-                    <div className="mergereq__cust">{r.survivorName || 'Anonymous'}</div>
-                    {r.survivorEmail && <div className="mergereq__cust-sub">{r.survivorEmail}</div>}
+                    <div className="ot-person">
+                      <Avatar name={r.survivorName || 'Anonymous'} seed={r.survivorEmail || r.id} size={28} />
+                      <div className="ot-person__text">
+                        <span className="ot-person__name">{r.survivorName || 'Anonymous'}</span>
+                        {r.survivorEmail && <span className="ot-person__sub">{r.survivorEmail}</span>}
+                      </div>
+                    </div>
                   </td>
-                  <td>{r.absorbedCount + 1} → 1</td>
-                  <td className="mergereq__muted">{r.source === 'restore' ? 'Lost cups' : r.source === 'admin' ? 'Admin' : 'Merge offer'}</td>
-                  <td className="mergereq__muted">{r.reason || '—'}</td>
-                  <td className="mergereq__when">{formatDate(r.requested_at)}</td>
+                  <td className="ot-num">{r.absorbedCount + 1} → 1</td>
+                  <td className="ot-muted">{r.source === 'restore' ? 'Lost cups' : r.source === 'admin' ? 'Admin' : 'Merge offer'}</td>
+                  <td className="ot-muted mergereq__reason">{r.reason || '—'}</td>
+                  <td className="ot-date">{formatDate(r.requested_at)}</td>
                   <td>
-                    <span className={`mergereq__pill mergereq__pill--${MERGE_STATUS_TONE[r.status] || 'pending'}`}>{r.status}</span>
-                    {r.decided_at && r.status !== 'pending' && <div className="mergereq__cust-sub">{formatDate(r.decided_at)}</div>}
+                    <Badge tone={MERGE_STATUS_TONE[r.status] || 'warning'}>
+                      <span className="mergereq__status">{r.status}</span>
+                    </Badge>
+                    {r.decided_at && r.status !== 'pending' && <div className="mergereq__sub">{formatDate(r.decided_at)}</div>}
                   </td>
                   <td>
                     {r.decider ? (
                       <span className="mergereq__decider" title={r.decider.email}>
-                        <span className="mergereq__decider-avatar" style={{ background: r.decider.color || '#5333A5' }}>
+                        <span className="mergereq__decider-avatar" style={{ background: r.decider.color || 'var(--ui-primary)' }}>
                           {r.decider.avatar_url
                             ? <img src={r.decider.avatar_url} alt="" />
                             : (r.decider.display_name || r.decider.email || '?')[0].toUpperCase()}
                         </span>
                         {r.decider.display_name || (r.decider.email || '').split('@')[0]}
                       </span>
-                    ) : <span className="mergereq__muted">—</span>}
+                    ) : <span className="ot-faint">—</span>}
                   </td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td className="mergereq__actions-cell" onClick={(e) => e.stopPropagation()}>
                     {r.status === 'pending' ? (
                       <div className="mergereq__actions">
-                        <button className="mergereq__btn mergereq__btn--approve" disabled={busyId === r.id} onClick={() => decide(r.id, 'approve')}>
+                        <Button variant="danger-ghost" size="sm" className="mergereq__reject" disabled={busyId === r.id} onClick={() => decide(r.id, 'reject')}>Reject</Button>
+                        <Button variant="primary" size="sm" disabled={busyId === r.id} onClick={() => decide(r.id, 'approve')}>
                           {busyId === r.id ? '…' : 'Approve'}
-                        </button>
-                        <button className="mergereq__btn mergereq__btn--deny" disabled={busyId === r.id} onClick={() => decide(r.id, 'reject')}>Reject</button>
+                        </Button>
                       </div>
                     ) : (
-                      <span className="mergereq__muted">
+                      <span className="ot-muted">
                         {r.merged_balance != null ? `${r.merged_balance} cups merged` : '—'}
                       </span>
                     )}
@@ -985,6 +953,6 @@ function MergeRequestsSection({ focusSection, onSectionConsumed }) {
           onDecide={(action) => decide(activeReq.id, action)}
         />
       )}
-    </section>
+    </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, History, KeyRound, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
+import { Building2, DatabaseZap, History, KeyRound, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
 import { useAccess } from '../context/accessCtx';
 import { useOrg } from '../context/OrgContext';
 import { useViewRole } from '../context/ViewRole';
@@ -10,6 +10,7 @@ import PeoplePanel from './PeoplePanel';
 import RolesPanel from './RolesPanel';
 import OrganisationsPanel from './OrganisationsPanel';
 import WorkspacePanel from './WorkspacePanel';
+import DataPanel from './DataPanel';
 import './MasterSettings.css';
 
 const TABS = [
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'roles', label: 'Roles & permissions', icon: KeyRound },
   { id: 'organisations', label: 'Organisations', icon: Building2 },
   { id: 'workspace', label: 'Workspace', icon: LayoutGrid },
+  { id: 'data', label: 'Data', icon: DatabaseZap },
   { id: 'activity', label: 'Activity log', icon: History },
 ];
 
@@ -25,12 +27,13 @@ const SECTION_TO = {
   people: ['people'], team: ['people'], roles: ['roles'], permissions: ['roles'],
   organisations: ['organisations', 'organisations'], organisation: ['organisations', 'organisations'],
   groups: ['organisations', 'groups'], regions: ['organisations', 'regions'],
-  workspace: ['workspace'], activity: ['activity'],
+  workspace: ['workspace'], data: ['data'], activity: ['activity'],
 };
 
 /* ─────────────────────────────────────────────────────────────────────
  * Master Settings — PackBack staff only. Who has access and to what
- * (people, roles, organisations) and which tabs exist at all.
+ * (people, roles, organisations), how the workspace looks, and deleting
+ * an organisation's records.
  * ───────────────────────────────────────────────────────────────────── */
 export default function AdminMasterSettings({ onNavigate, onAddOrg, section, draftState }) {
   const { access } = useViewRole();
@@ -74,7 +77,7 @@ export default function AdminMasterSettings({ onNavigate, onAddOrg, section, dra
     <div className="ui-page ms-page">
       <PageHeader
         title="Master settings"
-        subtitle="Who can use the dashboard, what each role allows, every organisation, and which tabs exist."
+        subtitle="Who can use the dashboard, what each role allows, every organisation, the workspace and its data."
       >
         <Badge tone="primary" icon={ShieldCheck}>Master</Badge>
         <Badge tone="neutral">{rolesList.length} roles</Badge>
@@ -97,8 +100,9 @@ export default function AdminMasterSettings({ onNavigate, onAddOrg, section, dra
           />
         )}
         {tab === 'workspace' && <WorkspacePanel />}
+        {tab === 'data' && <DataPanel orgs={orgs} />}
         {tab === 'activity' && (
-          <Card className="ms-legacy">
+          <Card>
             <CardBody flush>
               <AdminActivityLog embedded />
             </CardBody>

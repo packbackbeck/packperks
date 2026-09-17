@@ -1,183 +1,63 @@
+/* Receipt review styles. Used by the Claims review panel (ClaimDetailPanel)
+ * and the standalone Receipt check page. Shared pieces: ui/ui.css and
+ * shared/opsTable.css (panel shell, key/value rows, callouts). */
+
+/* ── Standalone Receipt check page ──────────────────────────────────── */
 .admin-receipt-check {
-  padding: 28px 28px 32px;
-  display: flex;
-  flex-direction: column;
   height: calc(100vh - var(--topbar-h, 64px));
   overflow: hidden;
-  gap: 12px;
+  gap: 14px;
+  padding-bottom: 20px;
+}
+.admin-receipt-check > * { flex-shrink: 0; }
+.rc-search { flex: 1; max-width: 300px; }
+.rc-layout {
+  flex: 1 1 auto !important;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  min-height: 0;
+}
+.rc-layout > .ot-table-card { height: 100%; }
+.rc-table td { padding-top: 8px; padding-bottom: 8px; }
+.rc-table td:first-child, .rc-table th:first-child { padding-left: 16px; }
+@media (max-width: 1000px) {
+  .rc-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
-.rc-header { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; }
-.rc-header__title { font-size: 22px; font-weight: 800; color: #1A1A1A; margin: 0 0 8px; }
-.rc-header__sub { display: flex; align-items: center; gap: 6px; margin: 0; flex-wrap: wrap; }
-.rc-header__link {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 13px; background: #FFFFFF; border: 1px solid #E8E6E1; border-radius: 8px;
-  font-size: 12px; font-weight: 600; color: #4A4540; cursor: pointer; font-family: inherit; transition: all 0.15s;
-  margin-top: 2px; flex-shrink: 0;
+/* ── Review panel ───────────────────────────────────────────────────── */
+.ot-panel.rc-detail { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--ui-border-2) transparent; }
+.ot-panel.rc-detail--empty { overflow: hidden; }
+.rc-detail__header { position: sticky; top: 0; z-index: 4; background: var(--ui-card); }
+.rc-detail__body { display: flex; flex-direction: column; gap: 16px; padding: 16px 18px 18px; }
+
+/* Photo */
+.rc-detail__photo-wrap { position: relative; flex-shrink: 0; border-bottom: 1px solid var(--ui-border); }
+.rc-detail__photo {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  background: #17151F;
+  cursor: zoom-in;
 }
-.rc-header__link:hover { background: #F8F4EC; border-color: #C8C4BC; }
-
-.rc-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
-.rc-chip--pending   { background: rgba(249,115,22,0.12); color: #EA580C; }
-.rc-chip--completed { background: rgba(74,222,128,0.12);  color: #16A34A; }
-.rc-chip--failed    { background: rgba(248,113,113,0.12); color: #DC2626; }
-.rc-chip--neutral   { background: #F0EDE8; color: #7A7166; }
-
-.rc-error-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 8px 14px; background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
-  border-radius: 8px; font-size: 12px; color: #DC2626; flex-shrink: 0;
-}
-.rc-error-bar button { background: none; border: none; color: inherit; cursor: pointer; font-size: 16px; padding: 0; }
-
-.rc-toolbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.rc-filter-group { display: flex; gap: 6px; }
-.rc-filter-btn {
-  padding: 5px 13px; background: #FFFFFF; border: 1px solid #E8E6E1; border-radius: 20px;
-  font-size: 12px; font-weight: 600; color: #7A7166; cursor: pointer; font-family: inherit; transition: all 0.15s;
-}
-.rc-filter-btn--active { background: #1A1A1A; border-color: #1A1A1A; color: #FFFFFF; }
-.rc-filter-btn:hover:not(.rc-filter-btn--active) { background: #F8F4EC; }
-
-.rc-search-wrap {
-  display: flex; align-items: center; gap: 7px; background: #FFFFFF; border: 1px solid #E8E6E1;
-  border-radius: 20px; padding: 5px 12px; flex: 1; max-width: 280px;
-}
-.rc-search { flex: 1; border: none; outline: none; font-size: 12px; font-family: inherit; color: #1A1A1A; background: transparent; }
-.rc-search::placeholder { color: #9E9A93; }
-
-.rc-layout { display: grid; grid-template-columns: 1fr 360px; gap: 14px; flex: 1; min-height: 0; }
-
-.rc-table-wrap {
-  background: #FFFFFF; border: 1px solid #E8E6E1; border-radius: 14px;
-  overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  scrollbar-width: thin; scrollbar-color: #E0DDD8 transparent;
-}
-.rc-loading { display: flex; align-items: center; justify-content: center; height: 200px; color: #6C6259; font-size: 13px; }
-
-.rc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.rc-table thead tr { border-bottom: 1px solid #F0EDE8; position: sticky; top: 0; background: #FAFAF8; z-index: 1; }
-.rc-table th { padding: 10px 12px; font-size: 10px; font-weight: 700; color: #6C6259; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; white-space: nowrap; }
-.rc-th--sortable { cursor: pointer; user-select: none; }
-.rc-th--sortable:hover { color: #4A4540; }
-.rc-sort-icon { margin-left: 3px; color: #C8C4BC; font-size: 10px; }
-.rc-sort-icon--active { color: var(--pb-orange-warm); }
-
-.rc-table__row { border-bottom: 1px solid #F8F6F3; transition: background 0.1s; cursor: pointer; }
-.rc-table__row:hover { background: #FAFAF8; }
-.rc-table__row--active { background: #FFF8F6 !important; }
-.rc-table td { padding: 10px 12px; vertical-align: middle; }
-.rc-table__empty { text-align: center; color: #9E9A93; padding: 40px 0 !important; font-size: 13px; }
-
-.rc-thumb { width: 44px; height: 44px; border-radius: 7px; overflow: hidden; background: #F0EDE8; flex-shrink: 0; }
-.rc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.rc-thumb--empty { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 7px; background: #F8F4EC; border: 1.5px dashed #D5D1CB; }
-
-.rc-user-cell { display: flex; align-items: center; gap: 8px; }
-.rc-user-avatar { width: 28px; height: 28px; border-radius: 50%; background: #F0EDE8; color: #4A4540; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.rc-user-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.rc-user-name { font-size: 12px; font-weight: 600; color: #1A1A1A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rc-user-email { font-size: 10px; color: #6C6259; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.rc-status { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; text-transform: capitalize; white-space: nowrap; }
-.rc-status--pending   { background: rgba(249,115,22,0.12); color: #EA580C; }
-.rc-status--completed { background: rgba(74,222,128,0.12);  color: #16A34A; }
-.rc-status--failed    { background: rgba(248,113,113,0.12); color: #DC2626; }
-
-.rc-muted  { color: #7A7166; }
-.rc-bold   { font-weight: 700; color: #1A1A1A; }
-.rc-green  { color: var(--pb-green); }
-.rc-center { text-align: center; }
-.rc-date   { font-size: 11px; white-space: nowrap; }
-
-/* Detail panel */
-.rc-detail {
-  background: #FFFFFF; border: 1px solid #E8E6E1; border-radius: 14px;
-  display: flex; flex-direction: column; overflow-y: auto;
-  scrollbar-width: thin; scrollbar-color: #E0DDD8 transparent;
-}
-.rc-detail--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #9E9A93; font-size: 13px; }
-
-.rc-detail__header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #F0EDE8; flex-shrink: 0; }
-.rc-detail__title { font-size: 14px; font-weight: 700; color: #1A1A1A; }
-.rc-detail__id { font-size: 10px; color: #6C6259; font-family: monospace; margin-top: 2px; }
-.rc-detail__claims-link {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 9px; background: #F8F4EC; border: 1px solid #E8E6E1; border-radius: 6px;
-  font-size: 10px; font-weight: 700; color: #4A4540; cursor: pointer; font-family: inherit; transition: all 0.15s;
-}
-.rc-detail__claims-link:hover { background: #ECEAE5; }
-
-.rc-detail__photo-wrap { position: relative; flex-shrink: 0; border-bottom: 1px solid #F0EDE8; }
-.rc-detail__photo { width: 100%; display: block; max-height: 260px; object-fit: contain; background: #0A0A0A; cursor: zoom-in; }
 .rc-detail__photo-hint {
-  position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.75);
-  background: rgba(0,0,0,0.45); padding: 2px 7px; border-radius: 4px;
-  display: flex; align-items: center; gap: 4px; pointer-events: none;
-}
-.rc-detail__photo-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; padding: 32px 16px; color: #9E9A93; font-size: 12px; background: #FAFAF8;
-}
-.rc-detail__photo-sub { font-size: 10px; color: #C8C4BC; }
-
-.rc-detail__rows { padding: 12px 16px; display: flex; flex-direction: column; gap: 0; border-bottom: 1px solid #F0EDE8; }
-.rc-detail__section-label { font-size: 9px; font-weight: 700; color: #9E9A93; text-transform: uppercase; letter-spacing: 0.8px; padding: 4px 0 2px; }
-.rc-detail__row { display: flex; align-items: flex-start; justify-content: space-between; padding: 5px 0; font-size: 12px; gap: 12px; border-bottom: 1px solid #F8F6F3; }
-.rc-detail__row:last-child { border-bottom: none; }
-.rc-detail__row-label { color: #6C6259; flex-shrink: 0; }
-.rc-detail__row-val { color: #1A1A1A; text-align: right; word-break: break-all; }
-.rc-detail__row-val--bold { font-weight: 700; }
-.rc-detail__row-val--muted { color: #7A7166; }
-.rc-detail__row-val--mono { font-family: monospace; font-size: 10px; }
-.rc-detail__row-val--green { color: var(--pb-green); font-weight: 700; }
-
-.rc-detail__actions { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-.rc-detail__actions-hint { font-size: 11px; color: #6C6259; margin: 0; line-height: 1.4; }
-
-/* Amber "approve is gated" warning shown above the action buttons when
- * the receipt photo can't be viewed. Same tone as the AI-uncertain
- * verdict callout so the two surfaces feel consistent. */
-.rc-detail__actions-warn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 9px 11px;
-  margin: 0 0 8px;
-  background: #FFF1CC;
-  border: 1px solid #F2D38B;
-  border-radius: 8px;
-  color: #7C5A00;
-  font-size: 12px;
-  line-height: 1.4;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(15, 13, 22, 0.6);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
 }
-.rc-detail__actions-warn svg { flex-shrink: 0; margin-top: 1px; color: #D69500; }
-
-/* "Retry image" button surfaced when sign-URL fetch failed. Same
- * neutral chip style as our ghost buttons so it doesn't compete with
- * the primary action below. */
-.rc-detail__photo-retry {
-  margin-top: 8px;
-  padding: 6px 14px;
-  background: #FFFFFF;
-  border: 1px solid #E5DECF;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: #4A4540;
-  cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease;
-}
-.rc-detail__photo-retry:hover {
-  background: #F8F4EC;
-  border-color: #DCD3C1;
-}
-
-/* "Hide image" button overlay — sits in the top-right of the photo
- * area, only visible to admins with claim.hide_image. Subtle so it
- * doesn't compete with the "Click to enlarge" hint at the bottom. */
+/* "Hide image" — top-right of the photo, only for admins with claim.hide_image. */
 .rc-detail__photo-hide {
   position: absolute;
   top: 10px;
@@ -185,314 +65,282 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 9px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(15, 15, 15, 0.6);
-  color: #FFFFFF;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 13, 22, 0.6);
+  color: #fff;
+  font: 600 12px/1 var(--ui-font);
   cursor: pointer;
   backdrop-filter: blur(4px);
-  transition: background 0.14s ease, border-color 0.14s ease;
+  transition: background-color 0.15s, border-color 0.15s;
 }
-.rc-detail__photo-hide:hover {
-  background: rgba(199, 62, 29, 0.85);
-  border-color: rgba(255, 255, 255, 0.6);
-}
+.rc-detail__photo-hide:hover { background: rgba(217, 45, 85, 0.9); border-color: rgba(255, 255, 255, 0.4); }
 
-/* Hidden-image placeholder (renders in place of the photo when
- * claim.image_hidden = true). Two tones, mirroring the table thumb:
- *   --ai    → AI moderator caught it (red)
+.rc-detail__photo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 26px 18px;
+  background: #FAFAFC;
+  text-align: center;
+}
+.rc-detail__photo-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 2px;
+  border-radius: 12px;
+  background: var(--ui-soft-2);
+  color: var(--ui-muted);
+}
+.rc-detail__photo-empty--failed .rc-detail__photo-icon { background: var(--ui-danger-soft); color: var(--ui-danger); }
+.rc-detail__photo-title { font-size: 13px; font-weight: 700; color: var(--ui-fg); }
+.rc-detail__photo-empty--failed .rc-detail__photo-title { color: var(--ui-danger); }
+.rc-detail__photo-sub { max-width: 300px; font-size: 12px; line-height: 1.45; color: var(--ui-muted); }
+.rc-detail__photo-retry { margin-top: 6px; }
+
+/* Hidden-image placeholder, in place of the photo:
+ *   --ai    → content moderation caught it (rose)
  *   --admin → an admin chose to hide it (amber) */
 .rc-detail__hidden {
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
-  padding: 28px 20px 24px;
-  gap: 8px;
-  background: #FAF8F3;
-  border-bottom: 1px solid #F0EDE8;
-}
-.rc-detail__hidden--ai {
-  background: rgba(199, 62, 29, 0.06);
-}
-.rc-detail__hidden--admin {
-  background: rgba(214, 149, 0, 0.06);
-}
-.rc-detail__hidden-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 2px;
-}
-.rc-detail__hidden--ai    .rc-detail__hidden-icon { color: #C73E1D; }
-.rc-detail__hidden--admin .rc-detail__hidden-icon { color: #8A5A00; }
-
-.rc-detail__hidden-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0F0F0F;
-}
-.rc-detail__hidden-sub {
-  font-size: 11px;
-  color: #6B645B;
-}
-.rc-detail__hidden-date {
-  color: #9E9A93;
-}
-.rc-detail__hidden-help {
-  margin: 4px 12px 6px;
-  font-size: 11px;
-  color: #6B645B;
-  line-height: 1.5;
-  max-width: 280px;
-}
-.rc-detail__hidden-unhide {
-  margin-top: 4px;
-  padding: 6px 14px;
-  border-radius: 7px;
-  border: 1px solid #D6CFC2;
-  background: #FFFFFF;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: #5A554F;
-  cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
-}
-.rc-detail__hidden-unhide:hover:not(:disabled) {
-  background: #F4EFE5;
-  color: #0F0F0F;
-}
-.rc-detail__hidden-unhide:disabled { opacity: 0.5; cursor: not-allowed; }
-.rc-detail__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.rc-detail__btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border: none; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-.rc-detail__btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.rc-detail__btn--approve { background: #D4EDDA; color: var(--pb-green); }
-.rc-detail__btn--approve:not(:disabled):hover { background: #b8dfc5; }
-.rc-detail__btn--fail    { background: rgba(220,38,38,0.1); color: #DC2626; }
-.rc-detail__btn--fail:not(:disabled):hover { background: rgba(220,38,38,0.18); }
-
-.rc-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 9000; padding: 24px; cursor: zoom-out; }
-.rc-lightbox__close { position: absolute; top: 16px; right: 20px; width: 36px; height: 36px; background: rgba(255,255,255,0.15); border: none; border-radius: 50%; color: #FFFFFF; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.rc-lightbox__close:hover { background: rgba(255,255,255,0.25); }
-.rc-lightbox__img { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; border-radius: 8px; cursor: default; box-shadow: 0 8px 40px rgba(0,0,0,0.6); }
-
-/* ── AI verdict panel ───────────────────────────────────────────────────── */
-.rc-ai-panel {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid #E8E2D9;
-  background: #FFFDF9;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.rc-ai-panel--pass      { border-color: #BDE5C6; background: #F1FAF3; }
-.rc-ai-panel--fail      { border-color: #F4C4BC; background: #FFF5F2; }
-.rc-ai-panel--uncertain { border-color: #F2D38B; background: #FFF8E7; }
-.rc-ai-panel--empty     { border-style: dashed; background: #FAF8F4; }
-
-/* Amber "needs manual review" callout shown when all three boolean
- * checks came back true but the model's own confidence is below the
- * pass threshold. Prevents the "0% confident + all green" trust bug. */
-.rc-ai-panel__override {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
-  background: #FFF1CC;
-  border: 1px solid #F2D38B;
-  border-radius: 8px;
-  color: #7C5A00;
-  font-size: 12px;
-  line-height: 1.45;
-}
-.rc-ai-panel__override svg { flex-shrink: 0; margin-top: 1px; color: #D69500; }
-.rc-ai-panel__override strong { font-weight: 700; }
-
-.rc-ai-panel__confidence--low {
-  background: #F2D38B !important;
-  color: #7C5A00 !important;
-}
-
-.rc-ai-panel__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.rc-ai-panel__title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #6B645B;
-}
-.rc-ai-panel__empty { font-size: 12px; color: #6C6259; font-style: italic; }
-.rc-ai-panel__confidence {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.05);
-  color: #3B3833;
-}
-.rc-ai-panel--pass      .rc-ai-panel__confidence { background: var(--pb-green); color: white; }
-.rc-ai-panel--fail      .rc-ai-panel__confidence { background: #C73E1D; color: white; }
-.rc-ai-panel--uncertain .rc-ai-panel__confidence { background: #D69500; color: white; }
-
-/* Right side of the AI panel header — holds the manual-review pill
- * (when present) and the confidence chip. Gap keeps them visually
- * paired without collapsing into one click target. */
-.rc-ai-panel__header-right {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
+  padding: 24px 20px 20px;
+  background: var(--ui-soft);
+  text-align: center;
 }
+.rc-detail__hidden--ai { background: var(--ui-danger-soft); }
+.rc-detail__hidden--admin { background: var(--ui-warning-soft); }
+.rc-detail__hidden-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow-sm);
+}
+.rc-detail__hidden--ai .rc-detail__hidden-icon { color: var(--ui-danger); }
+.rc-detail__hidden--admin .rc-detail__hidden-icon { color: var(--ui-warning); }
+.rc-detail__hidden-title { font-size: 13.5px; font-weight: 700; color: var(--ui-fg); }
+.rc-detail__hidden-sub { font-size: 12px; color: var(--ui-fg-2); }
+.rc-detail__hidden-date { color: var(--ui-muted); }
+.rc-detail__hidden-help { max-width: 290px; margin: 2px 12px 6px; font-size: 12px; line-height: 1.5; color: var(--ui-muted); }
+.rc-detail__hidden-unhide { margin-top: 2px; }
 
-/* "Manual review needed" pill, surfaced when AI confidence is below
- * the manual-review threshold even if every check passed. Yellow tone
- * mirrors the existing `uncertain` panel skin. */
-.rc-ai-panel__pill {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  text-transform: uppercase;
-}
-.rc-ai-panel__pill--review {
-  background: rgba(214, 149, 0, 0.18);
-  color: #8A5A00;
-  border: 1px solid rgba(214, 149, 0, 0.45);
-}
+/* Rows */
+.rc-detail__rows { display: flex; flex-direction: column; }
+.rc-detail__label-gap { margin-top: 16px; }
+.rc-detail__capital { text-transform: capitalize; }
+.rc-detail__link { color: var(--ui-primary); text-decoration: underline; text-underline-offset: 2px; }
+.rc-detail__link:hover { color: var(--ui-primary-hover); }
+.rc-detail__voucher { margin: 0; }
 
-/* Inline failure code shown next to the friendly label in the check
- * list, e.g. "Real KFC receipt · Wrong brand". Keeps the human-
- * readable description first while still surfacing the raw failure
- * category to admins who need it for triage. */
-.rc-ai-check__code {
-  font-weight: 600;
-  color: #C73E1D;
-  margin-left: 2px;
-}
-
-.rc-ai-panel__checks {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px 0;
-}
-.rc-ai-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.rc-ai-check__dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+/* "Mark for a second look" */
+.rc-flag {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  gap: 7px;
+  width: 100%;
+  height: 36px;
+  margin-top: 14px;
+  padding: 0 12px;
+  border: 1px dashed var(--ui-border-2);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ui-muted);
+  font: 600 13px/1 var(--ui-font);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
-.rc-ai-check--pass { color: #1A1A1A; }
-.rc-ai-check--pass .rc-ai-check__dot { background: #DFF5E3; color: var(--pb-green); }
-.rc-ai-check--fail { color: #C73E1D; }
-.rc-ai-check--fail .rc-ai-check__dot { background: #FFE0DC; color: #C73E1D; }
+.rc-flag:hover { background: var(--ui-soft); color: var(--ui-fg); }
+.rc-flag--on {
+  border-style: solid;
+  border-color: #F2D593;
+  background: #FEF7EA;
+  color: #9A5F05;
+}
+.rc-flag--on svg { color: #E3A21A; }
+.rc-flag--on:hover { background: #FDF0D8; color: #9A5F05; }
 
-.rc-ai-panel__row {
+/* Actions — pinned to the bottom of the panel while it scrolls */
+.rc-detail__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
   display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  padding: 2px 0;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding: 10px 18px 14px;
+  border-top: 1px solid var(--ui-border);
+  background: rgba(252, 251, 254, 0.96);
+  backdrop-filter: blur(6px);
 }
-.rc-ai-panel__row-label { color: #7A7166; }
-.rc-ai-panel__row-val { color: #1A1A1A; font-weight: 600; }
-.rc-ai-panel__row-val--mono { font-family: ui-monospace, monospace; font-size: 11px; }
+/* On short screens the panel has little room; let the actions scroll with it. */
+@media (max-height: 820px) {
+  .rc-detail__actions { position: static; }
+}
+.rc-detail__actions-hint { margin: 0; font-size: 12px; line-height: 1.4; color: var(--ui-muted); }
+.rc-detail__actions-warn { margin: 0; padding: 8px 10px; font-size: 12px; }
+.rc-detail__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rc-detail__btns .ui-btn { width: 100%; height: 38px; }
+.rc-detail__btn--reject { border: 1px solid #F3C9D3; }
+
+/* ── AI verdict panel ───────────────────────────────────────────────── */
+.rc-ai-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-card);
+}
+.rc-ai-panel--pass      { border-color: #D5EFE2; background: #F4FBF8; }
+.rc-ai-panel--fail      { border-color: #F7D9E1; background: #FEF5F7; }
+.rc-ai-panel--uncertain { border-color: #F7E4BE; background: #FFFAF0; }
+.rc-ai-panel--empty     { border-style: dashed; border-color: var(--ui-border-2); background: #FAFAFC; }
+
+.rc-ai-panel__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rc-ai-panel__header-right { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
+.rc-ai-panel__title {
+  flex: none;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ui-muted-2);
+}
+.rc-ai-panel__empty { font-size: 12.5px; color: var(--ui-muted); }
+.rc-ai-panel__confidence {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ui-soft-2);
+  color: var(--ui-fg-2);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rc-ai-panel--pass      .rc-ai-panel__confidence { background: var(--ui-success); color: #fff; }
+.rc-ai-panel--fail      .rc-ai-panel__confidence { background: var(--ui-danger); color: #fff; }
+.rc-ai-panel--uncertain .rc-ai-panel__confidence { background: var(--ui-warning); color: #fff; }
+.rc-ai-panel .rc-ai-panel__confidence--low { background: var(--ui-warning-soft); color: var(--ui-warning); }
+
+.rc-ai-panel__checks { display: flex; flex-direction: column; gap: 6px; }
+.rc-ai-check { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; font-weight: 600; line-height: 1.35; }
+.rc-ai-check__dot {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: -1px;
+  border-radius: 50%;
+}
+.rc-ai-check--pass { color: var(--ui-fg); }
+.rc-ai-check--pass .rc-ai-check__dot { background: var(--ui-success-soft); color: var(--ui-success); }
+.rc-ai-check--fail { color: var(--ui-danger); }
+.rc-ai-check--fail .rc-ai-check__dot { background: #FACFDA; color: var(--ui-danger); }
+/* Inline failure label next to the friendly check label, e.g.
+ * "Real KFC receipt · Wrong brand". */
+.rc-ai-check__code { margin-left: 2px; font-weight: 500; color: var(--ui-danger); }
+
+.rc-ai-panel__rows { display: flex; flex-direction: column; padding-top: 8px; border-top: 1px solid rgba(23, 21, 31, 0.07); }
+.rc-ai-panel__row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 12.5px; }
+.rc-ai-panel__row-label { color: var(--ui-muted); }
+.rc-ai-panel__row-val { font-weight: 600; color: var(--ui-fg); text-align: right; }
+.rc-ai-panel__row-val--mono { font-family: var(--ui-mono); font-size: 11.5px; }
 
 .rc-ai-panel__reason {
   display: flex;
   flex-direction: column;
   gap: 3px;
   padding: 8px 10px;
-  margin-top: 4px;
-  background: rgba(0, 0, 0, 0.03);
   border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(23, 21, 31, 0.06);
 }
 .rc-ai-panel__reason-label {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #6B645B;
+  color: var(--ui-muted-2);
 }
-.rc-ai-panel__reason-text { font-size: 12.5px; color: #3B3833; line-height: 1.4; }
+.rc-ai-panel__reason-text { font-size: 12.5px; line-height: 1.45; color: var(--ui-fg-2); }
 
-.rc-ai-panel__items {
-  margin-top: 4px;
-  font-size: 12px;
-}
-.rc-ai-panel__items summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: #6B645B;
-  padding: 4px 0;
-}
-.rc-ai-panel__items ul {
-  margin: 4px 0 0;
-  padding-left: 18px;
-  color: #3B3833;
-  line-height: 1.45;
-}
+.rc-ai-panel__items { font-size: 12.5px; }
+.rc-ai-panel__items summary { padding: 2px 0; font-weight: 600; color: var(--ui-primary); cursor: pointer; }
+.rc-ai-panel__items ul { margin: 4px 0 0; padding-left: 18px; line-height: 1.5; color: var(--ui-fg-2); }
 
-/* ── Per-criteria review checklist (Approve / Reject modal) ─────────────
- * The admin ticks each receipt rule Yes/No before deciding. The rules marked
+/* ── Per-criteria review checklist (Approve / Reject dialog) ─────────────
+ * The admin marks each receipt rule Yes/No before deciding. The rules marked
  * "No" are stored on the claim and shown to the customer on their rejected
  * screen, so a rejection always explains itself. */
+.rc-optional { font-weight: 400; color: var(--ui-muted); }
 .rc-criteria {
-  margin: 2px 0 16px;
-  border: 1px solid #ECE7DD;
-  border-radius: 12px;
-  background: #FBF9F5;
   overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-card);
 }
-.rc-criteria__head { padding: 10px 12px 8px; border-bottom: 1px solid #EFEAE0; }
-.rc-criteria__title { display: block; font-size: 12px; font-weight: 800; color: #1A1A1A; }
-.rc-criteria__hint { display: block; margin-top: 2px; font-size: 11px; color: #8A8175; line-height: 1.4; }
+.rc-criteria__head { padding: 10px 12px 9px; border-bottom: 1px solid var(--ui-border); background: var(--ui-soft); }
+.rc-criteria__title { display: block; font-size: 13px; font-weight: 700; color: var(--ui-fg); }
+.rc-criteria__hint { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--ui-muted); }
 .rc-criterion {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 12px;
-  border-top: 1px solid #F2EEE6;
+  border-top: 1px solid var(--ui-border);
 }
-.rc-criterion:first-of-type { border-top: none; }
-.rc-criterion__label { font-size: 12.5px; font-weight: 600; color: #3B3833; line-height: 1.35; }
-.rc-criterion--failed .rc-criterion__label { color: #B4463E; }
+.rc-criteria__head + .rc-criterion { border-top: 0; }
+.rc-criterion__label { font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--ui-fg-2); }
+.rc-criterion--failed { background: #FEF5F7; }
+.rc-criterion--failed .rc-criterion__label { color: var(--ui-danger); font-weight: 600; }
 .rc-criterion__toggle {
-  display: inline-flex; flex-shrink: 0;
-  border: 1px solid #E0DBD1; border-radius: 8px; overflow: hidden; background: #FFFFFF;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-soft);
 }
 .rc-criterion__opt {
-  border: none; background: transparent; cursor: pointer;
-  font-family: inherit; font-size: 11.5px; font-weight: 700; color: #8A8175;
-  padding: 5px 12px; line-height: 1;
+  height: 24px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-muted);
+  font: 600 12px/1 var(--ui-font);
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s, box-shadow 0.12s;
 }
-.rc-criterion__opt + .rc-criterion__opt { border-left: 1px solid #E0DBD1; }
-.rc-criterion__opt--yes.is-on { background: #DFF5E3; color: #197A32; }
-.rc-criterion__opt--no.is-on  { background: #FBE3DE; color: #B4463E; }
+.rc-criterion__opt:hover { color: var(--ui-fg); }
+.rc-criterion__opt--yes.is-on { background: var(--ui-success); color: #fff; box-shadow: 0 1px 2px rgba(23, 21, 31, 0.12); }
+.rc-criterion__opt--no.is-on  { background: var(--ui-danger); color: #fff; box-shadow: 0 1px 2px rgba(23, 21, 31, 0.12); }
 .rc-criteria__warn {
-  margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 600; color: #B4463E;
-  background: #FBF1EF; border-top: 1px solid #F2EEE6;
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid #F7D9E1;
+  background: var(--ui-danger-soft);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-danger);
 }

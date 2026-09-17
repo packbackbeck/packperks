@@ -1,0 +1,402 @@
+/* Shared bits for the operational table pages (Users, Claims, Cup scans,
+ * Cup transfers, Donations). Tokens and base classes: ui/ui.css. */
+
+/* ── Table card: a card whose body scrolls, header row pinned ───────── */
+.ot-table-card {
+  overflow: auto;
+  min-width: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border-2) transparent;
+}
+.ui-card.ot-table-card { display: block; }
+.ot-table-card > .ui-table { border-radius: var(--ui-radius); }
+.ot-table-card .ui-table thead th:first-child { border-top-left-radius: calc(var(--ui-radius) - 1px); }
+.ot-table-card .ui-table thead th:last-child { border-top-right-radius: calc(var(--ui-radius) - 1px); }
+.ot-table-card .ui-table thead th { z-index: 3; }
+.ot-table-card .ui-table td { vertical-align: middle; }
+
+/* Sortable header */
+.ot-th { display: inline-flex; align-items: center; gap: 5px; }
+.ot-th__icon { flex: none; opacity: 0.45; transition: opacity 0.15s, color 0.15s; }
+.ot-th--sortable { cursor: pointer; user-select: none; }
+.ot-th--sortable:hover { color: var(--ui-fg-2) !important; }
+.ot-th--sortable:hover .ot-th__icon { opacity: 0.8; }
+.ot-th--active { color: var(--ui-fg-2) !important; }
+.ot-th--active .ot-th__icon { opacity: 1; color: var(--ui-primary); }
+
+/* Row states. Selection (checkbox) is a faint violet; the row whose
+ * detail is open gets a stronger wash and a violet bar on the left. */
+.ui-table tbody tr.ot-row { cursor: pointer; }
+.ui-table tbody tr.ot-row--selected td,
+.ui-table tbody tr.ot-row--selected:hover td { background: var(--ui-primary-softer); }
+.ui-table tbody tr.ot-row--active td,
+.ui-table tbody tr.ot-row--active:hover td { background: var(--ui-primary-soft); }
+.ui-table tbody tr.ot-row--active td:first-child { box-shadow: inset 3px 0 0 var(--ui-primary); }
+.ui-table tbody tr.ot-row--flag td { background: #FEF9EE; }
+.ui-table tbody tr.ot-row--flag:hover td,
+.ui-table tbody tr.ot-row--flag.ot-row--selected td { background: #FDF4E1; }
+.ui-table tbody tr.ot-row--flag td:first-child { box-shadow: inset 3px 0 0 #E3A21A; }
+.ui-table tbody tr.ot-row--flag.ot-row--active td { background: #FBEFD6; }
+.ui-table tbody tr.ot-row--flag.ot-row--active td:first-child { box-shadow: inset 3px 0 0 var(--ui-primary); }
+
+/* Checkbox column */
+.ot-check { width: 40px; padding-right: 4px !important; text-align: center; }
+.ot-check input,
+.ot-checkbox {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--ui-primary);
+  cursor: pointer;
+}
+
+/* Cell helpers */
+.ot-muted { color: var(--ui-muted) !important; }
+.ot-faint { color: var(--ui-muted-2) !important; }
+.ot-date { font-size: 12px; color: var(--ui-muted) !important; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ot-mono { font-family: var(--ui-mono); font-size: 11.5px; }
+.ot-num { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ui-fg) !important; }
+.ot-center { text-align: center; }
+.ot-link {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-primary);
+  font: 600 13px/1.3 var(--ui-font);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s;
+}
+.ot-link:hover { text-decoration-color: currentColor; }
+
+/* Person cell */
+.ot-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ot-person__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ot-person__name { font-size: 13px; font-weight: 600; color: var(--ui-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ot-person__sub { font-size: 11.5px; color: var(--ui-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+button.ot-person {
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+button.ot-person:hover { background: var(--ui-soft-2); }
+
+.ot-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Clickable badge (opens a detail dialog) */
+.ot-badge-btn {
+  border: 0;
+  cursor: pointer;
+  transition: filter 0.15s, box-shadow 0.15s;
+}
+.ot-badge-btn:hover { filter: brightness(0.97); box-shadow: 0 0 0 1px currentColor inset; }
+
+/* ── Toolbar ────────────────────────────────────────────────────────── */
+.ot-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; flex-shrink: 0; }
+.ot-toolbar .ui-seg { flex-wrap: wrap; }
+.ot-toolbar__group { display: inline-flex; align-items: center; gap: 8px; }
+.ot-toolbar__label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ui-muted-2);
+}
+.ot-toolbar__end { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.ot-toolbar__break { flex-basis: 100%; height: 0; }
+.ot-select { width: auto; height: 34px; padding-right: 30px; font-size: 13px; cursor: pointer; }
+
+/* ── Search ─────────────────────────────────────────────────────────── */
+.ot-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  min-width: 220px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-card);
+  color: var(--ui-muted-2);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ot-search:focus-within { border-color: rgba(91, 63, 214, 0.55); box-shadow: 0 0 0 3px var(--ui-ring); }
+.ot-search svg { flex: none; }
+.ot-search .ot-search__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ui-fg);
+  font: 400 13px/1 var(--ui-font);
+}
+.ot-search .ot-search__input:focus-visible { outline: none; }
+.ot-search__input::placeholder { color: var(--ui-muted-2); }
+.ot-search__clear {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ui-soft);
+  color: var(--ui-muted);
+  cursor: pointer;
+}
+.ot-search__clear:hover { background: var(--ui-soft-2); color: var(--ui-fg); }
+
+/* ── Split handle ───────────────────────────────────────────────────── */
+.ot-split {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  cursor: col-resize;
+  touch-action: none;
+}
+.ot-split::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background-color 0.15s, width 0.15s;
+}
+.ot-split:hover::before,
+.ot-split:active::before { width: 2px; background: var(--ui-primary); }
+.ot-split__grip {
+  position: relative;
+  z-index: 1;
+  width: 4px;
+  height: 32px;
+  border-radius: 3px;
+  background: var(--ui-border-2);
+  transition: background-color 0.15s;
+}
+.ot-split:hover .ot-split__grip,
+.ot-split:active .ot-split__grip { background: var(--ui-primary); }
+
+/* ── Detail panel shell (Users, Claims, Cup scans) ──────────────────── */
+.ot-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ui-card);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow-sm);
+  font-family: var(--ui-font);
+  color: var(--ui-fg);
+}
+.ot-panel--empty { align-items: center; justify-content: center; }
+.ot-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 14px 14px 12px 18px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ot-panel__titles { flex: 1; min-width: 0; }
+.ot-panel__title { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--ui-fg); }
+.ot-panel__id { margin: 2px 0 0; font-family: var(--ui-mono); font-size: 11px; color: var(--ui-muted-2); }
+.ot-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border-2) transparent;
+}
+.ot-panel__foot {
+  flex-shrink: 0;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--ui-border);
+  background: #FCFBFE;
+}
+.ot-panel__label {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ui-muted-2);
+}
+
+/* Key / value rows */
+.ot-kv { display: flex; flex-direction: column; }
+.ot-kv__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 13px;
+}
+.ot-kv__row:last-child { border-bottom: 0; }
+.ot-kv__label { flex: none; color: var(--ui-muted); }
+.ot-kv__val { min-width: 0; color: var(--ui-fg); text-align: right; overflow-wrap: anywhere; }
+.ot-kv__val--strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.ot-kv__val--muted { color: var(--ui-muted); }
+.ot-kv__val--mono { font-family: var(--ui-mono); font-size: 12px; }
+.ot-kv__val--money { font-weight: 700; color: var(--ui-success); font-variant-numeric: tabular-nums; }
+.ot-kv__meta { margin-left: 6px; font-weight: 400; color: var(--ui-muted-2); }
+
+/* ── Photo well ─────────────────────────────────────────────────────── */
+.ot-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 44px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-card);
+  color: var(--ui-muted-2);
+  cursor: zoom-in;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+button.ot-thumb:hover { border-color: var(--ui-border-2); box-shadow: var(--ui-shadow-md); }
+.ot-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ot-thumb--empty { background: var(--ui-soft); cursor: default; }
+.ot-thumb--bad { background: var(--ui-danger-soft); border-color: #F7D9E1; color: var(--ui-danger); cursor: default; }
+
+/* ── Lightbox ───────────────────────────────────────────────────────── */
+.ot-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(15, 13, 22, 0.86);
+  backdrop-filter: blur(4px);
+  cursor: zoom-out;
+  animation: ui-page-in 0.15s ease-out both;
+}
+.ot-lightbox__img {
+  max-width: 100%;
+  max-height: calc(100vh - 80px);
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: var(--ui-shadow-lg);
+  cursor: default;
+}
+.ot-lightbox__close {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.ot-lightbox__close:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ── Notice ─────────────────────────────────────────────────────────── */
+.ot-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 9px 10px 9px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-card);
+  font-family: var(--ui-font);
+}
+.ot-notice__icon { flex: none; }
+.ot-notice__text { flex: 1; min-width: 0; margin: 0; font-size: 13px; line-height: 1.45; color: var(--ui-fg-2); overflow-wrap: anywhere; }
+.ot-notice__text b, .ot-notice__text strong { color: var(--ui-fg); font-weight: 700; }
+.ot-notice--danger { background: var(--ui-danger-soft); border-color: #F7D9E1; }
+.ot-notice--danger .ot-notice__icon { color: var(--ui-danger); }
+.ot-notice--danger .ot-notice__text b, .ot-notice--danger .ot-notice__text strong { color: var(--ui-danger); }
+.ot-notice--success { background: #EEF8F3; border-color: #D5EFE2; }
+.ot-notice--success .ot-notice__icon { color: var(--ui-success); }
+.ot-notice--warning { background: #FEF7EA; border-color: #F7E4BE; }
+.ot-notice--warning .ot-notice__icon { color: var(--ui-warning); }
+.ot-notice--info { background: var(--ui-primary-softer); border-color: #E3DDFB; }
+.ot-notice--info .ot-notice__icon { color: var(--ui-primary); }
+.ot-notice__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-muted);
+  cursor: pointer;
+}
+.ot-notice__close:hover { background: rgba(23, 21, 31, 0.06); color: var(--ui-fg); }
+
+/* Inline callout inside panels and dialogs */
+.ot-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #F7E4BE;
+  border-radius: 10px;
+  background: #FEF7EA;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+.ot-callout > svg { flex: none; margin-top: 2px; color: var(--ui-warning); }
+.ot-callout strong { color: var(--ui-fg); font-weight: 700; }
+.ot-callout--info { border-color: #E3DDFB; background: var(--ui-primary-softer); }
+.ot-callout--info > svg { color: var(--ui-primary); }
+
+/* Dialog helpers */
+.ot-modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ui-fg-2); }
+.ot-foot-spacer { margin-right: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-lightbox { animation: none; }
+}

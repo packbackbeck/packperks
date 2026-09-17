@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { ArrowRight, Check, GitMerge } from 'lucide-react';
 import { getMergeRequestDetail } from '../lib/adminApi';
+import { Badge, Button, Modal } from '../ui';
 import './MergeRequestModal.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -25,11 +26,13 @@ function shortId(id) {
 }
 const SOURCE_LABEL = { restore: 'Lost cups (restore)', admin: 'Admin-initiated', offer: 'Merge offer', merge: 'Merge offer' };
 
+const STATUS_TONE = { pending: 'warning', approved: 'success', completed: 'success', rejected: 'danger' };
+
 function AccountCard({ tone, badge, user }) {
   const name = user?.display_name || 'Anonymous';
   return (
     <div className={`mrm-acct mrm-acct--${tone}`}>
-      <div className="mrm-acct__badge">{badge}</div>
+      <div className="mrm-acct__badge">{tone === 'keep' && <Check size={11} aria-hidden="true" />}{badge}</div>
       <div className="mrm-acct__name">{name}</div>
       <div className="mrm-acct__email">{user?.email || 'No email on file'}</div>
       <dl className="mrm-acct__stats">
@@ -46,12 +49,6 @@ export default function MergeRequestModal({ req, onClose, onDecide, busy }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose?.(); }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   useEffect(() => {
     if (!req?.id) return;
@@ -77,79 +74,68 @@ export default function MergeRequestModal({ req, onClose, onDecide, busy }) {
   const keptEmail = survivor?.email || req.email || '—';
   const keptName = survivor?.display_name || 'Anonymous';
 
-  return createPortal(
-    <div className="mrm-overlay" onClick={onClose}>
-      <div className="mrm" onClick={(e) => e.stopPropagation()}>
-        <header className="mrm__head">
-          <div>
-            <span className="mrm__eyebrow">Account merge request</span>
-            <h2 className="mrm__title">Review this merge</h2>
-          </div>
-          <button className="mrm__close" onClick={onClose} aria-label="Close">×</button>
-        </header>
-
-        <div className="mrm__meta">
-          <span className={`mrm__pill mrm__pill--${req.status}`}>{req.status}</span>
-          <span className="mrm__meta-item">Source: {SOURCE_LABEL[req.source] || req.source || '—'}</span>
-          <span className="mrm__meta-item">Requested: {fmtDate(req.requested_at)}</span>
-          {req.status !== 'pending' && req.decider && (
-            <span className="mrm__meta-item">Decided by: {req.decider.display_name || (req.decider.email || '').split('@')[0]}</span>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="mrm__loading">Loading accounts…</div>
-        ) : error ? (
-          <div className="mrm__error">{error}</div>
-        ) : (
-          <>
-            <div className="mrm__grid">
-              <AccountCard tone="keep" badge="✓ Kept" user={survivor} />
-              <div className="mrm__arrow" aria-hidden>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="4" y1="12" x2="20" y2="12" /><polyline points="13 5 20 12 13 19" />
-                </svg>
-              </div>
-              <div className="mrm__absorbed-col">
-                {absorbed.length === 0 && <div className="mrm__none">No source accounts listed.</div>}
-                {absorbed.map((u) => (
-                  <AccountCard key={u.id} tone="merge" badge="Merged in" user={u} />
-                ))}
-              </div>
-            </div>
-
-            <div className="mrm__result">
-              <div className="mrm__result-title">After the merge</div>
-              <div className="mrm__result-rows">
-                <div className="mrm__result-row"><span>Name kept</span><strong>{keptName}</strong></div>
-                <div className="mrm__result-row"><span>Email kept</span><strong>{keptEmail}</strong></div>
-                <div className="mrm__result-row"><span>Combined balance</span><strong>{combinedBalance} cups</strong></div>
-                <div className="mrm__result-row"><span>Accounts merged</span><strong>{absorbed.length + 1} → 1</strong></div>
-              </div>
-              {req.reason && <p className="mrm__reason"><span>Customer’s reason:</span> {req.reason}</p>}
-            </div>
-          </>
+  return (
+    <Modal
+      open
+      wide
+      onClose={onClose}
+      title="Review this merge"
+      subtitle="Account merge request. Check which account is kept and what it ends up with."
+      icon={GitMerge}
+      footer={isPending ? (
+        <>
+          <Button variant="outline" className="mrm__cancel" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="danger-ghost" className="mrm__reject" onClick={() => onDecide?.('reject')} disabled={busy}>
+            {busy ? '…' : 'Reject'}
+          </Button>
+          <Button variant="primary" icon={GitMerge} onClick={() => onDecide?.('approve')} disabled={busy}>
+            {busy ? '…' : 'Approve & merge'}
+          </Button>
+        </>
+      ) : (
+        <Button variant="outline" onClick={onClose}>Close</Button>
+      )}
+    >
+      <div className="mrm__meta">
+        <Badge tone={STATUS_TONE[req.status] || 'neutral'}><span className="mrm__status">{req.status}</span></Badge>
+        <span className="mrm__meta-item">Source: <b>{SOURCE_LABEL[req.source] || req.source || '—'}</b></span>
+        <span className="mrm__meta-item">Requested: <b>{fmtDate(req.requested_at)}</b></span>
+        {req.status !== 'pending' && req.decider && (
+          <span className="mrm__meta-item">Decided by: <b>{req.decider.display_name || (req.decider.email || '').split('@')[0]}</b></span>
         )}
-
-        <footer className="mrm__foot">
-          {isPending ? (
-            <>
-              <button className="mrm__btn mrm__btn--ghost" onClick={onClose} disabled={busy}>Cancel</button>
-              <div className="mrm__foot-actions">
-                <button className="mrm__btn mrm__btn--deny" onClick={() => onDecide?.('reject')} disabled={busy}>
-                  {busy ? '…' : 'Reject'}
-                </button>
-                <button className="mrm__btn mrm__btn--approve" onClick={() => onDecide?.('approve')} disabled={busy}>
-                  {busy ? '…' : 'Approve & merge'}
-                </button>
-              </div>
-            </>
-          ) : (
-            <button className="mrm__btn mrm__btn--ghost" onClick={onClose}>Close</button>
-          )}
-        </footer>
       </div>
-    </div>,
-    document.body,
+
+      {loading ? (
+        <div className="mrm__loading">Loading accounts…</div>
+      ) : error ? (
+        <div className="mrm__error" role="alert">{error}</div>
+      ) : (
+        <>
+          <div className="mrm__grid">
+            <AccountCard tone="keep" badge="Kept" user={survivor} />
+            <div className="mrm__arrow" aria-hidden="true">
+              <ArrowRight size={20} />
+            </div>
+            <div className="mrm__absorbed-col">
+              {absorbed.length === 0 && <div className="mrm__none">No source accounts listed.</div>}
+              {absorbed.map((u) => (
+                <AccountCard key={u.id} tone="merge" badge="Merged in" user={u} />
+              ))}
+            </div>
+          </div>
+
+          <div className="mrm__result">
+            <div className="mrm__result-title">After the merge</div>
+            <div className="mrm__result-rows">
+              <div className="mrm__result-row"><span>Name kept</span><strong>{keptName}</strong></div>
+              <div className="mrm__result-row"><span>Email kept</span><strong>{keptEmail}</strong></div>
+              <div className="mrm__result-row"><span>Combined balance</span><strong>{combinedBalance} cups</strong></div>
+              <div className="mrm__result-row"><span>Accounts merged</span><strong>{absorbed.length + 1} → 1</strong></div>
+            </div>
+            {req.reason && <p className="mrm__reason"><span>Customer’s reason:</span> {req.reason}</p>}
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }

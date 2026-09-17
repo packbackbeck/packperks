@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Columns3 } from 'lucide-react';
 import './ColumnPicker.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -37,21 +38,22 @@ export default function ColumnPicker({ columns, visible, onToggle, onReset }) {
     };
   }, [open]);
 
+  const shown = columns.filter(c => visible.has(c.id)).length;
+
   return (
     <div className="cp" ref={wrapRef}>
       <button
         type="button"
-        className="cp__trigger"
+        className="ui-btn ui-btn--outline cp__trigger"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
+        aria-haspopup="true"
         title="Show or hide columns"
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="7" height="18" rx="1" />
-          <rect x="14" y="3" width="7" height="11" rx="1" />
-        </svg>
+        <Columns3 size={15} aria-hidden="true" />
         Columns
-        <span className="cp__count">{visible.size}/{columns.length}</span>
+        <span className="cp__count">{shown}/{columns.length}</span>
+        <ChevronDown size={14} className="cp__chev" aria-hidden="true" />
       </button>
       {open && (
         <div className="cp__menu" role="menu">
@@ -66,7 +68,7 @@ export default function ColumnPicker({ columns, visible, onToggle, onReset }) {
             </button>
           </div>
           {columns.map(c => (
-            <label key={c.id} className="cp__row">
+            <label key={c.id} className={`cp__row${visible.has(c.id) ? ' cp__row--on' : ''}`}>
               <input
                 type="checkbox"
                 checked={visible.has(c.id)}

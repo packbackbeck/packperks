@@ -4,16 +4,18 @@ import { Card, CardBody, CardHeader, EmptyState } from './primitives';
 const ICONS = { up: TrendingUp, down: TrendingDown, warn: AlertTriangle, info: Info };
 
 /* insights: [{ id, tone: 'up'|'down'|'warn'|'info', text: ReactNode,
- *              action?: { label, onClick } }] — most important first. */
+ *              action?: { label, onClick } }] — most important first.
+ * Beside the trend chart the card takes the chart's height and scrolls
+ * inside (ui.css, .ui-insights-card), however many insights there are. */
 export function InsightsCard({ insights, loading, subtitle, emptyText }) {
   return (
-    <Card>
+    <Card className="ui-insights-card">
       <CardHeader
         title="Insights"
         icon={Lightbulb}
         subtitle={subtitle || 'Read from the period on screen. They change as you change the period or the store.'}
       />
-      <CardBody>
+      <CardBody className="ui-insights-card__body">
         {loading ? (
           <div className="ui-insights" aria-busy="true">
             {[0, 1, 2].map(i => (

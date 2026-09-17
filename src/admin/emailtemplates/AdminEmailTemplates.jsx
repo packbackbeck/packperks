@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CalendarClock, CircleAlert, CircleCheck, Eye, KeyRound, Lock, Mail, PenLine, RotateCcw, Save, Send,
+  TriangleAlert,
+} from 'lucide-react';
 import { useOrg } from '../context/OrgContext';
 import { useAuth } from '../auth/AuthContext';
 import { getEmailTemplates, saveEmailTemplates, sendTestEmail } from '../lib/adminApi';
 import {
   EMAIL_TEMPLATES, templateByKey, renderTemplate, sampleValues, auditTags,
 } from '../lib/emailTemplates';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Field, PageHeader, Switch, Tabs } from '../ui';
 import './AdminEmailTemplates.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -181,165 +186,205 @@ export default function AdminEmailTemplates() {
     }
   }
 
+  const tabs = EMAIL_TEMPLATES.map(t => {
+    const o = stored[t.key];
+    const edited = !!o && (o.subject != null || o.html != null);
+    const off = o?.enabled === false;
+    return {
+      id: t.key,
+      icon: t.key === 'login_code' ? KeyRound : Mail,
+      label: (
+        <>
+          {t.label}
+          {off
+            ? <Badge tone="danger">Off</Badge>
+            : edited ? <Badge tone="primary">Edited</Badge> : <span className="aet-tab-default">Default</span>}
+        </>
+      ),
+    };
+  });
+
   return (
-    <div className="aet">
-      <header className="aet__head">
-        <div>
-          <h1 className="aet__title">Email templates</h1>
-          <p className="aet__sub">
-            The automated emails PackPerks sends your customers. Edit the subject and the HTML,
-            drop in {'{{tags}}'} for the live values, and preview exactly what lands in their inbox.
-          </p>
-        </div>
-        <div className="aet__headactions">
-          {dirty && <span className="aet__dirty">Unsaved changes</span>}
-          <button className="aet__btn aet__btn--primary" onClick={handleSave} disabled={saving || loading || !dirty}>
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
-      </header>
+    <div className="ui-page aet-page">
+      <PageHeader
+        title="Email templates"
+        subtitle={<>The automatic emails PackPerks sends your customers. Edit the subject and the HTML, add {'{{tags}}'} for live values, and preview exactly what arrives in their inbox.</>}
+      >
+        {dirty && <Badge tone="warning">Unsaved changes</Badge>}
+        <Button variant="primary" icon={Save} onClick={handleSave} disabled={saving || loading || !dirty}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+      </PageHeader>
 
-      {error && <div className="aet__error">{error}</div>}
-      {notice && <div className="aet__notice">{notice}</div>}
+      {error && (
+        <div className="aet-callout aet-callout--danger" role="alert">
+          <CircleAlert size={16} aria-hidden="true" />
+          <p>{error}</p>
+        </div>
+      )}
+      {notice && (
+        <div className="aet-callout aet-callout--success" role="status">
+          <CircleCheck size={16} aria-hidden="true" />
+          <p>{notice}</p>
+        </div>
+      )}
 
-      <div className="aet__tabs" role="tablist">
-        {EMAIL_TEMPLATES.map(t => {
-          const o = stored[t.key];
-          const edited = !!o && (o.subject != null || o.html != null);
-          const off = o?.enabled === false;
-          return (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={activeKey === t.key}
-              className={`aet__tab${activeKey === t.key ? ' is-on' : ''}`}
-              onClick={() => { setActiveKey(t.key); setNotice(null); }}
-            >
-              <span className="aet__tab-name">{t.label}</span>
-              <span className="aet__tab-meta">
-                {off ? <em className="aet__tab-off">Off</em> : edited ? 'Edited' : 'Default'}
-              </span>
-            </button>
-          );
-        })}
+      <div className="aet-tabs">
+        <Tabs
+          tabs={tabs}
+          value={activeKey}
+          onChange={(key) => { setActiveKey(key); setNotice(null); }}
+          ariaLabel="Email templates"
+        />
       </div>
 
       {loading ? (
-        <div className="aet__empty">Loading templates…</div>
+        <Card>
+          <EmptyState icon={Mail} title="Loading templates…" />
+        </Card>
       ) : (
-        <div className="aet__grid">
+        <div className="aet-grid">
           {/* ── Editor ── */}
-          <section className="aet__card">
-            <p className="aet__when"><strong>When it’s sent.</strong> {def.when}</p>
-
-            {def.canDisable ? (
-              <label className="aet__switch">
-                <input
-                  type="checkbox"
-                  checked={current.enabled}
-                  onChange={e => update({ enabled: e.target.checked })}
-                />
-                <span className="aet__switch-track"><span className="aet__switch-thumb" /></span>
-                <span className="aet__switch-label">
-                  {current.enabled ? 'Sending' : 'Paused'}
-                  <em>{def.disableNote}</em>
-                </span>
-              </label>
-            ) : (
-              <p className="aet__locked">This email can’t be switched off — logging in depends on it.</p>
-            )}
-
-            <label className="aet__field">
-              <span>Subject</span>
-              <input
-                ref={subjectRef}
-                value={current.subject}
-                onFocus={() => { lastFocusRef.current = 'subject'; }}
-                onChange={e => update({ subject: e.target.value })}
-              />
-            </label>
-
-            <div className="aet__tagbar">
-              <span className="aet__tagbar-label">Insert a tag</span>
-              <div className="aet__tags">
-                {def.tags.map(t => (
-                  <button key={t.tag} type="button" className="aet__tag" title={t.desc} onClick={() => insertTag(t.tag)}>
-                    {t.tag}
-                  </button>
-                ))}
+          <Card className="aet-editor">
+            <CardHeader
+              title={def.label}
+              icon={PenLine}
+              subtitle={isOverridden ? 'This venue uses its own version.' : 'This venue uses the PackPerks default.'}
+              ruled
+              actions={(
+                <Button size="sm" variant="ghost" icon={RotateCcw} onClick={handleReset} disabled={saving || !isOverridden}>
+                  Reset to default
+                </Button>
+              )}
+            />
+            <CardBody className="aet-editor__body">
+              <div className="aet-when">
+                <CalendarClock size={16} aria-hidden="true" />
+                <p><strong>When it’s sent.</strong> {def.when}</p>
               </div>
-            </div>
 
-            <label className="aet__field">
-              <span>HTML body</span>
-              <textarea
-                ref={htmlRef}
-                className="aet__code"
-                rows={16}
-                spellCheck={false}
-                value={current.html}
-                onFocus={() => { lastFocusRef.current = 'html'; }}
-                onChange={e => update({ html: e.target.value })}
-              />
-            </label>
+              {def.canDisable ? (
+                <div className="aet-toggle">
+                  <Switch
+                    id="aet-enabled"
+                    checked={current.enabled}
+                    onChange={(v) => update({ enabled: v })}
+                    label={`Send the ${def.label.toLowerCase()} email`}
+                  />
+                  <label className="aet-toggle__text" htmlFor="aet-enabled">
+                    <span className="aet-toggle__state">{current.enabled ? 'Sending' : 'Paused'}</span>
+                    <span className="aet-toggle__note">{def.disableNote}</span>
+                  </label>
+                </div>
+              ) : (
+                <p className="aet-locked">
+                  <Lock size={13} aria-hidden="true" />
+                  This email can’t be switched off. Customers need it to log in.
+                </p>
+              )}
 
-            {unknownTags.length > 0 && (
-              <p className="aet__warn">
-                Unknown tag{unknownTags.length > 1 ? 's' : ''}: {unknownTags.map(t => `{{${t}}}`).join(', ')} —
-                these are sent to the customer as literal text. Use the buttons above for tags this email can fill.
-              </p>
-            )}
-
-            <div className="aet__actions">
-              <button className="aet__btn" onClick={handleReset} disabled={saving || !isOverridden}>
-                Reset to default
-              </button>
-            </div>
-
-            <div className="aet__test">
-              <span className="aet__test-label">Send yourself a test</span>
-              <div className="aet__test-row">
+              <Field label="Subject" htmlFor="aet-subject">
                 <input
-                  value={testTo}
-                  onChange={e => setTestTo(e.target.value)}
-                  placeholder="you@example.com"
-                  aria-label="Test recipient"
+                  id="aet-subject"
+                  ref={subjectRef}
+                  className="ui-input"
+                  value={current.subject}
+                  onFocus={() => { lastFocusRef.current = 'subject'; }}
+                  onChange={e => update({ subject: e.target.value })}
                 />
-                <button className="aet__btn" onClick={handleTest} disabled={testing || !testTo.trim()}>
-                  {testing ? 'Sending…' : 'Send test'}
-                </button>
+              </Field>
+
+              <div className="aet-tagbar">
+                <span className="aet-micro">Insert a tag where your cursor is</span>
+                <div className="aet-tags">
+                  {def.tags.map(t => (
+                    <button key={t.tag} type="button" className="aet-tag" title={t.desc} onClick={() => insertTag(t.tag)}>
+                      {t.tag}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p className="aet__hint">
-                Sends the version on screen (saved or not) with sample values. Nothing reaches customers.
-              </p>
-            </div>
-          </section>
+
+              <Field label="HTML body" htmlFor="aet-html">
+                <textarea
+                  id="aet-html"
+                  ref={htmlRef}
+                  className="ui-textarea aet-code"
+                  rows={16}
+                  spellCheck={false}
+                  value={current.html}
+                  onFocus={() => { lastFocusRef.current = 'html'; }}
+                  onChange={e => update({ html: e.target.value })}
+                />
+              </Field>
+
+              {unknownTags.length > 0 && (
+                <div className="aet-callout aet-callout--warning" role="status">
+                  <TriangleAlert size={16} aria-hidden="true" />
+                  <p>
+                    Unknown tag{unknownTags.length > 1 ? 's' : ''}: <code>{unknownTags.map(t => `{{${t}}}`).join(', ')}</code>.
+                    Customers would see {unknownTags.length > 1 ? 'these' : 'this'} as plain text. Use the tag buttons above for the values this email can fill in.
+                  </p>
+                </div>
+              )}
+
+              <div className="aet-test">
+                <Field
+                  label="Send yourself a test"
+                  htmlFor="aet-test-to"
+                  hint="Sends the version on screen, saved or not, filled with sample values. Nothing reaches customers."
+                >
+                  <div className="aet-test__row">
+                    <input
+                      id="aet-test-to"
+                      className="ui-input"
+                      value={testTo}
+                      onChange={e => setTestTo(e.target.value)}
+                      placeholder="you@example.com"
+                    />
+                    <Button icon={Send} onClick={handleTest} disabled={testing || !testTo.trim()}>
+                      {testing ? 'Sending…' : 'Send test'}
+                    </Button>
+                  </div>
+                </Field>
+              </div>
+            </CardBody>
+          </Card>
 
           {/* ── Preview ── */}
-          <section className="aet__card aet__card--preview">
-            <h2 className="aet__card-title">Preview</h2>
-            <p className="aet__hint">Rendered with the same tag substitution the sender uses.</p>
-            <div className="aet__mail">
-              <div className="aet__mail-head">
-                <span className="aet__mail-from">PackPerks</span>
-                <span className="aet__mail-subject">{previewSubject || <em>No subject</em>}</span>
+          <Card className="aet-preview">
+            <CardHeader
+              title="Preview"
+              icon={Eye}
+              subtitle="Filled in the same way the real email is, with sample values."
+            />
+            <CardBody>
+              <div className="aet-mail">
+                <div className="aet-mail__head">
+                  <span className="aet-mail__avatar" aria-hidden="true">P</span>
+                  <div className="aet-mail__meta">
+                    <span className="aet-mail__from">PackPerks</span>
+                    <span className="aet-mail__subject">{previewSubject || <em>No subject</em>}</span>
+                  </div>
+                </div>
+                <iframe
+                  className="aet-mail__body"
+                  title="Email preview"
+                  sandbox=""
+                  srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:0;padding:16px;background:#fff">${previewHtml}</body>`}
+                />
               </div>
-              <iframe
-                className="aet__mail-body"
-                title="Email preview"
-                sandbox=""
-                srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:0;padding:16px;background:#fff">${previewHtml}</body>`}
-              />
-            </div>
-            <div className="aet__legend">
-              <span className="aet__legend-title">Tags this email can fill</span>
-              <ul>
-                {def.tags.map(t => (
-                  <li key={t.tag}><code>{t.tag}</code> <span>{t.desc}</span></li>
-                ))}
-              </ul>
-            </div>
-          </section>
+
+              <div className="aet-legend">
+                <span className="aet-micro">Tags this email can fill in</span>
+                <ul>
+                  {def.tags.map(t => (
+                    <li key={t.tag}><code>{t.tag}</code> <span>{t.desc}</span></li>
+                  ))}
+                </ul>
+              </div>
+            </CardBody>
+          </Card>
         </div>
       )}
     </div>

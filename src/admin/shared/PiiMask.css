@@ -1,60 +1,63 @@
 /* PiiMask — visually muted by default, revealed via click.
  *
  * The masked state should read as "value present but hidden", not as
- * a UI error. We use the same warm cream chip background as other
- * "metadata" elements in the dashboard, with a tiny eye icon to hint
- * at interactivity. Revealed state drops the icon and styles like
- * regular text so it doesn't compete for attention once the admin
- * has chosen to see it.
+ * a UI error: a quiet chip with a small eye icon hints that it can be
+ * clicked. Revealed state drops the icon and reads like regular text so
+ * it doesn't compete for attention once the admin has chosen to see it.
+ * Tokens: ui/ui.css.
  */
 
 .pii-mask {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  max-width: 100%;
+  font-family: var(--ui-mono, ui-monospace, 'SF Mono', Menlo, monospace);
   font-size: 12px;
   letter-spacing: -0.005em;
 }
 
 .pii-mask--empty {
-  color: #9E9A93;
-  font-style: italic;
+  color: var(--ui-muted-2);
   font-family: inherit;
 }
 
 /* Inline variant — used inside table cells where a button would
  * disturb the row hover state. */
 .pii-mask--inline {
+  display: inline;
   cursor: pointer;
-  color: #6C6259;
-  transition: color 0.14s ease;
+  color: var(--ui-muted);
+  border-radius: 4px;
+  transition: color 0.14s ease, background-color 0.14s ease;
 }
-.pii-mask--inline:hover { color: #2A2724; }
-.pii-mask--inline.pii-mask--revealed { color: #2A2724; }
+.pii-mask--inline:hover { color: var(--ui-primary); }
+.pii-mask--inline.pii-mask--revealed { color: var(--ui-fg-2); }
+.pii-mask--inline.pii-mask--revealed:hover { color: var(--ui-fg); }
 
 /* Chip variant — used in detail panels where we have room for an
  * obvious interactive affordance. */
 .pii-mask--chip {
-  border: 1px solid #E5DECF;
-  background: #FAFAF8;
-  color: #6C6259;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
-  padding: 4px 10px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  background: var(--ui-soft);
+  color: var(--ui-muted);
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
 }
 .pii-mask--chip:hover {
-  background: #FFFFFF;
-  border-color: #DCD3C1;
-  color: #2A2724;
+  background: var(--ui-card);
+  border-color: var(--ui-border-2);
+  color: var(--ui-fg);
 }
 .pii-mask--chip.pii-mask--revealed {
-  background: rgba(83, 51, 165, 0.06);
-  border-color: rgba(83, 51, 165, 0.20);
-  color: #2A2724;
+  background: var(--ui-primary-softer);
+  border-color: rgba(91, 63, 214, 0.2);
+  color: var(--ui-fg);
 }
 
-.pii-mask__icon { color: #9E9A93; flex-shrink: 0; }
-.pii-mask--chip:hover .pii-mask__icon { color: var(--pb-purple-600); }
+.pii-mask__value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pii-mask__icon { flex-shrink: 0; color: var(--ui-muted-2); }
+.pii-mask--chip:hover .pii-mask__icon { color: var(--ui-primary); }

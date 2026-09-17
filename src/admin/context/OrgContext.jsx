@@ -194,6 +194,9 @@ export function OrgProvider({ children }) {
   // functions actually see. Pages that must reflect live behaviour (the
   // receipt generator's payout figure) read this, not the admin draft.
   const [activeOrgSettings, setActiveOrgSettings] = useState(null);
+  // Which org (and group) the mode above was read for. Until it matches the
+  // active org, the mode is a guess and nothing should act on it.
+  const [modeLoadedFor, setModeLoadedFor] = useState(null);
   // Bumped by the settings mode picker (via the 'pp-org-mode-changed' event)
   // so the dashboard re-gates immediately without a full reload.
   const [modeRefresh, setModeRefresh] = useState(0);
@@ -226,6 +229,7 @@ export function OrgProvider({ children }) {
       setActiveGroupMode(gid ? normalizeMode(grpCfg?.value?.settings?.mode) : null);
       setActiveOrgMode(orgCfg?.value?.settings?.mode || null);
       setActiveOrgSettings(orgCfg?.value?.settings || null);
+      setModeLoadedFor(`${oid}:${gid || ''}`);
     })();
     return () => { alive = false; };
   }, [activeOrg?.id, activeOrg?.group_id, modeRefresh]);
@@ -252,6 +256,7 @@ export function OrgProvider({ children }) {
   groups.forEach(g => { groupsById[g.id] = g; });
 
   const activeGroupId = activeOrg?.group_id || null;
+  const modeReady = !activeOrg?.id || modeLoadedFor === `${activeOrg.id}:${activeGroupId || ''}`;
   const activeGroup   = activeGroupId ? (groupsById[activeGroupId] || null) : null;
   const groupMembers  = activeGroupId ? availableOrgs.filter(o => o.group_id === activeGroupId) : [];
   const groupMemberIds = groupMembers.map(o => o.id);
@@ -285,6 +290,7 @@ export function OrgProvider({ children }) {
     activeGroupMode,      // 'byo' | 'deposit' for a grouped venue, null otherwise
     activeOrgMode,        // org-level mode: 'tikkie_only' | null
     activeOrgSettings,    // the org's published settings blob (or null)
+    modeReady,            // have the two modes above been read for the active org?
   };
 
   return <OrgCtx.Provider value={value}>{children}</OrgCtx.Provider>;

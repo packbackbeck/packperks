@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  AlertCircle, Ban, CheckCircle2, ChevronLeft, ChevronRight, Copy, FileDown, History, ImageDown,
+  Minus, Plus, Printer, QrCode, RotateCcw, Settings2,
+} from 'lucide-react';
 import QRCode from 'qrcode';
 import { toJpeg, toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -8,10 +12,10 @@ import { useOrg } from '../context/OrgContext';
 import { getReceiptCopy } from './receiptCopy';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
-import QuickLinks from '../shared/QuickLinks';
 import { APP_URL } from '../../lib/appUrl';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
+import { Badge, Button, Card, CardBody, CardFoot, CardHeader, EmptyState, Field, Modal } from '../ui';
 import './AdminCupQr.css';
 import { useAdminMoney } from '../lib/adminMoney';
 import { effectiveRates } from '../../lib/rates';
@@ -55,7 +59,7 @@ const PROD_URL = APP_URL;
  * database until they're scanned by a user. Printing isn't required;
  * the QR on screen is scannable directly.
  * ───────────────────────────────────────────────────────────────────── */
-export default function AdminCupQr({ onNavigate }) {
+export default function AdminCupQr() {
   const { money } = useAdminMoney();
   const { activeOrg, activeOrgMode, activeOrgSettings } = useOrg();
   // Tikkie-only orgs print a receipt that pays out on scan — no app, no
@@ -79,8 +83,6 @@ export default function AdminCupQr({ onNavigate }) {
   const [printerIp, setPrinterIpState] = useState(getPrinterIp());
   const [printing, setPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState(null); // { ok, text } | null
-  // Quick print: one tap generates + prints a batch of N cups.
-  const [quickN, setQuickN] = useState(null); // the N currently generating/printing
   // Optional NV-graphics logo key codes (print logo by reference, no raster).
   const initialLogo = getLogoKeys();
   const [logoKey1, setLogoKey1] = useState(initialLogo ? String(initialLogo.key1) : '');
@@ -270,80 +272,12 @@ export default function AdminCupQr({ onNavigate }) {
         // with reality and the two receipts are never confused.
         cups: batch.cup_ids?.length ?? count,
       }, printerIp);
-      setPrintStatus({ ok: true, text: `Sent to printer at ${printerIp} ✓` });
+      setPrintStatus({ ok: true, text: `Sent to the printer at ${printerIp}.` });
     } catch (err) {
       console.error('ePOS print failed:', err);
       setPrintStatus({ ok: false, text: err.message || 'Print failed.' });
     } finally {
       setPrinting(false);
-    }
-  }
-
-  /* Quick print: mint a fresh batch of `n` cups and send it straight to the
-   * Epson printer in one tap. Mirrors handleGenerate + handleEposPrint but
-   * uses the freshly minted batch directly (no waiting on async state). */
-  async function handleQuickPrint(n) {
-    if (quickN !== null) return;
-    setQuickN(n);
-    setError(null);
-    setPrintStatus(null);
-    // A quick-print batch only "counts" if it actually prints. We mint it
-    // first (the QR codes have to exist before we can print them), then print,
-    // and only record it (latest-batch card, audit log, recent list) once the
-    // printer confirms. If printing fails, we roll the batch back with
-    // deleteCupBatches so it never lands in the records.
-    let pendingBatchId = null;
-    try {
-      const res = await generateCups(n);
-      pendingBatchId = res.batch_id;
-      const orgSlug = res.slug || activeOrg?.slug || '';
-      const slugPath = orgSlug ? `${orgSlug}/` : '';
-      const url = `${PROD_URL}${slugPath}?batch=${res.batch_id}`;
-      const preset = EXPIRY_PRESETS.find(p => p.id === expiryId);
-      let expiresAt = null;
-      if (preset?.ms) {
-        expiresAt = new Date(Date.now() + preset.ms).toISOString();
-        try { await setBatchExpiry(res.batch_id, expiresAt); }
-        catch (e) { console.error('setBatchExpiry failed (continuing):', e); }
-      }
-      const newBatch = { batch_id: res.batch_id, cup_ids: res.cup_ids, url, generatedAt: new Date(), expires_at: expiresAt };
-
-      // Print BEFORE recording. This is what throws if the printer is
-      // unreachable, sending us to the catch block where we roll back.
-      await printCupReceipt({
-        url,
-        restaurant,
-        generatedAt: newBatch.generatedAt,
-        totalAmount: (n * ratePerCup).toFixed(2),
-        sessionId: res.batch_id.slice(0, 8).toUpperCase(),
-        cups: res.cup_ids?.length ?? n,
-        variant: receiptVariant,
-      }, printerIp);
-
-      // Printed OK → commit it to the records.
-      pendingBatchId = null;
-      setBatch(newBatch);
-      setCount(n);
-      setPrintStatus({ ok: true, text: `Quick-printed ${n} cup${n !== 1 ? 's' : ''} to ${printerIp} ✓` });
-      logAction({
-        action: 'cup_batch.generate',
-        targetType: 'cup_batch',
-        targetId: res.batch_id,
-        metadata: { count: res.count, expires_at: expiresAt, restaurant, quick_print: true },
-      });
-      refreshRecent();
-    } catch (err) {
-      console.error('quick print failed:', err);
-      // Roll back the minted-but-unprinted batch so it is never recorded.
-      if (pendingBatchId) {
-        try { await deleteCupBatches([pendingBatchId]); }
-        catch (rbErr) { console.error('rollback (deleteCupBatches) failed:', rbErr); }
-      }
-      const msg = err.message || 'Quick print failed.';
-      setError(msg);
-      setPrintStatus({ ok: false, text: msg });
-    } finally {
-      setQuickN(null);
     }
   }
 
@@ -449,237 +383,238 @@ export default function AdminCupQr({ onNavigate }) {
     await refreshRecent();
   }
 
-  return (
-    <div className="admin-cup-qr">
-      <div className="acq-header">
-        <div className="acq-header__text">
-          <h1 className="acq-header__title">Cup QR Codes</h1>
-          <p className="acq-header__sub">
-            Generate the QR receipt printed by the smart bin. Each QR mints fresh
-            single-use cup tokens — scan them in the user app to redeem.
-          </p>
-        </div>
-        <div className="acq-header__actions">
-          <button
-            className="acq-btn acq-btn--ghost"
-            onClick={handleDownloadJpg}
-            disabled={!batch || !!exporting}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-            {exporting === 'jpg' ? 'Saving…' : 'JPG'}
-          </button>
-          <button
-            className="acq-btn acq-btn--ghost"
-            onClick={handleDownloadPdf}
-            disabled={!batch || !!exporting}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            {exporting === 'pdf' ? 'Saving…' : 'PDF'}
-          </button>
-          <button
-            className="acq-btn acq-btn--ghost"
-            onClick={handlePrint}
-            disabled={!batch}
-            title="Open the browser print dialog (Save as PDF / any OS printer)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"/>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-              <rect x="6" y="14" width="12" height="8"/>
-            </svg>
-            Browser print
-          </button>
-        </div>
-      </div>
+  const shownCups = batch?.cup_ids?.length ?? count;
 
+  return (
+    <div className="admin-cup-qr acq">
       {printStatus && (
-        <div className={`acq-print-status ${printStatus.ok ? 'acq-print-status--ok' : 'acq-print-status--err'}`}>
-          {printStatus.text}
+        <div
+          className={`acq-status ${printStatus.ok ? 'acq-status--ok' : 'acq-status--err'}`}
+          role={printStatus.ok ? 'status' : 'alert'}
+        >
+          {printStatus.ok ? <CheckCircle2 size={16} aria-hidden="true" /> : <AlertCircle size={16} aria-hidden="true" />}
+          <span>{printStatus.text}</span>
         </div>
       )}
 
-      {/* ── Left: generation controls ────────────────────────────────── */}
       <div className="acq-layout">
+        {/* ── Left: generation controls ─────────────────────────────── */}
         <div className="acq-controls">
-          {/* Quick print — one tap mints a fresh batch of N cups and prints it.
-              Hidden for Deferred Tikkie orgs: the smart bin prints its own
-              receipts, so a desk quick-print has no role there. */}
-          {!isTikkieOnly && <div className="acq-card acq-quick">
-            <h2 className="acq-card__title">Quick print</h2>
-            <p className="acq-field__hint">
-              One tap mints a fresh batch and prints it to {printerIp}.
-            </p>
-            <div className="acq-quick__row">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  className="acq-quick__btn"
-                  onClick={() => handleQuickPrint(n)}
-                  disabled={quickN !== null}
-                  aria-label={`Generate and print ${n} cup${n !== 1 ? 's' : ''}`}
-                  title={`Generate + print ${n} cup${n !== 1 ? 's' : ''}`}
-                >
-                  {quickN === n ? <span className="acq-quick__spin" /> : n}
-                </button>
-              ))}
-            </div>
-          </div>}
+          <Card>
+            <CardHeader
+              title="New batch"
+              icon={QrCode}
+              subtitle="Mint the cup codes, then print the receipt or save it as an image."
+            />
+            <CardBody>
+              <div className="acq-fields">
+                {/* NOT a <label>: a label forwards clicks anywhere in its area to
+                    its first labelable descendant (the − button), so clicking the
+                    title, the hint, or empty space would silently decrement. */}
+                <div className="ui-field">
+                  <span className="ui-field__label" id="acq-count-label">Cups returned</span>
+                  <div className="acq-stepper" role="group" aria-labelledby="acq-count-label">
+                    <button
+                      type="button"
+                      className="acq-stepper__btn"
+                      onClick={() => setCount(c => Math.max(1, c - 1))}
+                      disabled={count <= 1}
+                      aria-label="One cup fewer"
+                    >
+                      <Minus size={15} aria-hidden="true" />
+                    </button>
+                    <input
+                      type="number"
+                      className="acq-stepper__input"
+                      aria-labelledby="acq-count-label"
+                      min={1}
+                      max={50}
+                      value={count}
+                      onChange={e => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v)) setCount(Math.max(1, Math.min(50, v)));
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="acq-stepper__btn"
+                      onClick={() => setCount(c => Math.min(50, c + 1))}
+                      disabled={count >= 50}
+                      aria-label="One cup more"
+                    >
+                      <Plus size={15} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <span className="ui-field__hint">1 to 50 cups per QR code.</span>
+                </div>
 
-          <div className="acq-card">
-            <h2 className="acq-card__title">New batch</h2>
+                <Field label="Expiry" htmlFor="acq-expiry" hint="After this the QR code can’t be claimed any more.">
+                  <select
+                    id="acq-expiry"
+                    className="ui-select"
+                    value={expiryId}
+                    onChange={e => setExpiryId(e.target.value)}
+                  >
+                    {EXPIRY_PRESETS.map(p => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                </Field>
 
-            {/* NOT a <label>: a label forwards clicks anywhere in its area to
-                its first labelable descendant (the − button), so clicking the
-                title, the hint, or empty space would silently decrement. */}
-            <div className="acq-field">
-              <span className="acq-field__label">How many cups returned?</span>
-              <div className="acq-stepper">
-                <button
-                  type="button"
-                  className="acq-stepper__btn"
-                  onClick={() => setCount(c => Math.max(1, c - 1))}
-                  disabled={count <= 1}
-                >−</button>
-                <input
-                  type="number"
-                  className="acq-stepper__input"
-                  min={1}
-                  max={50}
-                  value={count}
-                  onChange={e => {
-                    const v = parseInt(e.target.value, 10);
-                    if (!isNaN(v)) setCount(Math.max(1, Math.min(50, v)));
-                  }}
-                />
-                <button
-                  type="button"
-                  className="acq-stepper__btn"
-                  onClick={() => setCount(c => Math.min(50, c + 1))}
-                  disabled={count >= 50}
-                >+</button>
+                <div className="acq-fields__wide">
+                  <Field label="Restaurant or location" htmlFor="acq-restaurant" hint="Printed on the receipt.">
+                    <input
+                      id="acq-restaurant"
+                      type="text"
+                      className="ui-input"
+                      value={restaurant}
+                      onChange={e => setRestaurant(e.target.value)}
+                      placeholder="Burger King — Amsterdam Damrak"
+                    />
+                  </Field>
+                </div>
               </div>
-              <span className="acq-field__hint">1 to 50 cups per QR.</span>
-            </div>
 
-            <label className="acq-field">
-              <span className="acq-field__label">Restaurant / location</span>
-              <input
-                type="text"
-                className="acq-input"
-                value={restaurant}
-                onChange={e => setRestaurant(e.target.value)}
-                placeholder="Burger King — Amsterdam Damrak"
-              />
-              <span className="acq-field__hint">Shown on the printed receipt.</span>
-            </label>
-
-            <label className="acq-field">
-              <span className="acq-field__label">Expiry</span>
-              <select
-                className="acq-input"
-                value={expiryId}
-                onChange={e => setExpiryId(e.target.value)}
-              >
-                {EXPIRY_PRESETS.map(p => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
-              <span className="acq-field__hint">After expiry the QR can't be claimed. Default: never expires.</span>
-            </label>
-
-            <label className="acq-field">
-              <span className="acq-field__label">Printer IP (Epson TM-m30III)</span>
-              <input
-                type="text"
-                className="acq-input"
-                value={printerIp}
-                onChange={e => setPrinterIpState(e.target.value)}
-                onBlur={e => setPrinterIp(e.target.value)}
-                placeholder="192.168.192.168"
-              />
-              <span className="acq-field__hint">Epson direct-Ethernet default — your computer must be on the same subnet.</span>
-            </label>
-
-            {/* div, not label: two inputs inside one label would forward
-                clicks on the title/hint to whichever comes first. */}
-            <div className="acq-field">
-              <span className="acq-field__label">Logo NV key codes (optional)</span>
-              <div className="acq-row" style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="number"
-                  className="acq-input"
-                  value={logoKey1}
-                  onChange={e => { setLogoKey1(e.target.value); setLogoKeys(e.target.value, logoKey2); }}
-                  placeholder="key 1 (e.g. 80)"
-                />
-                <input
-                  type="number"
-                  className="acq-input"
-                  value={logoKey2}
-                  onChange={e => { setLogoKey2(e.target.value); setLogoKeys(logoKey1, e.target.value); }}
-                  placeholder="key 2 (e.g. 80)"
-                />
-              </div>
-              <span className="acq-field__hint">Blank = text wordmark. Or enter the printer's NV-graphics key codes.</span>
-            </div>
-
-            <div className="acq-generate-row">
-              <button
-                className="acq-btn acq-btn--primary"
+              {error && (
+                <p className="acq-error" role="alert">
+                  <AlertCircle size={14} aria-hidden="true" />
+                  {error}
+                </p>
+              )}
+            </CardBody>
+            <div className="acq-actions">
+              <Button
+                variant="primary"
+                icon={QrCode}
                 onClick={handleGenerate}
                 disabled={generating}
               >
                 {generating ? 'Generating…' : `Generate for ${count} cup${count !== 1 ? 's' : ''}`}
-              </button>
-              <button
-                className="acq-btn acq-btn--print"
+              </Button>
+              <Button
+                icon={Printer}
                 onClick={handleEposPrint}
                 disabled={!batch || printing}
                 title={`Print to the Epson TM-m30III at ${printerIp} over Ethernet (ESC/POS via ePOS-Print)`}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 6 2 18 2 18 9"/>
-                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                  <rect x="6" y="14" width="12" height="8"/>
-                </svg>
                 {printing ? 'Printing…' : 'Print receipt'}
-              </button>
+              </Button>
             </div>
+          </Card>
 
-            {error && <p className="acq-error">{error}</p>}
-          </div>
+          <Card>
+            <CardHeader
+              title="Receipt printer"
+              icon={Settings2}
+              subtitle="An Epson TM-m30III on this network. Your computer must be on the same subnet."
+            />
+            <CardBody>
+              <div className="acq-fields">
+                <Field label="Printer IP address" htmlFor="acq-printer-ip" hint="Epson’s direct-Ethernet default is 192.168.192.168.">
+                  <input
+                    id="acq-printer-ip"
+                    type="text"
+                    className="ui-input acq-mono-input"
+                    value={printerIp}
+                    onChange={e => setPrinterIpState(e.target.value)}
+                    onBlur={e => setPrinterIp(e.target.value)}
+                    placeholder="192.168.192.168"
+                  />
+                </Field>
+
+                {/* div, not label: two inputs inside one label would forward
+                    clicks on the title/hint to whichever comes first. */}
+                <div className="ui-field">
+                  <span className="ui-field__label" id="acq-logo-label">
+                    Logo key codes <span className="acq-optional">optional</span>
+                  </span>
+                  <div className="acq-pair" role="group" aria-labelledby="acq-logo-label">
+                    <input
+                      type="number"
+                      className="ui-input"
+                      aria-label="Logo key 1"
+                      value={logoKey1}
+                      onChange={e => { setLogoKey1(e.target.value); setLogoKeys(e.target.value, logoKey2); }}
+                      placeholder="Key 1, e.g. 80"
+                    />
+                    <input
+                      type="number"
+                      className="ui-input"
+                      aria-label="Logo key 2"
+                      value={logoKey2}
+                      onChange={e => { setLogoKey2(e.target.value); setLogoKeys(logoKey1, e.target.value); }}
+                      placeholder="Key 2, e.g. 80"
+                    />
+                  </div>
+                  <span className="ui-field__hint">The logo stored on the printer. Leave blank to print the name as text.</span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
 
           {batch && (
-            <div className="acq-card acq-card--meta">
-              <h2 className="acq-card__title">Latest batch</h2>
-              <div className="acq-meta-row"><span>Batch ID</span><strong className="acq-mono">{batch.batch_id}</strong></div>
-              <div className="acq-meta-row"><span>Cup count</span><strong>{batch.cup_ids.length}</strong></div>
-              <div className="acq-meta-row acq-meta-row--col">
-                <span>Cup UUIDs</span>
-                <details className="acq-uuids">
-                  <summary>Show {batch.cup_ids.length} UUIDs</summary>
-                  <ul>{batch.cup_ids.map(id => <li key={id}>{id}</li>)}</ul>
-                </details>
-              </div>
-              <div className="acq-meta-row acq-meta-row--col">
-                <span>QR URL</span>
-                <code className="acq-url">{batch.url}</code>
-                <button className="acq-btn acq-btn--ghost" onClick={copyUrl}>Copy URL</button>
-              </div>
-            </div>
+            <Card>
+              <CardHeader title="Latest batch" icon={History} />
+              <CardBody>
+                <dl className="acq-meta">
+                  <div className="acq-meta__row">
+                    <dt>Batch ID</dt>
+                    <dd className="acq-mono">{batch.batch_id}</dd>
+                  </div>
+                  <div className="acq-meta__row">
+                    <dt>Cups</dt>
+                    <dd>{batch.cup_ids.length}</dd>
+                  </div>
+                  <div className="acq-meta__row acq-meta__row--col">
+                    <dt>Cup codes</dt>
+                    <dd>
+                      <details className="acq-uuids">
+                        <summary>Show {batch.cup_ids.length} code{batch.cup_ids.length === 1 ? '' : 's'}</summary>
+                        <ul>{batch.cup_ids.map(id => <li key={id}>{id}</li>)}</ul>
+                      </details>
+                    </dd>
+                  </div>
+                  <div className="acq-meta__row acq-meta__row--col">
+                    <dt>Link in the QR code</dt>
+                    <dd className="acq-url-row">
+                      <code className="acq-url">{batch.url}</code>
+                      <Button size="sm" icon={Copy} onClick={copyUrl}>Copy link</Button>
+                    </dd>
+                  </div>
+                </dl>
+              </CardBody>
+            </Card>
           )}
         </div>
 
         {/* ── Right: live receipt preview ───────────────────────────── */}
-        <div className="acq-preview-wrap">
+        <Card className="acq-preview-card">
+          <CardHeader
+            title="Receipt preview"
+            subtitle={batch ? 'Exactly what prints and exports.' : 'Generate a batch to fill in the QR code.'}
+            actions={(
+              <>
+                <Button size="sm" icon={ImageDown} onClick={handleDownloadJpg} disabled={!batch || !!exporting}>
+                  {exporting === 'jpg' ? 'Saving…' : 'JPG'}
+                </Button>
+                <Button size="sm" icon={FileDown} onClick={handleDownloadPdf} disabled={!batch || !!exporting}>
+                  {exporting === 'pdf' ? 'Saving…' : 'PDF'}
+                </Button>
+                <Button
+                  size="sm"
+                  icon={Printer}
+                  onClick={handlePrint}
+                  disabled={!batch}
+                  title="Open the browser print dialog (Save as PDF / any OS printer)"
+                >
+                  Browser print
+                </Button>
+              </>
+            )}
+          />
+          <div className="acq-preview-wrap">
+          {/* The receipt itself: its look is the printed/exported artwork, so it
+              keeps its own colours. */}
           <div className="acq-receipt" id="cupqr-receipt-print-target" ref={receiptRef}>
             <header className="acq-receipt__brand">
               <img src={packbackLogo} alt="PackBack" />
@@ -704,8 +639,8 @@ export default function AdminCupQr({ onNavigate }) {
             </ul>
 
             <div className="acq-receipt__cupcount">
-              <span className="acq-receipt__cupcount-num">{batch?.cup_ids?.length ?? count}</span>
-              <span className="acq-receipt__cupcount-label">{(batch?.cup_ids?.length ?? count) === 1 ? 'CUP' : 'CUPS'}</span>
+              <span className="acq-receipt__cupcount-num">{shownCups}</span>
+              <span className="acq-receipt__cupcount-label">{shownCups === 1 ? 'CUP' : 'CUPS'}</span>
             </div>
 
             <h3 className="acq-receipt__cta">{copy.cta}</h3>
@@ -740,7 +675,7 @@ export default function AdminCupQr({ onNavigate }) {
               </div>
               <div className="acq-receipt__footer-row">
                 <span>Cups:</span>
-                <span>{batch?.cup_ids?.length ?? count}</span>
+                <span>{shownCups}</span>
               </div>
               <div className="acq-receipt__footer-row">
                 <span>Total Amount:</span>
@@ -752,158 +687,178 @@ export default function AdminCupQr({ onNavigate }) {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </Card>
       </div>
 
       {/* P-21 — recent batches with revoke / un-revoke. Lets admins
        *  kill a misprinted batch or restore one that was revoked by
        *  accident. Each row shows usage (activated / total), the time
        *  generated, the expiry (if any), and the current status. */}
-      <section className="acq-batches">
-        <header className="acq-batches__head">
-          <h2 className="acq-batches__title">Recent batches</h2>
-          <p className="acq-batches__sub">
-            Mint new QR receipts above. Use this list to revoke a misprinted batch — the
-            customer will see a "QR cancelled" message if they try to scan it.
-          </p>
-        </header>
-        {recentLoading ? (
-          <div className="acq-batches__loading">Loading batches…</div>
-        ) : recent.length === 0 ? (
-          <div className="acq-batches__empty">No batches generated yet.</div>
-        ) : (
-          <table className="acq-batches__table">
-            <thead>
-              <tr>
-                <th className="bulk-check-cell">
-                  <input
-                    type="checkbox"
-                    checked={batchSel.allSelected}
-                    ref={el => { if (el) el.indeterminate = batchSel.someSelected && !batchSel.allSelected; }}
-                    onChange={batchSel.toggleAll}
-                    aria-label="Select all batches across all pages"
-                    title="Select all batches (all pages)"
-                  />
-                </th>
-                <th>Batch</th>
-                <th>Source</th>
-                <th>Generated</th>
-                <th>Used</th>
-                <th>Expiry</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageBatches.map(b => {
-                const exp = b.expires_at ? new Date(b.expires_at) : null;
-                const expired = exp ? exp.getTime() <= Date.now() : false;
-                const isRevoked = !!b.revoked_at;
-                const fullyUsed = b.activated >= b.total;
-                let statusLabel = 'Active';
-                let statusTone = 'active';
-                if (isRevoked)      { statusLabel = 'Revoked'; statusTone = 'revoked'; }
-                else if (expired)   { statusLabel = 'Expired'; statusTone = 'expired'; }
-                else if (fullyUsed) { statusLabel = 'Fully claimed'; statusTone = 'used'; }
-                const busy = revokingId === b.batch_id;
-                return (
-                  <tr key={b.batch_id} className={batchSel.isSelected(b.batch_id) ? 'acq-batches__row--selected' : ''}>
-                    <td className="bulk-check-cell">
+      <Card className="acq-batches">
+        <CardHeader
+          title="Recent batches"
+          icon={History}
+          ruled
+          subtitle="Revoke a misprinted batch here: a customer who scans it sees a “QR cancelled” message."
+          actions={recent.length > 0 && <Badge tone="neutral">{recent.length} batch{recent.length === 1 ? '' : 'es'}</Badge>}
+        />
+        <CardBody flush>
+          {recentLoading && recent.length === 0 ? (
+            <p className="acq-batches__loading">Loading batches…</p>
+          ) : recent.length === 0 ? (
+            <EmptyState icon={QrCode} title="No batches yet">
+              Batches you generate, and the ones the smart bin asks for, show up here.
+            </EmptyState>
+          ) : (
+            <div className="acq-table-wrap">
+              <table className="ui-table acq-table">
+                <thead>
+                  <tr>
+                    <th className="bulk-check-cell acq-check">
                       <input
                         type="checkbox"
-                        checked={batchSel.isSelected(b.batch_id)}
-                        onChange={() => batchSel.toggle(b.batch_id)}
-                        aria-label="Select batch"
+                        checked={batchSel.allSelected}
+                        ref={el => { if (el) el.indeterminate = batchSel.someSelected && !batchSel.allSelected; }}
+                        onChange={batchSel.toggleAll}
+                        aria-label="Select all batches across all pages"
+                        title="Select all batches (all pages)"
                       />
-                    </td>
-                    <td>
-                      <span className="acq-mono">{b.batch_id.slice(0, 8)}…</span>
-                    </td>
-                    <td>
-                      {/* Where the batch came from: the smart bin asked for
-                          it (print-first — its session id IS this batch id),
-                          or an admin generated it here. */}
-                      <span
-                        className={`acq-src acq-src--${b.source === 'requested' ? 'bin' : 'admin'}`}
-                        title={b.source === 'requested'
-                          ? `Requested by the smart bin${b.machine_id ? ` · machine ${b.machine_id.slice(0, 10)}…` : ''}${b.session_id ? ` · session ${b.session_id}` : ''}`
-                          : 'Generated in the dashboard'}
-                      >
-                        {b.source === 'requested' ? 'Requested' : 'Generated'}
-                      </span>
-                    </td>
-                    <td className="acq-batches__muted">
-                      {new Date(b.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td>{b.activated} / {b.total}</td>
-                    <td className="acq-batches__muted">
-                      {exp
-                        ? exp.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                        : <span style={{ color: '#B8B2A8' }}>Never</span>}
-                    </td>
-                    <td>
-                      <span className={`acq-batch-status acq-batch-status--${statusTone}`}>
-                        {statusLabel}
-                        {b.revoked_reason && <span className="acq-batch-status__why" title={b.revoked_reason}> · why</span>}
-                      </span>
-                    </td>
-                    <td className="acq-batches__actions">
-                      <button
-                        className="acq-batches__btn acq-batches__btn--ghost"
-                        onClick={() => setQrModal({ batch_id: b.batch_id, url: urlForBatch(b.batch_id), source: b.source })}
-                        title="Show this batch's QR code again"
-                      >
-                        QR
-                      </button>
-                      {isRevoked ? (
-                        <button
-                          className="acq-batches__btn acq-batches__btn--ghost"
-                          onClick={() => handleUnrevoke(b.batch_id)}
-                          disabled={busy}
-                          title="Re-enable this batch. Customers will be able to claim it again."
-                        >
-                          {busy ? 'Restoring…' : 'Un-revoke'}
-                        </button>
-                      ) : (
-                        <button
-                          className="acq-batches__btn acq-batches__btn--danger"
-                          onClick={() => setRevokeModal({ batch_id: b.batch_id })}
-                          disabled={busy || fullyUsed}
-                          title={fullyUsed ? 'All cups in this batch have already been claimed — nothing to revoke.' : 'Mark this batch as cancelled. Any pending scans of it will fail.'}
-                        >
-                          Revoke
-                        </button>
-                      )}
-                    </td>
+                    </th>
+                    <th>Batch</th>
+                    <th>Source</th>
+                    <th>Generated</th>
+                    <th className="ui-num">Claimed</th>
+                    <th>Expires</th>
+                    <th>Status</th>
+                    <th aria-label="Actions" />
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+                </thead>
+                <tbody>
+                  {pageBatches.map(b => {
+                    const exp = b.expires_at ? new Date(b.expires_at) : null;
+                    const expired = exp ? exp.getTime() <= Date.now() : false;
+                    const isRevoked = !!b.revoked_at;
+                    const fullyUsed = b.activated >= b.total;
+                    let statusLabel = 'Active';
+                    let statusTone = 'success';
+                    if (isRevoked)      { statusLabel = 'Revoked'; statusTone = 'danger'; }
+                    else if (expired)   { statusLabel = 'Expired'; statusTone = 'warning'; }
+                    else if (fullyUsed) { statusLabel = 'Fully claimed'; statusTone = 'neutral'; }
+                    const busy = revokingId === b.batch_id;
+                    const selected = batchSel.isSelected(b.batch_id);
+                    return (
+                      <tr key={b.batch_id} className={selected ? 'acq-row--selected' : ''}>
+                        <td className="bulk-check-cell acq-check">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => batchSel.toggle(b.batch_id)}
+                            aria-label={`Select batch ${b.batch_id.slice(0, 8)}`}
+                          />
+                        </td>
+                        <td>
+                          <span className="acq-mono">{b.batch_id.slice(0, 8)}…</span>
+                        </td>
+                        <td>
+                          {/* Where the batch came from: the smart bin asked for
+                              it (print-first — its session id IS this batch id),
+                              or an admin generated it here. */}
+                          <Badge
+                            tone={b.source === 'requested' ? 'info' : 'neutral'}
+                            title={b.source === 'requested'
+                              ? `Requested by the smart bin${b.machine_id ? ` · machine ${b.machine_id.slice(0, 10)}…` : ''}${b.session_id ? ` · session ${b.session_id}` : ''}`
+                              : 'Generated in the dashboard'}
+                          >
+                            {b.source === 'requested' ? 'Smart bin' : 'Dashboard'}
+                          </Badge>
+                        </td>
+                        <td className="acq-muted">
+                          {new Date(b.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="ui-num">{b.activated} / {b.total}</td>
+                        <td className="acq-muted">
+                          {exp
+                            ? exp.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            : 'Never'}
+                        </td>
+                        <td>
+                          <Badge tone={statusTone} title={b.revoked_reason ? `Reason: ${b.revoked_reason}` : undefined}>
+                            {statusLabel}
+                            {b.revoked_reason && <span className="acq-why"> · why?</span>}
+                          </Badge>
+                        </td>
+                        <td className="acq-row-actions">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={QrCode}
+                            onClick={() => setQrModal({ batch_id: b.batch_id, url: urlForBatch(b.batch_id), source: b.source })}
+                            title="Show this batch’s QR code again"
+                          >
+                            QR
+                          </Button>
+                          {isRevoked ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={RotateCcw}
+                              onClick={() => handleUnrevoke(b.batch_id)}
+                              disabled={busy}
+                              title="Re-enable this batch. Customers will be able to claim it again."
+                            >
+                              {busy ? 'Restoring…' : 'Restore'}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="danger-ghost"
+                              size="sm"
+                              icon={Ban}
+                              onClick={() => setRevokeModal({ batch_id: b.batch_id })}
+                              disabled={busy || fullyUsed}
+                              title={fullyUsed ? 'All cups in this batch have already been claimed — nothing to revoke.' : 'Mark this batch as cancelled. Any pending scans of it will fail.'}
+                            >
+                              Revoke
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
 
         {recent.length > BATCH_PAGE_SIZE && (
-          <div className="acq-pagination">
-            <button
-              className="acq-btn acq-btn--ghost"
-              onClick={() => setBatchPage(p => Math.max(0, p - 1))}
-              disabled={safeBatchPage <= 0}
-            >
-              ← Prev
-            </button>
-            <span className="acq-pagination__info">
-              Page {safeBatchPage + 1} of {batchPageCount} · {recent.length} batches
-            </span>
-            <button
-              className="acq-btn acq-btn--ghost"
-              onClick={() => setBatchPage(p => Math.min(batchPageCount - 1, p + 1))}
-              disabled={safeBatchPage >= batchPageCount - 1}
-            >
-              Next →
-            </button>
-          </div>
+          <CardFoot>
+            <div className="acq-pagination">
+              <span>
+                Page {safeBatchPage + 1} of {batchPageCount} · {recent.length} batches
+              </span>
+              <div className="acq-pagination__btns">
+                <Button
+                  size="sm"
+                  icon={ChevronLeft}
+                  onClick={() => setBatchPage(p => Math.max(0, p - 1))}
+                  disabled={safeBatchPage <= 0}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  iconRight={ChevronRight}
+                  onClick={() => setBatchPage(p => Math.min(batchPageCount - 1, p + 1))}
+                  disabled={safeBatchPage >= batchPageCount - 1}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardFoot>
         )}
-      </section>
+      </Card>
 
       <BulkDeleteBar
         count={batchSel.count}
@@ -914,45 +869,47 @@ export default function AdminCupQr({ onNavigate }) {
 
       {/* Re-opened QR for a past batch — reprint a receipt, or check the
           exact link a bin-requested session points at. */}
-      {qrModal && (
-        <div className="acq-qrmodal" role="dialog" aria-modal="true" aria-label="Batch QR code">
-          <div className="acq-qrmodal__back" onClick={() => setQrModal(null)} />
-          <div className="acq-qrmodal__card">
-            <h2 className="acq-qrmodal__title">Batch QR</h2>
-            <p className="acq-qrmodal__meta">
-              <span className={`acq-src acq-src--${qrModal.source === 'requested' ? 'bin' : 'admin'}`}>
-                {qrModal.source === 'requested' ? 'Requested' : 'Generated'}
-              </span>
-              <span className="acq-mono">{qrModal.batch_id}</span>
-            </p>
+      <Modal
+        open={!!qrModal}
+        onClose={() => setQrModal(null)}
+        title="Batch QR code"
+        subtitle={qrModal?.source === 'requested' ? 'Requested by the smart bin.' : 'Generated in the dashboard.'}
+        icon={QrCode}
+        footer={(
+          <>
+            <Button
+              icon={Copy}
+              onClick={() => navigator.clipboard?.writeText(qrModal?.url || '').catch(() => {})}
+            >
+              Copy link
+            </Button>
+            <Button variant="primary" onClick={() => setQrModal(null)}>Close</Button>
+          </>
+        )}
+      >
+        {qrModal && (
+          <div className="acq-qrmodal">
             <div className="acq-qrmodal__qr"><canvas ref={modalQrRef} /></div>
-            <code className="acq-url acq-qrmodal__url">{qrModal.url}</code>
-            <div className="acq-qrmodal__actions">
-              <button
-                className="acq-batches__btn acq-batches__btn--ghost"
-                onClick={() => navigator.clipboard?.writeText(qrModal.url).catch(() => {})}
-              >
-                Copy link
-              </button>
-              <button className="acq-btn acq-btn--primary" onClick={() => setQrModal(null)}>Close</button>
+            <div className="acq-qrmodal__meta">
+              <span className="acq-qrmodal__label">Batch</span>
+              <span className="acq-mono">{qrModal.batch_id}</span>
             </div>
+            <code className="acq-url">{qrModal.url}</code>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {revokeModal && (
-        <RevokeBatchModal
-          batchId={revokeModal.batch_id}
-          onCancel={() => setRevokeModal(null)}
-          onConfirm={async (reason) => {
-            const id = revokeModal.batch_id;
-            setRevokeModal(null);
-            await handleRevoke(id, reason);
-          }}
-        />
-      )}
-
-      <QuickLinks currentPage="cupqr" onNavigate={onNavigate} />
+      {/* Keyed per batch so the reason starts empty every time. */}
+      <RevokeBatchModal
+        key={revokeModal?.batch_id || 'none'}
+        batchId={revokeModal?.batch_id}
+        onCancel={() => setRevokeModal(null)}
+        onConfirm={async (reason) => {
+          const id = revokeModal.batch_id;
+          setRevokeModal(null);
+          await handleRevoke(id, reason);
+        }}
+      />
     </div>
   );
 }
@@ -969,54 +926,42 @@ function RevokeBatchModal({ batchId, onCancel, onConfirm }) {
   const canSubmit = reason.trim().length >= 3;
 
   return (
-    <div className="admin-publish-overlay" onClick={onCancel}>
-      <div className="admin-publish-modal" onClick={e => e.stopPropagation()}>
-        <div className="admin-publish-modal__header">
-          <div
-            className="admin-publish-modal__icon"
-            style={{ background: 'rgba(220,38,38,0.10)', color: '#DC2626' }}
+    <Modal
+      open={!!batchId}
+      onClose={onCancel}
+      title="Revoke this batch?"
+      subtitle="A customer who scans this QR code sees a “QR cancelled” message and gets no cups. Cups already claimed stay in their balance."
+      icon={Ban}
+      iconTone="rose"
+      footer={(
+        <>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button
+            variant="danger"
+            icon={Ban}
+            onClick={() => onConfirm(reason.trim())}
+            disabled={!canSubmit}
+            title={!canSubmit ? 'Say why you’re revoking this batch' : undefined}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="admin-publish-modal__title">Revoke this batch?</h3>
-            <p className="admin-publish-modal__sub">
-              Customers scanning this QR will see a "QR cancelled" message and won't get any cups.
-              Already-claimed cups stay in their balance — revocation only affects pending claims.
-            </p>
-          </div>
-        </div>
-
-        <label className="admin-publish-modal__label">Reason (required)</label>
+            Revoke batch
+          </Button>
+        </>
+      )}
+    >
+      <Field
+        label="Reason (required)"
+        htmlFor="acq-revoke-reason"
+        hint={<>Kept in the activity log. Batch <span className="acq-mono">{batchId}</span></>}
+      >
         <input
-          className="admin-publish-modal__input"
+          id="acq-revoke-reason"
+          className="ui-input"
           placeholder="e.g. Misprinted batch, reprinted as XYZ"
           value={reason}
           onChange={e => setReason(e.target.value)}
           autoFocus
         />
-
-        <div className="admin-publish-modal__actions">
-          <button className="admin-publish-modal__cancel" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            className="admin-publish-modal__confirm"
-            onClick={() => onConfirm(reason.trim())}
-            disabled={!canSubmit}
-            style={{ background: '#DC2626' }}
-            title={!canSubmit ? 'Please describe why you\'re revoking this batch' : ''}
-          >
-            Revoke batch →
-          </button>
-        </div>
-        <p style={{ marginTop: 8, fontSize: 11, color: '#9E9A93' }}>
-          Batch ID: <span className="acq-mono">{batchId}</span>
-        </p>
-      </div>
-    </div>
+      </Field>
+    </Modal>
   );
 }

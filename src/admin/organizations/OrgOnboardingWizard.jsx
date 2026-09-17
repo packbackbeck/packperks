@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { ArrowLeft, ArrowRight, Building2, Check, Plus, Trash2, TriangleAlert, X } from 'lucide-react';
 import { createOrganization, listOrgGroups, isOrgSlugAvailable } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { ORG_MODELS, ORG_MODEL_ORDER } from '../lib/orgModes';
 import { getCopyPreset } from '../../lib/copyPresets';
+import { getAllRegions } from '../../lib/regions';
+import { Badge, Button, Switch } from '../ui';
+import { MODE_GLYPH } from '../master/orgShared';
 import './OrgOnboardingWizard.css';
 import { useAdminMoney, adminMoney } from '../lib/adminMoney';
 
@@ -49,7 +53,7 @@ const EMPTY_REWARD = () => ({
   bgColor: '#FD6F46',
 });
 
-const EMPTY_INVITE = () => ({ email: '', role: 'admin', method: 'email' });
+const EMPTY_INVITE = () => ({ email: '', role: 'manager', method: 'email' });
 
 const EMPTY_DATA = {
   model: null,
@@ -111,18 +115,20 @@ const EMPTY_DATA = {
  * model, so the progress bar and the step numbers always reflect the
  * steps this particular org will actually go through. */
 const ALL_STEPS = [
-  { id: 'model',     title: 'Programme model' },
-  { id: 'group',     title: 'Group placement', when: (m) => !!m && ORG_MODELS[m].group !== 'never' },
-  { id: 'brand',     title: 'Brand identity' },
-  { id: 'legal',     title: 'Legal & contact details', optional: true },
+  { id: 'model',     title: 'Programme' },
+  { id: 'group',     title: 'Group', when: (m) => !!m && ORG_MODELS[m].group !== 'never' },
+  { id: 'brand',     title: 'Brand' },
+  { id: 'legal',     title: 'Company details', optional: true },
   { id: 'location',  title: 'First location', optional: true },
-  { id: 'economics', title: 'Cup economics' },
+  { id: 'economics', title: 'Cup value' },
   { id: 'rewards',   title: 'Starter rewards', optional: true, when: (m) => !!m && ORG_MODELS[m].steps.rewards },
-  { id: 'copy',      title: 'App copy', optional: true, when: (m) => !!m && ORG_MODELS[m].steps.copy },
-  { id: 'features',  title: 'Feature flags', when: (m) => !!m && ORG_MODELS[m].steps.features },
-  { id: 'invites',   title: 'Team invites', optional: true },
-  { id: 'review',    title: 'Review & launch' },
+  { id: 'copy',      title: 'Customer copy', optional: true, when: (m) => !!m && ORG_MODELS[m].steps.copy },
+  { id: 'features',  title: 'Features', when: (m) => !!m && ORG_MODELS[m].steps.features },
+  { id: 'invites',   title: 'Team', optional: true },
+  { id: 'review',    title: 'Review' },
 ];
+
+const MODEL_TONE = { deposit: 'standard', byo: 'byo', tikkie_only: 'tikkie_only' };
 
 export default function OrgOnboardingWizard({ onClose, onCreated }) {
   const [stepIdx, setStepIdx] = useState(0);
@@ -276,136 +282,134 @@ export default function OrgOnboardingWizard({ onClose, onCreated }) {
   }
 
   return (
-    <div className="oow-backdrop" role="dialog" aria-modal="true" aria-label="Add organisation">
+    <div className="oow-backdrop" role="dialog" aria-modal="true" aria-label="New organisation">
       <div className="oow-modal">
         <header className="oow-header">
-          <div>
-            <div className="oow-eyebrow">
+          <span className="oow-header__icon" aria-hidden="true"><Building2 size={19} /></span>
+          <div className="oow-header__titles">
+            <h2 className="oow-header__title">New organisation</h2>
+            <p className="oow-header__sub">
               {/* The model decides how many steps there are, so quoting a
                   total before it's picked would just be wrong. */}
-              Add organisation · Step {stepIdx + 1}{model ? ` of ${steps.length}` : ''}
-              {model && <span className="oow-eyebrow__chip">{model.label}</span>}
-            </div>
-            <h2 className="oow-title">
-              {step?.title}
-              {step?.optional && <span className="oow-title__opt">Optional</span>}
-            </h2>
+              Step {stepIdx + 1}{model ? ` of ${steps.length}` : ''}
+              {model && <> · {model.label}</>}
+            </p>
           </div>
-          <button className="oow-close" onClick={onClose} aria-label="Close">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
+          <Button variant="ghost" size="sm" icon={X} aria-label="Close" onClick={onClose} disabled={busy} />
         </header>
 
-        <div className="oow-progress">
-          {steps.map((s, i) => (
-            <span
-              key={s.id}
-              className={`oow-progress__seg ${i < stepIdx ? 'oow-progress__seg--done' : ''} ${i === stepIdx ? 'oow-progress__seg--active' : ''}`}
-              title={s.title}
-            />
-          ))}
+        <div className="oow-progress" aria-hidden="true">
+          <span className="oow-progress__fill" style={{ width: `${((stepIdx + 1) / steps.length) * 100}%` }} />
         </div>
 
-        <div className="oow-body">
-          {step?.id === 'model' && (
-            <StepModel value={data.model} onChange={chooseModel} />
-          )}
-          {step?.id === 'group' && (
-            <StepGroup
-              model={model}
-              modelKey={data.model}
-              value={data.group}
-              groups={groups}
-              loading={groupsLoading}
-              orgName={data.brand.name}
-              onChange={(patch) => updateSection('group', patch)}
-            />
-          )}
-          {step?.id === 'brand' && (
-            <StepBrand
-              data={data.brand}
-              slugState={slugState}
-              onChange={(patch) => {
-                if (patch.slug !== undefined) setSlugTouched(true);
-                updateSection('brand', patch);
-              }}
-            />
-          )}
-          {step?.id === 'legal' && (
-            <StepLegal data={data.legal} onChange={(patch) => updateSection('legal', patch)} />
-          )}
-          {step?.id === 'location' && (
-            <StepLocation data={data.location} onChange={(patch) => updateSection('location', patch)} />
-          )}
-          {step?.id === 'economics' && (
-            <StepEconomics
-              data={data.economics}
-              modelKey={data.model}
-              features={data.features}
-              onChange={(patch) => updateSection('economics', patch)}
-            />
-          )}
-          {step?.id === 'rewards' && (
-            <StepRewards
-              rewards={data.rewards}
-              onChange={(next) => setData(d => ({ ...d, rewards: next }))}
-            />
-          )}
-          {step?.id === 'copy' && (
-            <StepCopy data={data.copy} onChange={(patch) => updateSection('copy', patch)} />
-          )}
-          {step?.id === 'features' && (
-            <StepFeatures
-              data={data.features}
-              modelKey={data.model}
-              onChange={(patch) => updateSection('features', patch)}
-            />
-          )}
-          {step?.id === 'invites' && (
-            <StepInvites
-              invites={data.invites}
-              onChange={(next) => setData(d => ({ ...d, invites: next }))}
-            />
-          )}
-          {step?.id === 'review' && (
-            <StepReview data={data} model={model} groups={groups} steps={steps} />
-          )}
-        </div>
+        <div className="oow-main">
+          <nav className="oow-rail" aria-label="Steps">
+            <ol>
+              {steps.map((s, i) => {
+                const state = i < stepIdx ? 'done' : i === stepIdx ? 'active' : 'todo';
+                return (
+                  <li key={s.id} className={`oow-rail__item oow-rail__item--${state}`} aria-current={state === 'active' ? 'step' : undefined}>
+                    <button type="button" className="oow-rail__btn" disabled={i >= stepIdx || busy} onClick={() => setStepIdx(i)}>
+                      <span className="oow-rail__dot" aria-hidden="true">{state === 'done' ? <Check size={12} /> : i + 1}</span>
+                      <span className="oow-rail__label">{s.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+              {!model && <li className="oow-rail__item oow-rail__item--hint">More steps once you pick a programme</li>}
+            </ol>
+          </nav>
 
-        {error && <div className="oow-error">{error}</div>}
+          <div className="oow-body" key={step?.id}>
+            <h3 className="oow-title">
+              {step?.title}
+              {step?.optional && <Badge tone="neutral">Optional</Badge>}
+            </h3>
+            {step?.id === 'model' && (
+              <StepModel value={data.model} onChange={chooseModel} />
+            )}
+            {step?.id === 'group' && (
+              <StepGroup
+                model={model}
+                modelKey={data.model}
+                value={data.group}
+                groups={groups}
+                loading={groupsLoading}
+                orgName={data.brand.name}
+                onChange={(patch) => updateSection('group', patch)}
+              />
+            )}
+            {step?.id === 'brand' && (
+              <StepBrand
+                data={data.brand}
+                slugState={slugState}
+                onChange={(patch) => {
+                  if (patch.slug !== undefined) setSlugTouched(true);
+                  updateSection('brand', patch);
+                }}
+              />
+            )}
+            {step?.id === 'legal' && (
+              <StepLegal data={data.legal} onChange={(patch) => updateSection('legal', patch)} />
+            )}
+            {step?.id === 'location' && (
+              <StepLocation data={data.location} onChange={(patch) => updateSection('location', patch)} />
+            )}
+            {step?.id === 'economics' && (
+              <StepEconomics
+                data={data.economics}
+                modelKey={data.model}
+                features={data.features}
+                onChange={(patch) => updateSection('economics', patch)}
+              />
+            )}
+            {step?.id === 'rewards' && (
+              <StepRewards
+                rewards={data.rewards}
+                onChange={(next) => setData(d => ({ ...d, rewards: next }))}
+              />
+            )}
+            {step?.id === 'copy' && (
+              <StepCopy data={data.copy} grouped={data.group.choice !== 'none'} onChange={(patch) => updateSection('copy', patch)} />
+            )}
+            {step?.id === 'features' && (
+              <StepFeatures
+                data={data.features}
+                modelKey={data.model}
+                onChange={(patch) => updateSection('features', patch)}
+              />
+            )}
+            {step?.id === 'invites' && (
+              <StepInvites
+                invites={data.invites}
+                onChange={(next) => setData(d => ({ ...d, invites: next }))}
+              />
+            )}
+            {step?.id === 'review' && (
+              <StepReview data={data} model={model} groups={groups} steps={steps} />
+            )}
+          </div>
+        </div>
 
         <footer className="oow-footer">
-          <button
-            type="button"
-            className="oow-btn oow-btn--ghost"
+          <Button
+            variant="outline"
+            icon={ArrowLeft}
             onClick={() => setStepIdx(i => Math.max(0, i - 1))}
             disabled={busy || stepIdx === 0}
           >
             Back
-          </button>
-          <div className="oow-footer__right">
-            {!isLast ? (
-              <button
-                type="button"
-                className="oow-btn oow-btn--primary"
-                onClick={goNext}
-                disabled={!canAdvance || busy}
-              >
-                Continue
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="oow-btn oow-btn--primary"
-                onClick={handleSubmit}
-                disabled={busy}
-              >
-                {busy ? 'Creating…' : 'Create organisation'}
-              </button>
-            )}
-          </div>
+          </Button>
+          <span className="oow-footer__msg" role={error ? 'alert' : undefined}>{error}</span>
+          {!isLast ? (
+            <Button variant="primary" iconRight={ArrowRight} onClick={goNext} disabled={!canAdvance || busy}>
+              Continue
+            </Button>
+          ) : (
+            <Button variant="primary" icon={Check} onClick={handleSubmit} disabled={busy}>
+              {busy ? 'Creating…' : 'Create organisation'}
+            </Button>
+          )}
         </footer>
       </div>
     </div>
@@ -417,39 +421,38 @@ function StepModel({ value, onChange }) {
   return (
     <div className="oow-form">
       <p className="oow-step-intro">
-        What is this org actually running? This decides how customers get paid, which
-        pages the dashboard shows, and what the rest of this wizard asks you.
+        Which programme will this venue run? It decides how customers are paid, which dashboard
+        tabs exist, and what the rest of this wizard asks.
       </p>
-      <div className="oow-models">
+      <div className="oow-models" role="radiogroup" aria-label="Programme">
         {ORG_MODEL_ORDER.map(key => {
           const m = ORG_MODELS[key];
           const on = value === key;
+          const Glyph = MODE_GLYPH[MODEL_TONE[key]];
           return (
             <button
               type="button"
               key={key}
+              role="radio"
+              aria-checked={on}
               className={`oow-model${on ? ' oow-model--on' : ''}`}
               onClick={() => onChange(key)}
-              aria-pressed={on}
             >
-              <div className="oow-model__head">
-                <span className="oow-model__label">{m.label}</span>
-                <span className="oow-model__tag">{m.tagline}</span>
-                {on && (
-                  <span className="oow-model__check" aria-hidden="true">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </span>
-                )}
-              </div>
-              <p className="oow-model__body"><strong>Customer:</strong> {m.customer}</p>
-              <p className="oow-model__body"><strong>Dashboard:</strong> {m.dashboard}</p>
-              <div className="oow-model__foot">
-                {m.group === 'required' && 'Must belong to a group'}
-                {m.group === 'optional' && 'Can stand alone or join a group'}
-                {m.group === 'never'    && 'Always standalone — never grouped'}
-              </div>
+              <span className="oow-model__head">
+                <span className={`oow-model__glyph oow-model__glyph--${MODEL_TONE[key]}`} aria-hidden="true"><Glyph size={17} /></span>
+                <span className="oow-model__titles">
+                  <span className="oow-model__label">{m.label}</span>
+                  <span className="oow-model__tag">{m.tagline}</span>
+                </span>
+                <span className={`oow-radio${on ? ' oow-radio--on' : ''}`} aria-hidden="true" />
+              </span>
+              <span className="oow-model__body"><b>Customer app:</b> {m.customer}</span>
+              <span className="oow-model__body"><b>Dashboard:</b> {m.dashboard}</span>
+              <span className="oow-model__foot">
+                {m.group === 'required' && 'Always in a group'}
+                {m.group === 'optional' && 'On its own or in a group'}
+                {m.group === 'never'    && 'Never in a group'}
+              </span>
             </button>
           );
         })}
@@ -486,24 +489,23 @@ function StepGroup({ model, modelKey, value, groups, loading, orgName, onChange 
       <p className="oow-step-intro">
         {required ? (
           <>
-            A bring-your-own org <strong>must</strong> sit in a group. The group config is what
-            tells the counter-QR scanner this is a BYO programme — without it, scans are
-            rejected and no cup is ever added.
+            A Bring Your Own venue <strong>must</strong> be in a group. The group tells the counter
+            QR scanner this is a Bring Your Own programme; without it, every scan is refused.
           </>
         ) : (
           <>
-            Groups let several venues share one customer profile and appear together on the
-            market page. Pick one, start a new one, or leave this org standalone.
+            Venues in a group share one customer profile and one market page. Pick a group, start a
+            new one, or keep this venue on its own.
           </>
         )}
       </p>
 
-      <div className="oow-choices">
+      <div className="oow-choices" role="radiogroup" aria-label="Group">
         {!required && (
           <ChoiceRow
             on={value.choice === 'none'}
-            title="No group — standalone"
-            hint="The org gets its own URL and its own customer balances. You can move it into a group later."
+            title="No group"
+            hint="The venue has its own address and its own customer balances. You can add it to a group later."
             onClick={() => onChange({ choice: 'none', id: null })}
           />
         )}
@@ -513,15 +515,15 @@ function StepGroup({ model, modelKey, value, groups, loading, orgName, onChange 
             key={g.id}
             on={value.choice === 'existing' && value.id === g.id}
             title={g.name}
-            hint={`/${g.slug}/ · ${g.members.length} venue${g.members.length === 1 ? '' : 's'} already in this group`}
+            hint={`/${g.slug}/ · ${g.members.length} venue${g.members.length === 1 ? '' : 's'} in this group`}
             onClick={() => onChange({ choice: 'existing', id: g.id })}
           />
         ))}
 
         <ChoiceRow
           on={value.choice === 'new'}
-          title="Create a new group"
-          hint={`Starts a fresh ${model?.label.toLowerCase()} group with this org as its first venue.`}
+          title="New group"
+          hint={`Starts a ${model?.label} group with this venue in it.`}
           onClick={() => onChange({ choice: 'new', id: null, name: value.name || orgName || '' })}
         >
           {value.choice === 'new' && (
@@ -530,7 +532,7 @@ function StepGroup({ model, modelKey, value, groups, loading, orgName, onChange 
                 type="text"
                 value={value.name}
                 onChange={e => onChange({ name: e.target.value })}
-                placeholder="e.g. Amsterdam Cafés"
+                placeholder="Amsterdam cafés"
                 autoFocus
               />
             </Field>
@@ -540,8 +542,8 @@ function StepGroup({ model, modelKey, value, groups, loading, orgName, onChange 
 
       {hiddenCount > 0 && (
         <p className="oow-note">
-          {hiddenCount} other group{hiddenCount === 1 ? ' is' : 's are'} hidden here — they run a
-          different model, and mixing models inside one group would give customers the wrong app.
+          {hiddenCount} other group{hiddenCount === 1 ? ' is' : 's are'} not listed: they run a
+          different programme, and mixing programmes in one group would show customers the wrong app.
         </p>
       )}
     </div>
@@ -551,8 +553,8 @@ function StepGroup({ model, modelKey, value, groups, loading, orgName, onChange 
 function ChoiceRow({ on, title, hint, onClick, children }) {
   return (
     <div className={`oow-choice${on ? ' oow-choice--on' : ''}`}>
-      <button type="button" className="oow-choice__btn" onClick={onClick} aria-pressed={on}>
-        <span className={`oow-choice__radio${on ? ' oow-choice__radio--on' : ''}`} aria-hidden="true" />
+      <button type="button" className="oow-choice__btn" onClick={onClick} role="radio" aria-checked={on}>
+        <span className={`oow-radio${on ? ' oow-radio--on' : ''}`} aria-hidden="true" />
         <span>
           <span className="oow-choice__title">{title}</span>
           {hint && <span className="oow-choice__hint">{hint}</span>}
@@ -567,107 +569,122 @@ function ChoiceRow({ on, title, hint, onClick, children }) {
 function StepBrand({ data, slugState, onChange }) {
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">Tell us what to call this organisation. Name and URL slug are the only required fields — everything else can be edited later.</p>
-      <Field label="Organisation name" required>
-        <input
-          type="text"
-          value={data.name}
-          onChange={e => onChange({ name: e.target.value })}
-          placeholder="e.g. Big Coffee Co."
-          autoFocus
-        />
-      </Field>
-      <Field
-        label="URL slug"
-        required
-        hint="Lowercase, no spaces. This is the customer URL: /bigcoffee/"
-      >
-        <input
-          type="text"
-          value={data.slug}
-          onChange={e => onChange({ slug: slugify(e.target.value) })}
-          placeholder="bigcoffee"
-          className={slugState === 'taken' ? 'oow-input--bad' : ''}
-        />
-        {slugState === 'taken' && (
-          <span className="oow-inline-bad">That slug is already taken — pick another.</span>
-        )}
-        {slugState === 'free' && (
-          <span className="oow-inline-ok">/{data.slug}/ is available.</span>
-        )}
-      </Field>
-      <Field label="Partner brand display name" hint="The brand name shown in user-facing copy ('We're partnered with __').">
-        <input
-          type="text"
-          value={data.partner_brand_name}
-          onChange={e => onChange({ partner_brand_name: e.target.value })}
-          placeholder="e.g. Big Coffee Co."
-        />
-      </Field>
-      <Field label="Team email domain hint" hint="Shown as the placeholder in admin invite/login forms.">
-        <input
-          type="text"
-          value={data.email_domain_hint}
-          onChange={e => onChange({ email_domain_hint: e.target.value })}
-          placeholder="e.g. bigcoffee.nl"
-        />
-      </Field>
-      <Field label="Primary brand color">
-        <div className="oow-color-row">
-          <input
-            type="color"
-            value={data.brand_color}
-            onChange={e => onChange({ brand_color: e.target.value })}
-          />
+      <p className="oow-step-intro">What the venue is called and where its customer app lives. Only the name and the address are required; you can change the rest later.</p>
+      <div className="oow-row-2">
+        <Field label="Name" required>
           <input
             type="text"
-            value={data.brand_color}
-            onChange={e => onChange({ brand_color: e.target.value })}
-            placeholder="#FD6F46"
-            className="oow-color-input"
+            value={data.name}
+            onChange={e => onChange({ name: e.target.value })}
+            placeholder="Big Coffee Co."
+            autoFocus
           />
-        </div>
-      </Field>
-      <Field label="Logo URL" hint="Paste a URL to a logo image, or leave blank and add it later from the org details page.">
-        <input
-          type="url"
-          value={data.logo_url}
-          onChange={e => onChange({ logo_url: e.target.value })}
-          placeholder="https://example.com/logo.png"
-        />
-      </Field>
+        </Field>
+        <Field
+          label="Customer app address"
+          required
+          hint={slugState === 'taken' ? null : 'Lowercase letters, numbers and dashes.'}
+        >
+          <div className="oow-prefix">
+            <span className="oow-prefix__text">/</span>
+            <input
+              type="text"
+              value={data.slug}
+              onChange={e => onChange({ slug: slugify(e.target.value) })}
+              placeholder="bigcoffee"
+              className={slugState === 'taken' ? 'oow-input--bad' : ''}
+            />
+          </div>
+          {slugState === 'taken' && (
+            <span className="oow-inline-bad">That address is taken. Pick another.</span>
+          )}
+          {slugState === 'free' && (
+            <span className="oow-inline-ok"><Check size={12} aria-hidden="true" /> /{data.slug}/ is free.</span>
+          )}
+        </Field>
+      </div>
+      <div className="oow-row-2">
+        <Field label="Brand shown to customers" hint="Used in customer copy. Empty uses the name.">
+          <input
+            type="text"
+            value={data.partner_brand_name}
+            onChange={e => onChange({ partner_brand_name: e.target.value })}
+            placeholder={data.name || 'Big Coffee Co.'}
+          />
+        </Field>
+        <Field label="Team email domain" hint="Saved with the organisation for your reference.">
+          <input
+            type="text"
+            value={data.email_domain_hint}
+            onChange={e => onChange({ email_domain_hint: e.target.value })}
+            placeholder="bigcoffee.nl"
+          />
+        </Field>
+      </div>
+      <div className="oow-row-2">
+        <Field label="Brand colour" hint="Used when there is no logo.">
+          <div className="oow-color-row">
+            <input
+              type="color"
+              value={data.brand_color}
+              onChange={e => onChange({ brand_color: e.target.value })}
+              aria-label="Pick a brand colour"
+            />
+            <input
+              type="text"
+              value={data.brand_color}
+              onChange={e => onChange({ brand_color: e.target.value })}
+              placeholder="#FD6F46"
+              className="oow-color-input"
+            />
+          </div>
+        </Field>
+        <Field label="Logo link" hint="Paste a link to the logo, or upload one later in Master settings → Organisations.">
+          <input
+            type="url"
+            value={data.logo_url}
+            onChange={e => onChange({ logo_url: e.target.value })}
+            placeholder="https://"
+          />
+        </Field>
+      </div>
     </div>
   );
 }
 
 /* ─── Step: legal & contact ───────────────────────────────────────── */
 function StepLegal({ data, onChange }) {
+  const regions = getAllRegions();
+  const known = regions.some(r => r.label === data.country);
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">Used on receipts, invoices, and contract paperwork. All optional — fill in what you have today.</p>
-      <Field label="Legal entity name">
-        <input type="text" value={data.legal_name} onChange={e => onChange({ legal_name: e.target.value })} placeholder="e.g. Big Coffee B.V." />
+      <p className="oow-step-intro">For invoices and contracts. Everything here is optional except the region, which sets the currency and the payout provider.</p>
+      <Field label="Region" hint="Netherlands pays out through Tikkie. You can change it later.">
+        <select value={data.country} onChange={e => onChange({ country: e.target.value })}>
+          {!known && <option value={data.country}>{data.country || 'Pick a region'}</option>}
+          {regions.map(r => <option key={r.key} value={r.label}>{r.flag ? `${r.flag} ` : ''}{r.label} · {r.currency}</option>)}
+        </select>
+      </Field>
+      <Field label="Legal name">
+        <input type="text" value={data.legal_name} onChange={e => onChange({ legal_name: e.target.value })} placeholder="Big Coffee B.V." />
       </Field>
       <div className="oow-row-2">
-        <Field label="KVK number">
+        <Field label="KvK number">
           <input type="text" value={data.kvk_number} onChange={e => onChange({ kvk_number: e.target.value })} placeholder="12345678" />
         </Field>
         <Field label="BTW number">
           <input type="text" value={data.btw_number} onChange={e => onChange({ btw_number: e.target.value })} placeholder="NL000000000B01" />
         </Field>
       </div>
-      <Field label="Registered address">
+      <Field label="Street and number">
         <input type="text" value={data.address} onChange={e => onChange({ address: e.target.value })} placeholder="Damrak 1" />
       </Field>
-      <div className="oow-row-3">
+      <div className="oow-row-2">
         <Field label="Postal code">
           <input type="text" value={data.postal_code} onChange={e => onChange({ postal_code: e.target.value })} placeholder="1012 LG" />
         </Field>
         <Field label="City">
           <input type="text" value={data.city} onChange={e => onChange({ city: e.target.value })} placeholder="Amsterdam" />
-        </Field>
-        <Field label="Country" hint="Sets the payout provider: Netherlands pays via Tikkie.">
-          <input type="text" value={data.country} onChange={e => onChange({ country: e.target.value })} placeholder="Netherlands" />
         </Field>
       </div>
       <div className="oow-row-2">
@@ -690,20 +707,23 @@ function StepLocation({ data, onChange }) {
   if (data.skipped) {
     return (
       <div className="oow-form">
-        <p className="oow-step-intro">Skipped — you can add locations later from the Org details page.</p>
-        <button type="button" className="oow-btn oow-btn--ghost" onClick={() => onChange({ skipped: false })}>
-          Add a location after all
-        </button>
+        <div className="oow-empty">
+          <p>Skipped. You can add locations later in Settings → Locations.</p>
+          <Button size="sm" icon={Plus} onClick={() => onChange({ skipped: false })}>Add a location after all</Button>
+        </div>
       </div>
     );
   }
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">Add the first physical venue. Locations are what per-venue QR codes and reports are grouped by. <button type="button" className="oow-skip" onClick={() => onChange({ skipped: true })}>Skip this step</button></p>
+      <p className="oow-step-intro">
+        The first physical venue. Counter QR codes and reports are grouped by location.{' '}
+        <button type="button" className="oow-skip" onClick={() => onChange({ skipped: true })}>Skip this step</button>
+      </p>
       <Field label="Location name">
-        <input type="text" value={data.name} onChange={e => onChange({ name: e.target.value })} placeholder="e.g. Big Coffee Amsterdam Damrak" />
+        <input type="text" value={data.name} onChange={e => onChange({ name: e.target.value })} placeholder="Big Coffee Damrak" />
       </Field>
-      <Field label="Address">
+      <Field label="Street and number">
         <input type="text" value={data.address} onChange={e => onChange({ address: e.target.value })} placeholder="Damrak 70" />
       </Field>
       <div className="oow-row-2">
@@ -745,16 +765,19 @@ function StepEconomics({ data, modelKey, features, onChange }) {
     return (
       <div className="oow-form">
         <p className="oow-step-intro">
-          A bin receipt is paid out as one Tikkie link: cups on the receipt × the rate below.
-          Nothing else on this screen applies — there's no app, no sharing and no reward goals.
+          A bin receipt is paid out as one Tikkie link: the cups on the receipt times the rate
+          below. There is no app, no sharing and no reward goal to set.
         </p>
-        <Field label={`Refund per cup (${symbol})`} hint="The customer receives this for every cup on the receipt.">
-          <input
-            type="number" step="0.05" min="0"
-            value={data.refundRatePerCup}
-            onChange={e => onChange({ refundRatePerCup: parseFloat(e.target.value) || 0 })}
-            autoFocus
-          />
+        <Field label="Refund per cup" hint="The customer gets this for every cup on the receipt.">
+          <div className="oow-prefix">
+            <span className="oow-prefix__text">{symbol}</span>
+            <input
+              type="number" step="0.05" min="0"
+              value={data.refundRatePerCup}
+              onChange={e => onChange({ refundRatePerCup: parseFloat(e.target.value) || 0 })}
+              autoFocus
+            />
+          </div>
         </Field>
         <div className="oow-econ-preview">
           <div className="oow-econ-preview__head">What the customer gets</div>
@@ -772,30 +795,36 @@ function StepEconomics({ data, modelKey, features, onChange }) {
 
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">How much each cup is worth, and the per-scan limits that keep abuse in check.</p>
+      <p className="oow-step-intro">What a cup is worth, and the limits that keep scanning fair.</p>
       <div className="oow-row-2">
-        <Field label={`Cashback rate (${symbol} per cup)`} hint="What a cup is worth toward a reward payout.">
-          <input type="number" step="0.05" min="0" value={data.cashbackRatePerCup} onChange={e => onChange({ cashbackRatePerCup: parseFloat(e.target.value) || 0 })} />
+        <Field label="Cashback per cup" hint="What a cup is worth toward a reward.">
+          <div className="oow-prefix">
+            <span className="oow-prefix__text">{symbol}</span>
+            <input type="number" step="0.05" min="0" value={data.cashbackRatePerCup} onChange={e => onChange({ cashbackRatePerCup: parseFloat(e.target.value) || 0 })} />
+          </div>
         </Field>
         <Field
-          label={`Refund rate (${symbol} per cup)`}
+          label="Direct refund per cup"
           hint={features.featureDirectRefunds
-            ? 'Used for the direct cash-out path (lower value, no reward unlock).'
-            : 'Direct refunds are off for this model, so this rate is unused for now.'}
+            ? 'Paid when a customer cashes out instead of choosing a reward.'
+            : 'Direct refunds are off for this programme, so this rate is not used for now.'}
         >
-          <input
-            type="number" step="0.05" min="0"
-            value={data.refundRatePerCup}
-            onChange={e => onChange({ refundRatePerCup: parseFloat(e.target.value) || 0 })}
-            disabled={!features.featureDirectRefunds}
-          />
+          <div className="oow-prefix">
+            <span className="oow-prefix__text">{symbol}</span>
+            <input
+              type="number" step="0.05" min="0"
+              value={data.refundRatePerCup}
+              onChange={e => onChange({ refundRatePerCup: parseFloat(e.target.value) || 0 })}
+              disabled={!features.featureDirectRefunds}
+            />
+          </div>
         </Field>
       </div>
       <div className="oow-row-2">
-        <Field label="Max cups per scan" hint="Anti-fraud guardrail — scans above this are held for review.">
+        <Field label="Most cups per scan" hint="Scans above this are held for review.">
           <input type="number" step="1" min="1" value={data.maxCupsPerScan} onChange={e => onChange({ maxCupsPerScan: parseInt(e.target.value, 10) || 1 })} />
         </Field>
-        <Field label="Max cups per share" hint="Cap on peer-to-peer cup gifting.">
+        <Field label="Most cups per share" hint="The limit on gifting cups to someone else.">
           <input type="number" step="1" min="1" value={data.maxCupsToShare} onChange={e => onChange({ maxCupsToShare: parseInt(e.target.value, 10) || 1 })} />
         </Field>
       </div>
@@ -820,72 +849,81 @@ function StepRewards({ rewards, onChange }) {
 
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">The rewards a customer unlocks by collecting cups. The first one is featured on the home screen. You can leave this empty and add them later from the Rewards tab.</p>
+      <p className="oow-step-intro">What customers unlock by collecting cups. The first one is featured on the home screen. You can also add rewards later in Rewards &amp; offers.</p>
       {rewards.length === 0 && (
-        <div className="oow-empty">No starter rewards yet. <button type="button" className="oow-skip" onClick={add}>Add the first one</button></div>
+        <div className="oow-empty">
+          <p>No starter rewards yet.</p>
+          <Button size="sm" icon={Plus} onClick={add}>Add the first reward</Button>
+        </div>
       )}
       {rewards.map((r, i) => (
-        <div key={i} className="oow-reward-card">
-          <div className="oow-reward-card__head">
-            <strong>Reward {i + 1}{i === 0 && <span className="oow-reward-card__badge">Featured</span>}</strong>
-            <button type="button" className="oow-remove" onClick={() => removeAt(i)} aria-label="Remove">×</button>
+        <div key={i} className="oow-card">
+          <div className="oow-card__head">
+            <span className="oow-card__title">Reward {i + 1}{i === 0 && <Badge tone="warning">Featured</Badge>}</span>
+            <Button variant="danger-ghost" size="sm" icon={Trash2} onClick={() => removeAt(i)} aria-label={`Remove reward ${i + 1}`} />
           </div>
           <div className="oow-row-2">
             <Field label="Name">
-              <input type="text" value={r.name} onChange={e => updateAt(i, { name: e.target.value })} placeholder="e.g. Free Coffee" />
+              <input type="text" value={r.name} onChange={e => updateAt(i, { name: e.target.value })} placeholder="Free coffee" />
             </Field>
             <Field label="Cups needed">
               <input type="number" min="1" value={r.cupsNeeded} onChange={e => updateAt(i, { cupsNeeded: parseInt(e.target.value, 10) || 1 })} />
             </Field>
           </div>
           <div className="oow-row-2">
-            <Field label={`Cashback value (${symbol})`}>
-              <input type="number" step="0.01" min="0" value={r.euros} onChange={e => updateAt(i, { euros: parseFloat(e.target.value) || 0 })} />
+            <Field label="Cashback value">
+              <div className="oow-prefix">
+                <span className="oow-prefix__text">{symbol}</span>
+                <input type="number" step="0.01" min="0" value={r.euros} onChange={e => updateAt(i, { euros: parseFloat(e.target.value) || 0 })} />
+              </div>
             </Field>
-            <Field label="Image URL">
-              <input type="url" value={r.image} onChange={e => updateAt(i, { image: e.target.value })} placeholder="https://…" />
+            <Field label="Image link">
+              <input type="url" value={r.image} onChange={e => updateAt(i, { image: e.target.value })} placeholder="https://" />
             </Field>
           </div>
           <Field label="Description">
-            <textarea value={r.description} onChange={e => updateAt(i, { description: e.target.value })} placeholder="Short blurb shown on the reward card." rows={2} />
+            <textarea value={r.description} onChange={e => updateAt(i, { description: e.target.value })} placeholder="A short line for the reward card." rows={2} />
           </Field>
         </div>
       ))}
       {rewards.length > 0 && (
-        <button type="button" className="oow-btn oow-btn--ghost" onClick={add}>+ Add another reward</button>
+        <Button icon={Plus} onClick={add} className="oow-add">Add another reward</Button>
       )}
     </div>
   );
 }
 
 /* ─── Step: app copy ──────────────────────────────────────────────── */
-function StepCopy({ data, onChange }) {
+function StepCopy({ data, grouped, onChange }) {
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">Customer-facing copy on the home screen — prefilled from the model you picked. All editable later from Settings.</p>
-      <Field label="Hero headline">
+      <p className="oow-step-intro">
+        The words on the customer’s home screen, filled in for the programme you picked. You can change them later in Design &amp; copy.
+        {grouped && ' A venue in a group shows the group’s headline instead.'}
+      </p>
+      <Field label="Headline">
         <input type="text" value={data.heroHeadline} onChange={e => onChange({ heroHeadline: e.target.value })} />
       </Field>
-      <Field label="Hero subtext">
+      <Field label="Subtext">
         <textarea value={data.heroSubtext} onChange={e => onChange({ heroSubtext: e.target.value })} rows={2} />
       </Field>
       <div className="oow-row-2">
         <Field label="Donation recipient">
-          <input type="text" value={data.donationRecipient} onChange={e => onChange({ donationRecipient: e.target.value })} placeholder="e.g. Plastic Soup Foundation" />
+          <input type="text" value={data.donationRecipient} onChange={e => onChange({ donationRecipient: e.target.value })} placeholder="Plastic Soup Foundation" />
         </Field>
-        <Field label="Donation description">
-          <input type="text" value={data.donationDescription} onChange={e => onChange({ donationDescription: e.target.value })} placeholder="What the partner charity does." />
+        <Field label="What the charity does">
+          <input type="text" value={data.donationDescription} onChange={e => onChange({ donationDescription: e.target.value })} />
         </Field>
       </div>
       <div className="oow-row-3">
-        <Field label="Privacy URL">
-          <input type="url" value={data.privacyUrl} onChange={e => onChange({ privacyUrl: e.target.value })} placeholder="https://…/privacy" />
+        <Field label="Privacy policy link">
+          <input type="url" value={data.privacyUrl} onChange={e => onChange({ privacyUrl: e.target.value })} placeholder="https://" />
         </Field>
-        <Field label="Terms URL">
-          <input type="url" value={data.termsUrl} onChange={e => onChange({ termsUrl: e.target.value })} placeholder="https://…/terms" />
+        <Field label="Terms link">
+          <input type="url" value={data.termsUrl} onChange={e => onChange({ termsUrl: e.target.value })} placeholder="https://" />
         </Field>
-        <Field label="Cookies URL">
-          <input type="url" value={data.cookieUrl} onChange={e => onChange({ cookieUrl: e.target.value })} placeholder="https://…/cookies" />
+        <Field label="Cookie policy link">
+          <input type="url" value={data.cookieUrl} onChange={e => onChange({ cookieUrl: e.target.value })} placeholder="https://" />
         </Field>
       </div>
     </div>
@@ -897,32 +935,36 @@ function StepFeatures({ data, modelKey, onChange }) {
   const byo = modelKey === 'byo';
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">Optional features, preset for this model. All flippable later from Settings.</p>
-      <ToggleRow
-        label="Cup sharing"
-        hint="Lets customers gift cups to each other via QR code."
-        value={data.featureCupSharing}
-        onChange={(v) => onChange({ featureCupSharing: v })}
-      />
-      <ToggleRow
-        label="Donations"
-        hint="Lets customers donate cups to a partner charity."
-        value={data.featureDonations}
-        onChange={(v) => onChange({ featureDonations: v })}
-      />
-      <ToggleRow
-        label="Direct refunds"
-        hint={byo
-          ? 'Off for a rewards-only programme — turning it on lets customers cash out instead of working toward a reward.'
-          : 'Lets customers cash out cups directly, skipping the reward.'}
-        value={data.featureDirectRefunds}
-        onChange={(v) => onChange({ featureDirectRefunds: v })}
-      />
+      <p className="oow-step-intro">Set for the programme you picked. You can change them later in Settings → Features.</p>
+      <div className="oow-toggles">
+        <ToggleRow
+          label="Cup sharing"
+          hint="Customers can give cups to each other with a QR code."
+          value={data.featureCupSharing}
+          onChange={(v) => onChange({ featureCupSharing: v })}
+        />
+        <ToggleRow
+          label="Donations"
+          hint="Customers can donate cups to a partner charity."
+          value={data.featureDonations}
+          onChange={(v) => onChange({ featureDonations: v })}
+        />
+        <ToggleRow
+          label="Direct refunds"
+          hint={byo
+            ? 'Off for Bring Your Own: turning it on lets customers cash out instead of working toward a reward.'
+            : 'Customers can cash out their cups instead of choosing a reward.'}
+          value={data.featureDirectRefunds}
+          onChange={(v) => onChange({ featureDirectRefunds: v })}
+        />
+      </div>
     </div>
   );
 }
 
 /* ─── Step: team invites ──────────────────────────────────────────── */
+/* The role values are admin_roles keys. Manager and Viewer see only the new
+ * organisation; a master sees every organisation. */
 function StepInvites({ invites, onChange }) {
   function updateAt(i, patch) {
     const next = [...invites];
@@ -938,39 +980,53 @@ function StepInvites({ invites, onChange }) {
 
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">Invite the client's team. Owners and admins can spend money (approving payouts); managers and checkers can't. You can also do this later from Settings → Team.</p>
+      <p className="oow-step-intro">
+        Invite people to the dashboard. A master is PackBack staff and sees every organisation, so
+        pick Manager or Viewer for the venue’s own team. You can also do this later in Master settings → People.
+      </p>
       {invites.length === 0 && (
-        <div className="oow-empty">No invites queued. <button type="button" className="oow-skip" onClick={add}>Add an invite</button></div>
+        <div className="oow-empty">
+          <p>No one invited yet.</p>
+          <Button size="sm" icon={Plus} onClick={add}>Invite someone</Button>
+        </div>
       )}
       {invites.map((inv, i) => (
-        <div key={i} className="oow-invite-row">
-          <Field label="Email">
-            <input
-              type="email"
-              value={inv.email}
-              onChange={e => updateAt(i, { email: e.target.value })}
-              placeholder="teammate@example.com"
-              disabled={inv.method === 'link'}
-            />
-          </Field>
-          <Field label="Role">
-            <select value={inv.role} onChange={e => updateAt(i, { role: e.target.value })}>
-              <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
-              <option value="checker">Checker</option>
-            </select>
-          </Field>
-          <Field label="Method">
-            <select value={inv.method} onChange={e => updateAt(i, { method: e.target.value })}>
-              <option value="email">Email link</option>
-              <option value="link">Shareable link</option>
-            </select>
-          </Field>
-          <button type="button" className="oow-remove" onClick={() => removeAt(i)} aria-label="Remove">×</button>
+        <div key={i} className="oow-card">
+          <div className="oow-invite-row">
+            <Field label="Email">
+              <input
+                type="email"
+                value={inv.email}
+                onChange={e => updateAt(i, { email: e.target.value })}
+                placeholder="name@company.com"
+                disabled={inv.method === 'link'}
+              />
+            </Field>
+            <Field label="Role">
+              <select value={inv.role} onChange={e => updateAt(i, { role: e.target.value })}>
+                <option value="manager">Manager (this organisation)</option>
+                <option value="viewer">Viewer (this organisation)</option>
+                <option value="master">Master (every organisation)</option>
+              </select>
+            </Field>
+            <Field label="How">
+              <select value={inv.method} onChange={e => updateAt(i, { method: e.target.value })}>
+                <option value="email">Email</option>
+                <option value="link">Shareable link</option>
+              </select>
+            </Field>
+            <Button variant="danger-ghost" size="sm" icon={Trash2} onClick={() => removeAt(i)} aria-label={`Remove invite ${i + 1}`} className="oow-invite-row__remove" />
+          </div>
+          {inv.role === 'master' && (
+            <p className="oow-warn">
+              <TriangleAlert size={14} aria-hidden="true" />
+              A master sees and changes every organisation, including payouts. Only pick it for PackBack staff.
+            </p>
+          )}
         </div>
       ))}
       {invites.length > 0 && (
-        <button type="button" className="oow-btn oow-btn--ghost" onClick={add}>+ Add another invite</button>
+        <Button icon={Plus} onClick={add} className="oow-add">Invite someone else</Button>
       )}
     </div>
   );
@@ -984,22 +1040,23 @@ function StepReview({ data, model, groups, steps }) {
     if (data.group.choice === 'existing') {
       return groups.find(g => g.id === data.group.id)?.name || 'Selected group';
     }
-    return 'Standalone — no group';
+    return 'No group';
   })();
 
   const rows = [
-    ['Model', model?.label || '—'],
+    ['Programme', model?.label || '—'],
     ...(model?.group === 'never' ? [] : [['Group', groupLabel]]),
-    ['Organisation', data.brand.name || '—'],
-    ['Customer URL', data.brand.slug ? `/${data.brand.slug}/` : '—'],
+    ['Name', data.brand.name || '—'],
+    ['Customer app', data.brand.slug ? `/${data.brand.slug}/` : '—'],
     ['Brand colour', data.brand.brand_color],
-    ['Legal name', data.legal.legal_name || '(not set)'],
-    ['First location', data.location.skipped || !data.location.name ? '(skipped)' : data.location.name],
+    ['Region', data.legal.country || '—'],
+    ['Legal name', data.legal.legal_name || 'Not set'],
+    ['First location', data.location.skipped || !data.location.name ? 'Skipped' : data.location.name],
     isTikkie
       ? ['Refund', `${adminMoney(data.economics.refundRatePerCup)} per cup`]
       : ['Cashback / refund', `${adminMoney(data.economics.cashbackRatePerCup)} / ${adminMoney(data.economics.refundRatePerCup)} per cup`],
     ...(steps.some(s => s.id === 'rewards')
-      ? [['Starter rewards', data.rewards.length === 0 ? '(none)' : `${data.rewards.length} reward(s)`]]
+      ? [['Starter rewards', data.rewards.length === 0 ? 'None' : `${data.rewards.length}`]]
       : []),
     ...(steps.some(s => s.id === 'features')
       ? [['Features', [
@@ -1008,26 +1065,29 @@ function StepReview({ data, model, groups, steps }) {
           data.features.featureDirectRefunds && 'direct refunds',
         ].filter(Boolean).join(', ') || 'none']]
       : []),
-    ['Team invites', data.invites.length === 0 ? '(none)' : `${data.invites.length} invite(s)`],
+    ['Invitations', data.invites.length === 0 ? 'None' : `${data.invites.length}`],
   ];
 
   return (
     <div className="oow-form">
       <p className="oow-step-intro">
-        Final check. <strong>Create organisation</strong> provisions everything and switches you into the new org.
+        Check the details. <strong>Create organisation</strong> sets everything up and opens the new venue in the dashboard.
       </p>
-      <div className="oow-review">
+      <dl className="oow-review">
         {rows.map(([k, v]) => (
           <div key={k} className="oow-review__row">
-            <span className="oow-review__k">{k}</span>
-            <span className="oow-review__v">{v}</span>
+            <dt className="oow-review__k">{k}</dt>
+            <dd className="oow-review__v">
+              {k === 'Brand colour' && <span className="oow-swatch" style={{ background: v }} aria-hidden="true" />}
+              {v}
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
       {isTikkie && (
         <p className="oow-note">
-          Next step after creating: point the smart bin at this org, then print a test receipt
-          from the Receipt Generator to confirm the Tikkie link works end to end.
+          Next: point the smart bin at this venue, then print a test receipt from the Receipt
+          generator to check the Tikkie link works end to end.
         </p>
       )}
     </div>
@@ -1040,7 +1100,7 @@ function Field({ label, hint, required, children }) {
     <label className="oow-field">
       <span className="oow-field__label">
         {label}
-        {required && <span className="oow-field__req">*</span>}
+        {required && <span className="oow-field__req" aria-hidden="true">*</span>}
       </span>
       {children}
       {hint && <span className="oow-field__hint">{hint}</span>}
@@ -1055,14 +1115,7 @@ function ToggleRow({ label, hint, value, onChange }) {
         <div className="oow-toggle-row__label">{label}</div>
         {hint && <div className="oow-toggle-row__hint">{hint}</div>}
       </div>
-      <button
-        type="button"
-        className={`oow-toggle ${value ? 'oow-toggle--on' : ''}`}
-        onClick={() => onChange(!value)}
-        aria-pressed={value}
-      >
-        <span className="oow-toggle__dot" />
-      </button>
+      <Switch checked={value} onChange={onChange} label={label} />
     </div>
   );
 }

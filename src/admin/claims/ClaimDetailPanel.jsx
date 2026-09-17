@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Check, CloudAlert, EyeOff, FileText, Maximize2, RotateCcw, Star, TriangleAlert, X } from 'lucide-react';
 import { getReceiptSignedUrl, hideClaimImage, unhideClaimImage } from '../lib/adminApi';
 import PiiMask from '../shared/PiiMask';
 import ClaimStatusPills, { isPayoutActionable } from '../shared/ClaimStatusPills';
@@ -12,8 +13,10 @@ import {
   ALL_FAILURE_CODES,
   AI_MANUAL_REVIEW_CONFIDENCE,
 } from '../lib/aiVerdictLabels';
-// Reuse the existing styles defined for the receipts page — they cover
-// .rc-detail, .rc-status, .rc-ai-panel, .rc-lightbox, etc.
+import { Lightbox } from '../shared/opsTable';
+import { Badge, Button, EmptyState, Field, Modal } from '../ui';
+// Reuse the styles defined for the receipts page — they cover
+// .rc-detail, .rc-ai-panel, .rc-criteria, etc.
 import '../receipts/AdminReceiptCheck.css';
 import { useAdminMoney } from '../lib/adminMoney';
 
@@ -90,8 +93,10 @@ function AiVerdictPanel({ claim }) {
   if (!claim || !claim.verified_at) {
     return (
       <div className="rc-ai-panel rc-ai-panel--empty">
-        <span className="rc-ai-panel__title">AI check</span>
-        <span className="rc-ai-panel__empty">Not verified yet</span>
+        <div className="rc-ai-panel__header">
+          <span className="rc-ai-panel__title">AI check</span>
+          <span className="rc-ai-panel__empty">Not verified yet</span>
+        </div>
       </div>
     );
   }
@@ -133,9 +138,7 @@ function AiVerdictPanel({ claim }) {
         <span className="rc-ai-panel__title">AI check</span>
         <div className="rc-ai-panel__header-right">
           {needsManualReview && (
-            <span className="rc-ai-panel__pill rc-ai-panel__pill--review">
-              Manual review needed
-            </span>
+            <Badge tone="warning">Manual review needed</Badge>
           )}
           <span className={`rc-ai-panel__confidence${lowConfidence ? ' rc-ai-panel__confidence--low' : ''}`}>
             {(confidence * 100).toFixed(0)}% confident
@@ -144,12 +147,8 @@ function AiVerdictPanel({ claim }) {
       </div>
 
       {needsManualReview && (
-        <div className="rc-ai-panel__override">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
+        <div className="ot-callout">
+          <TriangleAlert size={15} aria-hidden="true" />
           <span>
             <strong>Needs manual review.</strong> The model marked every check as a pass
             but is only {(confidence * 100).toFixed(0)}% sure. Confirm against the receipt below before approving.
@@ -159,7 +158,7 @@ function AiVerdictPanel({ claim }) {
       <div className="rc-ai-panel__checks">
         {coreChecks.map(c => (
           <div key={c.key} className={`rc-ai-check rc-ai-check--${c.passed ? 'pass' : 'fail'}`}>
-            <span className="rc-ai-check__dot">{c.passed ? '✓' : '✕'}</span>
+            <span className="rc-ai-check__dot">{c.passed ? <Check size={11} strokeWidth={2.8} /> : <X size={11} strokeWidth={2.8} />}</span>
             <span className="rc-ai-check__label">
               {getPassLabel(c.key, { partnerBrand })}
               {!c.passed && (
@@ -173,7 +172,7 @@ function AiVerdictPanel({ claim }) {
              ai_failure_checks when they tripped. */}
         {extraFailures.map(code => (
           <div key={code} className="rc-ai-check rc-ai-check--fail">
-            <span className="rc-ai-check__dot">✕</span>
+            <span className="rc-ai-check__dot"><X size={11} strokeWidth={2.8} /></span>
             <span className="rc-ai-check__label">
               {getPassLabel(code, { partnerBrand })}
               <span className="rc-ai-check__code"> · {getFailureLabel(code, { partnerBrand })}</span>
@@ -181,22 +180,26 @@ function AiVerdictPanel({ claim }) {
           </div>
         ))}
       </div>
-      {claim.ai_required_item && (
-        <div className="rc-ai-panel__row">
-          <span className="rc-ai-panel__row-label">Required item</span>
-          <span className="rc-ai-panel__row-val">{claim.ai_required_item}</span>
-        </div>
-      )}
-      {claim.extracted_total_eur != null && (
-        <div className="rc-ai-panel__row">
-          <span className="rc-ai-panel__row-label">Receipt total</span>
-          <span className="rc-ai-panel__row-val">{money(Number(claim.extracted_total_eur))}</span>
-        </div>
-      )}
-      {claim.extracted_receipt_id && (
-        <div className="rc-ai-panel__row">
-          <span className="rc-ai-panel__row-label">Receipt #</span>
-          <span className="rc-ai-panel__row-val rc-ai-panel__row-val--mono">{claim.extracted_receipt_id}</span>
+      {(claim.ai_required_item || claim.extracted_total_eur != null || claim.extracted_receipt_id) && (
+        <div className="rc-ai-panel__rows">
+          {claim.ai_required_item && (
+            <div className="rc-ai-panel__row">
+              <span className="rc-ai-panel__row-label">Required item</span>
+              <span className="rc-ai-panel__row-val">{claim.ai_required_item}</span>
+            </div>
+          )}
+          {claim.extracted_total_eur != null && (
+            <div className="rc-ai-panel__row">
+              <span className="rc-ai-panel__row-label">Receipt total</span>
+              <span className="rc-ai-panel__row-val">{money(Number(claim.extracted_total_eur))}</span>
+            </div>
+          )}
+          {claim.extracted_receipt_id && (
+            <div className="rc-ai-panel__row">
+              <span className="rc-ai-panel__row-label">Receipt #</span>
+              <span className="rc-ai-panel__row-val rc-ai-panel__row-val--mono">{claim.extracted_receipt_id}</span>
+            </div>
+          )}
         </div>
       )}
       {claim.ai_reason && (
@@ -288,12 +291,10 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
 
   if (!claim) {
     return (
-      <div className="rc-detail rc-detail--empty">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-        </svg>
-        <p>Select a claim on the left to review.</p>
+      <div className="ot-panel ot-panel--empty rc-detail rc-detail--empty">
+        <EmptyState icon={FileText} title="No claim selected">
+          Select a claim on the left to review it.
+        </EmptyState>
       </div>
     );
   }
@@ -309,11 +310,11 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
     || (!!claim.receipt_photo_path && photoStatus === 'ready');
 
   return (
-    <div className="rc-detail">
-      <div className="rc-detail__header">
-        <div>
-          <div className="rc-detail__title">Claim review</div>
-          <div className="rc-detail__id">{claim.id?.slice(0, 8)}…</div>
+    <div className="ot-panel rc-detail">
+      <div className="ot-panel__head rc-detail__header">
+        <div className="ot-panel__titles">
+          <h2 className="ot-panel__title">Claim review</h2>
+          <p className="ot-panel__id">{claim.id?.slice(0, 8)}…</p>
         </div>
         <ClaimStatusPills claim={claim} />
       </div>
@@ -357,9 +358,7 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
               title="Click to enlarge"
             />
             <div className="rc-detail__photo-hint">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-              </svg>
+              <Maximize2 size={11} aria-hidden="true" />
               Click to enlarge
             </div>
             {canHideImage && (
@@ -369,42 +368,28 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
                 onClick={() => setHideModal(true)}
                 title="Hide this image from admin reviewers"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
+                <EyeOff size={12} aria-hidden="true" />
                 Hide image
               </button>
             )}
           </>
         ) : (
-          <div className="rc-detail__photo-empty">
+          <div className={`rc-detail__photo-empty${photoStatus === 'failed' ? ' rc-detail__photo-empty--failed' : ''}`}>
             {photoStatus === 'failed' ? (
               <>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="1.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                <span style={{ color: '#DC2626' }}>Photo couldn't load</span>
+                <span className="rc-detail__photo-icon"><CloudAlert size={20} aria-hidden="true" /></span>
+                <span className="rc-detail__photo-title">Photo couldn't load</span>
                 <span className="rc-detail__photo-sub">
                   The receipt is in storage but couldn't be fetched. Approving without seeing the receipt is disabled.
                 </span>
-                <button
-                  type="button"
-                  className="rc-detail__photo-retry"
-                  onClick={retryPhoto}
-                >
+                <Button variant="outline" size="sm" icon={RotateCcw} className="rc-detail__photo-retry" onClick={retryPhoto}>
                   Retry image
-                </button>
+                </Button>
               </>
             ) : (
               <>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                <span>{photoStatus === 'loading' ? 'Loading photo…' : 'No receipt photo'}</span>
+                <span className="rc-detail__photo-icon"><FileText size={20} aria-hidden="true" /></span>
+                <span className="rc-detail__photo-title">{photoStatus === 'loading' ? 'Loading photo…' : 'No receipt photo'}</span>
                 {!claim.receipt_photo_path && claim.type !== 'cashback' && (
                   <span className="rc-detail__photo-sub">Direct refund — no receipt expected</span>
                 )}
@@ -414,102 +399,102 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
         )}
       </div>
 
-      <AiVerdictPanel claim={claim} />
+      <div className="rc-detail__body">
+        <AiVerdictPanel claim={claim} />
 
-      <div className="rc-detail__rows">
-        <div className="rc-detail__section-label">Claimant</div>
-        <div className="rc-detail__row">
-          <span className="rc-detail__row-label">Name</span>
-          <span className="rc-detail__row-val">{claim.user?.display_name || 'Unknown'}</span>
-        </div>
-        {claim.user?.email && (
-          <div className="rc-detail__row">
-            <span className="rc-detail__row-label">Email</span>
-            <span className="rc-detail__row-val rc-detail__row-val--muted">
-              <PiiMask type="email" value={claim.user.email} targetType="claim" targetId={claim.id} inline />
-            </span>
-          </div>
-        )}
-        <div className="rc-detail__row">
-          <span className="rc-detail__row-label">Payout method</span>
-          <span className="rc-detail__row-val">Tikkie link</span>
-        </div>
-        {claim.notify_email && (
-          <div className="rc-detail__row">
-            <span className="rc-detail__row-label">Notify via</span>
-            <span className="rc-detail__row-val rc-detail__row-val--muted">
-              Email
-            </span>
-          </div>
-        )}
-        {claim.tikkie_url && (
-          <div className="rc-detail__row">
-            <span className="rc-detail__row-label">Tikkie link</span>
-            <span className="rc-detail__row-val rc-detail__row-val--mono">
-              <a href={claim.tikkie_url} target="_blank" rel="noopener noreferrer" style={{ color: '#1A8737', textDecoration: 'underline' }}>
-                {claim.tikkie_url.replace('https://', '')}
-              </a>
-            </span>
-          </div>
-        )}
-
-        <div className="rc-detail__section-label" style={{ marginTop: 10 }}>Claim</div>
-        <div className="rc-detail__row">
-          <span className="rc-detail__row-label">Type</span>
-          <span className="rc-detail__row-val" style={{ textTransform: 'capitalize' }}>{claim.type?.replace('_', ' ')}</span>
-        </div>
-        <div className="rc-detail__row">
-          <span className="rc-detail__row-label">Cups spent</span>
-          <span className="rc-detail__row-val rc-detail__row-val--bold">{claim.cups_redeemed ?? '—'}</span>
-        </div>
-        <div className="rc-detail__row">
-          <span className="rc-detail__row-label">Payout</span>
-          <span className="rc-detail__row-val rc-detail__row-val--green">{money(claim.payout_amount || 0)}</span>
-        </div>
-        <div className="rc-detail__row">
-          <span className="rc-detail__row-label">Submitted</span>
-          <span className="rc-detail__row-val rc-detail__row-val--muted">{formatDate(claim.created_at)}</span>
-        </div>
-
-        {claim.approver && (
-          <div className="rc-detail__row">
-            <span className="rc-detail__row-label">
-              {claim.status === 'completed' ? 'Approved by' : 'Decided by'}
-            </span>
-            <span className="rc-detail__row-val">
-              {claim.approver.display_name || claim.approver.email.split('@')[0]}
-              {claim.approved_at && (
-                <span style={{ color: '#9E9A93', fontWeight: 400, marginLeft: 6 }}>
-                  · {new Date(claim.approved_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+        <div className="rc-detail__rows">
+          <p className="ot-panel__label">Claimant</p>
+          <div className="ot-kv">
+            <div className="ot-kv__row">
+              <span className="ot-kv__label">Name</span>
+              <span className="ot-kv__val">{claim.user?.display_name || 'Unknown'}</span>
+            </div>
+            {claim.user?.email && (
+              <div className="ot-kv__row">
+                <span className="ot-kv__label">Email</span>
+                <span className="ot-kv__val ot-kv__val--muted">
+                  <PiiMask type="email" value={claim.user.email} targetType="claim" targetId={claim.id} inline />
                 </span>
-              )}
-            </span>
+              </div>
+            )}
+            <div className="ot-kv__row">
+              <span className="ot-kv__label">Payout method</span>
+              <span className="ot-kv__val">Tikkie link</span>
+            </div>
+            {claim.notify_email && (
+              <div className="ot-kv__row">
+                <span className="ot-kv__label">Notify via</span>
+                <span className="ot-kv__val ot-kv__val--muted">
+                  Email
+                </span>
+              </div>
+            )}
+            {claim.tikkie_url && (
+              <div className="ot-kv__row">
+                <span className="ot-kv__label">Tikkie link</span>
+                <span className="ot-kv__val ot-kv__val--mono">
+                  <a href={claim.tikkie_url} target="_blank" rel="noopener noreferrer" className="rc-detail__link">
+                    {claim.tikkie_url.replace('https://', '')}
+                  </a>
+                </span>
+              </div>
+            )}
           </div>
-        )}
 
-        <button
-          type="button"
-          onClick={() => onFlag?.(claim.id, !claim.flagged)}
-          style={{
-            marginTop: 12, width: '100%', padding: '9px 12px', borderRadius: 10,
-            border: `1px solid ${claim.flagged ? '#E0A400' : '#E2DDD2'}`,
-            background: claim.flagged ? '#FDF4DA' : 'transparent',
-            color: claim.flagged ? '#8A6400' : '#6B645B',
-            fontWeight: 700, fontSize: 13, cursor: 'pointer',
-          }}
-        >
-          {claim.flagged ? '★ Marked for review — click to clear' : '☆ Mark for a second look'}
-        </button>
-      </div>
+          <p className="ot-panel__label rc-detail__label-gap">Claim</p>
+          <div className="ot-kv">
+            <div className="ot-kv__row">
+              <span className="ot-kv__label">Type</span>
+              <span className="ot-kv__val rc-detail__capital">{claim.type?.replace('_', ' ')}</span>
+            </div>
+            <div className="ot-kv__row">
+              <span className="ot-kv__label">Cups spent</span>
+              <span className="ot-kv__val ot-kv__val--strong">{claim.cups_redeemed ?? '—'}</span>
+            </div>
+            <div className="ot-kv__row">
+              <span className="ot-kv__label">Payout</span>
+              <span className="ot-kv__val ot-kv__val--money">{money(claim.payout_amount || 0)}</span>
+            </div>
+            <div className="ot-kv__row">
+              <span className="ot-kv__label">Submitted</span>
+              <span className="ot-kv__val ot-kv__val--muted">{formatDate(claim.created_at)}</span>
+            </div>
 
-      {claim.type === 'voucher' && (
-        <div className="rc-detail__actions">
-          <p className="rc-detail__actions-hint">
+            {claim.approver && (
+              <div className="ot-kv__row">
+                <span className="ot-kv__label">
+                  {claim.status === 'completed' ? 'Approved by' : 'Decided by'}
+                </span>
+                <span className="ot-kv__val">
+                  {claim.approver.display_name || claim.approver.email.split('@')[0]}
+                  {claim.approved_at && (
+                    <span className="ot-kv__meta">
+                      · {new Date(claim.approved_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className={`rc-flag${claim.flagged ? ' rc-flag--on' : ''}`}
+            aria-pressed={!!claim.flagged}
+            onClick={() => onFlag?.(claim.id, !claim.flagged)}
+          >
+            <Star size={14} fill={claim.flagged ? 'currentColor' : 'none'} aria-hidden="true" />
+            {claim.flagged ? 'Marked for a second look · click to clear' : 'Mark for a second look'}
+          </button>
+        </div>
+
+        {claim.type === 'voucher' && (
+          <p className="ot-callout ot-callout--info rc-detail__voucher">
             Settled at the counter: a staff member slid to confirm on the customer's phone and the cups
             left the balance there and then. No receipt, no AI check, no payout — nothing to review.
           </p>
-        </div>
-      )}
+        )}
+      </div>
 
       {canAct && (
         <div className="rc-detail__actions">
@@ -518,38 +503,39 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
            * we hard-disable Approve — the admin needs evidence to sign off
            * on a payout. Reject stays available either way. */}
           {claim.type === 'cashback' && !receiptViewable && (
-            <p className="rc-detail__actions-warn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              {!claim.receipt_photo_path
-                ? 'Approve disabled — no receipt was attached to this cashback claim.'
-                : photoStatus === 'failed'
-                  ? 'Approve disabled — the receipt photo failed to load. Use Retry image above, or reject if it can\'t be recovered.'
-                  : 'Approve will unlock once the receipt photo finishes loading.'}
+            <p className="ot-callout rc-detail__actions-warn">
+              <TriangleAlert size={15} aria-hidden="true" />
+              <span>
+                {!claim.receipt_photo_path
+                  ? 'Approve disabled — no receipt was attached to this cashback claim.'
+                  : photoStatus === 'failed'
+                    ? 'Approve disabled — the receipt photo failed to load. Use Retry image above, or reject if it can\'t be recovered.'
+                    : 'Approve will unlock once the receipt photo finishes loading.'}
+              </span>
             </p>
           )}
-          <p className="rc-detail__actions-hint">Verify the receipt matches the claim before approving.</p>
+          <p className="rc-detail__actions-hint">Check the receipt matches the claim before approving.</p>
           <div className="rc-detail__btns">
             <PermissionGate action="claim.approve">
-              <button
-                className="rc-detail__btn rc-detail__btn--approve"
-                disabled={updating || (claim.type === 'cashback' && !receiptViewable)}
-                onClick={() => setDecision('approve')}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                Approve & Pay
-              </button>
-            </PermissionGate>
-            <PermissionGate action="claim.approve">
-              <button
-                className="rc-detail__btn rc-detail__btn--fail"
+              <Button
+                variant="danger-ghost"
+                icon={X}
+                className="rc-detail__btn--reject"
                 disabled={updating}
                 onClick={() => setDecision('reject')}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 Reject
-              </button>
+              </Button>
+            </PermissionGate>
+            <PermissionGate action="claim.approve">
+              <Button
+                variant="primary"
+                icon={Check}
+                disabled={updating || (claim.type === 'cashback' && !receiptViewable)}
+                onClick={() => setDecision('approve')}
+              >
+                Approve & pay
+              </Button>
             </PermissionGate>
           </div>
         </div>
@@ -571,12 +557,11 @@ export default function ClaimDetailPanel({ claim, onApprove, onFail, onFlag, onC
         />
       )}
 
-      {lightbox && photoSrc && !claim.image_hidden && (
-        <div className="rc-lightbox" onClick={() => setLightbox(false)}>
-          <button className="rc-lightbox__close" onClick={e => { e.stopPropagation(); setLightbox(false); }}>×</button>
-          <img src={photoSrc} alt="Receipt enlarged" className="rc-lightbox__img" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
+      <Lightbox
+        src={lightbox && photoSrc && !claim.image_hidden ? photoSrc : null}
+        alt="Receipt enlarged"
+        onClose={() => setLightbox(false)}
+      />
 
       {hideModal && (
         <HideImageModal
@@ -632,10 +617,7 @@ function HiddenImageTile({ reason, hiddenBy, hiddenAt, canUnhide, busy, onUnhide
   return (
     <div className={`rc-detail__hidden ${isAiHidden ? 'rc-detail__hidden--ai' : 'rc-detail__hidden--admin'}`}>
       <div className="rc-detail__hidden-icon">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-          <line x1="1" y1="1" x2="23" y2="23"/>
-        </svg>
+        <EyeOff size={22} aria-hidden="true" />
       </div>
       <div className="rc-detail__hidden-title">
         {isAiHidden ? 'Hidden — inappropriate' : 'Image hidden by admin'}
@@ -651,14 +633,15 @@ function HiddenImageTile({ reason, hiddenBy, hiddenAt, canUnhide, busy, onUnhide
         Approval requires reviewable evidence — consider rejecting this claim.
       </p>
       {canUnhide && (
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           className="rc-detail__hidden-unhide"
           onClick={onUnhide}
           disabled={busy}
         >
           {busy ? 'Working…' : 'Unhide image'}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -675,38 +658,34 @@ function HiddenImageTile({ reason, hiddenBy, hiddenAt, canUnhide, busy, onUnhide
 function HideImageModal({ busy, onCancel, onConfirm }) {
   const [reason, setReason] = useState('');
   return (
-    <div className="rc-decision-backdrop" onClick={onCancel}>
-      <div className="rc-decision-modal" onClick={e => e.stopPropagation()}>
-        <h3 className="rc-decision-modal__title">Hide this image?</h3>
-        <p className="rc-decision-modal__sub">
-          The image will be replaced with a "hidden" placeholder for every admin
-          who reviews this claim. The user's own copy is not affected. You can
-          unhide later from this same panel.
-        </p>
-        <label className="rc-decision-modal__label" htmlFor="hide-reason">
-          Reason <span style={{ color: '#9E9A93', fontWeight: 400 }}>(optional but recommended)</span>
-        </label>
+    <Modal
+      open
+      onClose={onCancel}
+      title="Hide this image?"
+      subtitle="Every admin who reviews this claim sees a “hidden” placeholder instead. The customer’s own copy isn’t affected, and you can unhide it later from this panel."
+      icon={EyeOff}
+      iconTone="rose"
+      footer={(
+        <>
+          <Button variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button>
+          <Button variant="danger" icon={EyeOff} onClick={() => onConfirm(reason.trim())} disabled={busy}>
+            {busy ? 'Hiding…' : 'Hide image'}
+          </Button>
+        </>
+      )}
+    >
+      <Field label={<>Reason <span className="rc-optional">(optional but recommended)</span></>} htmlFor="hide-reason">
         <textarea
           id="hide-reason"
-          className="rc-decision-modal__textarea"
+          className="ui-textarea"
           rows={3}
           value={reason}
           onChange={e => setReason(e.target.value)}
           placeholder="e.g. credit card number visible, PII in frame, AI moderator missed NSFW content"
           disabled={busy}
         />
-        <div className="rc-decision-modal__actions">
-          <button className="rc-decision-modal__cancel" onClick={onCancel} disabled={busy}>Cancel</button>
-          <button
-            className="rc-decision-modal__confirm rc-decision-modal__confirm--reject"
-            onClick={() => onConfirm(reason.trim())}
-            disabled={busy}
-          >
-            {busy ? 'Hiding…' : 'Hide image'}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Field>
+    </Modal>
   );
 }
 
@@ -756,97 +735,92 @@ function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
   const overridingFail = aiConfident && aiAnyFailed && !isReject;  // AI said NO, you're approving
 
   return (
-    <div className="admin-publish-overlay" onClick={onCancel}>
-      <div className="admin-publish-modal" onClick={e => e.stopPropagation()}>
-        <div className="admin-publish-modal__header">
-          <div
-            className="admin-publish-modal__icon"
-            style={isReject
-              ? { background: 'rgba(220,38,38,0.10)',  color: '#DC2626' }
-              : { background: 'rgba(22,163,74,0.12)', color: '#16A34A' }}
+    <Modal
+      open
+      onClose={onCancel}
+      title={isReject ? 'Reject this claim?' : 'Approve this claim?'}
+      subtitle={isReject
+        ? <>The customer's {claim?.cups_redeemed ?? 0} cup{(claim?.cups_redeemed ?? 0) === 1 ? '' : 's'} stay reserved — they can submit another receipt. No payout will be sent.</>
+        : <>This marks the claim as paid and releases {money(claim?.payout_amount || 0)} to {claim?.user?.display_name || 'the customer'}.</>}
+      icon={isReject ? X : Check}
+      iconTone={isReject ? 'rose' : 'emerald'}
+      footer={(
+        <>
+          <Button variant="outline" onClick={onCancel} disabled={updating}>
+            Cancel
+          </Button>
+          <Button
+            variant={isReject ? 'danger' : 'primary'}
+            icon={isReject ? X : Check}
+            onClick={() => onConfirm(reason.trim(), failedCodes)}
+            disabled={!canSubmit || updating}
+            title={!canSubmit ? 'Mark at least one failed criterion and add a reason' : ''}
           >
-            {isReject ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
-          </div>
-          <div>
-            <h3 className="admin-publish-modal__title">
-              {isReject ? 'Reject this claim?' : 'Approve this claim?'}
-            </h3>
-            <p className="admin-publish-modal__sub">
-              {isReject
-                ? <>The customer's {claim?.cups_redeemed ?? 0} cup{(claim?.cups_redeemed ?? 0) === 1 ? '' : 's'} stay reserved — they can submit another receipt. No payout will be sent.</>
-                : <>This will mark the claim as paid and release {money(claim?.payout_amount || 0)} to {claim?.user?.display_name || 'the customer'}.</>
-              }
-            </p>
-          </div>
+            {updating
+              ? (isReject ? 'Rejecting…' : 'Approving…')
+              : (isReject ? 'Reject claim' : 'Approve & pay')}
+          </Button>
+        </>
+      )}
+    >
+      {(overridingPass || overridingFail) && (
+        <p className="ot-callout">
+          <TriangleAlert size={15} aria-hidden="true" />
+          <span>
+            <strong>Overriding the AI.</strong> {overridingPass
+              ? 'The model passed every check at ' + Math.round((claim.ai_confidence || 0) * 100) + '% confidence. Your rejection will be logged as a human override.'
+              : 'The model failed at least one check at ' + Math.round((claim.ai_confidence || 0) * 100) + '% confidence. Your approval will be logged as a human override.'}
+          </span>
+        </p>
+      )}
+
+      <div className="rc-criteria">
+        <div className="rc-criteria__head">
+          <span className="rc-criteria__title">Receipt criteria</span>
+          <span className="rc-criteria__hint">
+            {isReject
+              ? 'Mark every rule Yes or No. The ones you mark “No” are shown to the customer.'
+              : 'Confirm each rule reads Yes before releasing the payout.'}
+          </span>
         </div>
-
-        {(overridingPass || overridingFail) && (
-          <div className="rc-detail__actions-warn" style={{ margin: '0 0 14px' }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>
-              <strong>Overriding the AI.</strong> {overridingPass
-                ? 'The model passed every check at ' + Math.round((claim.ai_confidence || 0) * 100) + '% confidence. Your rejection will be logged as a human override.'
-                : 'The model failed at least one check at ' + Math.round((claim.ai_confidence || 0) * 100) + '% confidence. Your approval will be logged as a human override.'}
-            </span>
-          </div>
-        )}
-
-        <div className="rc-criteria">
-          <div className="rc-criteria__head">
-            <span className="rc-criteria__title">Receipt criteria</span>
-            <span className="rc-criteria__hint">
-              {isReject
-                ? 'Mark every rule Yes/No — the ones you mark “No” are shown to the customer.'
-                : 'Confirm each rule reads Yes before releasing the payout.'}
-            </span>
-          </div>
-          {REVIEW_CRITERIA.map(code => {
-            const pass = marks[code] !== false;
-            return (
-              <div key={code} className={`rc-criterion${pass ? '' : ' rc-criterion--failed'}`}>
-                <span className="rc-criterion__label">
-                  {pass
-                    ? getPassLabel(code, { partnerBrand })
-                    : getFailureLabel(code, { partnerBrand, long: true })}
-                </span>
-                <div className="rc-criterion__toggle" role="group" aria-label={code}>
-                  <button
-                    type="button"
-                    className={`rc-criterion__opt rc-criterion__opt--yes${pass ? ' is-on' : ''}`}
-                    onClick={() => setMark(code, true)}
-                  >Yes</button>
-                  <button
-                    type="button"
-                    className={`rc-criterion__opt rc-criterion__opt--no${!pass ? ' is-on' : ''}`}
-                    onClick={() => setMark(code, false)}
-                  >No</button>
-                </div>
+        {REVIEW_CRITERIA.map(code => {
+          const pass = marks[code] !== false;
+          return (
+            <div key={code} className={`rc-criterion${pass ? '' : ' rc-criterion--failed'}`}>
+              <span className="rc-criterion__label">
+                {pass
+                  ? getPassLabel(code, { partnerBrand })
+                  : getFailureLabel(code, { partnerBrand, long: true })}
+              </span>
+              <div className="rc-criterion__toggle" role="group" aria-label={code}>
+                <button
+                  type="button"
+                  className={`rc-criterion__opt rc-criterion__opt--yes${pass ? ' is-on' : ''}`}
+                  aria-pressed={pass}
+                  onClick={() => setMark(code, true)}
+                >Yes</button>
+                <button
+                  type="button"
+                  className={`rc-criterion__opt rc-criterion__opt--no${!pass ? ' is-on' : ''}`}
+                  aria-pressed={!pass}
+                  onClick={() => setMark(code, false)}
+                >No</button>
               </div>
-            );
-          })}
-          {isReject && failedCodes.length === 0 && (
-            <p className="rc-criteria__warn">Mark at least one criterion “No” to reject this receipt.</p>
-          )}
-        </div>
+            </div>
+          );
+        })}
+        {isReject && failedCodes.length === 0 && (
+          <p className="rc-criteria__warn">Mark at least one criterion “No” to reject this receipt.</p>
+        )}
+      </div>
 
-        <label className="admin-publish-modal__label">
-          {isReject ? 'Reason (optional)' : (overridingFail ? 'Reason for overriding AI (recommended)' : 'Note (optional)')}
-        </label>
+      <Field
+        label={isReject ? 'Reason (optional)' : (overridingFail ? 'Reason for overriding AI (recommended)' : 'Note (optional)')}
+        htmlFor="rc-decision-reason"
+      >
         <input
-          className="admin-publish-modal__input"
+          id="rc-decision-reason"
+          className="ui-input"
           placeholder={isReject
             ? 'e.g. Receipt date is older than 30 days'
             : 'e.g. AI low-confidence but checked manually — looks legit'}
@@ -854,24 +828,7 @@ function DecisionModal({ kind, claim, updating, onCancel, onConfirm }) {
           onChange={e => setReason(e.target.value)}
           autoFocus
         />
-
-        <div className="admin-publish-modal__actions">
-          <button className="admin-publish-modal__cancel" onClick={onCancel} disabled={updating}>
-            Cancel
-          </button>
-          <button
-            className="admin-publish-modal__confirm"
-            onClick={() => onConfirm(reason.trim(), failedCodes)}
-            disabled={!canSubmit || updating}
-            style={isReject ? { background: '#DC2626' } : { background: '#16A34A' }}
-            title={!canSubmit ? 'Mark at least one failed criterion and add a reason' : ''}
-          >
-            {updating
-              ? (isReject ? 'Rejecting…' : 'Approving…')
-              : (isReject ? 'Reject claim →' : 'Approve & pay →')}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Field>
+    </Modal>
   );
 }

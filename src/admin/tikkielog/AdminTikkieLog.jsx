@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle2, CupSoda, ExternalLink, HandCoins, Link2, ListFilter, RefreshCw } from 'lucide-react';
 import { useOrg } from '../context/OrgContext';
 import { listBinTikkiePayouts } from '../lib/adminApi';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, KpiTile, PageHeader, Segmented } from '../ui';
 import './AdminTikkieLog.css';
 import { adminMoney } from '../lib/adminMoney';
 
@@ -14,11 +16,11 @@ import { adminMoney } from '../lib/adminMoney';
  * nothing to review or approve. */
 
 const STATUS_META = {
-  created:  { label: 'Link active', cls: 'ok' },
-  redeemed: { label: 'Redeemed',    cls: 'good' },
-  expired:  { label: 'Expired',     cls: 'muted' },
-  minting:  { label: 'Minting…',    cls: 'busy' },
-  failed:   { label: 'Mint failed', cls: 'bad' },
+  created:  { label: 'Link active',        tone: 'info' },
+  redeemed: { label: 'Redeemed',           tone: 'success' },
+  expired:  { label: 'Expired',            tone: 'neutral' },
+  minting:  { label: 'Creating link…',     tone: 'warning' },
+  failed:   { label: 'Link failed',        tone: 'danger' },
 };
 
 function rowStatus(r) {
@@ -82,108 +84,107 @@ export default function AdminTikkieLog() {
     [rows, filter],
   );
 
+  const kpis = [
+    { id: 'links', label: 'Links generated', icon: Link2, tone: 'violet', value: stats.count, description: 'One per collected balance' },
+    { id: 'cups', label: 'Cups returned', icon: CupSoda, tone: 'teal', value: stats.cups, description: 'Across all links' },
+    { id: 'issued', label: 'Cashback issued', icon: HandCoins, tone: 'sky', value: fmtEur(stats.issued), description: 'Every link that was created' },
+    { id: 'redeemed', label: 'Redeemed', icon: CheckCircle2, tone: 'emerald', value: stats.redeemed, description: `${fmtEur(stats.redeemedEur)} collected by customers` },
+  ];
+
   return (
-    <div className="admin-tikkielog">
-      <header className="atl-header">
-        <div>
-          <h1 className="atl-title">Tikkie payouts</h1>
-          <p className="atl-sub">
-            Every bin receipt that was scanned and turned into a Tikkie cashback link.
-            Redemption status updates automatically via the Tikkie webhook.
-          </p>
-        </div>
-        <button className="atl-refresh" onClick={load} disabled={loading}>
+    <div className="ui-page atl">
+      <PageHeader
+        title="Tikkie payouts"
+        subtitle="Every time a customer collected their bin receipts as a Tikkie cashback link. Tikkie reports back when a link is paid, and the status here follows."
+      >
+        <Button icon={RefreshCw} onClick={load} disabled={loading}>
           {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </header>
+        </Button>
+      </PageHeader>
 
-      <div className="atl-tiles">
-        <div className="atl-tile">
-          <div className="atl-tile__num">{stats.count}</div>
-          <div className="atl-tile__label">Links generated</div>
-        </div>
-        <div className="atl-tile">
-          <div className="atl-tile__num">{stats.cups}</div>
-          <div className="atl-tile__label">Cups returned</div>
-        </div>
-        <div className="atl-tile">
-          <div className="atl-tile__num">{fmtEur(stats.issued)}</div>
-          <div className="atl-tile__label">Cashback issued</div>
-        </div>
-        <div className="atl-tile">
-          <div className="atl-tile__num">{stats.redeemed} <span className="atl-tile__sm">({fmtEur(stats.redeemedEur)})</span></div>
-          <div className="atl-tile__label">Redeemed</div>
-        </div>
+      <div className="ui-kpis atl-kpis">
+        {kpis.map((m, i) => <KpiTile key={m.id} metric={m} index={i} interactive={false} />)}
       </div>
 
-      <div className="atl-filters">
-        {FILTERS.map(f => (
-          <button
-            key={f.key}
-            className={`atl-chip${filter === f.key ? ' atl-chip--on' : ''}`}
-            onClick={() => setFilter(f.key)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <Card>
+        <CardHeader
+          title="Payout links"
+          icon={ListFilter}
+          ruled
+          actions={(
+            <Segmented
+              ariaLabel="Filter payouts"
+              value={filter}
+              onChange={setFilter}
+              options={FILTERS.map(f => ({ id: f.key, label: f.label }))}
+            />
+          )}
+        />
+        <CardBody flush>
+          {error && (
+            <p className="atl-error" role="alert">
+              <AlertCircle size={15} aria-hidden="true" />{error}
+            </p>
+          )}
 
-      {error && <div className="atl-error">{error}</div>}
-
-      {loading && rows.length === 0 ? (
-        <div className="atl-empty">Loading…</div>
-      ) : visible.length === 0 ? (
-        <div className="atl-empty">
-          {rows.length === 0
-            ? 'No payouts yet. They appear here the moment a customer collects their balance.'
-            : 'Nothing matches this filter.'}
-        </div>
-      ) : (
-        <div className="atl-table-wrap">
-          <table className="atl-table">
-            <thead>
-              <tr>
-                <th>Generated</th>
-                <th>Cups</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Redeemed</th>
-                <th>Expires</th>
-                <th>Batch</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map(r => {
-                const st = rowStatus(r);
-                const meta = STATUS_META[st];
-                return (
-                  <tr key={r.id}>
-                    <td>{fmtDateTime(r.created_at)}</td>
-                    <td>{r.cups_redeemed ?? '—'}</td>
-                    <td className="atl-amount">{fmtEur(r.payout_amount)}</td>
-                    <td>
-                      <span className={`atl-badge atl-badge--${meta.cls}`} title={st === 'failed' ? (r.tikkie_last_error || '') : ''}>
-                        {meta.label}
-                      </span>
-                    </td>
-                    <td>{fmtDateTime(r.tikkie_redeemed_at)}</td>
-                    <td>{r.tikkie_expires_at ? new Date(r.tikkie_expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}</td>
-                    <td className="atl-batch" title={r.batch_id || 'Bulk payout: one link for the whole wallet balance'}>
-                      {r.batch_id ? r.batch_id.slice(0, 8) : 'bulk'}
-                    </td>
-                    <td>
-                      {r.tikkie_url && (
-                        <a className="atl-link" href={r.tikkie_url} target="_blank" rel="noopener noreferrer">Link</a>
-                      )}
-                    </td>
+          {loading && rows.length === 0 ? (
+            <p className="atl-loading">Loading…</p>
+          ) : visible.length === 0 ? (
+            <EmptyState icon={HandCoins} title={rows.length === 0 ? 'No payouts yet' : 'Nothing matches this filter'}>
+              {rows.length === 0
+                ? 'They appear here the moment a customer collects their balance.'
+                : 'Try another status.'}
+            </EmptyState>
+          ) : (
+            <div className="atl-table-wrap">
+              <table className="ui-table atl-table">
+                <thead>
+                  <tr>
+                    <th>Generated</th>
+                    <th className="ui-num">Cups</th>
+                    <th className="ui-num">Amount</th>
+                    <th>Status</th>
+                    <th>Redeemed</th>
+                    <th>Expires</th>
+                    <th>Batch</th>
+                    <th aria-label="Link" />
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                </thead>
+                <tbody>
+                  {visible.map(r => {
+                    const st = rowStatus(r);
+                    const meta = STATUS_META[st];
+                    return (
+                      <tr key={r.id}>
+                        <td>{fmtDateTime(r.created_at)}</td>
+                        <td className="ui-num">{r.cups_redeemed ?? '—'}</td>
+                        <td className="ui-num atl-amount">{fmtEur(r.payout_amount)}</td>
+                        <td>
+                          <Badge tone={meta.tone} title={st === 'failed' ? (r.tikkie_last_error || '') : undefined}>
+                            {meta.label}
+                          </Badge>
+                        </td>
+                        <td className="atl-muted">{fmtDateTime(r.tikkie_redeemed_at)}</td>
+                        <td className="atl-muted">{r.tikkie_expires_at ? new Date(r.tikkie_expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}</td>
+                        <td className="atl-batch" title={r.batch_id || 'Bulk payout: one link for the whole wallet balance'}>
+                          {r.batch_id ? r.batch_id.slice(0, 8) : 'Whole wallet'}
+                        </td>
+                        <td className="atl-link-cell">
+                          {r.tikkie_url && (
+                            <a className="atl-link" href={r.tikkie_url} target="_blank" rel="noopener noreferrer">
+                              Open link <ExternalLink size={12} aria-hidden="true" />
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }

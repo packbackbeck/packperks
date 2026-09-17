@@ -1,14 +1,17 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import {
+  Check, CircleHelp, Copy, ExternalLink, EyeOff, FileText, Link2, Minus, PanelRight, RefreshCw, Rows3,
+  ScanEye, Search, Trash2, TriangleAlert, X,
+} from 'lucide-react';
 import { getAdminClaims, updateClaimStatus, markClaim, getReceiptSignedUrl, deleteRecords, refreshTikkieStatus, mintTikkieLink } from '../lib/adminApi';
 import Spinner from '../lib/Spinner';
-import { useAuth, hasPermission } from '../auth/AuthContext';
 import { logAction } from '../auth/actionLog';
 import ClaimDetailPanel from './ClaimDetailPanel';
 import PiiMask from '../shared/PiiMask';
-import ClaimStatusPills, { ClaimStatusPill } from '../shared/ClaimStatusPills';
-import EmptyState from '../shared/EmptyState';
+import { ClaimStatusPill } from '../shared/ClaimStatusPills';
 import ColumnPicker from '../shared/ColumnPicker';
+import { Avatar, Lightbox, Notice, SearchBox, SortTh, SplitHandle } from '../shared/opsTable';
+import { Badge, Button, EmptyState, Field, Modal, PageHeader, Segmented } from '../ui';
 import './AdminClaims.css';
 import { useAdminMoney } from '../lib/adminMoney';
 
@@ -39,18 +42,13 @@ function ReceiptThumb({ claim, onZoom }) {
     const isAiHidden = !claim.image_hidden_by;
     return (
       <div
-        className={`ac-thumb ac-thumb--hidden ${isAiHidden ? 'ac-thumb--hidden-ai' : 'ac-thumb--hidden-admin'}`}
+        className={`ot-thumb ac-thumb--hidden ${isAiHidden ? 'ac-thumb--hidden-ai' : 'ac-thumb--hidden-admin'}`}
         title={isAiHidden
           ? `Hidden — inappropriate (${(claim.image_hidden_reason || 'auto').replace(/^ai_/, '')})`
           : `Hidden by admin: ${(claim.image_hidden_reason || '').replace(/^admin:\s*/, '') || 'no reason'}`}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-          <line x1="1" y1="1" x2="23" y2="23"/>
-        </svg>
-        <span className="ac-thumb__hidden-label">
-          {isAiHidden ? 'Hidden' : 'Hidden'}
-        </span>
+        <EyeOff size={13} aria-hidden="true" />
+        <span className="ac-thumb__hidden-label">Hidden</span>
       </div>
     );
   }
@@ -59,17 +57,15 @@ function ReceiptThumb({ claim, onZoom }) {
 
   if (!src) {
     return (
-      <div className="ac-thumb ac-thumb--empty" title="No photo">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-        </svg>
+      <div className="ot-thumb ot-thumb--empty" title="No photo">
+        <FileText size={14} aria-hidden="true" />
       </div>
     );
   }
   return (
     <button
-      className="ac-thumb"
+      type="button"
+      className="ot-thumb"
       onClick={e => { e.stopPropagation(); onZoom?.(src); }}
       title="Click to enlarge"
     >
@@ -78,16 +74,12 @@ function ReceiptThumb({ claim, onZoom }) {
   );
 }
 
-/* Modal showing the full AI check for one claim. Opens when the verdict
- * chip in the table is clicked. Rendered via portal so the fixed overlay
- * escapes any transformed ancestors. */
+const CHECK_ICON = { pass: Check, fail: X, skip: Minus };
+
+/* Dialog showing the full AI check for one claim. Opens when the verdict
+ * chip in the table is clicked. */
 function AiVerdictModal({ claim, onClose }) {
   const { money } = useAdminMoney();
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose?.(); }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   if (!claim) return null;
 
@@ -110,118 +102,93 @@ function AiVerdictModal({ claim, onClose }) {
   const rawAllPassed = !noVerdict && failed.length === 0 && !isDup;
   const needsManualReview = rawAllPassed && lowConfidence;
 
-  return createPortal(
-    <div className="ac-verdict-overlay" onClick={onClose}>
-      <div className="ac-verdict-modal" onClick={e => e.stopPropagation()}>
-        <button className="ac-verdict-close" onClick={onClose} aria-label="Close">×</button>
-
-        <div className="ac-verdict-header">
-          <span className="ac-verdict-eyebrow">AI check</span>
-          {!noVerdict && (
-            <span className="ac-verdict-confidence">
-              {Math.round((claim.ai_confidence || 0) * 100)}% confident
-            </span>
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="AI check"
+      subtitle={noVerdict
+        ? 'What the receipt check found for this claim.'
+        : `What the receipt check found for this claim. ${Math.round((claim.ai_confidence || 0) * 100)}% confident.`}
+      icon={ScanEye}
+      iconTone={noVerdict ? 'slate' : needsManualReview ? 'amber' : rawAllPassed ? 'emerald' : 'rose'}
+    >
+      {noVerdict ? (
+        <p className="ac-verdict-empty">This claim hasn't been verified yet.</p>
+      ) : (
+        <>
+          {needsManualReview && (
+            <p className="ot-callout">
+              <TriangleAlert size={15} aria-hidden="true" />
+              <span>
+                <strong>Needs manual review.</strong> The model passed every check but is
+                only {Math.round(conf * 100)}% sure. Confirm against the receipt before approving.
+              </span>
+            </p>
           )}
-        </div>
-
-        {noVerdict ? (
-          <p className="ac-verdict-empty">This claim hasn't been verified yet.</p>
-        ) : (
-          <>
-            {needsManualReview && (
-              <div className="ac-verdict-override">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                <span>
-                  <strong>Needs manual review.</strong> The model passed every check but is
-                  only {Math.round(conf * 100)}% sure. Confirm against the receipt before approving.
-                </span>
-              </div>
-            )}
-            <div className="ac-verdict-checks">
-              {checks.map(c => (
-                <div key={c.key} className={`ac-verdict-check ac-verdict-check--${c.passed === true ? 'pass' : c.passed === false ? 'fail' : 'skip'}`}>
-                  <span className="ac-verdict-check__dot">
-                    {c.passed === true ? '✓' : c.passed === false ? '✕' : '–'}
-                  </span>
+          <div className="ac-verdict-checks">
+            {checks.map(c => {
+              const state = c.passed === true ? 'pass' : c.passed === false ? 'fail' : 'skip';
+              const Icon = CHECK_ICON[state];
+              return (
+                <div key={c.key} className={`ac-verdict-check ac-verdict-check--${state}`}>
+                  <span className="ac-verdict-check__dot"><Icon size={12} strokeWidth={2.6} aria-hidden="true" /></span>
                   <span className="ac-verdict-check__label">{c.label}</span>
                   <span className="ac-verdict-check__state">
-                    {c.passed === true ? 'passed' : c.passed === false ? 'failed' : 'skipped'}
+                    {state === 'pass' ? 'Passed' : state === 'fail' ? 'Failed' : 'Skipped'}
                   </span>
                 </div>
-              ))}
-              {isDup && (
-                <div className="ac-verdict-check ac-verdict-check--fail">
-                  <span className="ac-verdict-check__dot">✕</span>
-                  <span className="ac-verdict-check__label">Not a duplicate</span>
-                  <span className="ac-verdict-check__state">failed</span>
-                </div>
+              );
+            })}
+            {isDup && (
+              <div className="ac-verdict-check ac-verdict-check--fail">
+                <span className="ac-verdict-check__dot"><X size={12} strokeWidth={2.6} aria-hidden="true" /></span>
+                <span className="ac-verdict-check__label">Not a duplicate</span>
+                <span className="ac-verdict-check__state">Failed</span>
+              </div>
+            )}
+          </div>
+
+          {(claim.ai_required_item || claim.extracted_total_eur != null || claim.extracted_receipt_id || claim.extracted_datetime) && (
+            <div className="ot-kv ac-verdict-extracted">
+              {claim.ai_required_item && (
+                <div className="ot-kv__row"><span className="ot-kv__label">Required item</span><strong className="ot-kv__val">{claim.ai_required_item}</strong></div>
+              )}
+              {claim.extracted_total_eur != null && (
+                <div className="ot-kv__row"><span className="ot-kv__label">Receipt total</span><strong className="ot-kv__val">{money(Number(claim.extracted_total_eur))}</strong></div>
+              )}
+              {claim.extracted_receipt_id && (
+                <div className="ot-kv__row"><span className="ot-kv__label">Receipt #</span><strong className="ot-kv__val ot-kv__val--mono">{claim.extracted_receipt_id}</strong></div>
+              )}
+              {claim.extracted_datetime && (
+                <div className="ot-kv__row"><span className="ot-kv__label">Receipt date</span><strong className="ot-kv__val">{new Date(claim.extracted_datetime).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></div>
               )}
             </div>
+          )}
 
-            {(claim.ai_required_item || claim.extracted_total_eur != null || claim.extracted_receipt_id || claim.extracted_datetime) && (
-              <div className="ac-verdict-extracted">
-                {claim.ai_required_item && (
-                  <div className="ac-verdict-row"><span>Required item</span><strong>{claim.ai_required_item}</strong></div>
-                )}
-                {claim.extracted_total_eur != null && (
-                  <div className="ac-verdict-row"><span>Receipt total</span><strong>{money(Number(claim.extracted_total_eur))}</strong></div>
-                )}
-                {claim.extracted_receipt_id && (
-                  <div className="ac-verdict-row"><span>Receipt #</span><strong className="ac-mono">{claim.extracted_receipt_id}</strong></div>
-                )}
-                {claim.extracted_datetime && (
-                  <div className="ac-verdict-row"><span>Receipt date</span><strong>{new Date(claim.extracted_datetime).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></div>
-                )}
-              </div>
-            )}
+          {claim.ai_reason && (
+            <div className="ac-verdict-reason">
+              <span className="ac-verdict-reason__label">Why</span>
+              <span className="ac-verdict-reason__text">{claim.ai_reason}</span>
+            </div>
+          )}
 
-            {claim.ai_reason && (
-              <div className="ac-verdict-reason">
-                <span className="ac-verdict-reason__label">Why</span>
-                <span className="ac-verdict-reason__text">{claim.ai_reason}</span>
-              </div>
-            )}
-
-            {claim.ai_verdict?.items?.length > 0 && (
-              <details className="ac-verdict-items">
-                <summary>Extracted line items ({claim.ai_verdict.items.length})</summary>
-                <ul>
-                  {claim.ai_verdict.items.map((it, i) => (
-                    <li key={i}>
-                      {it.qty}× {it.name}
-                      {it.price_eur != null && ` — ${money(Number(it.price_eur))}`}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </>
-        )}
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-/* Fullscreen lightbox for the receipt photo, opened when a thumb is clicked.
- * Rendered via portal so it covers the viewport, not the panel. */
-function ReceiptLightbox({ src, onClose }) {
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose?.(); }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  if (!src) return null;
-  return createPortal(
-    <div className="ac-lightbox" onClick={onClose}>
-      <button className="ac-lightbox__close" onClick={e => { e.stopPropagation(); onClose(); }}>×</button>
-      <img src={src} alt="Receipt enlarged" className="ac-lightbox__img" onClick={e => e.stopPropagation()} />
-    </div>,
-    document.body,
+          {claim.ai_verdict?.items?.length > 0 && (
+            <details className="ac-verdict-items">
+              <summary>Extracted line items ({claim.ai_verdict.items.length})</summary>
+              <ul>
+                {claim.ai_verdict.items.map((it, i) => (
+                  <li key={i}>
+                    {it.qty}× {it.name}
+                    {it.price_eur != null && ` — ${money(Number(it.price_eur))}`}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -259,38 +226,37 @@ const COLUMN_CONFIG = [
 ];
 const DEFAULT_VISIBLE_COLS = COLUMN_CONFIG.filter(c => c.defaultOn).map(c => c.id);
 
-function SortIcon({ active, dir }) {
+/* Validation chip. A button when there's a verdict to open. */
+function ChipButton({ claim, onClick, tone, icon, title, children }) {
+  const Icon = icon;
   return (
-    <span className={`ac-sort-icon${active ? ' ac-sort-icon--active' : ''}`}>
-      {active ? (dir === 'asc' ? '↑' : '↓') : '↕'}
-    </span>
+    <button
+      type="button"
+      className={`ui-badge ui-badge--${tone} ot-badge-btn ac-receipt-chip`}
+      title={title}
+      onClick={e => { e.stopPropagation(); onClick?.(claim); }}
+    >
+      {Icon && <Icon size={11} strokeWidth={2.4} aria-hidden="true" />}
+      {children}
+    </button>
   );
 }
 
 function ReceiptChip({ claim, onClick }) {
-  // Wrap as a button when clickable so the cursor + a11y are right.
-  const Wrapper = ({ className, title, children }) => (
-    <button
-      type="button"
-      className={`${className} ac-receipt-chip--clickable`}
-      title={title}
-      onClick={e => { e.stopPropagation(); onClick?.(claim); }}
-    >
-      {children}
-    </button>
-  );
-
   if (claim.type === 'direct_refund' || claim.type === 'voucher') {
-    return <span className="ac-receipt-chip ac-receipt-chip--na">N/A</span>;
+    return <Badge tone="neutral">N/A</Badge>;
   }
   if (claim.ai_confidence == null) {
     return (
-      <Wrapper
-        className="ac-receipt-chip ac-receipt-chip--neutral"
+      <ChipButton
+        claim={claim}
+        onClick={onClick}
+        tone="neutral"
+        icon={CircleHelp}
         title="No verdict yet — click for details"
       >
-        — Not checked
-      </Wrapper>
+        Not checked
+      </ChipButton>
     );
   }
   const failed = claim.ai_failure_checks || [];
@@ -305,42 +271,53 @@ function ReceiptChip({ claim, onClick }) {
     // pass — the admin needs to look at the receipt before approving.
     if (lowConfidence) {
       return (
-        <Wrapper
-          className="ac-receipt-chip ac-receipt-chip--uncertain"
+        <ChipButton
+          claim={claim}
+          onClick={onClick}
+          tone="warning"
+          icon={TriangleAlert}
           title={`AI marked all checks pass but is only ${Math.round(conf * 100)}% confident — needs manual review`}
         >
-          ⚠ Needs review
-        </Wrapper>
+          Needs review
+        </ChipButton>
       );
     }
     return (
-      <Wrapper
-        className="ac-receipt-chip ac-receipt-chip--valid"
+      <ChipButton
+        claim={claim}
+        onClick={onClick}
+        tone="success"
+        icon={Check}
         title={`All 3 checks passed (${Math.round(conf * 100)}% confident) — click for details`}
       >
-        ✓ Passed
-      </Wrapper>
+        Passed
+      </ChipButton>
     );
   }
   const labelMap = {
-    is_receipt: 'not a receipt',
-    is_authentic_burger_king: 'not real BK',
-    contains_required_item: 'wrong item',
-    price_mismatch: 'price differs',
-    is_newer_than_cup_return: 'before unlock',
-    within_claim_window: 'outside window',
-    duplicate_receipt: 'duplicate',
+    is_receipt: 'Not a receipt',
+    is_authentic_burger_king: 'Not real BK',
+    contains_required_item: 'Wrong item',
+    price_mismatch: 'Price differs',
+    is_newer_than_cup_return: 'Before unlock',
+    within_claim_window: 'Outside window',
+    duplicate_receipt: 'Duplicate',
   };
   const first = labelMap[failed[0]] || 'Flagged';
   return (
-    <Wrapper
-      className="ac-receipt-chip ac-receipt-chip--invalid"
+    <ChipButton
+      claim={claim}
+      onClick={onClick}
+      tone="danger"
+      icon={X}
       title={`${claim.ai_reason || failed.join(', ')} — click for details`}
     >
-      ✕ {first}
-    </Wrapper>
+      {first}
+    </ChipButton>
   );
 }
+
+const STATUS_LABEL = { all: 'All', pending: 'Pending', completed: 'Approved', failed: 'Rejected' };
 
 export default function AdminClaims({ onNavigate, draftState }) {
   const { money } = useAdminMoney();
@@ -687,109 +664,71 @@ export default function AdminClaims({ onNavigate, draftState }) {
     return r?.name || claim.reward_id;
   }
 
-  function ThCol({ label, sortable, field, style }) {
-    return (
-      <th style={style}
-        className={sortable ? 'ac-th--sortable' : ''}
-        onClick={sortable ? () => handleSort(field) : undefined}
-      >
-        {label}
-        {sortable && <SortIcon active={sortKey === field} dir={sortDir} />}
-      </th>
-    );
-  }
+  const sort = { key: sortKey, dir: sortDir };
+  const subtitleParts = [
+    `${counts.pending} waiting for review`,
+    `${counts.completed} approved`,
+    `${counts.failed} rejected`,
+    ...(counts.voucher > 0 ? [`${counts.voucher} redeemed at the counter`] : []),
+  ];
 
   return (
-    <div className="admin-claims">
-      <div className="ac-header">
-        <div>
-          <h1 className="ac-header__title">Claims</h1>
-          <p className="ac-header__sub">
-            <span className="ac-chip ac-chip--pending">{counts.pending} Pending</span>
-            <span className="ac-chip ac-chip--completed">{counts.completed} Approved</span>
-            <span className="ac-chip ac-chip--failed">{counts.failed} Rejected</span>
-            {counts.voucher > 0 && (
-              <span className="ac-chip ac-chip--voucher" title="Redeemed at the counter with a slider voucher — no review needed">
-                {counts.voucher} Redeemed at counter
-              </span>
-            )}
-          </p>
-        </div>
-
-        {/* View-mode toggle. The "Table" mode is the historic full-width
-         *  layout optimised for bulk operations; "Review" splits the
-         *  page into a compact list + the per-claim photo / AI check
-         *  panel (formerly the standalone Receipt Check tab). */}
-        <div className="ac-viewmode" role="tablist" aria-label="Claims view mode">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'table'}
-            className={`ac-viewmode__btn${viewMode === 'table' ? ' ac-viewmode__btn--active' : ''}`}
-            onClick={() => setViewMode('table')}
-            title="Bulk table view"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6"/>
-              <line x1="3" y1="12" x2="21" y2="12"/>
-              <line x1="3" y1="18" x2="21" y2="18"/>
-            </svg>
-            Table
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'review'}
-            className={`ac-viewmode__btn${viewMode === 'review' ? ' ac-viewmode__btn--active' : ''}`}
-            onClick={() => {
-              setViewMode('review');
-              // When entering review mode for the first time, auto-select
-              // the first pending claim so the right pane isn't empty.
-              if (!selectedId) {
-                const firstPending = filtered.find(c => c.status === 'pending');
-                if (firstPending) setSelectedId(firstPending.id);
-              }
-            }}
-            title="Single-claim review with photo + AI check"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="8" height="18"/>
-              <rect x="13" y="3" width="8" height="18"/>
-            </svg>
-            Review
-          </button>
-        </div>
-      </div>
+    <div className="ui-page ac-page">
+      <PageHeader
+        title="Claims"
+        subtitle={loading ? 'Cashback and refund claims to review and pay.' : subtitleParts.join(' · ')}
+      >
+        {/* View mode. "Table" is the full-width layout for bulk work;
+         *  "Review" splits the page into a compact list + the per-claim
+         *  photo / AI check panel. */}
+        <Segmented
+          ariaLabel="Claims view"
+          value={viewMode}
+          onChange={(mode) => {
+            if (mode === 'table') { setViewMode('table'); return; }
+            setViewMode('review');
+            // When entering review mode for the first time, auto-select
+            // the first pending claim so the right pane isn't empty.
+            if (!selectedId) {
+              const firstPending = filtered.find(c => c.status === 'pending');
+              if (firstPending) setSelectedId(firstPending.id);
+            }
+          }}
+          options={[
+            { id: 'table', label: 'Table', icon: Rows3, title: 'Bulk table view' },
+            { id: 'review', label: 'Review', icon: PanelRight, title: 'Single-claim review with photo + AI check' },
+          ]}
+        />
+      </PageHeader>
 
       {actionError && (
-        <div className="ac-error-bar">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <span>{actionError}</span>
-          {actionError.includes('constraint') && (
-            <button
-              style={{ marginLeft: 8, background: 'rgba(220,38,38,0.12)', border: 'none', color: '#DC2626', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+        <Notice
+          tone="danger"
+          onDismiss={() => setActionError(null)}
+          action={actionError.includes('constraint') && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Copy}
               onClick={() => navigator.clipboard?.writeText("ALTER TABLE claims DROP CONSTRAINT IF EXISTS claims_status_check;\nALTER TABLE claims ADD CONSTRAINT claims_status_check\n  CHECK (status IN ('pending', 'completed', 'failed'));")}
             >
-              📋 Copy SQL
-            </button>
+              Copy SQL
+            </Button>
           )}
-          <button onClick={() => setActionError(null)}>×</button>
-        </div>
+        >
+          {actionError}
+        </Notice>
       )}
 
-      <div className="ac-toolbar">
-        <div className="ac-filter-group">
-          {STATUS_OPTIONS.map(s => (
-            <button key={s} className={`ac-filter-btn${statusFilter === s ? ' ac-filter-btn--active' : ''}`}
-              onClick={() => setStatus(s)}>
-              {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-        </div>
+      <div className="ot-toolbar">
+        <Segmented
+          ariaLabel="Filter by review status"
+          value={statusFilter}
+          onChange={setStatus}
+          options={STATUS_OPTIONS.map(s => ({ id: s, label: STATUS_LABEL[s] }))}
+        />
         <select
-          className="ac-type-filter"
+          className="ui-select ot-select"
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
           aria-label="Filter by settlement method"
@@ -799,20 +738,16 @@ export default function AdminClaims({ onNavigate, draftState }) {
           <option value="voucher">Slider voucher</option>
           <option value="direct_refund">Direct refund</option>
         </select>
-        <div className="ac-search-wrap">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9E9A93" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            className="ac-search-input"
-            placeholder="Search user, email, claim ID…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        {/* Column picker — shared component, same dropdown is now used
-         *  on the Cup Scans table too. State + storage stay local so
-         *  each table persists its own column choices. */}
+        <SearchBox
+          className="ac-search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Search user, email, claim ID"
+          label="Search claims"
+        />
+        {/* Column picker — shared component, same dropdown is used on the
+         *  Cup scans table. State + storage stay local so each table
+         *  persists its own column choices. */}
         <ColumnPicker
           columns={COLUMN_CONFIG}
           visible={visibleCols}
@@ -823,75 +758,89 @@ export default function AdminClaims({ onNavigate, draftState }) {
 
       {/* Bulk actions bar */}
       {selected.size > 0 && (
-        <div className="ac-bulk-bar">
-          <span className="ac-bulk-bar__count">{selected.size} selected</span>
+        <div className={`ac-bulk-bar${deleteConfirm ? ' ac-bulk-bar--confirm' : ''}`} role="region" aria-label="Bulk actions">
+          {!deleteConfirm ? (
+            <span className="ac-bulk-bar__count">{selected.size} selected</span>
+          ) : (
+            <span className="ac-bulk-bar__warn">
+              <TriangleAlert size={15} aria-hidden="true" />
+              Permanently delete {selected.size} claim{selected.size === 1 ? '' : 's'}? This can’t be undone.
+            </span>
+          )}
           {/* B1: bulk APPROVE removed — approving many payouts at once hid
               per-claim Tikkie mint failures (a "done" claim whose money never
               went out). Approvals now go one at a time through the review panel,
               which shows the receipt and confirms. Bulk reject/delete stay —
               they move no money. */}
-          {selectedPending.length > 0 && (
-            <button className="ac-bulk-btn ac-bulk-btn--fail"
+          {selectedPending.length > 0 && !deleteConfirm && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={X}
+              className="ac-bulk-btn--reject"
               disabled={bulkUpdating}
-              onClick={() => setBulkConfirm({ newStatus: 'failed' })}>
-              ✕ Reject {selectedPending.length}
-            </button>
+              onClick={() => setBulkConfirm({ newStatus: 'failed' })}
+            >
+              Reject {selectedPending.length}
+            </Button>
           )}
           {!deleteConfirm ? (
-            <button className="ac-bulk-btn ac-bulk-btn--fail"
+            <Button
+              variant="danger-ghost"
+              size="sm"
+              icon={Trash2}
               disabled={deleting}
               onClick={() => setDeleteConfirm(true)}
-              title="Permanently delete the selected claims">
-              🗑 Delete {selected.size}
-            </button>
+              title="Permanently delete the selected claims"
+            >
+              Delete {selected.size}
+            </Button>
           ) : (
             <>
-              <span className="ac-bulk-bar__count" style={{ color: '#FCA5A5' }}>
-                ⚠️ Permanently delete {selected.size} claim{selected.size === 1 ? '' : 's'}? Can’t be undone.
-              </span>
-              <button className="ac-bulk-btn ac-bulk-btn--fail" disabled={deleting} onClick={handleBulkDelete}>
+              <Button variant="danger" size="sm" icon={Trash2} disabled={deleting} onClick={handleBulkDelete}>
                 {deleting ? 'Deleting…' : 'Confirm delete'}
-              </button>
-              <button className="ac-bulk-btn ac-bulk-btn--clear" disabled={deleting} onClick={() => setDeleteConfirm(false)}>
+              </Button>
+              <Button variant="outline" size="sm" disabled={deleting} onClick={() => setDeleteConfirm(false)}>
                 Cancel
-              </button>
+              </Button>
             </>
           )}
-          <button className="ac-bulk-btn ac-bulk-btn--clear" onClick={() => { setSelected(new Set()); setDeleteConfirm(false); }}>
-            Clear
-          </button>
+          <Button variant="ghost" size="sm" className="ac-bulk-bar__clear" onClick={() => { setSelected(new Set()); setDeleteConfirm(false); }}>
+            Clear selection
+          </Button>
         </div>
       )}
 
       <div
         className={`ac-layout${viewMode === 'review' ? ' ac-layout--review' : ''}`}
         ref={layoutRef}
-        style={viewMode === 'review' ? { gridTemplateColumns: `${reviewSplit}px 9px minmax(320px, 1fr)` } : undefined}
+        style={viewMode === 'review' ? { gridTemplateColumns: `minmax(300px, ${reviewSplit}px) 12px minmax(320px, 1fr)` } : undefined}
       >
-        <div className="ac-table-wrap">
+        <div className="ui-card ot-table-card ac-table-wrap">
           {loading ? (
             <Spinner label="Loading claims…" />
           ) : (
-            <table className="ac-table">
+            <table className="ui-table ac-table">
               <thead>
                 <tr>
-                  <th style={{ width: 40, padding: '10px 8px 10px 16px' }}>
+                  <th className="ot-check">
                     <input type="checkbox"
-                      className="ac-checkbox"
+                      className="ot-checkbox"
                       checked={allFilteredSelected}
                       onChange={() => toggleSelectAll(filteredIds)}
+                      aria-label="Select all claims"
                     />
                   </th>
-                  {isCol('receipt') && <th style={{ width: 50 }}>Receipt</th>}
-                  <ThCol label="User" />
-                  {isCol('validation') && <ThCol label="Validation" />}
-                  {isCol('reward')    && <ThCol label="Reward / Type" />}
-                  {isCol('cups')      && <ThCol label="Cups" sortable field="cups_redeemed" />}
-                  {isCol('amount')    && <ThCol label="Amount" sortable field="payout_amount" />}
-                  {isCol('tikkie')    && <ThCol label="Tikkie status" />}
-                  <ThCol label="Date" sortable field="created_at" />
-                  {isCol('review')    && <ThCol label="Review" sortable field="status" />}
-                  {isCol('decided_by') && <ThCol label="Decided by" />}
+                  {isCol('receipt') && <th style={{ width: 52 }}>Receipt</th>}
+                  <th>User</th>
+                  {isCol('validation') && <th>Validation</th>}
+                  {isCol('reward')    && <th>Reward / Type</th>}
+                  {isCol('cups')      && <SortTh label="Cups" field="cups_redeemed" sort={sort} onSort={handleSort} className="ot-center" />}
+                  {isCol('amount')    && <SortTh label="Amount" field="payout_amount" sort={sort} onSort={handleSort} />}
+                  {isCol('tikkie')    && <th>Tikkie status</th>}
+                  <SortTh label="Date" field="created_at" sort={sort} onSort={handleSort} />
+                  {isCol('review')    && <SortTh label="Review" field="status" sort={sort} onSort={handleSort} />}
+                  {isCol('decided_by') && <th>Decided by</th>}
                 </tr>
               </thead>
               <tbody>
@@ -899,37 +848,23 @@ export default function AdminClaims({ onNavigate, draftState }) {
                   // 3 fixed cols (checkbox, User, Date) + the toggleable ones
                   // still on. (Actions column removed — approve/reject now live
                   // in the review panel only.)
-                  <tr><td colSpan={3 + visibleCols.size} className="ac-table__empty">
+                  <tr className="ac-empty-row"><td colSpan={3 + visibleCols.size}>
                     {claims.length === 0 ? (
                       <EmptyState
-                        icon={
-                          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="16" y1="13" x2="8" y2="13" />
-                            <line x1="16" y1="17" x2="8" y2="17" />
-                          </svg>
-                        }
+                        icon={FileText}
                         title="No claims yet"
-                        body="Claims arrive here when customers submit a cashback receipt or cash-out request. You'll review the AI verdict + the photo before approving payout."
-                        tone="action"
-                        secondaryAction={{ label: 'See how claims work', onClick: () => onNavigate?.('support') }}
-                      />
+                        action={<Button variant="outline" size="sm" onClick={() => onNavigate?.('support')}>See how claims work</Button>}
+                      >
+                        Claims arrive here when customers submit a cashback receipt or cash-out request. You’ll review the AI verdict and the photo before approving the payout.
+                      </EmptyState>
                     ) : (
                       <EmptyState
-                        icon={
-                          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="11" cy="11" r="8" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                          </svg>
-                        }
+                        icon={Search}
                         title="No claims match these filters"
-                        body={`${claims.length} claim${claims.length === 1 ? '' : 's'} in total — broaden the status or clear the search.`}
-                        secondaryAction={{
-                          label: 'Reset filters',
-                          onClick: () => { setStatus('all'); setSearch(''); },
-                        }}
-                      />
+                        action={<Button variant="outline" size="sm" onClick={() => { setStatus('all'); setSearch(''); }}>Reset filters</Button>}
+                      >
+                        {`${claims.length} claim${claims.length === 1 ? '' : 's'} in total. Broaden the status or clear the search.`}
+                      </EmptyState>
                     )}
                   </td></tr>
                 ) : filtered.map(claim => {
@@ -939,10 +874,10 @@ export default function AdminClaims({ onNavigate, draftState }) {
                     <tr
                       key={claim.id}
                       className={[
-                        'ac-table__row',
-                        selected.has(claim.id) ? 'ac-table__row--selected' : '',
-                        viewMode === 'review' && selectedId === claim.id ? 'ac-table__row--active' : '',
-                        claim.flagged ? 'ac-table__row--flagged' : '',
+                        'ot-row',
+                        selected.has(claim.id) ? 'ot-row--selected' : '',
+                        viewMode === 'review' && selectedId === claim.id ? 'ot-row--active' : '',
+                        claim.flagged ? 'ot-row--flag' : '',
                       ].filter(Boolean).join(' ')}
                       onClick={() => {
                         // Re-clicking the highlighted row returns to the table.
@@ -954,28 +889,27 @@ export default function AdminClaims({ onNavigate, draftState }) {
                           setViewMode('review');
                         }
                       }}
-                      style={{ cursor: 'pointer' }}
+                      title={claim.flagged ? 'Marked for a second look' : undefined}
                     >
-                      <td style={{ padding: '0 8px 0 16px' }} onClick={e => e.stopPropagation()}>
+                      <td className="ot-check" onClick={e => e.stopPropagation()}>
                         <input type="checkbox"
-                          className="ac-checkbox"
+                          className="ot-checkbox"
                           checked={selected.has(claim.id)}
                           onChange={() => toggleSelect(claim.id)}
+                          aria-label="Select claim"
                         />
                       </td>
                       {isCol('receipt') && (
-                        <td style={{ padding: '6px 8px 6px 0' }}>
+                        <td className="ac-thumb-cell">
                           <ReceiptThumb claim={claim} onZoom={setLightboxSrc} />
                         </td>
                       )}
                       <td>
-                        <div className="ac-user-cell">
-                          <div className="ac-user-avatar">
-                            {(claim.user?.display_name || '?')[0].toUpperCase()}
-                          </div>
-                          <div className="ac-user-info">
-                            <span className="ac-user-name">{claim.user?.display_name || 'Unknown'}</span>
-                            <span className="ac-user-email" onClick={e => e.stopPropagation()}>
+                        <div className="ot-person">
+                          <Avatar name={claim.user?.display_name} seed={claim.user_id || claim.user?.email || claim.id} size={30} />
+                          <div className="ot-person__text">
+                            <span className="ot-person__name ac-user-name">{claim.user?.display_name || 'Unknown'}</span>
+                            <span className="ot-person__sub" onClick={e => e.stopPropagation()}>
                               {claim.user?.email
                                 ? <PiiMask type="email" value={claim.user.email} targetType="claim" targetId={claim.id} inline />
                                 : '—'}
@@ -983,10 +917,8 @@ export default function AdminClaims({ onNavigate, draftState }) {
                           </div>
                         </div>
                       </td>
-                      {/* Validation column — combines the old "AI check"
-                       *  chip with the validation half of the old
-                       *  three-pill status cluster. Click opens the
-                       *  full AI verdict modal. */}
+                      {/* Validation column — the AI check verdict. Click opens
+                       *  the full AI verdict dialog. */}
                       {isCol('validation') && (
                         <td onClick={e => e.stopPropagation()}>
                           <ReceiptChip claim={claim} onClick={setVerdictOpenClaim} />
@@ -995,29 +927,30 @@ export default function AdminClaims({ onNavigate, draftState }) {
                       {isCol('reward') && (
                         <td>
                           {claim.type === 'direct_refund' ? (
-                            <span className="ac-type-badge ac-type-badge--direct_refund">Direct Refund</span>
+                            <Badge tone="primary">Direct refund</Badge>
                           ) : claim.type === 'voucher' ? (
                             <span className="ac-voucher-cell">
-                              <span className="ac-type-badge ac-type-badge--voucher">Slider voucher</span>
+                              <Badge tone="success">Slider voucher</Badge>
                               {rewardObj
-                                ? <button className="ac-reward-link" onClick={e => { e.stopPropagation(); onNavigate?.('rewards'); }} title="Go to reward">{rewardName}</button>
-                                : <span className="ac-muted">{rewardName}</span>}
+                                ? <button type="button" className="ot-link ac-reward-link" onClick={e => { e.stopPropagation(); onNavigate?.('rewards'); }} title="Go to reward">{rewardName}</button>
+                                : <span className="ot-muted ac-reward-name">{rewardName}</span>}
                             </span>
                           ) : rewardObj ? (
                             <button
-                              className="ac-reward-link"
+                              type="button"
+                              className="ot-link ac-reward-link"
                               onClick={e => { e.stopPropagation(); onNavigate?.('rewards'); }}
                               title="Go to reward"
                             >
                               {rewardName}
                             </button>
                           ) : (
-                            <span className="ac-muted">{rewardName}</span>
+                            <span className="ot-muted ac-reward-name">{rewardName}</span>
                           )}
                         </td>
                       )}
-                      {isCol('cups')   && <td className="ac-center ac-bold">{claim.cups_redeemed ?? '—'}</td>}
-                      {isCol('amount') && <td className="ac-bold">{money(claim.payout_amount || 0)}</td>}
+                      {isCol('cups')   && <td className="ot-center ot-num">{claim.cups_redeemed ?? '—'}</td>}
+                      {isCol('amount') && <td className="ot-num">{money(claim.payout_amount || 0)}</td>}
                       {isCol('tikkie') && (
                         <td onClick={e => e.stopPropagation()}>
                           {(() => {
@@ -1027,8 +960,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                             if (meta.plain) {
                               return (
                                 <span
-                                  className="ac-tikkie-status ac-tikkie-status--plain"
-                                  style={{ background: meta.bg, color: meta.color }}
+                                  className={`ui-badge ui-badge--${meta.tone}`}
                                   title="Redeemed at the counter — no payout link is involved"
                                 >
                                   {meta.label}
@@ -1038,8 +970,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                             return (
                               <button
                                 type="button"
-                                className="ac-tikkie-status"
-                                style={{ background: meta.bg, color: meta.color }}
+                                className={`ui-badge ui-badge--${meta.tone} ot-badge-btn`}
                                 onClick={() => setTikkieModal(claim)}
                                 title="View the Tikkie link status timeline"
                               >
@@ -1049,13 +980,13 @@ export default function AdminClaims({ onNavigate, draftState }) {
                           })()}
                         </td>
                       )}
-                      <td className="ac-muted ac-date">{formatDate(claim.created_at)}</td>
+                      <td className="ot-date">{formatDate(claim.created_at)}</td>
                       {isCol('review') && <td><ClaimStatusPill kind="review" claim={claim} /></td>}
                       {isCol('decided_by') && (
                         <td>
                           {claim.approver ? (
                             <span className="ac-approver" title={`${claim.approver.email}\n${claim.approved_at ? new Date(claim.approved_at).toLocaleString('en-GB') : ''}`}>
-                              <span className="ac-approver__avatar" style={{ background: claim.approver.color || '#FD6F46' }}>
+                              <span className="ac-approver__avatar" style={{ background: claim.approver.color || 'var(--ui-primary)' }}>
                                 {claim.approver.avatar_url
                                   ? <img src={claim.approver.avatar_url} alt="" />
                                   : (claim.approver.display_name || claim.approver.email)[0].toUpperCase()}
@@ -1065,7 +996,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
                               </span>
                             </span>
                           ) : (
-                            <span className="ac-muted">—</span>
+                            <span className="ot-faint">—</span>
                           )}
                         </td>
                       )}
@@ -1078,21 +1009,15 @@ export default function AdminClaims({ onNavigate, draftState }) {
         </div>
 
         {/* Right-hand review panel — only rendered in "review" view mode.
-         *  Reuses the styles + structure from the old standalone Receipt
-         *  Check tab, but the selected claim state is shared with the
-         *  same approve/reject handlers used by the table view. */}
+         *  The selected claim state is shared with the same approve/reject
+         *  handlers used by the table view. */}
         {viewMode === 'review' && (
-          <div
+          <SplitHandle
             className="ac-resizer"
             onMouseDown={startSplitDrag}
             onDoubleClick={() => setReviewSplit(560)}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Drag to resize the table and review panel"
-            title="Drag to resize · double-click to reset"
-          >
-            <span className="ac-resizer__grip" aria-hidden="true" />
-          </div>
+            label="Drag to resize the table and review panel"
+          />
         )}
 
         {viewMode === 'review' && (
@@ -1115,9 +1040,7 @@ export default function AdminClaims({ onNavigate, draftState }) {
       {verdictOpenClaim && (
         <AiVerdictModal claim={verdictOpenClaim} onClose={() => setVerdictOpenClaim(null)} />
       )}
-      {lightboxSrc && (
-        <ReceiptLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
-      )}
+      <Lightbox src={lightboxSrc} alt="Receipt enlarged" onClose={() => setLightboxSrc(null)} />
 
       {bulkConfirm && (
         <BulkConfirmModal
@@ -1154,11 +1077,11 @@ export default function AdminClaims({ onNavigate, draftState }) {
  * collects the cash, or EXPIRED if the validity window passes first. Our claim
  * mirrors this in `tikkie_status`. No link (claim not approved) → empty cell. */
 const TIKKIE_STATUS_META = {
-  waiting:  { label: 'Waiting for approval', color: '#8A8175', bg: '#F1EBDF' },
-  created:  { label: 'Created',  color: '#A85320', bg: '#FBEEDA' },
-  redeemed: { label: 'Redeemed', color: '#1A8737', bg: '#DFF5E3' },
-  expired:  { label: 'Expired',  color: '#B4463E', bg: '#FBE7E1' },
-  failed:   { label: 'Link failed — retry', color: '#B4463E', bg: '#FBE7E1' },
+  waiting:  { label: 'Awaiting approval', tone: 'neutral' },
+  created:  { label: 'Created',  tone: 'info' },
+  redeemed: { label: 'Redeemed', tone: 'success' },
+  expired:  { label: 'Expired',  tone: 'danger' },
+  failed:   { label: 'Link failed — retry', tone: 'danger' },
 };
 
 function tikkieStatusOf(claim) {
@@ -1167,7 +1090,7 @@ function tikkieStatusOf(claim) {
    * cell. `plain` marks it as a statement of fact, not a clickable
    * timeline (there is no link history to open). */
   if (claim?.type === 'voucher') {
-    return { label: 'Settled at counter', color: '#1A8737', bg: '#DFF5E3', plain: true };
+    return { label: 'Settled at counter', tone: 'success', plain: true };
   }
   // Only cashback/refund claims pay via Tikkie; donations etc. show nothing.
   const paysViaTikkie = claim?.type === 'cashback' || claim?.type === 'direct_refund';
@@ -1254,7 +1177,7 @@ function TikkieStatusModal({ claim, onClose, onRefreshed }) {
   const steps = [
     {
       key: 'created', title: 'Link created', at: createdAt, done: true, current: !redeemed && !expired,
-      sub: 'We minted a Tikkie cashback link and sent it to the customer.',
+      sub: 'We created a Tikkie cashback link and sent it to the customer.',
     },
     redeemed
       ? { key: 'redeemed', title: 'Redeemed', at: redeemedAt, done: true, current: true, tone: 'good',
@@ -1266,66 +1189,63 @@ function TikkieStatusModal({ claim, onClose, onRefreshed }) {
             sub: 'Waiting for the customer to open the Tikkie link.' },
   ];
 
-  return createPortal(
-    <div className="ac-tk-overlay" onClick={onClose}>
-      <div className="ac-tk-modal" onClick={e => e.stopPropagation()}>
-        <div className="ac-tk-head">
-          <span className="ac-tk-title">Tikkie link status</span>
-          <button className="ac-tk-close" onClick={onClose} aria-label="Close">×</button>
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Tikkie link status"
+      subtitle="Where this claim’s payout link is: created, collected or expired."
+      icon={Link2}
+      iconTone={redeemed ? 'emerald' : expired || mintFailed ? 'rose' : 'violet'}
+    >
+      <ol className="ac-tk-timeline">
+        {steps.map(st => (
+          <li
+            key={st.key}
+            className={`ac-tk-step${st.done ? ' is-done' : ''}${st.current ? ' is-current' : ''}${st.tone ? ` is-${st.tone}` : ''}`}
+          >
+            <span className="ac-tk-dot" />
+            <div className="ac-tk-body">
+              <span className="ac-tk-step-title">
+                {st.title}{st.at ? <span className="ac-tk-at"> · {st.at}</span> : null}
+              </span>
+              <span className="ac-tk-step-sub">{st.sub}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      {claim.tikkie_url ? (
+        <a className="ui-btn ui-btn--primary ui-btn--lg ui-btn--block" href={claim.tikkie_url} target="_blank" rel="noopener noreferrer">
+          Open Tikkie link
+          <ExternalLink size={15} aria-hidden="true" />
+        </a>
+      ) : mintFailed ? (
+        <>
+          {claim.tikkie_last_error && (
+            <div className="ac-tk-error" role="alert">
+              <strong>Tikkie could not create the link:</strong> {claim.tikkie_last_error}
+              {claim.tikkie_last_error_at ? <span className="ac-tk-error-at"> · {fmtWhen(claim.tikkie_last_error_at)}</span> : null}
+            </div>
+          )}
+          <Button variant="primary" size="lg" block icon={Link2} onClick={handleMint} disabled={busy}>
+            {busy ? 'Creating…' : 'Create Tikkie link'}
+          </Button>
+          {msg && <p className="ac-tk-nolink">{msg}</p>}
+        </>
+      ) : (
+        <p className="ac-tk-nolink">No Tikkie link yet — approve the claim to create one.</p>
+      )}
+
+      {claim.tikkie_cashback_id && (
+        <div className="ac-tk-refresh-row">
+          <Button variant="outline" size="sm" icon={RefreshCw} onClick={handleRefresh} disabled={busy}>
+            {busy ? 'Checking…' : 'Refresh status'}
+          </Button>
+          {msg && <span className="ac-tk-refresh-msg">{msg}</span>}
         </div>
-
-        <ol className="ac-tk-timeline">
-          {steps.map(st => (
-            <li
-              key={st.key}
-              className={`ac-tk-step${st.done ? ' is-done' : ''}${st.current ? ' is-current' : ''}${st.tone ? ` is-${st.tone}` : ''}`}
-            >
-              <span className="ac-tk-dot" />
-              <div className="ac-tk-body">
-                <span className="ac-tk-step-title">
-                  {st.title}{st.at ? <span className="ac-tk-at"> · {st.at}</span> : null}
-                </span>
-                <span className="ac-tk-step-sub">{st.sub}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        {claim.tikkie_url ? (
-          <a className="ac-tk-link" href={claim.tikkie_url} target="_blank" rel="noopener noreferrer">
-            Open Tikkie link
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-          </a>
-        ) : mintFailed ? (
-          <>
-            {claim.tikkie_last_error && (
-              <div className="ac-tk-error">
-                <strong>Tikkie could not create the link:</strong> {claim.tikkie_last_error}
-                {claim.tikkie_last_error_at ? <span className="ac-tk-error-at"> · {fmtWhen(claim.tikkie_last_error_at)}</span> : null}
-              </div>
-            )}
-            <button className="ac-tk-link ac-tk-link--btn" onClick={handleMint} disabled={busy}>
-              {busy ? 'Creating…' : 'Create Tikkie link'}
-            </button>
-            {msg && <p className="ac-tk-nolink">{msg}</p>}
-          </>
-        ) : (
-          <p className="ac-tk-nolink">No Tikkie link yet — approve the claim to mint one.</p>
-        )}
-
-        {claim.tikkie_cashback_id && (
-          <div className="ac-tk-refresh-row">
-            <button className="ac-tk-refresh" onClick={handleRefresh} disabled={busy}>
-              {busy ? 'Checking…' : 'Refresh status'}
-            </button>
-            {msg && <span className="ac-tk-refresh-msg">{msg}</span>}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body,
+      )}
+    </Modal>
   );
 }
 
@@ -1351,63 +1271,58 @@ function BulkConfirmModal({ newStatus, claims, updating, onCancel, onConfirm }) 
   const previewNames = claims.slice(0, 5).map(c => c.user?.display_name || c.user?.email?.split('@')[0] || 'Unknown');
 
   return (
-    <div className="admin-publish-overlay" onClick={onCancel}>
-      <div className="admin-publish-modal admin-publish-modal--wide" onClick={e => e.stopPropagation()}>
-        <div className="admin-publish-modal__header">
-          <div
-            className="admin-publish-modal__icon"
-            style={isReject
-              ? { background: 'rgba(220,38,38,0.10)', color: '#DC2626' }
-              : { background: 'rgba(22,163,74,0.12)', color: '#16A34A' }}
+    <Modal
+      open
+      onClose={onCancel}
+      title={isReject
+        ? `Reject ${claims.length} claim${claims.length === 1 ? '' : 's'}?`
+        : `Approve ${claims.length} claim${claims.length === 1 ? '' : 's'}?`}
+      subtitle={isReject
+        ? <>The customers' reserved cups stay reserved — they can submit fresh receipts. No payouts will be sent.</>
+        : <>Releases <strong>{money(totalPayout)}</strong> in payouts across the selected claims. This action can't be reversed in bulk.</>}
+      icon={isReject ? X : Check}
+      iconTone={isReject ? 'rose' : 'emerald'}
+      footer={(
+        <>
+          <Button variant="outline" onClick={onCancel} disabled={updating}>
+            Cancel
+          </Button>
+          <Button
+            variant={isReject ? 'danger' : 'primary'}
+            onClick={() => onConfirm(reason.trim())}
+            disabled={!canSubmit || updating}
+            title={!canSubmit ? 'Describe why you\'re actioning all of these in bulk' : ''}
           >
-            {isReject ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+            {updating
+              ? (isReject ? 'Rejecting…' : 'Approving…')
+              : isReject ? `Reject ${claims.length}` : `Approve ${claims.length} & pay`}
+          </Button>
+        </>
+      )}
+    >
+      {previewNames.length > 0 && (
+        <div className="ac-affect">
+          <p className="ac-affect__title">Affecting</p>
+          <ul className="ac-affect__list">
+            {previewNames.map((name, i) => (
+              <li key={i} className="ac-affect__row">
+                <span className="ac-affect__name">{name}</span>
+                <span className="ac-affect__detail">
+                  <span className="ac-affect__type">{claims[i].type?.replace('_', ' ')}</span> · {money(claims[i].payout_amount || 0)}
+                </span>
+              </li>
+            ))}
+            {claims.length > previewNames.length && (
+              <li className="ac-affect__more">+ {claims.length - previewNames.length} more</li>
             )}
-          </div>
-          <div>
-            <h3 className="admin-publish-modal__title">
-              {isReject
-                ? `Reject ${claims.length} claim${claims.length === 1 ? '' : 's'}?`
-                : `Approve ${claims.length} claim${claims.length === 1 ? '' : 's'}?`}
-            </h3>
-            <p className="admin-publish-modal__sub">
-              {isReject
-                ? <>The customers' reserved cups stay reserved — they can submit fresh receipts. No payouts will be sent.</>
-                : <>Releases <strong>{money(totalPayout)}</strong> in payouts across the selected claims. This action can't be reversed in bulk.</>
-              }
-            </p>
-          </div>
+          </ul>
         </div>
+      )}
 
-        {previewNames.length > 0 && (
-          <div className="wd-diff" style={{ margin: '0 0 14px' }}>
-            <div className="wd-diff__title">Affecting</div>
-            <ul className="wd-diff__list" style={{ maxHeight: 140 }}>
-              {previewNames.map((name, i) => (
-                <li key={i} className="wd-diff__row" style={{ gridTemplateColumns: '1fr auto' }}>
-                  <span className="wd-diff__label">{name}</span>
-                  <span className="wd-diff__detail">
-                    {claims[i].type?.replace('_', ' ')} · {money(claims[i].payout_amount || 0)}
-                  </span>
-                </li>
-              ))}
-              {claims.length > previewNames.length && (
-                <li className="wd-diff__more">+ {claims.length - previewNames.length} more</li>
-              )}
-            </ul>
-          </div>
-        )}
-
-        <label className="admin-publish-modal__label">Reason (required)</label>
+      <Field label="Reason (required)" htmlFor="ac-bulk-reason" hint="Saved on every claim and in the activity log.">
         <input
-          className="admin-publish-modal__input"
+          id="ac-bulk-reason"
+          className="ui-input"
           placeholder={isReject
             ? 'e.g. Receipts older than the 30-day claim window'
             : 'e.g. Manual review of 3 borderline cases — all check out'}
@@ -1415,24 +1330,7 @@ function BulkConfirmModal({ newStatus, claims, updating, onCancel, onConfirm }) 
           onChange={e => setReason(e.target.value)}
           autoFocus
         />
-
-        <div className="admin-publish-modal__actions">
-          <button className="admin-publish-modal__cancel" onClick={onCancel} disabled={updating}>
-            Cancel
-          </button>
-          <button
-            className="admin-publish-modal__confirm"
-            onClick={() => onConfirm(reason.trim())}
-            disabled={!canSubmit || updating}
-            style={isReject ? { background: '#DC2626' } : { background: '#16A34A' }}
-            title={!canSubmit ? 'Describe why you\'re actioning all of these in bulk' : ''}
-          >
-            {updating
-              ? (isReject ? 'Rejecting…' : 'Approving…')
-              : isReject ? `Reject ${claims.length} →` : `Approve ${claims.length} & pay →`}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Field>
+    </Modal>
   );
 }

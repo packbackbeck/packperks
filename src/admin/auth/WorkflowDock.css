@@ -1,20 +1,4 @@
-/* Top-right workflow dock — Framer-style static row.
- *
- * The earlier design expanded on hover, which jostled the search bar
- * next to it every time the cursor brushed past. The new dock is a
- * fixed row of icon buttons + a labelled Preview + a highlighted
- * Publish. No width animation, no contextual cycling — just the same
- * five actions in the same place at all times. Predictable beats
- * clever in chrome that's always on screen.
- *
- * Layout (left-to-right):
- *   [ ? ] [ ⟲ ] [ Preview ] [ Publish ]
- *
- *   .wd          — the row container
- *   .wd-icon     — icon-only ghost button (support, history)
- *   .wd-preview  — labelled ghost button (Preview)
- *   .wd-publish  — highlighted primary button (Publish)
- */
+/* Top-right workflow dock: Preview and Publish. */
 
 .wd {
   display: inline-flex;
@@ -22,7 +6,6 @@
   gap: 6px;
 }
 
-.wd-icon,
 .wd-preview,
 .wd-publish {
   display: inline-flex;
@@ -39,15 +22,7 @@
   white-space: nowrap;
   transition: background-color 0.14s, color 0.14s, border-color 0.14s, box-shadow 0.14s, transform 0.08s;
 }
-.wd-icon:active, .wd-preview:active, .wd-publish:active { transform: translateY(1px); }
-
-.wd-icon {
-  width: 34px;
-  padding: 0;
-  background: transparent;
-  color: var(--ui-muted, #676374);
-}
-.wd-icon:hover { background: #fff; color: var(--ui-fg, #17151F); border-color: var(--ui-border, #E7E5EE); }
+.wd-preview:active, .wd-publish:active { transform: translateY(1px); }
 
 .wd-preview {
   padding: 0 13px;
@@ -90,40 +65,35 @@
 /* P-34: publish-diff block inside the publish modal. Goes between the
  * modal header and the change-summary input so the admin reads
  * "what's about to ship" before they type their commit message. */
-.admin-publish-modal--wide { max-width: 580px; }
 
 .wd-diff {
-  margin: 14px 0 8px;
-  padding: 12px 14px;
-  background: #F8F4EC;
-  border: 1px solid #E5DECF;
-  border-radius: 10px;
+  margin: 4px 0 16px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-soft);
 }
 
 .wd-diff__title {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #6B645B;
   margin-bottom: 8px;
+  color: var(--ui-muted-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
 }
 
-.wd-diff__empty {
-  font-size: 12.5px;
-  color: #8A857F;
-  font-style: italic;
-}
+.wd-diff__empty { font-size: 12.5px; color: var(--ui-muted); }
 
 .wd-diff__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
   max-height: 220px;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
+  list-style: none;
 }
 
 .wd-diff__row {
@@ -131,9 +101,10 @@
   grid-template-columns: 70px 1fr auto;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
-  background: #FFFFFF;
-  border-radius: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-card);
   font-size: 12px;
 }
 
@@ -143,36 +114,31 @@
   justify-content: center;
   padding: 2px 7px;
   border-radius: 999px;
-  font-size: 9.5px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
-.wd-diff__kind--settings { background: rgba(83, 51, 165, 0.10);  color: var(--pb-purple-600); }
-.wd-diff__kind--added    { background: rgba(74, 222, 128, 0.14); color: #16A34A; }
-.wd-diff__kind--changed  { background: rgba(214, 149, 0, 0.14);  color: #7C5A00; }
-.wd-diff__kind--removed  { background: rgba(220, 38, 38, 0.10);  color: #C73E1D; }
+.wd-diff__kind--settings { background: var(--ui-primary-soft); color: var(--ui-primary); }
+.wd-diff__kind--added    { background: var(--ui-success-soft); color: var(--ui-success); }
+.wd-diff__kind--changed  { background: var(--ui-warning-soft); color: var(--ui-warning); }
+.wd-diff__kind--removed  { background: var(--ui-danger-soft); color: var(--ui-danger); }
 
-.wd-diff__label { font-weight: 700; color: #1A1A1A; }
+.wd-diff__label { font-weight: 600; color: var(--ui-fg); }
 
 .wd-diff__values {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 11px;
-  color: #4A4540;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-}
-.wd-diff__from  { color: #C73E1D; text-decoration: line-through; }
-.wd-diff__to    { color: #16A34A; font-weight: 700; }
-.wd-diff__arrow { color: #6C6259; }
-.wd-diff__detail { color: #6C6259; font-size: 11px; }
-
-.wd-diff__more {
-  text-align: center;
+  gap: 6px;
+  color: var(--ui-fg-2);
+  font-family: var(--ui-mono);
   font-size: 11px;
-  color: #8A857F;
-  padding-top: 4px;
 }
+.wd-diff__from  { color: var(--ui-danger); text-decoration: line-through; }
+.wd-diff__to    { color: var(--ui-success); font-weight: 700; }
+.wd-diff__arrow { color: var(--ui-muted-2); }
+.wd-diff__detail { color: var(--ui-muted); font-size: 11px; }
+
+.wd-diff__more { padding-top: 4px; text-align: center; font-size: 11px; color: var(--ui-muted); }

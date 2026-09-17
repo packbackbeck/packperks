@@ -21,7 +21,7 @@ The dashboard now follows PackPulse's layout and access model.
   top and the account at the bottom. The top bar has a new programme badge, and
   a green cashback/refund badge where the settings gear used to be.
 - **Sign-in page** in PackPulse's layout: the form on the left, a dark panel
-  with the pulse animation and screenshots of the dashboard and the phone app
+  with an animation and screenshots of the dashboard and the phone app
   (`src/assets/images/login/`).
 - **Roles (migration `048`, applied).** Three levels: master, manager, vendor.
   Roles live in `admin_roles`, with hidden/view/edit per tab; accounts carry
@@ -42,6 +42,48 @@ The dashboard now follows PackPulse's layout and access model.
 - `activeGroupId` was missing from the organisation context. The old
   Settings page therefore never showed the group switches and never locked
   the programme for grouped venues.
+
+### 1b. Dashboard redesign, second round (17 Sep, later)
+
+- **Sign-in page:** a PackPerks animation replaces the PackPulse pulse:
+  cups circle a wallet, drop into smart bins, and coins fill a reward ring
+  (`auth/login/ReturnLoopCanvas.jsx`). The white edge around the dashboard
+  screenshot is gone, the headline is one line and the paragraph two.
+- **Top bar:** Version history and Contact support are gone from it. The
+  time zone reads "AMS UTC+2". Masters choose what it shows in Master
+  Settings → Workspace (`workspace:topbar`). The publish dialog is a shared
+  `Modal` now; inside the top bar it was clipped by the bar's blur.
+- **Sidebar:** MockupMaster and PackPulse are links at the bottom (tabs with
+  an `href`). Managers don't get them by default; a role can grant them.
+- **Every page is in the new design,** including Reports, Version history,
+  Help, Email templates, Activity log, Users, Claims, Cup scans, transfers,
+  Donations, Rewards, the receipt generators, BYO QR codes, Future vendors,
+  Tikkie payouts, Smart bins, Backup cups and Design & copy (rebuilt: tabs
+  on the left, a sticky phone preview on the right). Quick print is gone
+  from the receipt generator.
+- **Master Settings → Organisations** is rebuilt: lists for organisations,
+  groups and regions, each editing in a side drawer. Removed because nothing
+  read them: the group "Multi-region" switch, the group copy fields "How it
+  works" title, different-store note, scan-success message, cups badge and
+  cash-out label, the organisation's team email domain, and the region's
+  "assign a vendor" picker. Stored values were kept.
+- **Master Settings → Data** (migration `049`, applied) replaces "Delete test
+  data" on System health. A master picks an organisation, a time window and
+  which kinds of record to delete. `admin_purge_org_records` is master-only
+  in the database now as well.
+- **Number tiles:** System health shows its four main tiles; the rest are
+  switches under Customise. Mini graphs show on every number tile unless a
+  master turns them off (Workspace → Number tiles, `workspace:display`).
+  Insights keep the chart's height and scroll inside.
+- **Dashboard:** sections only show for the programmes they have data for
+  (scans by location: Bring Your Own; rewards and the reward budget: not
+  Deferred Tikkie). The reward budget spans the full width.
+- **Fixes on the way:** reloading a Deferred Tikkie page (Email templates)
+  no longer bounces to another page; the Cup Scans report asked for a
+  column that doesn't exist and always came back empty; the new-organisation
+  wizard invited people as masters by default and now invites managers for
+  that organisation only; view-only roles can switch the reward editor's
+  tabs; browser print on the receipt generator printed a blank page.
 
 ### 2. Architecture audit and the fixes that followed (16 Sep)
 
@@ -145,13 +187,26 @@ KFC: `https://perks.packback.network/kfc/`
 
 ## Open items
 
-**Two edge functions are written but not deployed:** `invite-admin` (v3:
-roles and organisation lists, masters only) and `bootstrap-admin` (applies
-them on first sign-in). The deploy was held for approval. Until they are
-live, the dashboard still writes the exact role and organisations onto each
-invitation. But the live `bootstrap-admin` gives a new non-vendor person
-every organisation on first sign-in, so set their organisations in People
-afterwards.
+**Invitations carry roles and organisation lists** since `invite-admin`
+(v20) and `bootstrap-admin` (v21) were deployed on 17 Sep. Nobody has been
+invited through them yet: the first real invitation is the end-to-end test
+(the new person should land with exactly the role and organisations chosen
+in People).
+
+**The weekly digest email still uses the old cream colours**
+(`supabase/functions/send-digest`). The preview in Reports copies the email,
+so change both together if it should match the dashboard.
+
+**Four customer-copy fields in Design & copy aren't shown in the app:** the
+cup balance label, the direct refund button, and the charity name and text
+(the app's donate screen always says Plastic Soup Foundation). The page says
+so.
+
+**`receipts/AdminReceiptCheck.jsx` has no route.** Only its CSS is used, by
+the claim review panel.
+
+**The dashboard has no phone layout.** Below about 900px the sidebar stays
+open and pages scroll sideways.
 
 **Shareable-link invitations don't work end to end.** Sign-in only matches
 invitations by email, and the sign-in page only creates accounts for

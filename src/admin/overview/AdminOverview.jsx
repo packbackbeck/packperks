@@ -11,6 +11,7 @@ import PiiMask from '../shared/PiiMask';
 import { useOrg } from '../context/OrgContext';
 import { useViewRole } from '../context/ViewRole';
 import { useAdminMoney } from '../lib/adminMoney';
+import { resolveEffectiveMode } from '../lib/orgModes';
 import {
   Button, Card, CardBody, CardFoot, CardHeader, EmptyState, InsightsCard, KpiGrid, Menu, MenuLabel,
   PageHeader, PeriodPicker, Switch, TrendCard, fmtInt, periodPhrase, periodRange, useChartSelection, usePersistentState,
@@ -26,16 +27,19 @@ const PAIRS = [
 ];
 
 /* Detail sections under the chart. Their visibility is stored with the
- * dashboard draft (dashboardBlocks), like the old Overview's cards. */
+ * dashboard draft (dashboardBlocks), like the old Overview's cards.
+ * `modes` limits a section to the programmes it has data for: only counter
+ * QR scans (Bring Your Own) carry a location, and Deferred Tikkie venues
+ * have no rewards, so no reward claims or reward budget. */
 const SECTIONS = [
   { id: 'chart-cup-dist', label: 'Where cups go', icon: PieIcon },
-  { id: 'chart-reward-pop', label: 'Most claimed rewards', icon: Gift },
+  { id: 'chart-reward-pop', label: 'Most claimed rewards', icon: Gift, modes: ['standard', 'byo'] },
   { id: 'insight-hourly', label: 'When cups come back', icon: Clock },
   { id: 'insight-devices', label: 'Devices', icon: Smartphone },
   { id: 'insight-top-returners', label: 'Top returners', icon: Trophy, staffOnly: true },
   { id: 'feed-activity', label: 'Recent activity', icon: Activity },
-  { id: 'chart-locations', label: 'Scans by location', icon: MapPin },
-  { id: 'budget', label: 'Reward budget', icon: Coins, staffOnly: true },
+  { id: 'chart-locations', label: 'Scans by location', icon: MapPin, modes: ['byo'] },
+  { id: 'budget', label: 'Reward budget', icon: Coins, staffOnly: true, modes: ['standard', 'byo'] },
 ];
 
 const ACTIVITY = {
@@ -110,7 +114,8 @@ function Legend({ data, total }) {
 export default function AdminOverview({ draftState, onNavigate }) {
   const { money } = useAdminMoney();
   const { isVendorView } = useViewRole();
-  const { activeOrg, scopeOrgIds, statsScope } = useOrg();
+  const { activeOrg, scopeOrgIds, statsScope, activeOrgMode, activeGroupMode } = useOrg();
+  const mode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
   const { draft, updateDraft } = draftState;
   const [period, setPeriod] = usePersistentState('pp-overview:period', '30d');
   const [stats, setStats] = useState(null);
@@ -154,7 +159,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
   }), [stats, metrics, range, draft?.rewards, budget, money, onNavigate, isVendorView]);
 
   const blocks = draft?.dashboardBlocks || [];
-  const sections = SECTIONS.filter(s => !(s.staffOnly && isVendorView));
+  const sections = SECTIONS.filter(s => !(s.staffOnly && isVendorView) && (!s.modes || s.modes.includes(mode)));
   const isVisible = (id) => blocks.find(b => b.id === id)?.visible ?? true;
   const toggleSection = (id) => updateDraft(prev => {
     const list = prev.dashboardBlocks || [];
@@ -198,7 +203,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
           <Menu
             align="right"
             trigger={({ open, toggle }) => (
-              <Button variant="outline" icon={SlidersHorizontal} aria-expanded={open} onClick={toggle}>Customize</Button>
+              <Button variant="outline" icon={SlidersHorizontal} aria-expanded={open} onClick={toggle}>Customise</Button>
             )}
           >
             <MenuLabel>Sections on this page</MenuLabel>
@@ -386,8 +391,8 @@ export default function AdminOverview({ draftState, onNavigate }) {
         )}
 
         {shown('budget') && budget && (
-          <Card>
-            <CardHeader title="Reward budget" icon={Coins} subtitle="The ceiling on cashback committed at this venue." />
+          <Card className="ov-span-2">
+            <CardHeader title="Reward budget" icon={Coins} subtitle="The most cashback this venue will commit to rewards." />
             <CardBody>
               <RewardBudgetMonitor
                 cap={budget.cap}
@@ -404,7 +409,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
       {!sections.some(s => shown(s.id)) && (
         <Card>
           <EmptyState icon={LayoutGrid} title="All sections are hidden">
-            Use Customize at the top to bring them back.
+            Use Customise at the top to bring them back.
           </EmptyState>
         </Card>
       )}
@@ -433,13 +438,13 @@ function LocationShare({ orgIds, depKey }) {
 
   return (
     <Card className="ov-span-2">
-      <CardHeader title="Cup scans by location" icon={MapPin} subtitle="Where cups are collected across this organisation. A cup can be spent at any location." />
+      <CardHeader title="Cup scans by location" icon={MapPin} subtitle="Which counter QR code customers scanned. Cups collected at one location can be spent at any other." />
       <CardBody>
         {loading ? (
           <div className="ov-loc__bar ov-loc__bar--loading" />
         ) : !total ? (
-          <EmptyState icon={MapPin} title="No location-tagged scans yet">
-            Give each counter QR code a location on the BYO QR codes page.
+          <EmptyState icon={MapPin} title="No scans with a location yet">
+            Add your locations in Settings → Locations, then give each counter QR code one.
           </EmptyState>
         ) : (
           <>

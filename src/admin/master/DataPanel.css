@@ -1,0 +1,146 @@
+/* Master Settings → Data. */
+.md-steps { display: flex; flex-direction: column; gap: 22px; padding-top: 6px; }
+.md-step { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
+.md-step > .ui-seg { align-self: flex-start; }
+.md-step__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.md-step__actions { display: flex; gap: 4px; }
+.md-step__title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ui-fg);
+}
+.md-step__n {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.md-step .ms-note { margin: 0; }
+.md-org { width: 420px; max-width: 100%; min-width: 0; }
+
+.md-dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  gap: 12px;
+}
+@media (max-width: 560px) { .md-dates { grid-template-columns: minmax(0, 1fr); width: 100%; } }
+
+.md-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.md-kind {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 11px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-card);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.md-kind:hover { border-color: var(--ui-border-2); }
+.md-kind input {
+  width: 16px;
+  height: 16px;
+  margin: 8px 0 0;
+  accent-color: var(--ui-danger);
+  cursor: pointer;
+}
+.md-kind--on { border-color: rgba(217, 45, 85, 0.4); background: #FFF8FA; }
+.md-kind__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--ui-soft-2);
+  color: var(--ui-muted);
+}
+.md-kind--on .md-kind__icon { background: var(--ui-danger-soft); color: var(--ui-danger); }
+.md-kind__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.md-kind__name { font-size: 13px; font-weight: 600; color: var(--ui-fg); }
+.md-kind__desc { font-size: 12px; line-height: 1.45; color: var(--ui-muted); }
+.md-kind__warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ui-warning);
+}
+.md-kind__warn svg { flex: none; margin-top: 2px; }
+.md-kind__count {
+  padding-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+.md-kind__count--zero { color: var(--ui-muted-2); font-weight: 500; }
+
+.md-done {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 18px;
+  padding: 11px 13px;
+  border: 1px solid var(--ui-success-soft);
+  border-radius: 10px;
+  background: #F2FAF6;
+  color: var(--ui-success);
+}
+.md-done svg { flex: none; margin-top: 1px; }
+.md-done p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ui-fg-2); }
+
+.md-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+.md-foot__summary { font-size: 12.5px; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+
+.md-confirm__intro { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--ui-fg-2); }
+.md-confirm__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 16px;
+  padding: 4px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-soft);
+  list-style: none;
+}
+.md-confirm__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 13px;
+  color: var(--ui-fg);
+}
+.md-confirm__list li + li { border-top: 1px solid var(--ui-border); }

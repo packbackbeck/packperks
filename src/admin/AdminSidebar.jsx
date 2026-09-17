@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PanelLeft, PanelLeftClose } from 'lucide-react';
+import { ArrowUpRight, PanelLeft, PanelLeftClose } from 'lucide-react';
 import OrgSwitcher from './context/OrgSwitcher';
 import ProfileMenu from './auth/ProfileMenu';
 import { getPendingCounts } from './lib/adminApi';
@@ -63,6 +63,22 @@ export default function AdminSidebar({ tabs, activePage, onNavigate, onAddOrg, c
             {!collapsed && <p className="sb__group-label">{g.label}</p>}
             {g.items.map(item => {
               const Icon = item.icon;
+              if (item.href) {
+                return (
+                  <a
+                    key={item.id}
+                    className="sb__item sb__item--link"
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={collapsed ? `${item.label} (opens in a new tab)` : item.description}
+                  >
+                    <span className="sb__item-icon"><Icon size={17} aria-hidden="true" /></span>
+                    {!collapsed && <span className="sb__item-label">{item.label}</span>}
+                    {!collapsed && <ArrowUpRight size={14} className="sb__item-out" aria-label="Opens in a new tab" />}
+                  </a>
+                );
+              }
               const active = activePage === item.id;
               const count = item.badge ? pending[item.badge] || 0 : 0;
               const groupScoped = !!activeGroup && GROUP_SCOPED.has(item.id);

@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle, Eye, EyeOff, Globe2, Hand, Inbox, MapPinOff, Minus, Pencil, Plus, Search, Settings2, Store, Trash2, Trophy, X,
+} from 'lucide-react';
 import { useOrg } from '../context/OrgContext';
 import {
   listOrgGroups,
@@ -10,6 +13,7 @@ import {
   deleteStoreRequest,
 } from '../lib/adminApi';
 import { getNotYetStores } from '../../lib/notYetStores';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Field, KpiTile, Modal, PageHeader, Segmented, Switch } from '../ui';
 import './AdminFutureVendors.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -38,13 +42,6 @@ function fmtWhen(iso) {
   return d.toLocaleDateString();
 }
 const BLANK = { name: '', area: '', lat: '', lng: '', color: '#E4572E', logo_url: '' };
-
-const IconEdit = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" /></svg>
-);
-const IconTrash = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-);
 
 export default function AdminFutureVendors() {
   const { activeGroup } = useOrg();
@@ -76,39 +73,42 @@ export default function AdminFutureVendors() {
   }
 
   return (
-    <div className="afv">
-      <header className="afv__head">
-        <div className="afv__head-main">
-          <h1 className="afv__title">Future vendors</h1>
-          <p className="afv__sub">
-            Nearby places that aren’t on PackPerks yet. They appear as locked “coming soon” cards and map
-            pins on the customer Stores page — customers tap “Request it” to signal demand.
-          </p>
-        </div>
+    <div className="ui-page afv">
+      <PageHeader
+        title="Future vendors"
+        subtitle="Nearby places that aren’t on PackPerks yet. Customers see them as locked “coming soon” cards and map pins on the Stores page, and tap “Request it” to ask for them."
+      >
         {group && (
-          <div className="afv__head-side">
+          <>
             {groups.length > 1 && (
               <label className="afv__groupsel">
                 <span>Group</span>
-                <select value={selectedId || ''} onChange={e => setSelectedId(e.target.value)}>
+                <select className="ui-select" value={selectedId || ''} onChange={e => setSelectedId(e.target.value)}>
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               </label>
             )}
-            <span className="afv__region">{groupRegion(group) === 'UAE' ? 'United Arab Emirates' : 'Netherlands'}</span>
-          </div>
+            <Badge tone="neutral" icon={Globe2}>
+              {groupRegion(group) === 'UAE' ? 'United Arab Emirates' : 'Netherlands'}
+            </Badge>
+          </>
         )}
-      </header>
+      </PageHeader>
 
-      {error && <p className="afv__error">{error}</p>}
+      {error && (
+        <p className="afv__error" role="alert">
+          <AlertCircle size={15} aria-hidden="true" />{error}
+        </p>
+      )}
 
       {loading ? (
         <p className="afv__muted">Loading…</p>
       ) : groups.length === 0 ? (
-        <div className="afv__empty">
-          <p className="afv__empty-title">No groups yet</p>
-          <p className="afv__muted">Future vendors are a group-level feature. Create a group under Organizations first.</p>
-        </div>
+        <Card>
+          <EmptyState icon={Store} title="No groups yet">
+            Future vendors belong to a group of venues. A master can create one in Master Settings → Organisations → Groups.
+          </EmptyState>
+        </Card>
       ) : !group ? (
         <p className="afv__muted">Select a group to manage its future vendors.</p>
       ) : (
@@ -185,155 +185,191 @@ function Manager({ group, busy, showNotYet, threshold, onToggle, onThreshold, on
   };
   const discard = () => { setRows(seed()); setDirty(false); };
 
+  const kpis = [
+    { id: 'vendors', label: 'Vendors', icon: Store, tone: 'violet', value: rows.length, description: 'Coming-soon venues on the list' },
+    { id: 'requests', label: 'Requests', icon: Hand, tone: 'sky', value: stats == null ? '—' : totalReq, description: '“Request it” taps from customers' },
+    { id: 'top', label: 'Most requested', icon: Trophy, tone: 'amber', value: top ? top[0] : '—', description: top ? `${top[1]} request${top[1] === 1 ? '' : 's'}` : 'No requests yet' },
+    {
+      id: 'status',
+      label: 'On the Stores page',
+      icon: showNotYet ? Eye : EyeOff,
+      tone: showNotYet ? 'emerald' : 'slate',
+      value: showNotYet ? 'Showing' : 'Hidden',
+      description: showNotYet ? 'Customers see these venues' : 'Customers see live stores only',
+    },
+  ];
+
   return (
     <div className="afv__body">
       {/* ── At-a-glance ── */}
-      <div className="afv__stats">
-        <div className="afv__stat">
-          <span className="afv__stat-n">{rows.length}</span>
-          <span className="afv__stat-l">Vendors</span>
-        </div>
-        <div className="afv__stat">
-          <span className="afv__stat-n">{stats == null ? '—' : totalReq}</span>
-          <span className="afv__stat-l">Requests</span>
-        </div>
-        <div className="afv__stat afv__stat--wide">
-          <span className="afv__stat-n afv__stat-n--sm" title={top ? top[0] : ''}>{top ? top[0] : '—'}</span>
-          <span className="afv__stat-l">Most requested{top ? ` · ${top[1]}` : ''}</span>
-        </div>
-        <div className={`afv__stat afv__stat--status ${showNotYet ? 'is-live' : 'is-off'}`}>
-          <span className="afv__stat-dot" />
-          <span className="afv__stat-l">{showNotYet ? 'Live on Stores' : 'Hidden'}</span>
-        </div>
+      <div className="ui-kpis afv__kpis">
+        {kpis.map((m, i) => <KpiTile key={m.id} metric={m} index={i} interactive={false} />)}
       </div>
 
       {/* ── Settings ── */}
-      <section className="afv__card">
-        <h2 className="afv__card-title">Settings</h2>
-        <div className="afv__setting">
-          <div className="afv__setting-txt">
-            <strong>Show coming-soon venues</strong>
-            <span>Locked cards &amp; map pins on the customer Stores page for “{group.name}”. When off, customers see only live stores.</span>
+      <Card>
+        <CardHeader title="Settings" icon={Settings2} subtitle={`For every venue in ${group.name}.`} ruled />
+        <CardBody>
+          <div className="afv__setting">
+            <div className="afv__setting-txt">
+              <label className="afv__setting-title" htmlFor="afv-show">Show coming-soon venues</label>
+              <span>Locked cards and map pins on the customer Stores page. When off, customers see only live stores.</span>
+            </div>
+            <Switch
+              id="afv-show"
+              checked={showNotYet}
+              onChange={next => onToggle(next)}
+              disabled={busy}
+              label="Show coming-soon venues"
+            />
           </div>
-          <label className="afv__toggle">
-            <input type="checkbox" checked={showNotYet} onChange={e => onToggle(e.target.checked)} disabled={busy} />
-            <span className="afv__toggle-track"><span className="afv__toggle-thumb" /></span>
-          </label>
-        </div>
-        <div className="afv__setting">
-          <div className="afv__setting-txt">
-            <strong>Request goal</strong>
-            <span>How many “Request it” taps a venue needs before it reads “Coming soon”. Shown as a progress bar on each card.</span>
+          <div className="afv__setting">
+            <div className="afv__setting-txt">
+              <span className="afv__setting-title" id="afv-goal-label">Request goal</span>
+              <span>How many “Request it” taps a venue needs before its card reads “Coming soon”. Each card shows its progress.</span>
+            </div>
+            <ThresholdInput value={threshold} busy={busy} onSave={onThreshold} />
           </div>
-          <ThresholdInput value={threshold} busy={busy} onSave={onThreshold} />
-        </div>
-      </section>
+        </CardBody>
+      </Card>
 
       {/* ── Vendors ── */}
-      <section className="afv__card">
-        <div className="afv__vhead">
-          <h2 className="afv__card-title">Vendors <span className="afv__count">{rows.length}</span></h2>
-          <div className="afv__vtools">
-            <span className="afv__search">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search vendors…" aria-label="Search vendors" />
-            </span>
-            <span className="afv__seg" role="group" aria-label="Sort">
-              <button className={sort === 'requests' ? 'is-on' : ''} onClick={() => setSort('requests')}>Most wanted</button>
-              <button className={sort === 'az' ? 'is-on' : ''} onClick={() => setSort('az')}>A–Z</button>
-            </span>
-            <button className="afv__btn afv__btn--primary" onClick={() => setEditing({ ...BLANK })} disabled={busy}>+ Add vendor</button>
-          </div>
-        </div>
+      <Card>
+        <CardHeader
+          title={<>Vendors <span className="afv__count">{rows.length}</span></>}
+          icon={Store}
+          ruled
+          actions={(
+            <>
+              <span className="afv__search">
+                <Search size={14} aria-hidden="true" />
+                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search vendors" aria-label="Search vendors" />
+                {q && (
+                  <button type="button" className="afv__search-clear" aria-label="Clear search" onClick={() => setQ('')}>
+                    <X size={12} />
+                  </button>
+                )}
+              </span>
+              <Segmented
+                ariaLabel="Sort vendors"
+                value={sort}
+                onChange={setSort}
+                options={[{ id: 'requests', label: 'Most wanted' }, { id: 'az', label: 'A–Z' }]}
+              />
+              <Button variant="primary" icon={Plus} onClick={() => setEditing({ ...BLANK })} disabled={busy}>
+                Add vendor
+              </Button>
+            </>
+          )}
+        />
 
-        {visible.length === 0 ? (
-          <div className="afv__vempty">{q ? 'No vendors match your search.' : 'No vendors yet — add one to get started.'}</div>
-        ) : (
-          <ul className="afv__vlist">
-            {visible.map(r => {
-              const n = reqOf(r.name);
-              const pct = Math.min(100, Math.round((n / threshold) * 100));
-              const reached = n >= threshold;
-              const hasPin = r.lat != null && r.lng != null;
-              return (
-                <li key={r._k} className="afv__vrow">
-                  <span className="afv__vlogo" style={{ background: r.color || '#B0A897' }}>
-                    {r.logo_url
-                      ? <img src={r.logo_url} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} />
-                      : (r.name || 'S').charAt(0).toUpperCase()}
-                  </span>
-                  <div className="afv__vinfo">
-                    <span className="afv__vname">{r.name || 'Untitled venue'}</span>
-                    <span className="afv__vmeta">
-                      {cityFromArea(r.area) || r.area || 'No area'}
-                      {!hasPin && <span className="afv__vwarn" title="No coordinates — this venue won’t show on the map"> · no map pin</span>}
+        <CardBody flush>
+          {visible.length === 0 ? (
+            <EmptyState icon={q ? Search : Store} title={q ? 'No matches' : 'No vendors yet'}>
+              {q ? 'No vendors match your search.' : 'Add one to get started.'}
+            </EmptyState>
+          ) : (
+            <ul className="afv__vlist">
+              {visible.map(r => {
+                const n = reqOf(r.name);
+                const pct = Math.min(100, Math.round((n / threshold) * 100));
+                const reached = n >= threshold;
+                const hasPin = r.lat != null && r.lng != null;
+                return (
+                  <li key={r._k} className="afv__vrow">
+                    <span className="afv__vlogo" style={{ background: r.color || '#B0A897' }}>
+                      {r.logo_url
+                        ? <img src={r.logo_url} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                        : (r.name || 'S').charAt(0).toUpperCase()}
                     </span>
-                  </div>
-                  <div className="afv__vprog" title={`${n} of ${threshold} requests`}>
-                    <div className="afv__vbar"><span className={reached ? 'is-reached' : ''} style={{ width: `${Math.max(reached ? 100 : n ? 6 : 0, pct)}%` }} /></div>
-                    <span className={`afv__vcount${reached ? ' afv__vcount--soon' : ''}`}>{reached ? 'Coming soon' : `${n}/${threshold}`}</span>
-                  </div>
-                  <div className="afv__vactions">
-                    <button className="afv__iconbtn" onClick={() => setEditing(r)} disabled={busy} title="Edit vendor" aria-label="Edit vendor"><IconEdit /></button>
-                    <button className="afv__iconbtn afv__iconbtn--del" onClick={() => removeVendor(r._k)} disabled={busy} title="Remove vendor" aria-label="Remove vendor"><IconTrash /></button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                    <div className="afv__vinfo">
+                      <span className="afv__vname">{r.name || 'Untitled venue'}</span>
+                      <span className="afv__vmeta">
+                        {cityFromArea(r.area) || r.area || 'No area'}
+                        {!hasPin && (
+                          <span className="afv__vwarn" title="No coordinates — this venue won’t show on the map">
+                            <MapPinOff size={12} aria-hidden="true" /> no map pin
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="afv__vprog" title={`${n} of ${threshold} requests`}>
+                      <div className="ui-bar afv__vbar">
+                        <span
+                          className={`ui-bar__fill${reached ? ' afv__vbar--reached' : ''}`}
+                          style={{ display: 'block', width: `${Math.max(reached ? 100 : n ? 6 : 0, pct)}%` }}
+                        />
+                      </div>
+                      <span className={`afv__vcount${reached ? ' afv__vcount--soon' : ''}`}>{reached ? 'Coming soon' : `${n} of ${threshold}`}</span>
+                    </div>
+                    <div className="afv__vactions">
+                      <Button variant="ghost" size="sm" icon={Pencil} onClick={() => setEditing(r)} disabled={busy} title="Edit vendor" aria-label={`Edit ${r.name || 'vendor'}`} />
+                      <Button variant="danger-ghost" size="sm" icon={Trash2} onClick={() => removeVendor(r._k)} disabled={busy} title="Remove vendor" aria-label={`Remove ${r.name || 'vendor'}`} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
 
       {/* ── Customer requests — free-text "Haven't found your store?" intake ── */}
-      <section className="afv__card">
-        <div className="afv__vhead afv__vhead--stack">
-          <h2 className="afv__card-title">
-            Customer requests
-            {requests?.length ? <span className="afv__count">{requests.length}</span> : null}
-          </h2>
-          <p className="afv__reqsub">Stores customers typed in themselves on the market page — not on your list yet.</p>
-        </div>
-        {requests == null ? (
-          <div className="afv__vempty">Loading…</div>
-        ) : requests.length === 0 ? (
-          <div className="afv__vempty">No customer requests yet.</div>
-        ) : (
-          <ul className="afv__reqlist">
-            {requests.map(r => (
-              <li key={r.name.toLowerCase()} className="afv__reqrow">
-                {r.count > 1 && <span className="afv__reqcount" title={`Requested ${r.count} times`}>{r.count}×</span>}
-                <div className="afv__reqinfo">
-                  <span className="afv__reqname">{r.name}</span>
-                  <span className="afv__reqmeta">Last requested {fmtWhen(r.lastAt)}</span>
-                </div>
-                <button
-                  className="afv__btn afv__btn--ghost afv__btn--sm"
-                  onClick={() => setEditing({ ...BLANK, name: r.name })}
-                  disabled={busy}
-                >
-                  Add as vendor
-                </button>
-                <button
-                  className="afv__iconbtn afv__iconbtn--del"
-                  onClick={() => removeRequest(r.name)}
-                  disabled={removing === r.name.toLowerCase()}
-                  title="Delete request"
-                  aria-label={`Delete request for ${r.name}`}
-                >
-                  <IconTrash />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Card>
+        <CardHeader
+          title={<>Customer requests {requests?.length ? <span className="afv__count">{requests.length}</span> : null}</>}
+          icon={Inbox}
+          subtitle="Stores customers typed in themselves on the market page that aren’t on your list yet."
+          ruled
+        />
+        <CardBody flush>
+          {requests == null ? (
+            <p className="afv__muted afv__pad">Loading…</p>
+          ) : requests.length === 0 ? (
+            <EmptyState icon={Inbox} title="No customer requests yet" />
+          ) : (
+            <ul className="afv__vlist">
+              {requests.map(r => (
+                <li key={r.name.toLowerCase()} className="afv__vrow">
+                  <span className={`afv__reqcount${r.count > 1 ? '' : ' afv__reqcount--one'}`} title={`Requested ${r.count} time${r.count === 1 ? '' : 's'}`}>
+                    {r.count}×
+                  </span>
+                  <div className="afv__vinfo">
+                    <span className="afv__vname">{r.name}</span>
+                    <span className="afv__vmeta">Last requested {fmtWhen(r.lastAt)}</span>
+                  </div>
+                  <div className="afv__vactions">
+                    <Button
+                      size="sm"
+                      icon={Plus}
+                      onClick={() => setEditing({ ...BLANK, name: r.name })}
+                      disabled={busy}
+                    >
+                      Add as vendor
+                    </Button>
+                    <Button
+                      variant="danger-ghost"
+                      size="sm"
+                      icon={Trash2}
+                      onClick={() => removeRequest(r.name)}
+                      disabled={removing === r.name.toLowerCase()}
+                      title="Delete request"
+                      aria-label={`Delete request for ${r.name}`}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
 
       {dirty && (
         <div className="afv__savebar" role="status">
           <span className="afv__savebar-txt">You have unsaved vendor changes</span>
           <div className="afv__savebar-actions">
-            <button className="afv__btn afv__btn--ghost" onClick={discard} disabled={busy}>Discard</button>
-            <button className="afv__btn afv__btn--primary" onClick={saveAll} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
+            <Button variant="ghost" className="afv__savebar-ghost" onClick={discard} disabled={busy}>Discard</Button>
+            <Button variant="primary" onClick={saveAll} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</Button>
           </div>
         </div>
       )}
@@ -359,8 +395,8 @@ function ThresholdInput({ value, busy, onSave }) {
     if (n !== value) onSave(n);
   };
   return (
-    <div className="afv__stepper">
-      <button className="afv__stepper-btn" onClick={() => commit(Number(val) - 1)} disabled={busy} aria-label="Decrease">−</button>
+    <div className="afv__stepper" role="group" aria-labelledby="afv-goal-label">
+      <button type="button" className="afv__stepper-btn" onClick={() => commit(Number(val) - 1)} disabled={busy} aria-label="Decrease"><Minus size={15} aria-hidden="true" /></button>
       <input
         type="number" min="1" max="999" value={val}
         onChange={e => setVal(e.target.value)}
@@ -368,7 +404,7 @@ function ThresholdInput({ value, busy, onSave }) {
         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
         disabled={busy} aria-label="Request goal"
       />
-      <button className="afv__stepper-btn" onClick={() => commit(Number(val) + 1)} disabled={busy} aria-label="Increase">+</button>
+      <button type="button" className="afv__stepper-btn" onClick={() => commit(Number(val) + 1)} disabled={busy} aria-label="Increase"><Plus size={15} aria-hidden="true" /></button>
     </div>
   );
 }
@@ -392,67 +428,60 @@ function VendorEditor({ initial, onClose, onSave }) {
     });
   };
   const hex = /^#[0-9a-fA-F]{6}$/.test(v.color) ? v.color : '#B0A897';
+  const isEdit = !!initial._k;
 
   return (
-    <div className="afv__modal-back" onClick={onClose}>
-      <div className="afv__modal" onClick={e => e.stopPropagation()}>
-        <div className="afv__modal-head">
-          <h3>{initial._k ? 'Edit vendor' : 'Add vendor'}</h3>
-          <button className="afv__iconbtn" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-
-        <div className="afv__preview">
-          <span className="afv__vlogo afv__vlogo--lg" style={{ background: hex }}>
-            {v.logo_url ? <img src={v.logo_url} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} /> : (v.name || 'S').charAt(0).toUpperCase()}
-          </span>
-          <div className="afv__preview-txt">
-            <strong>{v.name || 'Vendor name'}</strong>
-            <span>{cityFromArea(v.area) || v.area || 'Area / city'}</span>
-          </div>
-        </div>
-
-        <div className="afv__form">
-          <label className="afv__field">
-            <span>Name</span>
-            <input value={v.name} onChange={e => set({ name: e.target.value })} placeholder="e.g. Bocca Coffee" autoFocus />
-          </label>
-          <label className="afv__field">
-            <span>Area / city</span>
-            <input value={v.area} onChange={e => set({ area: e.target.value })} placeholder="e.g. De Pijp, Amsterdam" />
-          </label>
-          <div className="afv__field-row">
-            <label className="afv__field">
-              <span>Latitude <em>(optional)</em></span>
-              <input value={v.lat} onChange={e => set({ lat: e.target.value })} placeholder="52.3555" inputMode="decimal" />
-            </label>
-            <label className="afv__field">
-              <span>Longitude <em>(optional)</em></span>
-              <input value={v.lng} onChange={e => set({ lng: e.target.value })} placeholder="4.9066" inputMode="decimal" />
-            </label>
-          </div>
-          <div className="afv__field-row">
-            <label className="afv__field afv__field--color">
-              <span>Brand colour</span>
-              <span className="afv__colorpick">
-                <span className="afv__colorpick-swatch" style={{ background: hex }}>
-                  <input type="color" value={hex} onChange={e => set({ color: e.target.value })} aria-label="Brand colour" />
-                </span>
-                <input className="afv__colorpick-hex" value={v.color} onChange={e => set({ color: e.target.value })} placeholder="#E4572E" />
-              </span>
-            </label>
-            <label className="afv__field">
-              <span>Logo URL <em>(optional)</em></span>
-              <input value={v.logo_url} onChange={e => set({ logo_url: e.target.value })} placeholder="https://…" />
-            </label>
-          </div>
-          <p className="afv__field-hint">Coordinates place the pin on the map; without them the venue still shows in the list. Logo defaults to a coloured initial.</p>
-        </div>
-
-        <div className="afv__modal-foot">
-          <button className="afv__btn afv__btn--ghost" onClick={onClose}>Cancel</button>
-          <button className="afv__btn afv__btn--primary" onClick={submit} disabled={!valid}>{initial._k ? 'Save vendor' : 'Add vendor'}</button>
+    <Modal
+      open
+      onClose={onClose}
+      title={isEdit ? 'Edit vendor' : 'Add vendor'}
+      subtitle="Saved with the rest of your list when you press Save changes."
+      icon={Store}
+      footer={(
+        <>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={submit} disabled={!valid}>{isEdit ? 'Save vendor' : 'Add vendor'}</Button>
+        </>
+      )}
+    >
+      <div className="afv__preview">
+        <span className="afv__vlogo afv__vlogo--lg" style={{ background: hex }}>
+          {v.logo_url ? <img src={v.logo_url} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} /> : (v.name || 'S').charAt(0).toUpperCase()}
+        </span>
+        <div className="afv__preview-txt">
+          <strong>{v.name || 'Vendor name'}</strong>
+          <span>{cityFromArea(v.area) || v.area || 'Area / city'}</span>
         </div>
       </div>
-    </div>
+
+      <div className="afv__form">
+        <Field label="Name" htmlFor="afv-name">
+          <input id="afv-name" className="ui-input" value={v.name} onChange={e => set({ name: e.target.value })} placeholder="e.g. Bocca Coffee" autoFocus />
+        </Field>
+        <Field label="Area or city" htmlFor="afv-area">
+          <input id="afv-area" className="ui-input" value={v.area} onChange={e => set({ area: e.target.value })} placeholder="e.g. De Pijp, Amsterdam" />
+        </Field>
+        <Field label={<>Latitude <span className="afv__optional">optional</span></>} htmlFor="afv-lat">
+          <input id="afv-lat" className="ui-input" value={v.lat} onChange={e => set({ lat: e.target.value })} placeholder="52.3555" inputMode="decimal" />
+        </Field>
+        <Field label={<>Longitude <span className="afv__optional">optional</span></>} htmlFor="afv-lng">
+          <input id="afv-lng" className="ui-input" value={v.lng} onChange={e => set({ lng: e.target.value })} placeholder="4.9066" inputMode="decimal" />
+        </Field>
+        <Field label="Brand colour" htmlFor="afv-color">
+          <span className="afv__colorpick">
+            <span className="afv__colorpick-swatch" style={{ background: hex }}>
+              <input type="color" value={hex} onChange={e => set({ color: e.target.value })} aria-label="Pick a brand colour" />
+            </span>
+            <input id="afv-color" className="ui-input afv__colorpick-hex" value={v.color} onChange={e => set({ color: e.target.value })} placeholder="#E4572E" />
+          </span>
+        </Field>
+        <Field label={<>Logo URL <span className="afv__optional">optional</span></>} htmlFor="afv-logo">
+          <input id="afv-logo" className="ui-input" value={v.logo_url} onChange={e => set({ logo_url: e.target.value })} placeholder="https://…" />
+        </Field>
+      </div>
+      <p className="afv__field-hint">
+        Coordinates place the pin on the map; without them the venue still shows in the list. Without a logo, the card shows a coloured initial.
+      </p>
+    </Modal>
   );
 }

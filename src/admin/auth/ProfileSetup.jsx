@@ -9,8 +9,8 @@ import './ProfileSetup.css';
  * profile color. We don't force any of these — every field is optional
  * and they can edit them later from the profile menu. */
 const COLOR_OPTIONS = [
-  '#FD6F46', '#FF7A2E', '#FFC52F', '#1A8737',
-  '#5333A5', '#7C3AED', '#C2185B', '#0F172A',
+  '#5B3FD6', '#8B6CFF', '#1F8FCE', '#0F8A7E',
+  '#0E9E74', '#E8930C', '#F2643A', '#E03E6B',
 ];
 
 export default function ProfileSetup({ onDone }) {

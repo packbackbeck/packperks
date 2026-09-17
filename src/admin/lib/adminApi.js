@@ -2023,15 +2023,49 @@ export async function createGeneratedReceipt({ items, total, receiptDate, venue 
   return data;
 }
 
-/* DANGER: permanently delete this org's activity records (cup scans,
- * claims, cup/donation transfers). Server-side RPC is admin-gated and
- * scoped strictly to the passed org_id. Returns per-table delete counts.
- * Pass the org explicitly so we never accidentally purge "all orgs". */
-export async function purgeOrgRecords(orgId = getActiveOrgId()) {
-  if (!orgId) throw new Error('No active organization selected.');
-  const { data, error } = await supabase.rpc('admin_purge_org_records', { p_org_id: orgId });
-  if (error) throw new Error(error.message);
-  return data; // { cup_scans, claims, cup_transfers }
+/* DANGER: Master Settings → Data. Permanently delete the chosen kinds of
+ * one organisation's records, optionally only between `from` (inclusive)
+ * and `to` (exclusive), both ISO strings. The database function is
+ * master-only and knows the same kinds (migration 049). The org is always
+ * passed explicitly so nothing can ever reach "all organisations". */
+export const ORG_DATA_TIME_COLUMN = {
+  cup_scans: 'scanned_at',
+  claims: 'created_at',
+  activity_history: 'created_at',
+  donation_transfers: 'created_at',
+  bin_sessions: 'created_at',
+  client_events: 'created_at',
+  system_events: 'created_at',
+};
+
+/* How many rows each kind has for this org and window: { kind: n | null }. */
+export async function countOrgData(orgId, kinds, { from = null, to = null } = {}) {
+  if (!orgId) return {};
+  const entries = await Promise.all(kinds.map(async (kind) => {
+    const col = ORG_DATA_TIME_COLUMN[kind];
+    if (!col) return [kind, null];
+    let q = supabase.from(kind).select(col, { count: 'exact', head: true }).eq('org_id', orgId);
+    if (from) q = q.gte(col, from);
+    if (to) q = q.lt(col, to);
+    const { count, error } = await q;
+    return [kind, error ? null : count ?? 0];
+  }));
+  return Object.fromEntries(entries);
+}
+
+export async function purgeOrgData(orgId, kinds, { from = null, to = null } = {}) {
+  if (!orgId) throw new Error('Pick an organisation first.');
+  const list = (kinds || []).filter(k => ORG_DATA_TIME_COLUMN[k]);
+  if (!list.length) return {};
+  const { data, error } = await supabase.rpc('admin_purge_org_data', {
+    p_org_id: orgId, p_kinds: list, p_from: from, p_to: to,
+  });
+  if (error) {
+    if (/not_authorized/.test(error.message)) throw new Error('Only a master can delete data.');
+    if (/invalid_range/.test(error.message)) throw new Error('The start date is after the end date.');
+    throw new Error(error.message);
+  }
+  return data || {}; // { kind: rows deleted }
 }
 
 /* DANGER: permanently delete the selected rows by id. Admin-gated +
@@ -3202,7 +3236,7 @@ export async function getOrgBundle() {
  *                 donationDescription, privacyUrl, termsUrl, cookieUrl },
  *     features: { featureCupSharing, featureDonations,
  *                 featureDirectRefunds },
- *     invites:  [ { email, role, method } ],
+ *     invites:  [ { email, role, method } ],   // role: an admin_roles key
  *   }
  *
  * Order of operations (all sequential, abort on first error so we
@@ -3356,18 +3390,25 @@ export async function createOrganization(payload) {
     });
   if (cfgErr) console.warn('createOrganization: app_config upsert failed', cfgErr);
 
-  // 4. Team invites (best-effort).
+  // 4. Team invites (best-effort). `role` is an admin_roles key; older
+  // names are mapped so nobody becomes a master by accident. Everyone but a
+  // master sees only the new organisation.
   const inviteResults = [];
+  const ROLE_KEY = { admin: 'master', checker: 'viewer' };
   for (const inv of invites) {
     if (!inv?.email && inv?.method !== 'link') continue;
+    const accessRole = ROLE_KEY[inv.role] || inv.role || 'manager';
+    const isMaster = accessRole === 'master';
     try {
       const { data, error } = await supabase.functions.invoke('invite-admin', {
         body: {
           email: inv.email || undefined,
-          role: inv.role || 'admin',
+          access_role: accessRole,
+          org_ids: isMaster ? [] : [newOrgId],
+          all_orgs: isMaster,
+          org_id: isMaster ? undefined : newOrgId,
           method: inv.method || 'email',
           single_use: inv.single_use === undefined ? true : !!inv.single_use,
-          org_id: newOrgId, // edge fn should respect this if it accepts it
         },
       });
       if (error) throw error;

@@ -1,24 +1,18 @@
 import { useMemo, useState } from 'react';
-import { CircleHelp, Eye, History, Send } from 'lucide-react';
+import { Eye, Send } from 'lucide-react';
+import { Button, Field, Modal } from '../ui';
 import './WorkflowDock.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * WorkflowDock — top-right command cluster, Framer-style.
- *
- * A static row of buttons in the top-right (Help · History · Preview ·
- * Publish). Settings lives in the sidebar.
- *
- *   • Support         — question-mark icon, opens Help & support.
- *   • Version history — clock-arrow icon, navigates to History page.
- *   • Preview         — labelled button, opens the live user app in a
- *                       new tab.
- *   • Publish         — the only highlighted button. Always available
- *                       (changes auto-save now, so Save is gone).
+ * WorkflowDock — the top bar's right-hand buttons: Preview (opens the
+ * customer app in a new tab; hidden when the top bar setting is off) and
+ * Publish (for people who can change what gets published). Help and
+ * version history live in the sidebar.
  *
  * Auto-save means there is no explicit Save button or contextual primary
  * cycling through unsaved → saved → published states. The Publish
  * button is always live and pushes the current draft to the user app. */
-export default function WorkflowDock({ draftState, onPreview, onOpenHistory, onOpenSupport, canPublish = true }) {
+export default function WorkflowDock({ draftState, onPreview, canPublish = true }) {
   const { publishDraft, isDirty, published, draft } = draftState || {};
   const [publishModal, setPublishModal] = useState(false);
   const [publishNote, setPublishNote] = useState('');
@@ -55,20 +49,12 @@ export default function WorkflowDock({ draftState, onPreview, onOpenHistory, onO
   return (
     <>
       <div className="wd" role="toolbar" aria-label="Workflow actions">
-        {onOpenSupport && (
-          <button type="button" className="wd-icon" onClick={onOpenSupport} title="Help & support" aria-label="Help & support">
-            <CircleHelp size={17} aria-hidden="true" />
+        {onPreview && (
+          <button type="button" className="wd-preview" onClick={onPreview} title="Open the customer app in a new tab">
+            <Eye size={15} aria-hidden="true" />
+            Preview
           </button>
         )}
-        {onOpenHistory && (
-          <button type="button" className="wd-icon" onClick={onOpenHistory} title="Version history" aria-label="Version history">
-            <History size={17} aria-hidden="true" />
-          </button>
-        )}
-        <button type="button" className="wd-preview" onClick={onPreview} title="Open the customer app in a new tab">
-          <Eye size={15} aria-hidden="true" />
-          Preview
-        </button>
         {canPublish && (
           <button type="button" className="wd-publish" onClick={() => setPublishModal(true)}>
             <Send size={14} aria-hidden="true" />
@@ -78,84 +64,73 @@ export default function WorkflowDock({ draftState, onPreview, onOpenHistory, onO
         )}
       </div>
 
-      {publishModal && (
-        <div className="admin-publish-overlay" onClick={() => setPublishModal(false)}>
-          <div className="admin-publish-modal admin-publish-modal--wide" onClick={e => e.stopPropagation()}>
-            <div className="admin-publish-modal__header">
-              <div className="admin-publish-modal__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="22 2 11 13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="admin-publish-modal__title">Publish to live</h3>
-                <p className="admin-publish-modal__sub">This pushes all changes to the user-facing app immediately.</p>
-              </div>
+      {/* The dialog renders at the root of the dashboard (Modal portals
+       *  it): the top bar's blur would otherwise trap it inside the bar. */}
+      <Modal
+        open={publishModal}
+        onClose={() => setPublishModal(false)}
+        title="Publish to live"
+        subtitle="Puts every draft change live in the customer app straight away."
+        icon={Send}
+        wide
+        footer={(
+          <>
+            <Button onClick={() => setPublishModal(false)}>Cancel</Button>
+            <Button variant="primary" icon={Send} onClick={handlePublishConfirm}>Publish now</Button>
+          </>
+        )}
+      >
+        {/* P-34: what is about to go live. With nothing changed the block
+         *  still shows, so admins learn where to look next time. */}
+        <div className="wd-diff">
+          <div className="wd-diff__title">Changes since the last publish</div>
+          {diff && (diff.settings.length + diff.rewards.length === 0) ? (
+            <div className="wd-diff__empty">
+              Nothing has changed. Publishing again re-stamps the live version without changing any values.
             </div>
-
-            {/* P-34: diff preview so the admin can see what's about to
-             *  go live. If nothing changed we still show a benign
-             *  "nothing to publish" hint instead of hiding the block,
-             *  because the visual placement teaches admins where to
-             *  look on future publishes. */}
-            <div className="wd-diff">
-              <div className="wd-diff__title">Changes since last publish</div>
-              {diff && (diff.settings.length + diff.rewards.length === 0) ? (
-                <div className="wd-diff__empty">
-                  No changes detected. Publishing now will re-stamp the live config without touching any values.
-                </div>
-              ) : diff ? (
-                <ul className="wd-diff__list">
-                  {diff.settings.slice(0, 6).map((d, i) => (
-                    <li key={'s' + i} className="wd-diff__row">
-                      <span className="wd-diff__kind wd-diff__kind--settings">setting</span>
-                      <span className="wd-diff__label">{d.label}</span>
-                      <span className="wd-diff__values">
-                        <span className="wd-diff__from">{formatDiffValue(d.before)}</span>
-                        <span className="wd-diff__arrow">→</span>
-                        <span className="wd-diff__to">{formatDiffValue(d.after)}</span>
-                      </span>
-                    </li>
-                  ))}
-                  {diff.rewards.slice(0, 5).map((d, i) => (
-                    <li key={'r' + i} className="wd-diff__row">
-                      <span className={`wd-diff__kind wd-diff__kind--${d.kind}`}>{d.kind}</span>
-                      <span className="wd-diff__label">{d.name}</span>
-                      <span className="wd-diff__values">
-                        {d.detail && <span className="wd-diff__detail">{d.detail}</span>}
-                      </span>
-                    </li>
-                  ))}
-                  {diff.settings.length + diff.rewards.length > 11 && (
-                    <li className="wd-diff__more">
-                      + {diff.settings.length + diff.rewards.length - 11} more change{diff.settings.length + diff.rewards.length - 11 === 1 ? '' : 's'}
-                    </li>
-                  )}
-                </ul>
-              ) : null}
-            </div>
-
-            <label className="admin-publish-modal__label">Change summary (optional)</label>
-            <input
-              className="admin-publish-modal__input"
-              placeholder="e.g. Added new reward, updated cashback rate…"
-              value={publishNote}
-              onChange={e => setPublishNote(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handlePublishConfirm()}
-              autoFocus
-            />
-            <div className="admin-publish-modal__actions">
-              <button className="admin-publish-modal__cancel" onClick={() => setPublishModal(false)}>
-                Cancel
-              </button>
-              <button className="admin-publish-modal__confirm" onClick={handlePublishConfirm}>
-                Publish now →
-              </button>
-            </div>
-          </div>
+          ) : diff ? (
+            <ul className="wd-diff__list">
+              {diff.settings.slice(0, 6).map((d, i) => (
+                <li key={'s' + i} className="wd-diff__row">
+                  <span className="wd-diff__kind wd-diff__kind--settings">setting</span>
+                  <span className="wd-diff__label">{d.label}</span>
+                  <span className="wd-diff__values">
+                    <span className="wd-diff__from">{formatDiffValue(d.before)}</span>
+                    <span className="wd-diff__arrow">→</span>
+                    <span className="wd-diff__to">{formatDiffValue(d.after)}</span>
+                  </span>
+                </li>
+              ))}
+              {diff.rewards.slice(0, 5).map((d, i) => (
+                <li key={'r' + i} className="wd-diff__row">
+                  <span className={`wd-diff__kind wd-diff__kind--${d.kind}`}>{d.kind}</span>
+                  <span className="wd-diff__label">{d.name}</span>
+                  <span className="wd-diff__values">
+                    {d.detail && <span className="wd-diff__detail">{d.detail}</span>}
+                  </span>
+                </li>
+              ))}
+              {diff.settings.length + diff.rewards.length > 11 && (
+                <li className="wd-diff__more">
+                  + {diff.settings.length + diff.rewards.length - 11} more change{diff.settings.length + diff.rewards.length - 11 === 1 ? '' : 's'}
+                </li>
+              )}
+            </ul>
+          ) : null}
         </div>
-      )}
+
+        <Field label="Change summary (optional)" htmlFor="wd-publish-note">
+          <input
+            id="wd-publish-note"
+            className="ui-input"
+            placeholder="e.g. Added a new reward, changed the cashback rate"
+            value={publishNote}
+            onChange={e => setPublishNote(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handlePublishConfirm()}
+            autoFocus
+          />
+        </Field>
+      </Modal>
     </>
   );
 }

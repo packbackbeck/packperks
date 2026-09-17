@@ -7,12 +7,13 @@ import {
   getDonationCollectedTotal,
   deleteRecords,
 } from '../lib/adminApi';
+import { CircleCheck, FileText, HandCoins, HeartHandshake, Paperclip, Plus, RefreshCw, Scale, Send, Upload, Wallet, X } from 'lucide-react';
 import { logAction } from '../auth/actionLog';
 import { useAuth } from '../auth/AuthContext';
-import EmptyState from '../shared/EmptyState';
-import QuickLinks from '../shared/QuickLinks';
 import { useBulkSelection } from '../shared/useBulkSelection';
 import BulkDeleteBar from '../shared/BulkDeleteBar';
+import { Lightbox, Notice } from '../shared/opsTable';
+import { Button, Card, CardBody, CardHeader, EmptyState, Field, KpiTile, PageHeader } from '../ui';
 import './AdminDonations.css';
 import { adminMoney, adminSymbol } from '../lib/adminMoney';
 
@@ -54,7 +55,7 @@ function formatEuro(n) {
   return adminMoney(n ?? 0);
 }
 
-export default function AdminDonations({ onNavigate, draftState }) {
+export default function AdminDonations({ draftState }) {
   const { profile } = useAuth();
   const role = profile?.role || 'checker';
   const canRecord = role === 'owner' || role === 'admin';
@@ -103,59 +104,60 @@ export default function AdminDonations({ onNavigate, draftState }) {
     clear: 'All settled — donations are fully transferred',
   }[statusKind];
 
+  const StatusIcon = statusKind === 'clear' ? CircleCheck : statusKind === 'owed' ? HandCoins : Scale;
+
   return (
-    <div className="admin-donations">
-      {/* Header */}
-      <header className="ad-header">
-        <div className="ad-header__text">
-          <h1 className="ad-header__title">Charity transfers</h1>
-          <p className="ad-header__sub">
-            Customers turn cups into donations via the "Donate" button on the user app.
-            Use this page to record when you wire the collected funds to the partner
-            charity and to keep the running balance visible.
-          </p>
-        </div>
-        <div className={`ad-status ad-status--${statusKind}`}>
-          <span className="ad-status__dot" />
+    <div className="ui-page admin-donations">
+      <PageHeader
+        title="Charity transfers"
+        subtitle={'Customers turn cups into donations with the "Donate" button in the app. Record here when you send the collected money to the partner charity, and keep the running balance in view.'}
+      >
+        <span className={`ad-status ad-status--${statusKind}`} role="status">
+          <StatusIcon size={15} aria-hidden="true" />
           {statusCopy}
-        </div>
-      </header>
+        </span>
+      </PageHeader>
 
       {error && (
-        <div className="ad-error">
+        <Notice
+          tone="danger"
+          action={<Button variant="outline" size="sm" icon={RefreshCw} onClick={refresh}>Retry</Button>}
+        >
           <strong>Couldn't load donations:</strong> {error}
-          <button onClick={refresh}>Retry</button>
-        </div>
+        </Notice>
       )}
 
       {/* Stat trio */}
-      <section className="ad-stats">
+      <section className="ui-grid-3 ad-stats" aria-label="Donation totals">
         <StatCard
-          tone="purple"
+          tone="violet"
+          icon={HeartHandshake}
           label="Collected from customers"
           value={formatEuro(collected.amount)}
           sub={`${collected.cups} cup${collected.cups === 1 ? '' : 's'} donated`}
-          tooltip="Sum of payout_amount on completed donation claims. Each cup → cash via the refund rate at the moment the claim was approved."
+          tooltip="The value of completed donation claims. Each cup is turned into money at the refund rate when the claim was approved."
         />
         <StatCard
-          tone="green"
+          tone="emerald"
+          icon={Send}
           label="Transferred to charity"
           value={formatEuro(totalTransferred)}
           sub={`${transfers.length} transfer${transfers.length === 1 ? '' : 's'} recorded`}
-          tooltip="Sum of amount_eur across donation_transfers. Click a row below to see the receipt."
+          tooltip="The total of every transfer recorded below. Click a receipt in the table to see it."
         />
         <StatCard
-          tone={statusKind === 'owed' ? 'orange' : 'cream'}
+          tone={statusKind === 'owed' ? 'amber' : statusKind === 'over' ? 'violet' : 'slate'}
+          icon={statusKind === 'over' ? Scale : Wallet}
           label={statusKind === 'over' ? 'Over-transferred' : 'Outstanding balance'}
           value={statusKind === 'over' ? formatEuro(overshoot) : formatEuro(outstanding)}
           sub={
             statusKind === 'owed'
-              ? 'Still to wire to the charity'
+              ? 'Still to send to the charity'
               : statusKind === 'over'
                 ? 'Programme covered the difference'
-                : '✓ Fully settled'
+                : 'Fully settled'
           }
-          tooltip="Difference between what customers donated and what you've transferred. Should trend to zero; a small over-transfer is fine if the programme tops up."
+          tooltip="What customers donated minus what you've transferred. It should trend to zero; a small over-transfer is fine if the programme tops up."
         />
       </section>
 
@@ -180,44 +182,35 @@ export default function AdminDonations({ onNavigate, draftState }) {
           }}
         />
       ) : (
-        <div className="ad-readonly">
-          Your role can view donation transfers but can't record new ones. Ask an Owner or Admin to wire the money.
-        </div>
+        <Notice tone="info">
+          Your role can view donation transfers but can't record new ones. Ask an Owner or Admin to send the money.
+        </Notice>
       )}
 
       {/* Past transfers */}
-      <section className="ad-transfers">
-        <header className="ad-transfers__head">
-          <h2 className="ad-transfers__title">Past transfers</h2>
-          <p className="ad-transfers__sub">Each row is one bank transfer to the charity. Click the receipt to enlarge.</p>
-        </header>
+      <Card className="ad-transfers">
+        <CardHeader
+          title="Past transfers"
+          icon={Wallet}
+          subtitle="Each row is one bank transfer to the charity. Click a receipt to enlarge it."
+          ruled
+        />
 
         {loading ? (
-          <div className="ad-transfers__loading">Loading transfers…</div>
+          <p className="ad-transfers__loading">Loading transfers…</p>
         ) : transfers.length === 0 ? (
-          <EmptyState
-            icon={
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-                <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-              </svg>
-            }
-            title="No transfers yet"
-            body={
-              collected.amount > 0
-                ? `Customers have donated ${formatEuro(collected.amount)} so far. Use the form above to record your first wire to the charity.`
-                : 'When customers start donating cups, the rolled-up total will show in the "Collected" card above and you can start recording outgoing transfers.'
-            }
-            tone="action"
-          />
+          <EmptyState icon={Wallet} title="No transfers yet">
+            {collected.amount > 0
+              ? `Customers have donated ${formatEuro(collected.amount)} so far. Use the form above to record your first transfer to the charity.`
+              : 'When customers start donating cups, the total shows in the "Collected" card above and you can start recording transfers.'}
+          </EmptyState>
         ) : (
-          <div className="ad-transfers__table-wrap">
-            <table className="ad-transfers__table">
+          <CardBody flush className="ad-transfers__table-wrap">
+            <table className="ui-table ad-transfers__table">
               <thead>
                 <tr>
                   {canRecord && (
-                    <th className="bulk-check-cell">
+                    <th className="ot-check">
                       <input
                         type="checkbox"
                         checked={sel.allSelected}
@@ -229,7 +222,7 @@ export default function AdminDonations({ onNavigate, draftState }) {
                   )}
                   <th>Date</th>
                   <th>Recipient</th>
-                  <th>Amount</th>
+                  <th className="ui-num">Amount</th>
                   <th>Reference</th>
                   <th>Receipt</th>
                   <th>Recorded</th>
@@ -249,14 +242,14 @@ export default function AdminDonations({ onNavigate, draftState }) {
               <tfoot>
                 <tr>
                   <td colSpan={canRecord ? 3 : 2} className="ad-transfers__tf-label">Total transferred</td>
-                  <td className="ad-transfers__tf-val">{formatEuro(totalTransferred)}</td>
+                  <td className="ad-transfers__tf-val ui-num">{formatEuro(totalTransferred)}</td>
                   <td colSpan={3} />
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </CardBody>
         )}
-      </section>
+      </Card>
 
       {canRecord && (
         <BulkDeleteBar
@@ -270,31 +263,17 @@ export default function AdminDonations({ onNavigate, draftState }) {
           }}
         />
       )}
-
-      <QuickLinks currentPage="donations" onNavigate={onNavigate} />
     </div>
   );
 }
 
 /* ── Stat tile ─────────────────────────────────────────────────────── */
-function StatCard({ tone, label, value, sub, tooltip }) {
+function StatCard({ tone, icon, label, value, sub, tooltip }) {
   return (
-    <div className={`ad-stat ad-stat--${tone}`} title={tooltip}>
-      <div className="ad-stat__label">
-        {label}
-        {tooltip && (
-          <span className="ad-stat__info" aria-hidden>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-          </span>
-        )}
-      </div>
-      <div className="ad-stat__value">{value}</div>
-      {sub && <div className="ad-stat__sub">{sub}</div>}
-    </div>
+    <KpiTile
+      interactive={false}
+      metric={{ id: label, label, icon, tone, value, description: sub, info: tooltip }}
+    />
   );
 }
 
@@ -358,127 +337,136 @@ function AddTransferCard({ defaultRecipient, outstanding, onCreated }) {
   }
 
   return (
-    <form className="ad-add" onSubmit={handleSubmit}>
-      <div className="ad-add__head">
-        <div className="ad-add__head-text">
-          <h2 className="ad-add__title">Record a transfer</h2>
-          <p className="ad-add__sub">
-            Wire the collected donation cash to the partner charity, then capture the proof
-            here. Attach the bank confirmation (PDF or screenshot) so this row stands up to
-            an audit.
-          </p>
-        </div>
-      </div>
+    <Card as="form" className="ad-add" onSubmit={handleSubmit}>
+      <CardHeader
+        title="Record a transfer"
+        icon={Send}
+        subtitle="Send the collected donation money to the partner charity, then record it here. Attach the bank confirmation (PDF or screenshot) so the record holds up in an audit."
+        ruled
+      />
 
-      <div className="ad-add__grid">
-        <label className="ad-add__field">
-          <span className="ad-add__label">Amount ({adminSymbol()})</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="ad-add__input"
-            required
-          />
-          {outstanding > 0 && (
-            <span className="ad-add__hint">
-              {formatEuro(outstanding)} still owed.{' '}
-              <button
-                type="button"
-                className="ad-add__hint-link"
-                onClick={() => setAmount(outstanding.toFixed(2))}
-              >
-                Fill outstanding amount
-              </button>
-            </span>
-          )}
-        </label>
-
-        <label className="ad-add__field">
-          <span className="ad-add__label">Transfer date</span>
-          <input
-            type="date"
-            value={transferDate}
-            onChange={e => setDate(e.target.value)}
-            className="ad-add__input"
-            required
-          />
-        </label>
-
-        <label className="ad-add__field ad-add__field--wide">
-          <span className="ad-add__label">Recipient</span>
-          <input
-            type="text"
-            value={recipient}
-            onChange={e => setRecipient(e.target.value)}
-            placeholder="Plastic Soup Foundation"
-            className="ad-add__input"
-            required
-          />
-        </label>
-
-        <label className="ad-add__field">
-          <span className="ad-add__label">Bank reference (optional)</span>
-          <input
-            type="text"
-            value={reference}
-            onChange={e => setReference(e.target.value)}
-            placeholder="e.g. PSF-2025-09"
-            className="ad-add__input"
-          />
-        </label>
-
-        <label className="ad-add__field ad-add__field--wide">
-          <span className="ad-add__label">Internal note (optional)</span>
-          <input
-            type="text"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            placeholder="e.g. Quarterly batch, includes August + September donations."
-            className="ad-add__input"
-          />
-        </label>
-
-        <label className="ad-add__field ad-add__field--wide">
-          <span className="ad-add__label">Receipt (required)</span>
-          <div className={`ad-add__file${file ? ' ad-add__file--has' : ''}`}>
-            <input
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={e => setFile(e.target.files?.[0] || null)}
-              className="ad-add__file-input"
-            />
-            <span className="ad-add__file-cta">
-              {file ? `📎 ${file.name}` : 'Drop a file here or click to upload — image or PDF'}
-            </span>
-            {file && (
-              <button
-                type="button"
-                className="ad-add__file-clear"
-                onClick={() => setFile(null)}
-                aria-label="Remove file"
-              >×</button>
+      <CardBody className="ad-add__body">
+        <div className="ad-add__grid">
+          <Field
+            label={`Amount (${adminSymbol()})`}
+            htmlFor="ad-amount"
+            hint={outstanding > 0 && (
+              <>
+                {formatEuro(outstanding)} still owed.{' '}
+                <button
+                  type="button"
+                  className="ad-add__hint-link"
+                  onClick={() => setAmount(outstanding.toFixed(2))}
+                >
+                  Fill outstanding amount
+                </button>
+              </>
             )}
-          </div>
-        </label>
-      </div>
+          >
+            <input
+              id="ad-amount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="ui-input"
+              required
+            />
+          </Field>
 
-      {err && <p className="ad-add__err">{err}</p>}
-      {info && <p className="ad-add__info">{info}</p>}
+          <Field label="Transfer date" htmlFor="ad-date">
+            <input
+              id="ad-date"
+              type="date"
+              value={transferDate}
+              onChange={e => setDate(e.target.value)}
+              className="ui-input"
+              required
+            />
+          </Field>
+
+          <div className="ad-add__wide">
+            <Field label="Recipient" htmlFor="ad-recipient">
+              <input
+                id="ad-recipient"
+                type="text"
+                value={recipient}
+                onChange={e => setRecipient(e.target.value)}
+                placeholder="Plastic Soup Foundation"
+                className="ui-input"
+                required
+              />
+            </Field>
+          </div>
+
+          <Field label="Bank reference (optional)" htmlFor="ad-reference">
+            <input
+              id="ad-reference"
+              type="text"
+              value={reference}
+              onChange={e => setReference(e.target.value)}
+              placeholder="e.g. PSF-2025-09"
+              className="ui-input"
+            />
+          </Field>
+
+          <Field label="Internal note (optional)" htmlFor="ad-note">
+            <input
+              id="ad-note"
+              type="text"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="e.g. Quarterly batch, includes August + September donations."
+              className="ui-input"
+            />
+          </Field>
+
+          <div className="ad-add__wide">
+            <Field label="Receipt (required)" htmlFor="ad-file">
+              <div className={`ad-add__file${file ? ' ad-add__file--has' : ''}`}>
+                <input
+                  id="ad-file"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={e => setFile(e.target.files?.[0] || null)}
+                  className="ad-add__file-input"
+                />
+                <span className="ad-add__file-icon" aria-hidden="true">
+                  {file ? <Paperclip size={16} /> : <Upload size={16} />}
+                </span>
+                <span className="ad-add__file-text">
+                  <span className="ad-add__file-cta">
+                    {file ? file.name : 'Drop a file here or click to upload'}
+                  </span>
+                  <span className="ad-add__file-sub">{file ? 'Ready to attach' : 'Image or PDF of the bank confirmation'}</span>
+                </span>
+                {file && (
+                  <button
+                    type="button"
+                    className="ad-add__file-clear"
+                    onClick={() => setFile(null)}
+                    aria-label="Remove file"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            </Field>
+          </div>
+        </div>
+
+        {err && <Notice tone="danger">{err}</Notice>}
+        {info && <Notice tone="success">{info}</Notice>}
+      </CardBody>
 
       <div className="ad-add__actions">
-        <button
-          type="submit"
-          className="ad-add__submit"
-          disabled={submitting}
-        >
+        <Button type="submit" variant="primary" icon={Plus} disabled={submitting}>
           {submitting ? 'Recording…' : 'Record transfer'}
-        </button>
+        </Button>
       </div>
-    </form>
+    </Card>
   );
 }
 
@@ -500,66 +488,52 @@ function TransferRow({ transfer, selectable = false, checked = false, onToggle }
   const isPdf = (transfer.receipt_filename || transfer.receipt_path || '').toLowerCase().endsWith('.pdf');
 
   return (
-    <>
-      <tr className={checked ? 'ad-transfers__row--selected' : ''}>
-        {selectable && (
-          <td className="bulk-check-cell">
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={onToggle}
-              aria-label="Select transfer"
-            />
-          </td>
-        )}
-        <td className="ad-transfers__date">{formatDate(transfer.transfer_date)}</td>
-        <td>{transfer.recipient}</td>
-        <td className="ad-transfers__amount">{formatEuro(Number(transfer.amount_eur))}</td>
-        <td className="ad-transfers__ref">
-          {transfer.reference || <span className="ad-transfers__muted">—</span>}
+    <tr className={checked ? 'ot-row--selected' : ''}>
+      {selectable && (
+        <td className="ot-check">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggle}
+            aria-label="Select transfer"
+          />
         </td>
-        <td>
-          {!transfer.receipt_path ? (
-            <span className="ad-transfers__muted">No file</span>
-          ) : isPdf ? (
-            <a
-              href={signedUrl || '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ad-transfers__pdf"
-              title={transfer.receipt_filename || 'Receipt PDF'}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              PDF
-            </a>
-          ) : (
-            <button
-              type="button"
-              className="ad-transfers__thumb"
-              onClick={() => setLightbox(true)}
-              title="Click to enlarge"
-            >
-              {signedUrl
-                ? <img src={signedUrl} alt="Transfer receipt" />
-                : <span className="ad-transfers__thumb-loading">…</span>}
-            </button>
-          )}
-        </td>
-        <td className="ad-transfers__recorded">{formatDate(transfer.created_at)}</td>
-      </tr>
-      {lightbox && signedUrl && (
-        <tr className="ad-transfers__lightbox-row">
-          <td colSpan={selectable ? 7 : 6}>
-            <div className="ad-lightbox" onClick={() => setLightbox(false)}>
-              <button className="ad-lightbox__close" onClick={e => { e.stopPropagation(); setLightbox(false); }}>×</button>
-              <img src={signedUrl} alt="Transfer receipt enlarged" onClick={e => e.stopPropagation()} />
-            </div>
-          </td>
-        </tr>
       )}
-    </>
+      <td className="ad-transfers__date">{formatDate(transfer.transfer_date)}</td>
+      <td className="ad-transfers__recipient">{transfer.recipient}</td>
+      <td className="ad-transfers__amount ui-num">{formatEuro(Number(transfer.amount_eur))}</td>
+      <td className="ad-transfers__ref">
+        {transfer.reference || <span className="ot-faint">—</span>}
+      </td>
+      <td>
+        {!transfer.receipt_path ? (
+          <span className="ot-faint">No file</span>
+        ) : isPdf ? (
+          <a
+            href={signedUrl || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ui-badge ui-badge--primary ad-transfers__pdf"
+            title={transfer.receipt_filename || 'Receipt PDF'}
+          >
+            <FileText size={12} aria-hidden="true" />
+            PDF
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="ot-thumb ad-transfers__thumb"
+            onClick={() => setLightbox(true)}
+            title="Click to enlarge"
+          >
+            {signedUrl
+              ? <img src={signedUrl} alt="Transfer receipt" />
+              : <span className="ad-transfers__thumb-loading">…</span>}
+          </button>
+        )}
+        <Lightbox src={lightbox && signedUrl ? signedUrl : null} alt="Transfer receipt enlarged" onClose={() => setLightbox(false)} />
+      </td>
+      <td className="ot-date">{formatDate(transfer.created_at)}</td>
+    </tr>
   );
 }

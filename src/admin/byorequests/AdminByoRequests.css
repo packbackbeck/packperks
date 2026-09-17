@@ -1,27 +1,25 @@
-/* AdminByoRequests — Phase 3 BYO approval queue */
+/* BYO QR codes — counter QR, the review queue, test receipts.
+ * Shared pieces live in ui/ui.css. The .byoreq__qr-brand poster is the
+ * exported PNG / A4 artwork and keeps its own colours. */
 
-.byoreq { padding: 28px 32px; }
+.byoreq__muted { color: var(--ui-muted); font-size: 13px; }
 
-.byoreq__head { margin-bottom: 20px; }
-.byoreq__eyebrow {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
-  color: var(--pb-green);
+/* ── Counter QR ─────────────────────────────────────────────────────── */
+.byoreq__qr {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  padding-top: 8px;
 }
-.byoreq__title { margin: 4px 0 6px; font-size: 26px; font-weight: 700; color: #0F0F0F; }
-.byoreq__sub { margin: 0; font-size: 13px; color: #5A554F; line-height: 1.5; max-width: 640px; }
-
-/* Stationary QR card */
-.byoreq__qr-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  padding: 20px;
-  margin-bottom: 22px;
-  background: #FAF8F3;
-  border: 1px solid #ECE5D8;
+@media (max-width: 860px) { .byoreq__qr { grid-template-columns: minmax(0, 1fr); } }
+.byoreq__qr-left { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.byoreq__qr-stage {
+  padding: 14px;
+  border: 1px solid var(--ui-border);
   border-radius: 12px;
+  background: var(--ui-soft);
 }
-.byoreq__qr-left { display: flex; flex-direction: column; align-items: center; gap: 12px; flex-shrink: 0; }
 
 /* Branded, downloadable QR poster — this exact node is exported as PNG. */
 .byoreq__qr-brand {
@@ -52,158 +50,66 @@
 .byoreq__qr-brand-name { font-size: 11.5px; font-weight: 800; color: #14100A; }
 .byoreq__qr-address { font-size: 11.5px; color: #9A9186; line-height: 1.4; max-width: 100%; }
 
-.byoreq__qr-download {
-  display: inline-flex; align-items: center; gap: 7px;
-  height: 38px; padding: 0 16px;
-  border: 1px solid #D9D0BF; border-radius: 10px;
-  background: #FFFFFF; color: #2A251F;
-  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease;
-}
-.byoreq__qr-download:hover:not(:disabled) { background: #F3ECDD; border-color: #C9BFA9; }
-.byoreq__qr-download:disabled { opacity: 0.5; cursor: default; }
-
-/* Two download buttons side by side (single PNG + A4 sheet). Wraps on narrow. */
 .byoreq__qr-downloads { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.byoreq__qr-download--a4 { background: #F3ECDD; }
-.byoreq__qr-download--a4:hover:not(:disabled) { background: #EBE2CE; }
 
-.byoreq__loc-select {
-  height: 38px; min-width: 220px; padding: 0 12px;
-  border: 1.5px solid #E6DECE; border-radius: 9px;
-  background: #FFFFFF; font-family: inherit; font-size: 14px; color: #1D1D1D; cursor: pointer;
-}
-.byoreq__loc-select:focus { outline: none; border-color: #1A8737; }
-.byoreq__loc-select:disabled { opacity: 0.6; }
-.byoreq__qr-info h3 { margin: 0 0 6px; font-size: 15px; color: #0F0F0F; }
-.byoreq__qr-info p { margin: 0 0 8px; font-size: 13px; color: #5A554F; line-height: 1.45; max-width: 420px; }
+.byoreq__qr-info { display: flex; flex-direction: column; gap: 16px; min-width: 0; max-width: 560px; }
+.byoreq__loc-select { max-width: 360px; }
 .byoreq__qr-url {
-  display: inline-block;
-  background: #F0E9DB;
-  padding: 4px 9px;
-  border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ui-soft);
+  color: var(--ui-fg-2);
+  font-family: var(--ui-mono);
   font-size: 12px;
-  color: #5A554F;
+  line-height: 1.5;
   word-break: break-all;
 }
+.byoreq__divider { height: 1px; background: var(--ui-border); }
 
-/* Per-store daily auto-credit limit */
-.byoreq__cap {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px dashed #E4DCCB;
-}
-.byoreq__cap-label {
-  display: flex; flex-direction: column; gap: 2px;
-  font-size: 13px; font-weight: 700; color: #2A2724; margin-bottom: 7px;
-}
-.byoreq__cap-hint { font-size: 11.5px; font-weight: 500; color: #8A8175; line-height: 1.4; }
-.byoreq__cap-row { display: flex; align-items: center; gap: 8px; }
-.byoreq__cap-input {
-  width: 72px; padding: 7px 9px; border: 1px solid #D6CFC2; border-radius: 8px;
-  font-family: inherit; font-size: 14px; color: #2A2724; background: #fff;
-}
-.byoreq__cap-save {
-  padding: 7px 13px; border: none; border-radius: 8px;
-  background: var(--pb-green, var(--pb-green)); color: #fff;
-  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
-}
-.byoreq__cap-save:disabled { opacity: 0.5; cursor: default; }
-.byoreq__cap-msg { font-size: 12.5px; font-weight: 600; color: var(--pb-green); }
-
-/* Filter tabs */
-.byoreq__tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-.byoreq__tab {
-  padding: 7px 14px;
-  border-radius: 8px;
-  border: 1px solid #D6CFC2;
-  background: transparent;
-  font-family: inherit;
-  font-size: 13px;
+.byoreq__cap-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.byoreq__cap-input.ui-input { width: 84px; font-variant-numeric: tabular-nums; }
+.byoreq__cap-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
   font-weight: 600;
-  color: #5A554F;
-  cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  color: var(--ui-success);
 }
-.byoreq__tab:hover { background: #F4EFE5; color: #0F0F0F; }
-.byoreq__tab--on { background: var(--pb-orange-warm); color: #FFFFFF; border-color: var(--pb-orange-warm); }
+.byoreq__cap-msg--err { color: var(--ui-danger); }
 
-.byoreq__error {
-  margin-bottom: 14px; padding: 10px 14px; border-radius: 8px;
-  background: #FEE7E3; border: 1px solid #F6B5AD; color: #8E1F12; font-size: 13px;
+/* ── Review queue ───────────────────────────────────────────────────── */
+.byoreq__messages { display: flex; flex-direction: column; gap: 8px; padding: 14px 20px 0; }
+.byoreq__msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  line-height: 1.45;
 }
-.byoreq__notice {
-  margin-bottom: 14px; padding: 10px 14px; border-radius: 8px;
-  background: #E7F6EC; border: 1px solid #A9DCBC; color: #1A6B38; font-size: 13px;
-}
-.byoreq__skeleton { padding: 24px; text-align: center; color: #7A7166; font-size: 14px; }
+.byoreq__msg svg { flex: none; margin-top: 1px; }
+.byoreq__msg--err { background: #FDF0F3; border-color: #F7D9E1; color: var(--ui-danger); }
+.byoreq__msg--ok { background: #EEF8F3; border-color: #D5EFE2; color: var(--ui-success); }
+.byoreq__loading { margin: 0; padding: 22px 20px; font-size: 13px; color: var(--ui-muted); }
 
-.byoreq__empty {
-  background: #FAF8F3; border: 1px dashed #D6CFC2; border-radius: 12px;
-  padding: 40px 24px; text-align: center;
-}
-.byoreq__empty h3 { margin: 0 0 6px; font-size: 17px; color: #0F0F0F; }
-.byoreq__empty p { margin: 0; font-size: 13px; color: #5A554F; }
+.byoreq__table-wrap { overflow-x: auto; }
+.byoreq__table { min-width: 620px; }
+.byoreq__table thead th:first-child, .byoreq__table td:first-child { padding-left: 20px; }
+.byoreq__table thead th:last-child, .byoreq__table td:last-child { padding-right: 20px; }
+.byoreq__table td { vertical-align: middle; padding-top: 11px; padding-bottom: 11px; }
+.byoreq__th-actions { text-align: right !important; }
+.byoreq__cust { font-weight: 600; color: var(--ui-fg); }
+.byoreq__cust-sub { margin-top: 2px; font-size: 11.5px; color: var(--ui-muted); }
+.byoreq__when { color: var(--ui-muted) !important; font-size: 12.5px; white-space: nowrap; }
+.byoreq__actions { display: flex; justify-content: flex-end; gap: 6px; }
+.byoreq__none { display: block; text-align: right; }
 
-/* Table */
-.byoreq__table-wrap { background: #FFFFFF; border: 1px solid #ECE5D8; border-radius: 12px; overflow: hidden; }
-.byoreq__table { width: 100%; border-collapse: collapse; }
-.byoreq__table th {
-  text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
-  color: #7A7166; padding: 12px 16px; border-bottom: 1px solid #ECE5D8; background: #FAF8F3;
-}
-.byoreq__th-actions { text-align: right; }
-.byoreq__table td { padding: 13px 16px; border-bottom: 1px solid #F4EFE5; font-size: 14px; vertical-align: middle; }
-.byoreq__table tbody tr:last-child td { border-bottom: none; }
-.byoreq__table tbody tr:hover { background: #FCFAF5; }
-
-.byoreq__cust { font-weight: 600; color: #0F0F0F; }
-.byoreq__cust-sub { font-size: 11.5px; color: #7A7166; margin-top: 2px; }
-.byoreq__when { color: #5A554F; font-size: 12.5px; }
-
-.byoreq__pill {
-  display: inline-block; padding: 3px 10px; border-radius: 20px;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: capitalize;
-}
-.byoreq__pill--pending  { background: rgba(254, 160, 30, 0.18); color: #A66A00; }
-.byoreq__pill--approved { background: rgba(26, 135, 55, 0.16);  color: #1A6B38; }
-.byoreq__pill--denied   { background: #F4EFE5; color: #7A7166; }
-
-.byoreq__actions { display: flex; justify-content: flex-end; gap: 8px; }
-.byoreq__btn {
-  padding: 6px 13px; border-radius: 7px; font-family: inherit; font-size: 12.5px; font-weight: 600;
-  cursor: pointer; border: 1px solid transparent; transition: background 0.14s ease;
-}
-.byoreq__btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.byoreq__btn--approve { background: var(--pb-green); color: #FFFFFF; }
-.byoreq__btn--approve:hover:not(:disabled) { background: #14702D; }
-.byoreq__btn--deny { background: transparent; color: #B4463E; border-color: #E4C9C4; }
-.byoreq__btn--deny:hover:not(:disabled) { background: #FDECEA; }
-
-.byoreq__muted { color: #A69C8D; font-size: 13px; }
-
-/* ── Embedded rewards receipt generator ── */
-.byoreq__generator {
-  margin-top: 30px;
-  padding-top: 26px;
-  border-top: 1px solid #E7E0D4;
-}
-.byoreq__generator-head { margin-bottom: 10px; }
-.byoreq__generator-title { font-size: 19px; font-weight: 800; color: #1D1D1D; margin: 0 0 3px; }
-.byoreq__generator-sub { font-size: 13px; color: #7A7166; margin: 0; line-height: 1.4; }
-
-/* "test" pill next to the Cups-per-scan label. */
-.byoreq__cap-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: #FBEEDA;
-  color: #A85320;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
+/* ── Embedded test receipts ─────────────────────────────────────────── */
+.byoreq__generator { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.byoreq__generator-title { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.015em; color: var(--ui-fg); }
+.byoreq__generator-sub { margin: 3px 0 0; font-size: 13px; line-height: 1.5; color: var(--ui-muted); }

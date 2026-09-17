@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Building2, CircleAlert, RefreshCw } from 'lucide-react';
+import { Building2, CircleAlert, RefreshCw, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { getAiAccuracy, getStatsMetrics, getTikkieStatsMetrics } from '../lib/adminApi';
 import { TAB_BY_ID, tabAvailability } from '../lib/access';
 import { resolveEffectiveMode } from '../lib/orgModes';
@@ -8,14 +8,14 @@ import { useViewRole } from '../context/ViewRole';
 import { AccessCtx } from '../context/accessCtx';
 import ScopeToggle from '../shared/ScopeToggle';
 import {
-  Badge, Button, Card, EmptyState, InsightsCard, KpiGrid, PageHeader, PeriodPicker, TrendCard, fmtInt, periodRange,
-  useChartSelection, usePersistentState,
+  Badge, Button, Card, EmptyState, InsightsCard, KpiGrid, Menu, MenuItem, MenuLabel, MenuSeparator, PageHeader,
+  PeriodPicker, Switch, TrendCard, fmtInt, periodRange, useChartSelection, usePersistentState,
 } from '../ui';
 import {
   buildErrorRows, buildHealthInsights, buildHealthMetrics, inPeriod, orderedChecks, plural, prepareHealth,
 } from './healthModel';
 import {
-  AiAccuracyCard, ChecksCard, DangerZoneCard, ErrorLogCard, ErrorTypesCard, InspectModal,
+  AiAccuracyCard, ChecksCard, ErrorLogCard, ErrorTypesCard, InspectModal,
 } from './HealthSections';
 import './AdminStats.css';
 
@@ -43,6 +43,9 @@ const PERIODS = {
 };
 
 const KEY_METRIC = { standard: 'qr_scan', tikkie: 'tk_mint' };
+
+/* The tiles a new visitor sees; the rest are a switch away in Customise. */
+const MAIN_TILES = 4;
 
 /* The period and the one before it (for the change on each tile and the
  * dashed line on the chart), plus the receipt AI's record. */
@@ -86,6 +89,8 @@ export default function AdminStats({ onNavigate }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [result, setResult] = useState(null);
   const [inspectId, setInspectId] = useState(null);
+  // Which tiles show, per kind of venue: { standard: [ids], tikkie: [ids] }.
+  const [tileChoice, setTileChoice] = usePersistentState('pp-health:tiles', {});
 
   const scopeKey = scopeOrgIds.join(',');
   // No organisation at all: nothing to check. While the list is still
@@ -157,6 +162,13 @@ export default function AdminStats({ onNavigate }) {
     tiles = metrics.map(m => ({ ...m, value: null, unavailable: null, footnote: m.kind === 'check' ? badge : null }));
   }
 
+  const mainIds = metrics.slice(0, MAIN_TILES).map(m => m.id);
+  const shownIds = Array.isArray(tileChoice?.[kind]) ? tileChoice[kind] : mainIds;
+  const shownTiles = tiles.filter(m => shownIds.includes(m.id));
+  const setShown = (ids) => setTileChoice(prev => ({ ...(prev || {}), [kind]: ids }));
+  const toggleTile = (id) => setShown(shownIds.includes(id) ? shownIds.filter(x => x !== id) : [...shownIds, id]);
+  const isMainSet = shownIds.length === mainIds.length && mainIds.every(id => shownIds.includes(id));
+
   // A check scored only for the period as a whole can't join a comparison:
   // it would get a colour but no line.
   const toggleCompare = (id) => {
@@ -178,7 +190,6 @@ export default function AdminStats({ onNavigate }) {
   }
 
   const venueName = activeOrg?.name || 'this venue';
-  const purgeName = activeOrg?.partner_brand_name || activeOrg?.name || 'this organisation';
   const where = groupScope ? 'across this group' : `at ${venueName}`;
   const subtitle = isTikkie
     ? `Whether refunds work ${where}, from smart-bin receipt to Tikkie payout.`
@@ -213,6 +224,31 @@ export default function AdminStats({ onNavigate }) {
           className={loading ? 'hl-spin' : ''}
           onClick={refresh}
         />
+        <Menu
+          align="right"
+          className="hl-custom"
+          trigger={({ open, toggle }) => (
+            <Button variant="outline" icon={SlidersHorizontal} aria-expanded={open} onClick={toggle}>Customise</Button>
+          )}
+        >
+          <MenuLabel>Tiles on this page</MenuLabel>
+          {metrics.map((m, i) => {
+            const Icon = m.icon;
+            return (
+              <div key={m.id} className="hl-custom-row">
+                {Icon && <Icon size={15} aria-hidden="true" />}
+                <span>{m.label}{i < MAIN_TILES && <small>Main</small>}</span>
+                <Switch checked={shownIds.includes(m.id)} onChange={() => toggleTile(m.id)} label={`Show ${m.label}`} />
+              </div>
+            );
+          })}
+          {!isMainSet && (
+            <>
+              <MenuSeparator />
+              <MenuItem icon={RotateCcw} onClick={() => setShown(mainIds)}>Show the {MAIN_TILES} main tiles only</MenuItem>
+            </>
+          )}
+        </Menu>
       </PageHeader>
 
       {result?.error && !loading && (
@@ -223,8 +259,9 @@ export default function AdminStats({ onNavigate }) {
         </div>
       )}
 
+      {shownTiles.length > 0 && (
       <KpiGrid
-        metrics={tiles}
+        metrics={shownTiles}
         mode={selection.tileMode}
         selectedId={selection.selectedId}
         comparedIds={selection.comparedIds}
@@ -233,6 +270,7 @@ export default function AdminStats({ onNavigate }) {
         colorFor={selection.colorFor}
         keyMetricId={KEY_METRIC[kind]}
       />
+      )}
 
       <div className="ui-grid-main">
         <TrendCard
@@ -289,16 +327,6 @@ export default function AdminStats({ onNavigate }) {
           <div className="hl-skeleton" style={{ height: 240 }} />
           <div className="hl-skeleton" style={{ height: 240 }} />
         </div>
-      )}
-
-      {access?.isMaster && activeOrg?.id && (
-        <DangerZoneCard
-          key={activeOrg.id}
-          org={activeOrg}
-          orgName={purgeName}
-          groupScope={groupScope}
-          onDeleted={refresh}
-        />
       )}
 
       {inspectMetric && inspectDetail && (

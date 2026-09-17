@@ -241,7 +241,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
           onClick={() => setReloadKey(k => k + 1)}
         />
         {!isVendorView && (
-          <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog('arrange')}>Customize</Button>
+          <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog('arrange')}>Customise</Button>
         )}
         <Button variant="outline" icon={Download} onClick={() => setDialog('export')} disabled={!fresh}>Export</Button>
       </PageHeader>
@@ -272,7 +272,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
           <EmptyState
             icon={LayoutGrid}
             title="No tiles at the top"
-            action={!isVendorView && <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog('arrange')}>Customize</Button>}
+            action={!isVendorView && <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog('arrange')}>Customise</Button>}
           >
             Move a metric to Primary to show it here.
           </EmptyState>

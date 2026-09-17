@@ -1,256 +1,185 @@
-.admin-cup-qr {
-  padding: 20px 28px 40px;
-  display: flex;
-  flex-direction: column;
-}
+/* Receipt generator → Cup QR receipts. Shared pieces live in ui/ui.css.
+ *
+ * Everything under .acq-receipt is the printed / exported artwork (JPG, PDF,
+ * browser print) and keeps its own colours; the rest is dashboard chrome. */
 
-/* Header row — title block on the left, export buttons aligned to the
- * right so the user doesn't have to scroll the preview pane to find them. */
-.acq-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-.acq-header__text { flex: 1; min-width: 280px; }
-.acq-header__title {
-  font-size: 20px;
-  font-weight: 800;
-  color: #1A1A1A;
-  margin: 0 0 3px;
-}
-.acq-header__sub {
-  font-size: 12px;
-  color: #7A7166;
-  margin: 0;
-  max-width: 640px;
-  line-height: 1.35;
-}
-.acq-header__actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-  padding-top: 2px;
-}
+.acq { display: flex; flex-direction: column; gap: 16px; }
 
-/* Two-column layout — controls on the left, receipt preview on the right.
- * Natural height (no inner scroll); both columns flow normally and the
- * page itself scrolls if content is taller than the viewport. */
+/* ePOS print result */
+.acq-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
+.acq-status svg { flex: none; }
+.acq-status--ok { background: #EEF8F3; border-color: #D5EFE2; color: var(--ui-success); }
+.acq-status--err { background: #FDF0F3; border-color: #F7D9E1; color: var(--ui-danger); }
+
+/* Two columns: controls on the left, the receipt preview on the right. */
 .acq-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(360px, 520px);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 460px);
+  gap: 16px;
   align-items: start;
 }
-@media (max-width: 960px) {
-  .acq-layout { grid-template-columns: 1fr; }
+@media (max-width: 1080px) {
+  .acq-layout { grid-template-columns: minmax(0, 1fr); }
 }
+.acq-controls { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
-.acq-controls,
-.acq-preview-wrap { display: flex; flex-direction: column; gap: 12px; }
-
-.acq-preview-wrap { align-items: center; }
-
-/* ── Controls panel ─────────────────────────────────────────────────── */
-.acq-controls { display: flex; flex-direction: column; gap: 12px; }
-
-.acq-card {
-  background: #FFFFFF;
-  border: 1px solid #E8E6E1;
-  border-radius: 16px;
-  padding: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+/* ── Controls ───────────────────────────────────────────────────────── */
+.acq-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 16px 18px;
 }
+.acq-fields__wide { grid-column: 1 / -1; }
+.acq-optional { margin-left: 4px; font-size: 11.5px; font-weight: 500; color: var(--ui-muted-2); }
+.ui-input.acq-mono-input { font-family: var(--ui-mono); font-size: 13px; }
+.acq-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 
-.acq-card__title {
-  font-size: 14px;
-  font-weight: 800;
-  color: #1A1A1A;
-  margin: 0 0 10px;
-}
-
-.acq-field {
+.acq-actions {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 9px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--ui-border);
 }
 
-.acq-field__label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #4A4540;
-  letter-spacing: 0.02em;
-}
-
-.acq-field__hint {
-  font-size: 11px;
-  color: #6C6259;
-  font-style: italic;
-}
-
-/* Number stepper */
+/* Cup count stepper */
 .acq-stepper {
-  display: flex;
+  display: inline-flex;
   align-items: stretch;
-  gap: 0;
-  border: 1px solid #E0DDD8;
-  border-radius: 10px;
-  overflow: hidden;
   width: fit-content;
+  height: 38px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--ui-card);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
+.acq-stepper:focus-within { border-color: rgba(91, 63, 214, 0.55); box-shadow: 0 0 0 3px var(--ui-ring); }
 .acq-stepper__btn {
-  width: 36px;
-  background: #FAFAF8;
-  border: none;
-  font-size: 18px;
-  font-weight: 700;
-  color: #4A4540;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  border: 0;
+  background: var(--ui-soft);
+  color: var(--ui-fg-2);
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background-color 0.15s, color 0.15s;
 }
-.acq-stepper__btn:hover:not(:disabled) { background: #F0EDE8; }
+.acq-stepper__btn:hover:not(:disabled) { background: var(--ui-soft-2); color: var(--ui-fg); }
 .acq-stepper__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .acq-stepper__input {
-  width: 56px;
+  width: 58px;
+  border: 0;
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-card);
+  color: var(--ui-fg);
+  font: 700 15px/1 var(--ui-font);
   text-align: center;
-  border: none;
-  background: white;
-  border-left: 1px solid #E0DDD8;
-  border-right: 1px solid #E0DDD8;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1A1A1A;
+  font-variant-numeric: tabular-nums;
   outline: none;
+  -moz-appearance: textfield;
 }
-.acq-stepper__input:focus { background: #FFF8F1; }
 .acq-stepper__input::-webkit-outer-spin-button,
 .acq-stepper__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-
-.acq-input {
-  border: 1px solid #E0DDD8;
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-size: 13px;
-  font-family: inherit;
-  color: #1A1A1A;
-  outline: none;
-  background: white;
-}
-.acq-input:focus { border-color: var(--pb-orange-warm); }
-
-/* Buttons */
-.acq-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: none;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.acq-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.acq-btn--primary { background: var(--pb-orange-warm); color: white; }
-.acq-btn--primary:hover:not(:disabled) { background: #E55A30; }
-
-/* "Print receipt" — distinct colour from the orange Generate button so the
-   two side-by-side actions are clearly different. */
-.acq-btn--print { background: var(--pb-green); color: white; }
-.acq-btn--print:hover:not(:disabled) { background: #15702E; }
-
-/* Generate + Print side by side, each filling half the row. */
-.acq-generate-row {
-  display: flex;
-  gap: 8px;
-}
-.acq-generate-row .acq-btn { flex: 1; }
-.acq-btn--ghost {
-  background: white;
-  color: #4A4540;
-  border: 1px solid #E0DDD8;
-}
-.acq-btn--ghost:hover:not(:disabled) { background: #F8F4EC; }
+.admin-app .acq-stepper__input:focus-visible { outline: none; }
 
 .acq-error {
-  margin-top: 10px;
-  padding: 8px 12px;
-  background: rgba(220,38,38,0.08);
-  border: 1px solid rgba(220,38,38,0.2);
-  border-radius: 8px;
-  color: #DC2626;
-  font-size: 12px;
-}
-
-/* Meta panel */
-.acq-card--meta { font-size: 12px; }
-.acq-meta-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid #F0EDE8;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 14px 0 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px solid #F7D9E1;
+  background: #FDF0F3;
+  color: var(--ui-danger);
+  font-size: 12.5px;
+  line-height: 1.45;
 }
-.acq-meta-row:last-child { border-bottom: none; }
-.acq-meta-row--col { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 0; }
-.acq-meta-row span:first-child { color: #7A7166; }
-.acq-meta-row strong { color: #1A1A1A; }
+.acq-error svg { flex: none; margin-top: 1px; }
 
-.acq-mono { font-family: ui-monospace, monospace; font-size: 11.5px; }
+/* Latest batch */
+.acq-meta { margin: 0; display: flex; flex-direction: column; }
+.acq-meta__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 13px;
+}
+.acq-meta__row:first-child { padding-top: 2px; }
+.acq-meta__row:last-child { border-bottom: 0; padding-bottom: 0; }
+.acq-meta__row--col { flex-direction: column; align-items: stretch; gap: 6px; }
+.acq-meta dt { color: var(--ui-muted); font-size: 12.5px; }
+.acq-meta dd { margin: 0; color: var(--ui-fg); font-weight: 600; min-width: 0; }
+.acq-meta__row--col dd { font-weight: 400; }
+.acq-url-row { display: flex; align-items: flex-start; gap: 8px; }
+.acq-url-row .acq-url { flex: 1; }
+
 .acq-url {
-  font-family: ui-monospace, monospace;
-  font-size: 11px;
-  background: #F4EFE5;
+  display: block;
+  min-width: 0;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
+  background: var(--ui-soft);
+  color: var(--ui-fg-2);
+  font-family: var(--ui-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
   word-break: break-all;
-  color: #4A4540;
 }
 
 .acq-uuids summary {
   cursor: pointer;
-  font-size: 11.5px;
+  width: fit-content;
+  font-size: 12.5px;
   font-weight: 600;
-  color: #4A4540;
-  padding: 4px 0;
+  color: var(--ui-primary);
 }
 .acq-uuids ul {
   list-style: none;
-  padding: 6px 0 0;
   margin: 0;
+  padding: 8px 0 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
+  max-height: 220px;
+  overflow-y: auto;
 }
 .acq-uuids li {
-  font-family: ui-monospace, monospace;
-  font-size: 11px;
-  color: #6B645B;
   padding: 3px 8px;
-  background: #FAFAF8;
-  border-radius: 4px;
+  border-radius: 6px;
+  background: var(--ui-soft);
+  color: var(--ui-fg-2);
+  font-family: var(--ui-mono);
+  font-size: 11.5px;
 }
 
 /* ── Receipt preview ────────────────────────────────────────────────── */
+.acq-preview-card { position: sticky; top: calc(var(--topbar-h, 64px) + 16px); }
 .acq-preview-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  margin: 4px 16px 16px;
+  padding: 22px 16px;
+  border-radius: 10px;
+  background: var(--ui-soft);
 }
-
-.acq-preview-actions {
-  display: flex;
-  gap: 8px;
-  align-self: stretch;
-  justify-content: flex-end;
+@media (max-width: 1080px) {
+  .acq-preview-card { position: static; }
 }
 
 .acq-receipt {
@@ -419,34 +348,71 @@
   word-break: break-all;
 }
 
-/* ── Print styling — hides everything except the receipt panel ────── */
+.acq-mono { font-family: ui-monospace, monospace; font-size: 11.5px; }
+
+/* ── Recent batches ─────────────────────────────────────────────────── */
+.acq-batches__loading { margin: 0; padding: 22px 20px; font-size: 13px; color: var(--ui-muted); }
+.acq-table-wrap { overflow-x: auto; }
+.acq-table { min-width: 760px; }
+.acq-table td { vertical-align: middle; white-space: nowrap; }
+.acq-table thead th:first-child, .acq-table td:first-child { padding-left: 16px; }
+.acq-table thead th:last-child, .acq-table td:last-child { padding-right: 16px; }
+.acq-table .acq-check { width: 44px; }
+.acq-row--selected td,
+.acq-table tbody tr.acq-row--selected:hover td { background: var(--ui-primary-softer); }
+.acq-muted { color: var(--ui-muted) !important; font-size: 12.5px; }
+.acq-why { font-weight: 500; opacity: 0.8; cursor: help; }
+.acq-row-actions { text-align: right; }
+.acq-row-actions .ui-btn + .ui-btn { margin-left: 4px; }
+
+.acq-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.acq-pagination__btns { display: flex; gap: 6px; }
+
+/* ── Re-opened QR for a past batch ── */
+.acq-qrmodal { display: flex; flex-direction: column; gap: 12px; }
+.acq-qrmodal__qr {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+.acq-qrmodal__qr canvas { display: block; }
+.acq-qrmodal__meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--ui-fg-2); }
+.acq-qrmodal__label { font-size: 12px; color: var(--ui-muted); }
+
+/* ── Browser print: only the receipt ────────────────────────────────
+ * handlePrint() puts .cupqr-printing on <body>. Every element that is not
+ * the receipt, inside it, or one of its ancestors is hidden; the ancestors
+ * lose their layout so the receipt sits at the top of the page. */
 @media print {
-  body.cupqr-printing > div:not(#cupqr-receipt-print-target) {
-    /* fall through to the more specific rule below */
-  }
-  body.cupqr-printing .admin-app__body,
-  body.cupqr-printing .admin-app > *:not(.admin-app__body),
-  body.cupqr-printing .admin-sidebar,
-  body.cupqr-printing .admin-app__main > *:not(.admin-cup-qr),
-  body.cupqr-printing .acq-header,
-  body.cupqr-printing .acq-controls,
-  body.cupqr-printing .acq-preview-actions {
+  body.cupqr-printing { background: white; }
+  body.cupqr-printing .admin-app *:not(:has(#cupqr-receipt-print-target)):not(#cupqr-receipt-print-target):not(#cupqr-receipt-print-target *) {
     display: none !important;
   }
-  body.cupqr-printing { background: white; }
   body.cupqr-printing .admin-app,
-  body.cupqr-printing .admin-app__body,
-  body.cupqr-printing .admin-app__main,
-  body.cupqr-printing .admin-cup-qr,
-  body.cupqr-printing .acq-layout,
-  body.cupqr-printing .acq-preview-wrap {
+  body.cupqr-printing .admin-app :has(#cupqr-receipt-print-target) {
     display: block !important;
+    position: static !important;
     padding: 0 !important;
     margin: 0 !important;
-    grid-template-columns: 1fr !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    max-width: none !important;
     min-height: auto !important;
     height: auto !important;
     overflow: visible !important;
+    animation: none !important;
   }
   body.cupqr-printing .acq-receipt {
     border: none !important;
@@ -454,243 +420,4 @@
     max-width: none !important;
     margin: 0 auto !important;
   }
-}
-
-
-/* ── P-21: recent batches table + revoke ─────────────────────────── */
-.acq-batches {
-  margin-top: 28px;
-  padding: 22px;
-  background: #FFFFFF;
-  border: 1px solid #E5DECF;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-}
-
-.acq-batches__head {
-  margin-bottom: 14px;
-}
-
-.acq-batches__title {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 800;
-  color: #1A1A1A;
-  letter-spacing: -0.005em;
-}
-
-.acq-batches__sub {
-  margin: 0;
-  font-size: 12.5px;
-  color: #7A7166;
-  line-height: 1.5;
-  max-width: 640px;
-}
-
-.acq-batches__loading,
-.acq-batches__empty {
-  padding: 20px 0;
-  text-align: center;
-  font-size: 13px;
-  color: #6C6259;
-}
-
-.acq-batches__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.acq-batches__table thead tr {
-  border-bottom: 1px solid #F0EDE8;
-}
-.acq-batches__table th {
-  text-align: left;
-  padding: 10px 12px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #6C6259;
-}
-.acq-batches__table tbody tr {
-  border-bottom: 1px solid #F8F6F3;
-  transition: background 0.1s ease;
-}
-.acq-batches__table tbody tr:hover { background: #FAFAF8; }
-.acq-batches__table td {
-  padding: 10px 12px;
-  vertical-align: middle;
-}
-.acq-batches__muted { color: #7A7166; font-size: 12px; }
-.acq-batches__actions { text-align: right; }
-
-.acq-batch-status {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-}
-.acq-batch-status--active  { background: rgba(74, 222, 128, 0.14); color: #16A34A; }
-.acq-batch-status--used    { background: #ECE5D8;                   color: #6C5E47; }
-.acq-batch-status--expired { background: rgba(214, 149, 0, 0.14);  color: #7C5A00; }
-.acq-batch-status--revoked { background: rgba(220, 38, 38, 0.10);  color: #C73E1D; }
-.acq-batch-status__why { font-weight: 600; opacity: 0.7; cursor: help; }
-
-.acq-batches__btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.08s ease;
-}
-.acq-batches__btn:active:not(:disabled) { transform: translateY(1px); }
-.acq-batches__btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.acq-batches__btn--danger {
-  background: #FFFFFF;
-  color: #C73E1D;
-  border-color: rgba(220, 38, 38, 0.32);
-}
-.acq-batches__btn--danger:hover:not(:disabled) {
-  background: rgba(220, 38, 38, 0.06);
-  border-color: rgba(220, 38, 38, 0.50);
-}
-
-.acq-batches__btn--ghost {
-  background: #FFFFFF;
-  color: #4A4540;
-  border-color: #E5DECF;
-}
-.acq-batches__btn--ghost:hover:not(:disabled) {
-  background: #F8F4EC;
-  border-color: #DCD3C1;
-}
-
-/* Epson ePOS-Print status message */
-.acq-print-status {
-  margin: 12px 0 0;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.acq-print-status--ok {
-  background: rgba(26, 135, 55, 0.10);
-  color: #14622A;
-  border: 1px solid rgba(26, 135, 55, 0.35);
-}
-.acq-print-status--err {
-  background: rgba(220, 38, 38, 0.08);
-  color: #B91C1C;
-  border: 1px solid rgba(220, 38, 38, 0.35);
-}
-
-.acq-batches__row--selected { background: #FFF6F2; }
-
-/* Recent-batches pagination */
-.acq-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 14px;
-}
-.acq-pagination__info {
-  font-size: 12px;
-  color: #6C6259;
-  font-weight: 600;
-}
-
-/* ── Quick print (unfoldable round buttons) ── */
-.acq-quick__toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-.acq-quick__chevron { color: #8A8175; transition: transform 0.2s ease; }
-.acq-quick__chevron--open { transform: rotate(180deg); }
-
-.acq-quick__body { margin-top: 12px; }
-.acq-quick__row {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-.acq-quick__btn {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 1.5px solid #E2DAC9;
-  background: #fff;
-  font-size: 18px;
-  font-weight: 800;
-  color: #1D1D1D;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.08s;
-}
-.acq-quick__btn:hover:not(:disabled) { background: var(--pb-orange-warm); border-color: var(--pb-orange-warm); color: #fff; }
-.acq-quick__btn:active:not(:disabled) { transform: scale(0.94); }
-.acq-quick__btn:disabled { opacity: 0.5; cursor: default; }
-.acq-quick__spin {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(0, 0, 0, 0.18);
-  border-top-color: var(--pb-orange-warm);
-  border-radius: 50%;
-  animation: acq-quick-spin 0.7s linear infinite;
-}
-@keyframes acq-quick-spin { to { transform: rotate(360deg); } }
-
-/* ── Batch source tag (Recent batches) ──
-   "Requested" = the smart bin asked for this batch (print-first: the bin's
-   session id is the batch id). "Generated" = minted here at a desk. */
-.acq-src {
-  display: inline-block; padding: 3px 10px; border-radius: 999px;
-  font-size: 11px; font-weight: 800; white-space: nowrap;
-}
-.acq-src--bin   { background: #E7EEFB; color: #2A5DAF; }
-.acq-src--admin { background: #F1EBDF; color: #7A7166; }
-
-/* ── Re-opened QR for a past batch ── */
-.acq-qrmodal {
-  position: fixed; inset: 0; z-index: 90;
-  display: flex; align-items: center; justify-content: center; padding: 20px;
-}
-.acq-qrmodal__back { position: absolute; inset: 0; background: rgba(31, 27, 22, 0.45); }
-.acq-qrmodal__card {
-  position: relative; width: 100%; max-width: 380px;
-  background: #fff; border-radius: 16px; padding: 22px 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
-  text-align: center;
-}
-.acq-qrmodal__title { margin: 0 0 10px; font-size: 17px; font-weight: 800; color: #1F1B16; }
-.acq-qrmodal__meta {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin: 0 0 14px; font-size: 12px; color: #7A7166; flex-wrap: wrap;
-}
-.acq-qrmodal__qr {
-  display: flex; justify-content: center;
-  padding: 12px; background: #fff; border: 1px solid #EDE6D8; border-radius: 12px;
-}
-.acq-qrmodal__url {
-  display: block; margin: 12px 0 0; word-break: break-all;
-  font-size: 11.5px; text-align: left;
-}
-.acq-qrmodal__actions {
-  display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;
 }

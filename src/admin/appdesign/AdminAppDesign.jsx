@@ -1,1059 +1,537 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_DESIGN, mergeDesign } from './designDefaults';
-import { extractColorsFromFile } from './extractColors';
-import { saveAppConfig } from '../../lib/api';
-import { uploadRewardImage } from '../lib/adminApi';
-import { GUIDE_ICONS, GUIDE_ICON_KEYS } from '../../components/HowItWorks';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Check, ChevronLeft, ChevronRight, Ellipsis, ExternalLink, Eye, LockOpen, RotateCcw, Send, TriangleAlert,
+} from 'lucide-react';
+import {
+  Badge, Button, Card, Menu, MenuItem, Modal, PageHeader, Segmented, Tabs, ToggleChip,
+} from '../ui';
+import { supabase } from '../../lib/supabase';
+import { composeGroupCopy } from '../../lib/groups';
+import { resolvePaymentMethod, voucherGuideSteps } from '../../lib/paymentMethods';
+import { effectiveRates } from '../../lib/rates';
+import { formatMoney, getRegion } from '../../lib/regions';
 import { useOrg } from '../context/OrgContext';
 import { useViewRole } from '../context/ViewRole';
 import { logAction } from '../auth/actionLog';
-import './AdminAppDesign.css';
 import { useAdminMoney } from '../lib/adminMoney';
+import { DEFAULT_DESIGN, mergeDesign } from './designDefaults';
+import { BUILT_IN_GUIDE, COLOR_KEYS, SCREENS, TABS, featureOn, resolveGuideStep } from './designModel';
+import { toHex } from './colorUtils';
+import { Callout } from './DesignFields';
+import ColoursPanel from './ColoursPanel';
+import CopyPanel from './CopyPanel';
+import SectionsPanel from './SectionsPanel';
+import GuidePanel from './GuidePanel';
+import PhonePreview from './PhonePreview';
+import './AdminAppDesign.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * AdminAppDesign — per-org "skin" editor for the user-facing web app.
+ * Design & copy — how one organisation's customer app looks and reads.
  *
- * Layout:
- *   ┌───────────────────────── header ─────────────────────────┐
- *   │  App Design                       [Revert] [Save changes]│
- *   ├───────────────────── 2/3 controls ──────┬── 1/3 preview ─┤
- *   │                                          │                │
- *   │  ┌──── tabs ────┐                        │   live mock-up │
- *   │  Colors │ Copy │ Sections │ Smart Import │   of the user  │
- *   │                                          │   app, painted │
- *   │  …form for current tab…                  │   with the     │
- *   │                                          │   draft palette│
- *   └──────────────────────────────────────────┴────────────────┘
+ *   ┌ header ─────────────────────── status · ⋯ · Revert · Publish ┐
+ *   │ Colours │ Copy │ Sections │ Guide          ┌ preview ────────┐ │
+ *   │ cards for the chosen tab                   │ Home/Account/…  │ │
+ *   │                                            │  [ phone ]      │ │
+ *   └────────────────────────────────────────────┴─────────────────┘
  *
- * Data flow:
- *   • The draft lives in `draftState.draft.settings.design` (per-org
- *     via useAdminDraft → org-keyed localStorage). Every change runs
- *     through draftState.updateDraft so it autosaves locally as the
- *     admin tinkers.
- *   • Save → publishes the whole settings/rewards bundle via
- *     publishDraft (writes app_config row `published:<orgId>` so the
- *     user app picks it up on next load).
- *   • Revert → snaps the draft back to whatever is currently published.
- *
- * Independence between orgs: useAdminDraft re-keys localStorage on org
- * switch, so KFC's palette never bleeds into BK's even before publish.
+ * Data: everything edits the org's draft through draftState.updateDraft
+ * (org-keyed, autosaved locally): settings.design.{colors, copy, sections,
+ * guide} plus the top-level heroHeadline, heroSubtext, donationRecipient
+ * and donationDescription. Publish calls draftState.publishDraft, which
+ * puts the WHOLE draft live (rewards and settings too), so the confirm
+ * dialog says what else is waiting. Revert puts this page's settings back
+ * to what is published and leaves the rest of the draft alone.
  * ───────────────────────────────────────────────────────────────────── */
 
-const TABS = [
-  { id: 'colors',   label: 'Colors' },
-  { id: 'copy',     label: 'Copy' },
-  { id: 'sections', label: 'Sections' },
-  { id: 'guide',    label: 'Guide stories' },
-  { id: 'import',   label: 'Smart import' },
-];
-
 const TAB_STORAGE_KEY = 'pp_admin_appdesign_tab';
+const COPY_KEYS = ['heroHeadline', 'heroSubtext', 'donationRecipient', 'donationDescription'];
+const NO_SETTINGS = {};
+const SAMPLE_REWARD = { id: 'sample', name: 'Your featured reward', cupsNeeded: 5, tags: [], image: '' };
+
+function readStoredTab() {
+  try {
+    const stored = localStorage.getItem(TAB_STORAGE_KEY);
+    return TABS.some(t => t.id === stored) ? stored : 'colors';
+  } catch { return 'colors'; }
+}
+
+/* The group's published config, for venues in a group (their home and
+ * account copy, guide and payment method come from it). */
+function useGroupConfig(groupId) {
+  const [loaded, setLoaded] = useState({ id: null, config: null });
+  useEffect(() => {
+    if (!groupId) return undefined;
+    let alive = true;
+    supabase.from('app_config').select('value').eq('key', `published:group:${groupId}`).maybeSingle()
+      .then(({ data }) => { if (alive) setLoaded({ id: groupId, config: data?.value || null }); })
+      .catch(() => { if (alive) setLoaded({ id: groupId, config: null }); });
+    return () => { alive = false; };
+  }, [groupId]);
+  return loaded.id === groupId ? loaded.config : null;
+}
+
+/* The logo width a venue set for the app header. OrgContext doesn't load
+ * this column, so the preview reads it here. */
+function useLogoWidth(orgId) {
+  const [loaded, setLoaded] = useState({ id: null, width: null });
+  useEffect(() => {
+    if (!orgId) return undefined;
+    let alive = true;
+    supabase.from('organizations').select('logo_width').eq('id', orgId).maybeSingle()
+      .then(({ data }) => { if (alive) setLoaded({ id: orgId, width: data?.logo_width ?? null }); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [orgId]);
+  return loaded.id === orgId ? loaded.width : null;
+}
 
 export default function AdminAppDesign({ draftState }) {
-  const { activeOrg } = useOrg();
+  const { activeOrg, activeGroupId, activeGroup, activeGroupMode } = useOrg();
   const { access } = useViewRole();
   const readOnly = !!access && !access.canEdit('appdesign');
-  /* Tab persisted to localStorage so it survives any incidental
-   * remounts (admin sidebar nav, org switch, HMR in dev). Without
-   * this, editing a non-Colors tab would occasionally bounce the
-   * user back to the Colors tab because parent state changes
-   * recreated the active panel — confusing and frustrating to debug. */
-  const [tab, setTab] = useState(() => {
-    if (typeof window === 'undefined') return 'colors';
-    try {
-      const stored = localStorage.getItem(TAB_STORAGE_KEY);
-      return stored && TABS.some(t => t.id === stored) ? stored : 'colors';
-    } catch { return 'colors'; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(TAB_STORAGE_KEY, tab); } catch { /* private mode etc */ }
-  }, [tab]);
+  const isMaster = !!access?.isMaster;
+  const { region } = useAdminMoney();
+  const money = useMemo(() => (n) => formatMoney(n, region), [region]);
 
-  const [saving, setSaving] = useState(false);
-  const [saveOk, setSaveOk] = useState(false);
-  const [error, setError] = useState(null);
+  const [tab, setTabState] = useState(readStoredTab);
+  const [screen, setScreen] = useState(() => (readStoredTab() === 'guide' ? 'guide' : 'home'));
+  const [guideIndex, setGuideIndex] = useState(0);
+  const [unlocked, setUnlocked] = useState(false);
+  const [dialog, setDialog] = useState(null); // 'publish' | 'revert' | 'reset'
+  const [justPublished, setJustPublished] = useState(false);
 
-  const settings = draftState?.draft?.settings || {};
+  function setTab(next) {
+    setTabState(next);
+    if (next === 'guide') setScreen('guide');
+    else if (screen === 'guide') setScreen('home');
+    try { localStorage.setItem(TAB_STORAGE_KEY, next); } catch { /* private mode */ }
+  }
+
+  const draft = draftState?.draft;
+  const publishedDraft = draftState?.published;
+  const settings = draft?.settings || NO_SETTINGS;
+  const rewards = draft?.rewards;
+  const published = publishedDraft?.settings || null;
   const design = useMemo(() => mergeDesign(settings.design), [settings.design]);
 
+  const groupConfig = useGroupConfig(activeGroupId);
+  const logoWidth = useLogoWidth(activeOrg?.id);
+  const previewOrg = useMemo(
+    () => (activeOrg && logoWidth ? { ...activeOrg, logo_width: logoWidth } : activeOrg),
+    [activeOrg, logoWidth],
+  );
+  const groupCopy = useMemo(() => (activeGroupId
+    ? composeGroupCopy({ mode: groupConfig?.settings?.mode ?? activeGroupMode, groupConfig })
+    : null), [activeGroupId, activeGroupMode, groupConfig]);
+  const isVoucher = resolvePaymentMethod(settings.paymentMethod, groupConfig?.settings?.paymentMethod) === 'voucher';
+  const isTikkie = getRegion(region)?.payoutNoun === 'Tikkie link';
+
+  const view = useMemo(() => buildPreviewView({
+    design, settings, org: previewOrg, rewards, groupCopy, isVoucher, isTikkie, money, unlocked,
+  }), [design, settings, previewOrg, rewards, groupCopy, isVoucher, isTikkie, money, unlocked]);
+  const stepCount = view.guideSteps.length;
+  const shownStep = Math.min(guideIndex, stepCount - 1);
+  const customSteps = design.guide.steps;
+
+  const changes = useMemo(() => countChanges(settings, published), [settings, published]);
+  const otherChanges = useMemo(() => hasOtherChanges(draft, publishedDraft), [draft, publishedDraft]);
+
+  /* ── Draft writers ───────────────────────────────────────────────── */
   function patchDesign(group, patch) {
-    draftState.updateDraft(prev => {
-      const merged = mergeDesign(prev.settings?.design);
-      const next = {
-        ...prev,
-        settings: {
-          ...prev.settings,
-          design: {
-            ...merged,
-            [group]: { ...merged[group], ...patch },
-          },
-        },
-      };
-      return next;
-    });
-    setSaveOk(false);
-  }
-
-  /* Customer copy that lives at the top level of the settings (the home
-   * screen headline and the donation text), edited here with the rest of
-   * the app's words. */
-  function patchSetting(key, value) {
-    draftState.updateDraft(prev => ({ ...prev, settings: { ...prev.settings, [key]: value } }));
-    setSaveOk(false);
-  }
-
-  function replaceColors(nextColors) {
     draftState.updateDraft(prev => {
       const merged = mergeDesign(prev.settings?.design);
       return {
         ...prev,
-        settings: {
-          ...prev.settings,
-          design: { ...merged, colors: { ...merged.colors, ...nextColors } },
-        },
+        settings: { ...prev.settings, design: { ...merged, [group]: { ...merged[group], ...patch } } },
       };
     });
-    setSaveOk(false);
+    setJustPublished(false);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    setSaveOk(false);
-    try {
-      // publishDraft writes the whole rewards+settings snapshot to
-      // Supabase. Side-effect we want: any user-facing tab open at
-      // /<slug>/ will pull this on next refresh.
-      draftState.publishDraft('App Design update');
-      logAction({
-        action: 'design.publish',
-        targetType: 'organization',
-        targetId: activeOrg?.id,
-        after: { design },
-      });
-      setSaveOk(true);
-      setTimeout(() => setSaveOk(false), 2200);
-    } catch (e) {
-      setError(e.message || 'Could not save.');
-    } finally {
-      setSaving(false);
-    }
+  function patchSetting(key, value) {
+    draftState.updateDraft(prev => ({ ...prev, settings: { ...prev.settings, [key]: value } }));
+    setJustPublished(false);
+  }
+
+  function replaceColors(nextColors) {
+    patchDesign('colors', nextColors);
+  }
+
+  function reveal(next) {
+    if (next) setScreen(next);
+  }
+
+  function showGuideStep(i) {
+    setScreen('guide');
+    setGuideIndex(Math.max(0, i));
+  }
+
+  /* ── Publish / revert / reset ────────────────────────────────────── */
+  function handlePublish() {
+    // publishDraft stores the snapshot locally and pushes the whole draft to
+    // app_config `published:<orgId>`; the customer app reads it on next load.
+    draftState.publishDraft('Design & copy update');
+    logAction({
+      action: 'design.publish',
+      targetType: 'organization',
+      targetId: activeOrg?.id,
+      after: { design },
+    });
+    setDialog(null);
+    setJustPublished(true);
+    setTimeout(() => setJustPublished(false), 4000);
   }
 
   function handleRevert() {
-    if (!draftState?.published) {
-      // No published baseline yet — reset to the canonical defaults.
-      draftState.updateDraft(prev => ({
+    const base = published;
+    draftState.updateDraft(prev => {
+      if (!base) {
+        // Nothing published yet: the design goes back to the defaults.
+        return { ...prev, settings: { ...prev.settings, design: structuredClone(DEFAULT_DESIGN) } };
+      }
+      const restoredCopy = Object.fromEntries(COPY_KEYS.filter(k => k in base).map(k => [k, base[k]]));
+      return {
         ...prev,
-        settings: { ...prev.settings, design: { ...DEFAULT_DESIGN } },
-      }));
-    } else {
-      // Snap back to whatever the last publish was.
-      draftState.updateDraft(prev => ({
-        ...prev,
-        settings: {
-          ...prev.settings,
-          design: mergeDesign(draftState.published.settings?.design),
-        },
-      }));
-    }
-    setSaveOk(false);
-    setError(null);
+        settings: { ...prev.settings, ...restoredCopy, design: mergeDesign(base.design) },
+      };
+    });
+    setDialog(null);
   }
 
-  function handleResetToDefaults() {
+  function handleResetAll() {
     draftState.updateDraft(prev => ({
       ...prev,
-      settings: { ...prev.settings, design: { ...DEFAULT_DESIGN } },
+      settings: { ...prev.settings, design: structuredClone(DEFAULT_DESIGN) },
     }));
-    setSaveOk(false);
+    setDialog(null);
   }
 
-  return (
-    <div className="aad">
-      <header className="aad__header">
-        <div>
-          <h1 className="aad__title">User app appearance</h1>
-          <p className="aad__sub">
-            Customise the palette, copy and visible sections of the customer-facing
-            app for <strong>{activeOrg?.name || 'this organisation'}</strong>. Each
-            org has its own design — switching the active org loads its own draft.
-          </p>
-        </div>
-        <div className="aad__actions">
-          {readOnly ? (
-            <span className="aad__readonly">View only: your role can’t change the app’s design</span>
-          ) : (
-            <>
-              {saveOk && <span className="aad__ok">Saved</span>}
-              {error && <span className="aad__error">{error}</span>}
-              <button className="aad__btn aad__btn--ghost" onClick={handleRevert} disabled={saving}>
-                Revert
-              </button>
-              <button className="aad__btn aad__btn--primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+  const orgName = activeOrg?.name || 'this organisation';
+  const status = !published
+    ? { tone: 'warning', label: 'Not published yet' }
+    : changes.total > 0
+      ? { tone: 'warning', label: `${changes.total} unpublished change${changes.total !== 1 ? 's' : ''}` }
+      : { tone: 'success', label: justPublished ? 'Published just now' : 'Published', icon: Check };
+  const tabs = TABS.map(t => (t.id === 'guide' && customSteps.length ? { ...t, count: customSteps.length } : t));
 
-      <div className="aad__layout">
-        <div className="aad__controls">
-          <div className="aad__tabs" role="tablist">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={tab === t.id}
-                className={`aad__tab ${tab === t.id ? 'aad__tab--active' : ''}`}
-                onClick={() => setTab(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
+  return (
+    <div className="ui-page dz-page">
+      <PageHeader
+        title="Design & copy"
+        subtitle={`How the customer app looks and reads for ${orgName}. Edits save to your draft as you make them; publishing puts them live.`}
+      >
+        {readOnly ? (
+          <Badge tone="neutral" icon={Eye}>View only</Badge>
+        ) : (
+          <>
+            <Badge tone={status.tone} icon={status.icon}>{status.label}</Badge>
+            <Menu
+              trigger={({ toggle, open, id }) => (
+                <Button variant="ghost" icon={Ellipsis} aria-label="More actions" aria-expanded={open} aria-controls={id} onClick={toggle} />
+              )}
+            >
+              <MenuItem icon={RotateCcw} danger onClick={() => setDialog('reset')}>Reset design to defaults…</MenuItem>
+            </Menu>
+            <Button icon={RotateCcw} disabled={!published || changes.total === 0} onClick={() => setDialog('revert')}>
+              Revert
+            </Button>
+            <Button variant="primary" icon={Send} onClick={() => setDialog('publish')} title="Puts your whole draft live, including changes made on other pages">
+              Publish draft
+            </Button>
+          </>
+        )}
+      </PageHeader>
+
+      {draftState?.publishError && !readOnly && (
+        <Callout tone="danger" icon={TriangleAlert} title="Publishing didn’t go through">
+          {draftState.publishError}
+        </Callout>
+      )}
+
+      <div className="dz-layout">
+        <div className="dz-controls">
+          {readOnly && (
+            <Callout tone="info" icon={Eye} title="You can look, but not change">
+              Your role can see this organisation’s design but can’t edit it. Ask a manager or PackBack for edit access.
+            </Callout>
+          )}
+
+          <div className="dz-tabs">
+            <Tabs tabs={tabs} value={tab} onChange={setTab} ariaLabel="Design sections" />
           </div>
 
-          <fieldset className="aad__pane" disabled={readOnly}>
+          <fieldset className="dz-pane" disabled={readOnly} key={tab}>
+            <legend className="dz-sr">{TABS.find(t => t.id === tab)?.label}</legend>
             {tab === 'colors' && (
-              <ColorsPanel
+              <ColoursPanel
                 colors={design.colors}
+                org={activeOrg}
+                readOnly={readOnly}
                 onPatch={(p) => patchDesign('colors', p)}
-                onResetToDefaults={handleResetToDefaults}
+                onReplace={replaceColors}
               />
             )}
             {tab === 'copy' && (
               <CopyPanel
-                copy={design.copy}
-                onPatch={(p) => patchDesign('copy', p)}
+                design={design}
                 settings={settings}
+                groupCopy={groupCopy}
+                groupName={activeGroup?.name}
+                isMaster={isMaster}
+                readOnly={readOnly}
+                onDesignCopy={(key, value) => patchDesign('copy', { [key]: value })}
                 onSetting={patchSetting}
+                onReveal={reveal}
               />
             )}
             {tab === 'sections' && (
-              <SectionsPanel sections={design.sections} settings={settings} onPatch={(p) => patchDesign('sections', p)} />
+              <SectionsPanel
+                sections={design.sections}
+                settings={settings}
+                readOnly={readOnly}
+                onPatch={(p) => patchDesign('sections', p)}
+                onReveal={reveal}
+              />
             )}
             {tab === 'guide' && (
-              <GuidePanel steps={design.guide?.steps || []} onChange={(steps) => patchDesign('guide', { steps })} />
-            )}
-            {tab === 'import' && (
-              <SmartImportPanel onApply={replaceColors} />
+              <GuidePanel
+                steps={customSteps}
+                builtIn={view.builtInGuide}
+                builtInFrom={view.guideFromGroup ? activeGroup?.name || 'venue’s' : null}
+                isVoucher={isVoucher}
+                activeIndex={shownStep}
+                readOnly={readOnly}
+                onChange={(steps) => patchDesign('guide', { steps })}
+                onActivate={showGuideStep}
+              />
             )}
           </fieldset>
         </div>
 
-        <aside className="aad__preview">
-          <div className="aad__preview-label">Live preview</div>
-          <DevicePreview design={design} org={activeOrg} heroHeadline={settings.heroHeadline} heroSubtext={settings.heroSubtext} />
-          <p className="aad__preview-help">
-            Reflects the current draft. Open the customer app at <code>/{activeOrg?.slug}/</code>
-            after saving to see it live.
-          </p>
+        <aside className="dz-preview" aria-label="Preview">
+          <Card className="dz-preview__card">
+            <div className="dz-preview__bar">
+              <Segmented options={SCREENS} value={screen} onChange={setScreen} ariaLabel="Screen to preview" />
+              {activeOrg?.slug && (
+                <a
+                  className="ui-btn ui-btn--ghost ui-btn--sm ui-btn--icon"
+                  href={`/${activeOrg.slug}/`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open the live app in a new tab. It shows what is published, not your draft."
+                  aria-label="Open the live app"
+                >
+                  <ExternalLink size={14} aria-hidden="true" />
+                </a>
+              )}
+            </div>
+            <div className="dz-preview__stage">
+              <PhonePreview screen={screen} view={view} guideIndex={shownStep} onGuideIndex={setGuideIndex} />
+            </div>
+            <div className="dz-preview__foot">
+              {screen === 'home' && (
+                <div className="dz-preview__row">
+                  <span className="dz-preview__note">
+                    Your draft, with a sample balance of {view.collected} of {view.reward.cupsNeeded} cups
+                  </span>
+                  <ToggleChip pressed={unlocked} icon={LockOpen} onClick={() => setUnlocked(u => !u)}>Unlocked</ToggleChip>
+                </div>
+              )}
+              {screen === 'account' && (
+                <span className="dz-preview__note">Your draft, with a sample customer and activity.</span>
+              )}
+              {screen === 'guide' && (
+                <div className="dz-preview__row">
+                  <Button variant="ghost" size="sm" icon={ChevronLeft} aria-label="Previous step" disabled={shownStep <= 0} onClick={() => setGuideIndex(shownStep - 1)} />
+                  <span className="dz-preview__note dz-preview__note--center">
+                    Step {shownStep + 1} of {stepCount}
+                    <small>{customSteps.length ? 'Your guide (draft)' : view.guideFromGroup ? 'The group’s guide' : 'The built-in guide'}</small>
+                  </span>
+                  <Button variant="ghost" size="sm" icon={ChevronRight} aria-label="Next step" disabled={shownStep >= stepCount - 1} onClick={() => setGuideIndex(shownStep + 1)} />
+                </div>
+              )}
+              {view.groupNote && screen !== 'guide' && <span className="dz-preview__note dz-preview__note--warn">{view.groupNote}</span>}
+            </div>
+          </Card>
         </aside>
       </div>
-    </div>
-  );
-}
 
-/* ─── Colors panel ────────────────────────────────────────────────── */
-/* ─── Colors panel ──────────────────────────────────────────────────
- * Tokens are grouped into three logical sets — Brand, Surface, Text +
- * one State swatch — instead of one flat list. Designers think in
- * "what role does this colour play", not "alphabetical list of vars".
- *
- * Each row also surfaces a tiny contrast preview ("Aa" on the swatch
- * background) and a 4.5:1 / 3:1 pass/fail chip when relevant. That
- * catches the common mistake of picking a too-light text colour or
- * a too-dark background. */
-function ColorsPanel({ colors, onPatch, onResetToDefaults }) {
-  const GROUPS = [
-    {
-      title: 'Brand',
-      hint: "These three drive everything that should look distinctly yours — CTAs, the progress bar, highlight pills, the 'FREE' badge. Accent + Deep accent together paint the cup-progress gradient.",
-      fields: [
-        { key: 'primary',    label: 'Primary',     hint: 'Dark CTAs, headings, strokes.',                       pairTextOn: 'surface' },
-        { key: 'accent',     label: 'Accent · gradient start', hint: 'Highlight chips + left end of the progress gradient.', pairTextOn: 'surface' },
-        { key: 'accentDeep', label: 'Deep accent · gradient end', hint: '"FREE" pills + right end of the progress gradient.', pairTextOn: 'surface' },
-      ],
-    },
-    {
-      title: 'Surface',
-      hint: 'The two layers your content sits on. Background is the page; surface is each card or sheet.',
-      fields: [
-        { key: 'background', label: 'Background',  hint: 'Page backdrop. Keep it light.' },
-        { key: 'surface',    label: 'Surface',     hint: 'Cards & sheets. Usually white.' },
-      ],
-    },
-    {
-      title: 'Text',
-      hint: 'How readable the app feels. Aim for 4.5:1 contrast on body text.',
-      fields: [
-        { key: 'text',       label: 'Body text',   hint: 'Main reading colour.',          pairBg: 'background' },
-        { key: 'textMuted',  label: 'Muted text',  hint: 'Secondary copy & captions.',     pairBg: 'background' },
-      ],
-    },
-    {
-      title: 'State',
-      hint: 'Reserved tone for positive feedback (cup added, claim approved).',
-      fields: [
-        { key: 'success',    label: 'Success',     hint: 'Unlocked states, success ticks.' },
-      ],
-    },
-  ];
-  return (
-    <div className="aad-colors">
-      <div className="aad-section-head">
-        <h2>Palette</h2>
-        <button className="aad__link" onClick={onResetToDefaults} type="button">Reset to defaults</button>
-      </div>
-      <div className="aad-colors__groups">
-        {GROUPS.map(group => (
-          <div key={group.title} className="aad-colors__group">
-            <div className="aad-colors__group-head">
-              <span className="aad-colors__group-title">{group.title}</span>
-              <span className="aad-colors__group-hint">{group.hint}</span>
-            </div>
-            <div className="aad-colors__grid">
-              {group.fields.map(f => (
-                <ColorField
-                  key={f.key}
-                  label={f.label}
-                  hint={f.hint}
-                  value={colors[f.key] || '#000000'}
-                  onChange={(v) => onPatch({ [f.key]: v })}
-                  pairTextOn={f.pairTextOn ? colors[f.pairTextOn] : null}
-                  pairBg={f.pairBg ? colors[f.pairBg] : null}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ColorField({ label, hint, value, onChange, pairTextOn, pairBg }) {
-  // Contrast hint — only shown when the field has a "paired" colour
-  // it'll commonly sit on (e.g. text on background, accent on surface).
-  // No paired colour → no chip. Calculation is the standard WCAG
-  // relative-luminance ratio.
-  const otherSide = pairBg || pairTextOn;
-  const contrast = otherSide ? wcagContrast(value, otherSide) : null;
-  const contrastBand = contrast == null ? null
-                    : contrast >= 4.5 ? 'aa'
-                    : contrast >= 3   ? 'aa-large'
-                    : 'fail';
-
-  return (
-    <div className="aad-color">
-      <div className="aad-color__head">
-        <span className="aad-color__label">{label}</span>
-        {contrast != null && (
-          <span
-            className={`aad-color__contrast aad-color__contrast--${contrastBand}`}
-            title={
-              contrastBand === 'aa'       ? `Contrast ${contrast.toFixed(1)}:1 — passes WCAG AA for body text`
-              : contrastBand === 'aa-large' ? `Contrast ${contrast.toFixed(1)}:1 — passes WCAG AA for large text only`
-              : `Contrast ${contrast.toFixed(1)}:1 — fails WCAG AA. Pick a darker or lighter tone.`
-            }
-          >
-            {contrast.toFixed(1)}:1
-          </span>
+      <Modal
+        open={dialog === 'publish'}
+        onClose={() => setDialog(null)}
+        icon={Send}
+        title="Publish your draft?"
+        subtitle={`${orgName} customers see it the next time they open the app.`}
+        footer={(
+          <>
+            <Button onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="primary" icon={Send} onClick={handlePublish}>Publish now</Button>
+          </>
         )}
-      </div>
-
-      {/* Preview tile — shows the swatch with a paired-color "Aa" so
-          the admin sees the actual feel before they tweak. */}
-      <div
-        className="aad-color__preview"
-        style={{
-          background: pairBg || value,
-          color: pairBg ? value : (pairTextOn || '#FFFFFF'),
-        }}
       >
-        Aa
-      </div>
-
-      <div className="aad-color__row">
-        <input
-          type="color"
-          value={normHex(value)}
-          onChange={e => onChange(e.target.value.toUpperCase())}
-          className="aad-color__picker"
-          aria-label={`${label} colour picker`}
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={e => onChange(e.target.value.toUpperCase())}
-          className="aad-color__hex"
-          spellCheck="false"
-        />
-      </div>
-      {hint && <p className="aad-color__hint">{hint}</p>}
-    </div>
-  );
-}
-
-function normHex(v) {
-  if (typeof v !== 'string') return '#000000';
-  const m = v.trim().match(/^#?([0-9a-f]{6})$/i);
-  return m ? '#' + m[1] : '#000000';
-}
-
-/* WCAG relative-luminance contrast ratio between two hex colours.
- * Returns null when either input can't be parsed (so callers can
- * hide the chip rather than show a misleading number). */
-function wcagContrast(a, b) {
-  const la = relativeLuminance(a);
-  const lb = relativeLuminance(b);
-  if (la == null || lb == null) return null;
-  const lighter = Math.max(la, lb);
-  const darker  = Math.min(la, lb);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function relativeLuminance(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
-  const chan = (c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
-}
-
-/* ─── Copy panel ──────────────────────────────────────────────────
- * Grouped by where the copy lives in the user app: Header, Actions,
- * Activity. Char counts on each input warn when the label would
- * overflow the button it lives in — soft warning at 18 chars,
- * hard at 24 (matches the widest practical phone button width). */
-/* Customer copy stored at the top level of the settings. */
-const SETTING_COPY_GROUPS = [
-  {
-    title: 'Home screen',
-    hint: 'The first thing customers read when they open the app.',
-    fields: [
-      { key: 'heroHeadline', label: 'Headline', maxSoft: 34, maxHard: 48, placeholder: 'Collect Cups & Get Rewards' },
-      { key: 'heroSubtext', label: 'Text under the headline', multiline: true, maxSoft: 120, maxHard: 180, hint: 'One or two short sentences.' },
-    ],
-  },
-  {
-    title: 'Donations',
-    hint: 'Shown when a customer gives cups away. Donations are switched on in Settings → Features.',
-    feature: 'featureDonations',
-    fields: [
-      { key: 'donationRecipient', label: 'Charity', maxSoft: 32, maxHard: 48, placeholder: 'Plastic Soup Foundation' },
-      { key: 'donationDescription', label: 'What the donation does', multiline: true, maxSoft: 140, maxHard: 220, hint: 'Shown on the donate confirmation screen.' },
-    ],
-  },
-];
-
-function CopyPanel({ copy, onPatch, settings = {}, onSetting }) {
-  const GROUPS = [
-    {
-      title: 'Header',
-      hint: 'Shown in the cup-balance tile at the top of every screen.',
-      fields: [
-        { key: 'badgeText', label: 'Cup balance label', maxSoft: 12, maxHard: 16, hint: 'Used by the cup-balance tile screen-reader label.' },
-      ],
-    },
-    {
-      title: 'Action buttons',
-      hint: 'CTA labels on the customer profile screen.',
-      fields: [
-        { key: 'shareButtonLabel',   label: 'Share a cup',        maxSoft: 18, maxHard: 24 },
-        { key: 'donateButtonLabel',  label: 'Donate',             maxSoft: 18, maxHard: 24 },
-        { key: 'nextCupFreeLabel',   label: '"Next cup free"',    maxSoft: 18, maxHard: 24 },
-        { key: 'refundButtonLabel',  label: 'Direct refund',      maxSoft: 22, maxHard: 28 },
-      ],
-    },
-    {
-      title: 'Sections',
-      hint: 'Labels for the long-form sections on the profile screen.',
-      fields: [
-        { key: 'activityLabel', label: 'Activity feed heading', maxSoft: 20, maxHard: 28 },
-      ],
-    },
-  ];
-
-  return (
-    <div className="aad-copy">
-      <div className="aad-section-head">
-        <h2>App copy</h2>
-        <span className="aad__hint-inline">Every word customers read in the app, in one place. Changes go live when you publish.</span>
-      </div>
-      <div className="aad-copy__groups">
-        {SETTING_COPY_GROUPS.map(group => {
-          const off = group.feature && settings[group.feature] === false;
-          return (
-            <div key={group.title} className="aad-copy__group">
-              <div className="aad-copy__group-head">
-                <span className="aad-copy__group-title">{group.title}</span>
-                <span className="aad-copy__group-hint">{off ? 'Donations are off in Settings → Features, so customers don’t see this now.' : group.hint}</span>
-              </div>
-              <div className="aad-copy__list">
-                {group.fields.map(f => {
-                  const value = settings[f.key] || '';
-                  const overSoft = value.length > f.maxSoft;
-                  const overHard = value.length > f.maxHard;
-                  const Tag = f.multiline ? 'textarea' : 'input';
-                  return (
-                    <label key={f.key} className="aad-copy__row">
-                      <span className="aad-copy__label">
-                        {f.label}
-                        {f.hint && <span className="aad-copy__hint">{f.hint}</span>}
-                      </span>
-                      <span className="aad-copy__input-wrap">
-                        <Tag
-                          {...(f.multiline ? { rows: 3 } : { type: 'text' })}
-                          value={value}
-                          onChange={e => onSetting?.(f.key, e.target.value)}
-                          className={`aad-copy__input${f.multiline ? ' aad-copy__input--area' : ''}${overHard ? ' aad-copy__input--overflow' : ''}`}
-                          placeholder={f.placeholder}
-                        />
-                        <span className={`aad-copy__count ${overHard ? 'aad-copy__count--bad' : overSoft ? 'aad-copy__count--warn' : ''}`}>
-                          {value.length}/{f.maxSoft}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-        {GROUPS.map(group => (
-          <div key={group.title} className="aad-copy__group">
-            <div className="aad-copy__group-head">
-              <span className="aad-copy__group-title">{group.title}</span>
-              <span className="aad-copy__group-hint">{group.hint}</span>
-            </div>
-            <div className="aad-copy__list">
-              {group.fields.map(f => {
-                const value = copy[f.key] || '';
-                const overSoft = value.length > f.maxSoft;
-                const overHard = value.length > f.maxHard;
-                return (
-                  <label key={f.key} className="aad-copy__row">
-                    <span className="aad-copy__label">
-                      {f.label}
-                      {f.hint && <span className="aad-copy__hint">{f.hint}</span>}
-                    </span>
-                    <span className="aad-copy__input-wrap">
-                      <input
-                        type="text"
-                        value={value}
-                        onChange={e => onPatch({ [f.key]: e.target.value })}
-                        className={`aad-copy__input ${overHard ? 'aad-copy__input--overflow' : ''}`}
-                        placeholder={DEFAULT_DESIGN.copy[f.key]}
-                        maxLength={f.maxHard + 8}
-                      />
-                      <span
-                        className={`aad-copy__count ${overHard ? 'aad-copy__count--bad' : overSoft ? 'aad-copy__count--warn' : ''}`}
-                        title={overHard
-                          ? 'Likely to overflow the button on mobile'
-                          : overSoft ? 'Getting long — may wrap on small screens'
-                          : ''}
-                      >
-                        {value.length}/{f.maxSoft}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Sections panel ──────────────────────────────────────────────── */
-function SectionsPanel({ sections, onPatch, settings = {} }) {
-  const rows = [
-    { key: 'showPackbackLogo',   label: 'PackBack logo',         hint: 'The "PackBack" wordmark on the left of the header lockup. Hiding it also removes the × separator.' },
-    { key: 'showBrandLogo',      label: 'Brand / restaurant logo', hint: 'The partner logo (BK, KFC, etc.) on the right of the header lockup.' },
-    { key: 'showShareCup',       label: 'Share a cup',           hint: 'Peer-to-peer cup transfer entry point.', feature: 'featureCupSharing', featureLabel: 'Cup sharing' },
-    { key: 'showDonate',         label: 'Donate cups',           hint: 'Donation CTA in the bottom actions.', feature: 'featureDonations', featureLabel: 'Donations' },
-    { key: 'showNextCupForFree', label: '"Next cup for free"',    hint: 'Quick-share variant for the bottom row.', feature: 'featureCupSharing', featureLabel: 'Cup sharing' },
-    { key: 'showDirectRefund',   label: 'Direct refund',         hint: 'Quick cashout button on the home screen.', feature: 'featureDirectRefunds', featureLabel: 'Direct refunds' },
-    { key: 'showActivity',       label: 'Activity / history',    hint: 'Recent cup + reward activity feed.' },
-    { key: 'showImpact',         label: 'Impact metrics',        hint: 'Lifetime cups + plastic-avoided card in the customer profile.' },
-  ];
-  return (
-    <div className="aad-sections">
-      <div className="aad-section-head">
-        <h2>Visible UI sections</h2>
-        <span className="aad__hint-inline">Hide a button without switching its feature off. The features themselves are in Settings → Features.</span>
-      </div>
-      <div className="aad-sections__list">
-        {rows.map(r => {
-          const featureOff = r.feature && settings[r.feature] === false;
-          return (
-            <div key={r.key} className={`aad-section-row${featureOff ? ' aad-section-row--off' : ''}`}>
-              <div>
-                <div className="aad-section-row__label">{r.label}</div>
-                <div className="aad-section-row__hint">
-                  {featureOff ? `${r.featureLabel} is off in Settings → Features, so this never shows.` : r.hint}
-                </div>
-              </div>
-              <Toggle
-                value={!featureOff && !!sections[r.key]}
-                onChange={(v) => { if (!featureOff) onPatch({ [r.key]: v }); }}
-                label={r.label}
-              />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function Toggle({ value, onChange, label }) {
-  return (
-    <button
-      type="button"
-      className={`aad-toggle ${value ? 'aad-toggle--on' : ''}`}
-      onClick={() => onChange(!value)}
-      aria-pressed={value}
-      aria-label={`${label} ${value ? 'on' : 'off'}`}
-    >
-      <span className="aad-toggle__dot" />
-    </button>
-  );
-}
-
-/* ─── Guide stories panel ─────────────────────────────────────────────
- * Edits the How-it-works walkthrough (the full-screen "stories" guide).
- * Steps live under design.guide.steps. An empty list means "use the
- * built-in / group-mode guide"; adding steps here fully replaces it.
- * Each step carries a title, body text, an optional image, an icon and
- * an accent colour. */
-function GuidePanel({ steps, onChange }) {
-  const list = Array.isArray(steps) ? steps : [];
-
-  function update(i, patch) {
-    onChange(list.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
-  }
-  function add() {
-    const n = list.length;
-    onChange([
-      ...list,
-      {
-        key: `step-${n + 1}-${n}`,
-        title: '',
-        text: '',
-        image: '',
-        icon: GUIDE_ICON_KEYS[n % GUIDE_ICON_KEYS.length],
-        accent: '#E08A53',
-        bg: '',
-      },
-    ]);
-  }
-  function remove(i) { onChange(list.filter((_, idx) => idx !== i)); }
-  function move(i, dir) {
-    const j = i + dir;
-    if (j < 0 || j >= list.length) return;
-    const next = [...list];
-    [next[i], next[j]] = [next[j], next[i]];
-    onChange(next);
-  }
-
-  return (
-    <div className="aad-guide">
-      <div className="aad-section-head">
-        <h2>Guide stories</h2>
-        <span className="aad__hint-inline">
-          The full-screen walkthrough customers open from “How it works”. Empty = the built-in guide.
-        </span>
-      </div>
-
-      {list.length === 0 && (
-        <p className="aad-guide__empty">
-          No custom steps yet — the app shows its built-in guide. Add a step to fully take over the walkthrough.
-        </p>
-      )}
-
-      <div className="aad-guide__list">
-        {list.map((s, i) => (
-          <GuideStepEditor
-            key={s.key || i}
-            index={i}
-            total={list.length}
-            step={s}
-            onUpdate={(patch) => update(i, patch)}
-            onRemove={() => remove(i)}
-            onMove={(dir) => move(i, dir)}
-          />
-        ))}
-      </div>
-
-      <button type="button" className="aad__btn aad__btn--ghost aad-guide__add" onClick={add}>
-        + Add step
-      </button>
-    </div>
-  );
-}
-
-function GuideStepEditor({ index, total, step, onUpdate, onRemove, onMove }) {
-  const fileRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
-  const [err, setErr] = useState(null);
-
-  async function handleFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setErr(null); setUploading(true);
-    try {
-      const url = await uploadRewardImage(file);
-      if (!url) throw new Error('Upload returned no URL.');
-      onUpdate({ image: url });
-    } catch (ex) {
-      setErr(ex.message || 'Upload failed. Paste a URL instead.');
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  }
-
-  const accent = step.accent || '#E08A53';
-
-  return (
-    <div className="aad-guide__step">
-      <div className="aad-guide__step-head">
-        <span className="aad-guide__step-num">Step {index + 1}</span>
-        <div className="aad-guide__step-tools">
-          <button type="button" className="aad-guide__icon-btn" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move up">↑</button>
-          <button type="button" className="aad-guide__icon-btn" onClick={() => onMove(1)} disabled={index === total - 1} aria-label="Move down">↓</button>
-          <button type="button" className="aad-guide__icon-btn aad-guide__icon-btn--danger" onClick={onRemove} aria-label="Remove step">✕</button>
-        </div>
-      </div>
-
-      <div className="aad-guide__step-body">
-        {/* Image */}
-        <div className="aad-guide__media">
-          <div className="aad-guide__thumb" style={{ background: step.bg || `${accent}22` }}>
-            {step.image
-              ? <img src={step.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              : <IconPreview iconKey={step.icon} accent={accent} />}
-          </div>
-          <div className="aad-guide__media-actions">
-            <button type="button" className="aad__btn aad__btn--ghost aad__btn--sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-              {uploading ? 'Uploading…' : 'Upload image'}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-            {step.image && (
-              <button type="button" className="aad__link" onClick={() => onUpdate({ image: '' })}>Clear</button>
-            )}
-          </div>
-        </div>
-
-        <div className="aad-guide__fields">
-          <label className="aad-guide__f">
-            <span>Title</span>
-            <input type="text" value={step.title || ''} onChange={(e) => onUpdate({ title: e.target.value })} placeholder="Bring your own cup" />
-          </label>
-          <label className="aad-guide__f">
-            <span>Text</span>
-            <textarea rows={2} value={step.text ?? step.body ?? ''} onChange={(e) => onUpdate({ text: e.target.value })} placeholder="Short explanation shown under the title." />
-          </label>
-          <label className="aad-guide__f">
-            <span>Image URL</span>
-            <input type="text" value={step.image || ''} onChange={(e) => onUpdate({ image: e.target.value })} placeholder="https://… or upload above" />
-          </label>
-          {err && <span className="aad-guide__err">{err}</span>}
-
-          <div className="aad-guide__row">
-            <label className="aad-guide__f aad-guide__f--icon">
-              <span>Icon</span>
-              <div className="aad-guide__icons">
-                {GUIDE_ICON_KEYS.map((k) => {
-                  const Ic = GUIDE_ICONS[k];
-                  const on = (step.icon || GUIDE_ICON_KEYS[index % GUIDE_ICON_KEYS.length]) === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      className={`aad-guide__icon-opt ${on ? 'is-on' : ''}`}
-                      style={on ? { borderColor: accent, color: accent } : undefined}
-                      onClick={() => onUpdate({ icon: k })}
-                      aria-label={k}
-                      title={k}
-                    >
-                      <Ic />
-                    </button>
-                  );
-                })}
-              </div>
-            </label>
-
-            <label className="aad-guide__f aad-guide__f--color">
-              <span>Accent</span>
-              <span className="aad-guide__color">
-                <input type="color" value={normHex(accent)} onChange={(e) => onUpdate({ accent: e.target.value.toUpperCase() })} />
-                <input type="text" value={accent} onChange={(e) => onUpdate({ accent: e.target.value.toUpperCase() })} spellCheck="false" />
-              </span>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* Small live icon preview (used as the thumbnail fallback + swatch). */
-function IconPreview({ iconKey, accent }) {
-  const Ic = GUIDE_ICONS[iconKey] || GUIDE_ICONS[GUIDE_ICON_KEYS[0]];
-  return <span className="aad-guide__iconpreview" style={{ color: accent }}><Ic /></span>;
-}
-
-/* ─── Smart import panel ──────────────────────────────────────────── */
-function SmartImportPanel({ onApply }) {
-  const fileRef = useRef(null);
-  const [filePreview, setFilePreview] = useState(null);
-  const [palette, setPalette] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
-
-  async function handleFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setErr(null);
-    setBusy(true);
-    setPalette(null);
-    setFilePreview(URL.createObjectURL(file));
-    try {
-      const colors = await extractColorsFromFile(file);
-      setPalette(colors);
-    } catch (ex) {
-      setErr(ex.message || 'Could not read the image.');
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  }
-
-  function handleApply() {
-    if (!palette) return;
-    onApply(palette);
-  }
-
-  return (
-    <div className="aad-import">
-      <div className="aad-section-head">
-        <h2>Smart palette from image</h2>
-      </div>
-      <p className="aad-import__intro">
-        Upload a logo, product photo, or brand reference. PackPerks samples it,
-        builds a 6-colour palette (primary, accent, background, surface, text,
-        muted text), and lets you apply it to the design in one click.
-      </p>
-
-      <div className="aad-import__zone">
-        {filePreview ? (
-          <img src={filePreview} alt="Source preview" className="aad-import__thumb" />
-        ) : (
-          <div className="aad-import__placeholder">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="3" />
-              <circle cx="9" cy="9" r="2" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-            <span>No image yet</span>
-          </div>
+        <ul className="dz-publish-list">
+          <li>
+            <span className="dz-publish-list__label">Design & copy</span>
+            <span>{describeChanges(changes, !!published)}</span>
+          </li>
+          <li>
+            <span className="dz-publish-list__label">Rest of the draft</span>
+            <span>{otherChanges ? 'Has changes too (rewards or settings). They go live with this.' : 'No other changes.'}</span>
+          </li>
+        </ul>
+        {otherChanges && (
+          <Callout tone="warning" icon={TriangleAlert}>
+            Publishing always puts the whole draft live. Check the other pages first if someone else is mid-edit.
+          </Callout>
         )}
-        <div className="aad-import__zone-actions">
-          <button
-            type="button"
-            className="aad__btn aad__btn--primary"
-            onClick={() => fileRef.current?.click()}
-            disabled={busy}
-          >
-            {busy ? 'Reading image…' : 'Upload image'}
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-          {palette && (
-            <button type="button" className="aad__btn aad__btn--ghost" onClick={() => { setPalette(null); setFilePreview(null); }}>
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
+      </Modal>
 
-      {err && <div className="aad-import__error">{err}</div>}
+      <Modal
+        open={dialog === 'revert'}
+        onClose={() => setDialog(null)}
+        icon={RotateCcw}
+        iconTone="amber"
+        title="Discard your design changes?"
+        footer={(
+          <>
+            <Button onClick={() => setDialog(null)}>Keep editing</Button>
+            <Button variant="danger" onClick={handleRevert}>Discard changes</Button>
+          </>
+        )}
+      >
+        <p className="dz-modal-text">
+          Colours, copy, sections and the guide go back to what customers see now ({describeChanges(changes, true).toLowerCase()}).
+          Unpublished changes on other pages stay in your draft.
+        </p>
+      </Modal>
 
-      {palette && (
-        <>
-          <div className="aad-import__palette" aria-label="Extracted palette">
-            {Object.entries(palette).map(([key, hex]) => (
-              <div key={key} className="aad-import__chip">
-                <span className="aad-import__chip-swatch" style={{ background: hex }} />
-                <div>
-                  <div className="aad-import__chip-key">{labelForKey(key)}</div>
-                  <code className="aad-import__chip-hex">{hex}</code>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="aad__btn aad__btn--primary aad-import__apply" onClick={handleApply}>
-            Apply these colors to the design
-          </button>
-        </>
-      )}
+      <Modal
+        open={dialog === 'reset'}
+        onClose={() => setDialog(null)}
+        icon={RotateCcw}
+        iconTone="rose"
+        title="Reset the whole design to defaults?"
+        footer={(
+          <>
+            <Button onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="danger" onClick={handleResetAll}>Reset design</Button>
+          </>
+        )}
+      >
+        <p className="dz-modal-text">
+          Colours, button labels, sections and the guide go back to the PackBack defaults. The headline and donation
+          text stay as they are. Nothing changes for customers until you publish.
+        </p>
+      </Modal>
     </div>
   );
 }
 
-function labelForKey(k) {
-  const map = {
-    primary: 'Primary', accent: 'Accent', background: 'Background',
-    surface: 'Surface', text: 'Text', textMuted: 'Muted', success: 'Success',
-  };
-  return map[k] || k;
-}
+/* ── Helpers ────────────────────────────────────────────────────────── */
 
-/* ─── Live preview (synchronous mock — no iframe, cannot reload) ────
- *
- * Final architecture decision: we DO NOT embed the real user app in
- * an iframe for this preview. Two iframe attempts both ended in
- * reload loops — between the inner app's Supabase auth listener,
- * Vite's HMR full-reload signals in dev, and the cookie-shared admin
- * session, there were too many ways for the embedded app to cycle.
- * Even with `?preview=1` short-circuits in the inner App.jsx, dev
- * HMR alone could re-trigger churn.
- *
- * This component hand-rolls a faithful approximation of the real
- * home-screen instead. It uses the SAME CSS variables and the SAME
- * gradient definitions as the live app (see FeaturedReward.css), so
- * the Accent + Deep accent colours genuinely paint a left-to-right
- * gradient on the progress strip. The visual is close enough to
- * verify any palette / copy / section choice before publishing —
- * and it updates instantly on every keystroke with zero reload risk.
- *
- * If the admin wants pixel-perfect verification, they can open the
- * customer URL at /<slug>/ in a separate tab after saving. */
-function DevicePreview({ design, org, heroHeadline, heroSubtext }) {
-  const { money } = useAdminMoney();
-  const c = design.colors;
-  const copy = design.copy;
+/* Everything the phone shows, resolved the way App.jsx resolves it. */
+function buildPreviewView({ design, settings, org, rewards, groupCopy, isVoucher, isTikkie, money, unlocked }) {
   const sections = design.sections;
-  const orgName = org?.partner_brand_name || org?.name || 'Brand';
-  const initial = (orgName || 'B').charAt(0).toUpperCase();
+  const cashbackRate = effectiveRates(settings).cashback;
+  const asReward = (r) => ({
+    ...r,
+    cupsNeeded: Math.max(1, Number(r.cupsNeeded) || 1),
+    value: r.euros ?? (Math.max(1, Number(r.cupsNeeded) || 1) * 1.25),
+  });
+  const live = (rewards || []).filter(r => r.status === 'live');
+  const featured = live.find(r => r.featured) || live[0] || null;
+  const reward = asReward(featured || { ...SAMPLE_REWARD, euros: SAMPLE_REWARD.cupsNeeded * cashbackRate });
+  const need = reward.cupsNeeded;
+  const collected = unlocked ? need : Math.min(need - 1, Math.max(1, Math.round(need * 0.6)));
+  const others = live.filter(r => r !== featured).slice(0, 2).map(asReward);
 
-  // CSS-variable overrides scoped to JUST the preview subtree, so
-  // we never repaint the admin shell itself with the customer
-  // palette. These map exactly the way the runtime applyDesignColors
-  // does on the real app's :root, just locally here.
-  const scopedVars = {
-    '--bk-brown':   c.primary,
-    '--bk-orange':  c.accent,
-    '--bk-red':     c.accentDeep,
-    '--bk-cream':   c.background,
-    '--white':      c.surface,
-    '--black':      c.text,
-    '--text-muted': c.textMuted,
-    '--bk-green':   c.success,
-    background:     c.background,
-    color:          c.text,
+  // Guide: the venue's own steps, else the group's, else the app's built-in.
+  const ownSteps = design.guide.steps.length ? design.guide.steps : null;
+  const groupSteps = groupCopy?.howItWorks?.steps?.length ? groupCopy.howItWorks.steps : null;
+  const raw = ownSteps || groupSteps;
+  const builtInGuide = groupSteps ? groupSteps.map(resolveGuideStep) : BUILT_IN_GUIDE;
+  const guideSteps = raw
+    ? (isVoucher ? voucherGuideSteps(raw) : raw).map(resolveGuideStep)
+    : BUILT_IN_GUIDE;
+
+  const headline = groupCopy ? groupCopy.heroHeadline : settings.heroHeadline;
+  const subtext = groupCopy ? groupCopy.heroSubtext : settings.heroSubtext;
+
+  return {
+    colors: design.colors,
+    org,
+    money,
+    isVoucher,
+    isTikkie,
+    cashbackRate,
+    store: org?.partner_brand_name || org?.name || 'the store',
+    headline: headline || '',
+    subtext: subtext || '',
+    showSubtext: groupCopy?.mode !== 'byo',
+    copy: groupCopy ? { ...design.copy, ...groupCopy.designCopy } : design.copy,
+    show: {
+      storesLink: !!org?.group_id && !settings.hideStoresLink,
+      packbackLogo: sections.showPackbackLogo !== false,
+      brandLogo: sections.showBrandLogo !== false && !!org,
+      directRefund: featureOn(settings, 'featureDirectRefunds') && sections.showDirectRefund !== false,
+      share: featureOn(settings, 'featureCupSharing') && sections.showShareCup !== false,
+      nextCupFree: featureOn(settings, 'featureCupSharing') && sections.showNextCupForFree !== false,
+      donate: featureOn(settings, 'featureDonations') && sections.showDonate !== false,
+      impact: sections.showImpact !== false,
+      activity: sections.showActivity !== false,
+    },
+    reward,
+    others,
+    collected,
+    guideSteps,
+    builtInGuide,
+    guideFromGroup: !ownSteps && !!groupSteps,
+    groupNote: groupCopy ? 'Headline and account buttons come from the group.' : null,
   };
+}
 
-  return (
-    <div className="aad-device">
-      <div className="aad-device__notch" />
-      <div className="aad-device__screen" style={scopedVars}>
-        {/* Header — 3-tile cluster matching real Header.jsx layout. */}
-        <div className="aad-preview__header">
-          <div className="aad-preview__brand">
-            {sections.showPackbackLogo !== false && (
-              <span className="aad-preview__pp">PackBack</span>
-            )}
-            {sections.showPackbackLogo !== false && sections.showBrandLogo !== false && (
-              <span className="aad-preview__x">×</span>
-            )}
-            {sections.showBrandLogo !== false && (
-              org?.logo_url ? (
-                <img src={org.logo_url} alt="" className="aad-preview__logo" />
-              ) : (
-                <span className="aad-preview__logo-chip" style={{ background: c.accent }}>
-                  {initial}
-                </span>
-              )
-            )}
-          </div>
-          <div className="aad-preview__tiles">
-            <span className="aad-preview__tile" style={{ background: c.primary, color: c.surface }}>2 ☕</span>
-            <span className="aad-preview__tile" style={{ background: c.accent, color: c.surface }}>+</span>
-            <span className="aad-preview__tile" style={{ background: c.primary, color: c.surface }}>👤</span>
-          </div>
-        </div>
+const str = (v) => (typeof v === 'string' ? v : '');
 
-        <h2 className="aad-preview__headline">{heroHeadline || 'Collect Cups & Get Rewards'}</h2>
-        <p className="aad-preview__sub" style={{ color: c.textMuted }}>
-          {heroSubtext || 'Return your cups to earn cashback.'}
-        </p>
+/* Unpublished changes on this page, counted per setting. */
+function countChanges(settings, published) {
+  const draft = mergeDesign(settings?.design);
+  const base = mergeDesign(published?.design);
+  const colors = COLOR_KEYS.filter(k => (toHex(draft.colors[k]) || str(draft.colors[k])) !== (toHex(base.colors[k]) || str(base.colors[k]))).length;
+  const copy = Object.keys({ ...draft.copy, ...base.copy }).filter(k => str(draft.copy[k]) !== str(base.copy[k])).length
+    + COPY_KEYS.filter(k => str(settings?.[k]) !== str(published?.[k])).length;
+  const sections = Object.keys({ ...draft.sections, ...base.sections }).filter(k => (draft.sections[k] !== false) !== (base.sections[k] !== false)).length;
+  const guide = JSON.stringify(draft.guide.steps) !== JSON.stringify(base.guide.steps) ? 1 : 0;
+  return { colors, copy, sections, guide, total: colors + copy + sections + guide };
+}
 
-        {/* Progress bar — REAL gradient using both brand accent stops.
-            Mirrors the .featured-reward__gradient rule from the live
-            app's CSS so designers see the actual gradient flow. */}
-        <div className="aad-preview__progress" style={{ background: c.accentDeep }}>
-          <div
-            className="aad-preview__progress-fill"
-            style={{ background: `linear-gradient(90deg, ${c.accent} 0%, ${c.accent} 60%, ${c.accentDeep} 100%)` }}
-          />
-        </div>
+function describeChanges(c, hasPublished) {
+  if (!hasPublished) return 'Everything on this page is new.';
+  if (!c.total) return 'No changes';
+  const parts = [];
+  if (c.colors) parts.push(`${c.colors} colour${c.colors !== 1 ? 's' : ''}`);
+  if (c.copy) parts.push(`${c.copy} text${c.copy !== 1 ? 's' : ''}`);
+  if (c.sections) parts.push(`${c.sections} section${c.sections !== 1 ? 's' : ''}`);
+  if (c.guide) parts.push('the guide');
+  return parts.join(', ').replace(/^./, s => s.toUpperCase());
+}
 
-        {/* Reward card */}
-        <div className="aad-preview__reward" style={{ background: c.accentDeep }}>
-          <div className="aad-preview__reward-thumb" style={{ background: c.accent }} />
-          <div className="aad-preview__reward-body">
-            <div className="aad-preview__reward-name" style={{ color: c.surface }}>Sample reward</div>
-            <div className="aad-preview__reward-row">
-              <span className="aad-preview__reward-pill" style={{ background: c.primary, color: c.surface }}>FREE</span>
-              <span className="aad-preview__reward-pill aad-preview__reward-pill--ghost" style={{ color: c.surface, borderColor: c.surface }}>3 cups</span>
-            </div>
-          </div>
-        </div>
+/* Does the draft differ from what is published anywhere this page doesn't
+ * own? Compared as sorted JSON so key order can't cause a false alarm. */
+function hasOtherChanges(draft, published) {
+  if (!draft) return false;
+  if (!published) return true;
+  const strip = (s) => {
+    const rest = { ...(s || {}) };
+    delete rest.design;
+    COPY_KEYS.forEach(k => { delete rest[k]; });
+    return rest;
+  };
+  return stableJson(draft.rewards || []) !== stableJson(published.rewards || [])
+    || stableJson(strip(draft.settings)) !== stableJson(strip(published.settings));
+}
 
-        <button
-          type="button"
-          className="aad-preview__cta"
-          style={{ background: c.primary, color: c.surface }}
-          aria-hidden="true"
-          tabIndex={-1}
-        >
-          Get {money(5)} cashback
-        </button>
-
-        <div className="aad-preview__actions">
-          {sections.showShareCup && (
-            <span className="aad-preview__action" style={{ background: c.surface, color: c.text }}>
-              {copy.shareButtonLabel || 'Share a cup'}
-            </span>
-          )}
-          {sections.showDonate && (
-            <span className="aad-preview__action" style={{ background: c.surface, color: c.text }}>
-              {copy.donateButtonLabel || 'Donate'}
-            </span>
-          )}
-          {sections.showNextCupForFree && (
-            <span className="aad-preview__action" style={{ background: c.surface, color: c.text }}>
-              {copy.nextCupFreeLabel || 'Next cup free'}
-            </span>
-          )}
-        </div>
-
-        {sections.showActivity && (
-          <div className="aad-preview__activity" style={{ color: c.textMuted }}>
-            ⌄ {copy.activityLabel || 'Activity'}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+function stableJson(value) {
+  return JSON.stringify(value, (_, v) => (v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]]))
+    : v));
 }

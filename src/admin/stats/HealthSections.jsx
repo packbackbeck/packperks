@@ -1,9 +1,7 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import {
-  ArrowUpRight, Bot, CircleAlert, CircleCheck, Download, ListChecks, ScrollText, Search, ServerCrash, Trash2,
-  TriangleAlert,
+  ArrowUpRight, Bot, CircleAlert, CircleCheck, Download, ListChecks, ScrollText, Search, ServerCrash,
 } from 'lucide-react';
-import { purgeOrgRecords } from '../lib/adminApi';
 import {
   Badge, Button, Card, CardBody, CardFoot, CardHeader, EmptyState, Modal, Segmented, fmtInt,
 } from '../ui';
@@ -317,78 +315,6 @@ export function AiAccuracyCard({ acc, groupScope, onReview, loading }) {
               </div>
             )}
           </div>
-        )}
-      </CardBody>
-    </Card>
-  );
-}
-
-/* ── Danger zone: delete one venue's test data (masters only) ──────── */
-export function DangerZoneCard({ org, orgName, groupScope, onDeleted }) {
-  const inputId = useId();
-  const [confirm, setConfirm] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const ready = confirm.trim().toUpperCase() === 'DELETE' && !busy && !!org?.id;
-
-  async function purge() {
-    if (!ready) return;
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    try {
-      const res = await purgeOrgRecords(org.id);
-      setResult(res || {});
-      setConfirm('');
-      onDeleted?.();
-    } catch (e) {
-      console.error('purgeOrgRecords failed', e);
-      setError(e?.message || 'The records could not be deleted.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card className="hl-span-2 hl-danger">
-      <CardHeader
-        title="Delete test data"
-        icon={TriangleAlert}
-        subtitle={`Permanently deletes the cup scans, reward claims and cup transfers of ${orgName}. This can’t be undone.`}
-      />
-      <CardBody>
-        <ul className="hl-danger__list">
-          <li>Printed QR batches and rewards stay.</li>
-          <li>
-            Only <b>{orgName}</b> (<code>{org?.slug || org?.id || '—'}</code>) is touched
-            {groupScope ? ', even though this page shows the whole group' : ''}. Other organisations keep their data.
-          </li>
-          <li>Type <b>DELETE</b> to unlock the button.</li>
-        </ul>
-        <div className="hl-danger__row">
-          <label htmlFor={inputId} className="hl-sr-only">Type DELETE to confirm</label>
-          <input
-            id={inputId}
-            type="text"
-            className="ui-input hl-danger__input"
-            placeholder="Type DELETE to confirm"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            disabled={busy}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <Button variant="danger" icon={Trash2} disabled={!ready} onClick={purge}>
-            {busy ? 'Deleting…' : `Delete ${orgName} test data`}
-          </Button>
-        </div>
-        {error && <p className="hl-danger__msg hl-danger__msg--error" role="alert">{error}</p>}
-        {result && (
-          <p className="hl-danger__msg hl-danger__msg--ok" role="status">
-            Deleted for {orgName}: {fmtInt(result.cup_scans ?? 0)} cup scans, {fmtInt(result.claims ?? 0)} claims
-            and {fmtInt(result.cup_transfers ?? 0)} cup transfers.
-          </p>
         )}
       </CardBody>
     </Card>

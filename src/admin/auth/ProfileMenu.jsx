@@ -155,7 +155,7 @@ function MenuView({ profile, roleText, onEditProfile, onChangeEmail, onResetPass
   return (
     <>
       <div className="pm__header">
-        <span className="pm__h-avatar" style={{ background: profile.color || '#FD6F46' }}>
+        <span className="pm__h-avatar" style={{ background: profile.color || '#5B3FD6' }}>
           {profile.avatar_url
             ? <img src={profile.avatar_url} alt="" />
             : (profile.display_name || profile.email)[0].toUpperCase()}
@@ -212,12 +212,12 @@ function MenuView({ profile, roleText, onEditProfile, onChangeEmail, onResetPass
   );
 }
 
-const COLOR_OPTIONS = ['#FD6F46', '#FF7A2E', '#FFC52F', '#1A8737', '#5333A5', '#7C3AED', '#C2185B', '#0F172A'];
+const COLOR_OPTIONS = ['#5B3FD6', '#8B6CFF', '#1F8FCE', '#0F8A7E', '#0E9E74', '#E8930C', '#F2643A', '#E03E6B'];
 
 function EditProfileView({ profile, setProfile, onBack }) {
   const fileRef = useRef(null);
   const [name, setName]       = useState(profile.display_name || '');
-  const [color, setColor]     = useState(profile.color || '#FD6F46');
+  const [color, setColor]     = useState(profile.color || '#5B3FD6');
   const [avatar, setAvatar]   = useState(profile.avatar_url || '');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving]   = useState(false);

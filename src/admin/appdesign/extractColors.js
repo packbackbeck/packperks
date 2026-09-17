@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────
- * extractColors — pull a sensible 6-colour palette out of any uploaded
+ * extractColors — pull a sensible palette out of any uploaded
  * image, with no external dependencies.
  *
  * Algorithm:
@@ -14,8 +14,8 @@
  *   5. Pick the most-saturated mid-luminance bucket as the explicit
  *      `accent` (the one that should grab the eye).
  *
- * Returns an object matching the shape of DEFAULT_DESIGN.colors so the
- * caller can drop it straight into the design draft.
+ * Returns an object matching the shape of DEFAULT_DESIGN.colors (all eight
+ * colours) so the caller can drop it straight into the design draft.
  * ───────────────────────────────────────────────────────────────────── */
 
 const CANVAS_SIZE = 96;
@@ -115,6 +115,9 @@ function extractFromImage(img) {
   const palette = {
     primary:    rgbHex(primaryCandidate),
     accent:     rgbHex(accentCandidate),
+    // The reward card and the far end of the progress fill: the accent,
+    // a shade darker, so the gradient reads as one colour deepening.
+    accentDeep: blend(accentCandidate, { r: 0, g: 0, b: 0 }, 0.28),
     background: lightenForBg(light),
     surface:    '#FFFFFF',
     text:       rgbHex(text),

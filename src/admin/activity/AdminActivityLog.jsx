@@ -23,6 +23,14 @@ const ACTION_LABELS = {
   'location.create':    { color: '#5333A5', label: 'Created location' },
   'location.update':    { color: '#FD6F46', label: 'Updated location' },
   'location.delete':    { color: '#DC2626', label: 'Deleted location' },
+  'team.access':        { color: '#5B3FD6', label: 'Changed someone’s access' },
+  'team.invite_access': { color: '#5B3FD6', label: 'Changed an invitation' },
+  'role.save':          { color: '#5B3FD6', label: 'Saved a role' },
+  'role.delete':        { color: '#D92D55', label: 'Deleted a role' },
+  'workspace.tabs':     { color: '#0B7FB8', label: 'Changed workspace tabs' },
+  'org.mode':           { color: '#E8930C', label: 'Changed a programme' },
+  'org.archive':        { color: '#D92D55', label: 'Archived an organisation' },
+  'org.restore':        { color: '#0E9468', label: 'Restored an organisation' },
 };
 
 function formatTime(ts) {

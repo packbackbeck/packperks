@@ -16,7 +16,7 @@ There are two apps in one codebase:
 ```bash
 npm run dev        # Vite dev server on :5173  (use this, not a bare `vite`)
 npm run build      # what Vercel runs — plain `vite build`, no lint step
-npm run lint       # eslint . — the repo ships with ~240 pre-existing errors
+npm run lint       # eslint . — src/ alone has ~205 pre-existing errors
 ```
 
 `npm run lint` is **not** clean and never has been. Judge your work by whether
@@ -92,14 +92,38 @@ goes through `payoutCopy()`: `link` regions promise a link to collect,
 review) or `voucher` (slider voucher redeemed at the counter). Resolution is
 org → group → default.
 
-**Admin roles** (`src/admin/lib/roles.js`, `AuthContext.hasPermission`):
-`owner` > `admin` > `manager` > `checker` > `vendor`. Vendor is the venue's own
-staff: read-only, three pages (`VENDOR_TABS` = overview, reports, behaviour),
-pinned to one store. Staff roles carry `org_id: null` and see every org;
-vendor is the only role scoped to one.
+**Dashboard access** (`src/admin/lib/access.js`, migration 048). Every
+account holds one role from `admin_roles`; a role has a **level** and, per
+dashboard tab, `hidden`, `view` or `edit`:
+- **master** — PackBack staff. Every organisation, every tab, and Master
+  Settings (people, roles, organisations, groups, regions, workspace tabs).
+  Only masters add people, roles or organisations.
+- **manager** — runs the organisations on their account (`org_ids`, or all of
+  them with `all_orgs`). Built-in roles: Manager (changes everything) and
+  Viewer (views everything).
+- **vendor** — the venue's own people; read-only reporting by default.
 
-`#overview?as=vendor` previews the vendor view. It can only ever *remove*
-access, so any staff role may use it.
+Masters add roles of the manager or vendor level in Master Settings → Roles &
+permissions. `workspace:tabs` in `app_config` switches a tab off for
+everyone. A setting with a tab (cup sharing, donations) hides that tab when it
+is off. `tabAvailability()` is the one place that decides whether a tab
+shows, and why not.
+
+The old `admin_profiles.role` column stays and a trigger keeps it in step
+(master → `admin`, or `owner` for the founding account; manager → `manager`,
+or `checker` when the role changes nothing; vendor → `vendor`). Edge
+functions and `hasPermission()` still read it, so the money paths keep their
+rule: minting cups and creating payouts is master-only. A write that sets
+only the old role name is translated into the new fields.
+
+What the database enforces: the level (`is_master()`), whether an account can
+write at all (`is_staff_writer()`: a master, or a role with at least one
+editable tab), and who may manage people, roles, organisations and the
+workspace tabs. Which tab a role may change, and which organisations it sees,
+is enforced by the dashboard (see *Org isolation* under Landmines).
+
+`#overview?as=vendor` previews the vendor role. It can only ever *remove*
+access, so any account above vendor may use it.
 
 ---
 
@@ -111,6 +135,10 @@ access, so any staff role may use it.
 | `src/lib/regions.js` | currency, region seed, `formatMoney`, `payoutCopy` |
 | `src/lib/RegionContext.jsx` | `useRegion()`, `useMoney()` for the customer app |
 | `src/admin/lib/adminApi.js` | every admin query; ~5k lines |
+| `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
+| `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
+| `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |
+| `src/admin/master/` | Master Settings: people, roles, organisations, workspace |
 | `src/admin/lib/adminMoney.js` | `useAdminMoney()` / `adminMoney()` — dashboard currency |
 | `src/admin/lib/demoData.js` | the “Demo numbers” dataset |
 | `src/admin/context/orgState.js` | module-level active org for non-React callers |
@@ -125,6 +153,14 @@ access, so any staff role may use it.
 The three analytics readers behind the dashboard, all in `adminApi.js`:
 `getAdminStats` (Overview), `getStatsMetrics` (System Health),
 `getUserBehaviourStats` → `computeMetrics` (User Behaviour).
+
+Those three pages share one layout, taken from PackPulse: KPI tiles
+(`KpiGrid`), the trend chart (`TrendCard`) with `InsightsCard` beside it, then
+detail cards. Each page turns its reader's output into metric objects in a
+`*Model.jsx` next to it; the metric shape is documented at the top of
+`ui/KpiTiles.jsx`. A `value: null` point in a series is a gap, not a zero.
+Dialogs (`Modal`) render into `.admin-app`, so they sit above the fixed top
+bar and sidebar and keep the dashboard's tokens.
 
 ---
 
@@ -161,10 +197,13 @@ database, as they are in `hasPermission()`.
 Things that have already cost real time. Read before touching the area.
 
 **Org isolation is not enforced in the database.** `applyOrgFilter()` adds
-`.eq('org_id', …)` in JavaScript. The RLS policies say
-`(current_admin()).id IS NOT NULL` with no org constraint. Any authenticated
-admin can read every org's rows. Treat org scoping as a UI convention, not a
-security boundary, and never hand out a Supabase key expecting it to filter.
+`.eq('org_id', …)` in JavaScript, and the organisation list on an account
+(`org_ids`) only narrows the switcher. The RLS policies on customer data say
+`(current_admin()).id IS NOT NULL` with no org constraint, so any signed-in
+dashboard account can read every org's rows through the API. Locations and
+the audit log are the exceptions (`admin_sees_org()`, migration 048). Treat
+org scoping as a UI convention, not a security boundary, and never hand out
+a Supabase key expecting it to filter.
 
 **The anon key ships in the customer bundle — treat it as public.** Closing
 what it could do is split in two stages, because the live app and the database

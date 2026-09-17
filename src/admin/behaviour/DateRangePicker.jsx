@@ -1,142 +1,130 @@
-import { useEffect, useRef, useState } from 'react';
+import { useId, useState } from 'react';
+import { ArrowLeft, Calendar, CalendarRange, Check, ChevronDown } from 'lucide-react';
+import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, PERIODS, formatWindow } from '../ui';
+import { PERIOD_IDS, fmtDay, parseDayInput, toDayInput } from './behaviourModel';
 
 /* ─────────────────────────────────────────────────────────────────────
- * DateRangePicker — the time-window control above the behaviour metrics.
+ * The period control in the User Behaviour header.
  *
- * A single pill shows the active window ("All time" or "1 May – 15 Jun
- * 2026"). Clicking opens a popover with quick presets on the left and a
- * custom from/to range on the right, the custom inputs clamped to the
- * dates we actually have data for. Choosing a preset applies instantly;
- * a custom range applies on "Apply". The parent only ever receives a
- * resolved { from, to } (ISO strings, or nulls for all-time).
+ * The shared presets (as on the Dashboard), plus "This year" and a custom
+ * range, which this page has always offered. "Custom range…" turns the
+ * menu into a small from/to form, limited to the days there is data for.
+ *
+ *   value     — a preset id, 'ytd' or 'custom'
+ *   custom    — { from, to } as yyyy-mm-dd, used when value is 'custom'
+ *   onChange  — (id, custom?) => void
+ *   minDate   — ISO date of the first recorded event, if known
  * ───────────────────────────────────────────────────────────────────── */
 
-const DAY = 86400000;
+const PRESETS = PERIODS.filter(p => PERIOD_IDS.includes(p.id));
 
-const PRESETS = [
-  { id: 'all',  label: 'All time' },
-  { id: '7d',   label: 'Last 7 days',  days: 7 },
-  { id: '30d',  label: 'Last 30 days', days: 30 },
-  { id: '90d',  label: 'Last 90 days', days: 90 },
-  { id: 'ytd',  label: 'This year' },
-];
-
-const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-const endOfDay   = (d) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
-
-// yyyy-mm-dd for <input type="date">, in local time.
-function toInput(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const m = `${d.getMonth() + 1}`.padStart(2, '0');
-  const day = `${d.getDate()}`.padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
+function periodLabel(value, custom) {
+  if (value === 'ytd') return 'This year';
+  if (value === 'custom') {
+    const from = parseDayInput(custom?.from);
+    const to = parseDayInput(custom?.to);
+    return from != null && to != null ? formatWindow(Math.min(from, to), Math.max(from, to)) : 'Custom range';
+  }
+  return (PRESETS.find(p => p.id === value) || PRESETS.find(p => p.id === '30d')).label;
 }
 
-function fmtNice(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function resolvePreset(p) {
-  if (!p || p.id === 'all') return { from: null, to: null };
-  const now = new Date();
-  if (p.id === 'ytd') {
-    return { from: new Date(now.getFullYear(), 0, 1).toISOString(), to: endOfDay(now).toISOString() };
-  }
-  const from = startOfDay(new Date(now.getTime() - (p.days - 1) * DAY));
-  return { from: from.toISOString(), to: endOfDay(now).toISOString() };
-}
-
-export default function DateRangePicker({ value, meta, onChange }) {
-  const [open, setOpen] = useState(false);
-  const [draftFrom, setDraftFrom] = useState('');
-  const [draftTo, setDraftTo] = useState('');
-  const wrapRef = useRef(null);
-
-  const isAll = !value?.from && !value?.to;
-  const minInput = toInput(meta?.minDate);
-  const maxInput = toInput(meta?.maxDate);
-
-  // Seed the custom inputs from the active window (or the data extent) each
-  // time the popover opens, so "Custom" starts somewhere sensible.
-  useEffect(() => {
-    if (!open) return;
-    setDraftFrom(toInput(value?.from) || minInput);
-    setDraftTo(toInput(value?.to) || maxInput);
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
-  const label = isAll ? 'All time' : `${fmtNice(value.from)} – ${fmtNice(value.to)}`;
-
-  function applyPreset(p) {
-    onChange(resolvePreset(p));
-    setOpen(false);
-  }
-  function applyCustom() {
-    if (!draftFrom || !draftTo) return;
-    let from = startOfDay(draftFrom);
-    let to = endOfDay(draftTo);
-    if (from > to) { const t = from; from = startOfDay(to); to = endOfDay(t); } // tolerate reversed
-    onChange({ from: from.toISOString(), to: to.toISOString() });
-    setOpen(false);
-  }
-
+function CustomForm({ custom, minDate, onBack, onApply }) {
+  const id = useId();
+  const [today] = useState(() => toDayInput(Date.now()));
+  const min = minDate ? toDayInput(Date.parse(minDate)) : undefined;
+  const [from, setFrom] = useState(custom?.from || min || today);
+  const [to, setTo] = useState(custom?.to || today);
+  const ready = parseDayInput(from) != null && parseDayInput(to) != null;
   return (
-    <div className="ub-range" ref={wrapRef}>
-      <button className="ub-range__pill" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9h18M8 2.5v4M16 2.5v4" />
-        </svg>
-        <span className="ub-range__label">{label}</span>
-        <svg className="ub-range__caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      {open && (
-        <>
-          <div className="ub-range__backdrop" onClick={() => setOpen(false)} role="presentation" />
-          <div className="ub-range__pop" role="dialog" aria-label="Choose a time period">
-            <div className="ub-range__presets">
-              {PRESETS.map(p => {
-                const r = resolvePreset(p);
-                const active = (p.id === 'all' && isAll) ||
-                  (p.id !== 'all' && !isAll && r.from === value.from && r.to === value.to);
-                return (
-                  <button key={p.id} className={`ub-range__preset${active ? ' is-active' : ''}`} onClick={() => applyPreset(p)}>
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="ub-range__custom">
-              <div className="ub-range__custom-title">Custom range</div>
-              <label className="ub-range__field">
-                <span>From</span>
-                <input type="date" value={draftFrom} min={minInput} max={maxInput} onChange={e => setDraftFrom(e.target.value)} />
-              </label>
-              <label className="ub-range__field">
-                <span>To</span>
-                <input type="date" value={draftTo} min={minInput} max={maxInput} onChange={e => setDraftTo(e.target.value)} />
-              </label>
-              {meta?.minDate && (
-                <p className="ub-range__hint">Data spans {fmtNice(meta.minDate)} – {fmtNice(meta.maxDate)}</p>
-              )}
-              <button className="ub-range__apply" onClick={applyCustom} disabled={!draftFrom || !draftTo}>
-                Apply range
-              </button>
-            </div>
-          </div>
-        </>
+    <form
+      className="ub-range"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!ready) return;
+        const [a, b] = from <= to ? [from, to] : [to, from];
+        onApply({ from: a, to: b });
+      }}
+    >
+      <div className="ub-range__head">
+        <Button size="sm" variant="ghost" icon={ArrowLeft} aria-label="Back to periods" onClick={onBack} />
+        <span className="ub-range__title">Custom range</span>
+      </div>
+      <div className="ub-range__fields">
+        <label className="ui-field" htmlFor={`${id}-from`}>
+          <span className="ui-field__label">From</span>
+          <input id={`${id}-from`} className="ui-input" type="date" value={from} min={min} max={today} onChange={e => setFrom(e.target.value)} required />
+        </label>
+        <label className="ui-field" htmlFor={`${id}-to`}>
+          <span className="ui-field__label">To</span>
+          <input id={`${id}-to`} className="ui-input" type="date" value={to} min={min} max={today} onChange={e => setTo(e.target.value)} required />
+        </label>
+      </div>
+      {min && (
+        <p className="ub-range__hint">
+          Data starts on {fmtDay(Date.parse(minDate), true)}.
+        </p>
       )}
-    </div>
+      <Button type="submit" variant="primary" block disabled={!ready}>Show this range</Button>
+    </form>
+  );
+}
+
+export default function DateRangePicker({ value, custom, onChange, minDate }) {
+  const [view, setView] = useState('list');
+  const current = PRESETS.some(p => p.id === value) || value === 'ytd' || value === 'custom' ? value : '30d';
+  const label = periodLabel(current, custom);
+  return (
+    <Menu
+      align="right"
+      className="ub-period"
+      trigger={({ open, toggle, id }) => (
+        <button
+          type="button"
+          className="ui-btn ui-btn--outline"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? id : undefined}
+          onClick={() => { setView('list'); toggle(); }}
+        >
+          {current === 'custom' ? <CalendarRange size={15} aria-hidden="true" /> : <Calendar size={15} aria-hidden="true" />}
+          {label}
+          <ChevronDown size={14} aria-hidden="true" style={{ opacity: 0.6 }} />
+        </button>
+      )}
+    >
+      {({ close }) => (view === 'custom' ? (
+        <CustomForm
+          custom={current === 'custom' ? custom : null}
+          minDate={minDate}
+          onBack={() => setView('list')}
+          onApply={(range) => { onChange('custom', range); close(); }}
+        />
+      ) : (
+        <>
+          <MenuLabel>Period</MenuLabel>
+          {PRESETS.map(p => (
+            <MenuItem key={p.id} checked={p.id === current} onClick={() => onChange(p.id)}>
+              <span style={{ display: 'flex', alignItems: 'center' }}>
+                {p.label}
+                {p.id === current && <Check size={14} className="ui-menu__check" aria-hidden="true" />}
+              </span>
+            </MenuItem>
+          ))}
+          <MenuItem checked={current === 'ytd'} onClick={() => onChange('ytd')}>
+            <span style={{ display: 'flex', alignItems: 'center' }}>
+              This year
+              {current === 'ytd' && <Check size={14} className="ui-menu__check" aria-hidden="true" />}
+            </span>
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem icon={CalendarRange} checked={current === 'custom'} keepOpen onClick={() => setView('custom')}>
+            <span style={{ display: 'flex', alignItems: 'center' }}>
+              {current === 'custom' ? label : 'Custom range…'}
+              {current === 'custom' && <Check size={14} className="ui-menu__check" aria-hidden="true" />}
+            </span>
+          </MenuItem>
+        </>
+      ))}
+    </Menu>
   );
 }

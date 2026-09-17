@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { EyeOff } from 'lucide-react';
 import { AuthProvider, useAuth as useAuthRole } from './auth/AuthContext';
 import { OrgProvider, useOrg } from './context/OrgContext';
+import { AccessProvider } from './context/AccessProvider';
+import { useAccess } from './context/accessCtx';
 import OrgOnboardingWizard from './organizations/OrgOnboardingWizard';
-import AdminOrganizations from './organizations/AdminOrganizations';
 import AuthGate from './auth/AuthGate';
 import AdminTopBar from './AdminTopBar';
 import AdminSidebar from './AdminSidebar';
-import { VENDOR_TABS } from './lib/roles';
 import { ViewRoleCtx, readVendorPreviewFlag } from './context/ViewRole';
 import { setAdminDemoMode } from './lib/adminApi';
+import { resolveEffectiveMode } from './lib/orgModes';
+import { LEVELS, TABS, TAB_ALIASES, TAB_BY_ID, previewAccess, tabAvailability } from './lib/access';
+import { Button, Card, EmptyState } from './ui';
 import AdminOverview from './overview/AdminOverview';
 import AdminRewards from './rewards/AdminRewards';
 import AdminUsers from './users/AdminUsers';
@@ -16,14 +20,14 @@ import AdminSmartBins from './smartbins/AdminSmartBins';
 import AdminEmailTemplates from './emailtemplates/AdminEmailTemplates';
 import AdminClaims from './claims/AdminClaims';
 import AdminCupScans from './cupscans/AdminCupScans';
-import AdminWorkspace from './settings/AdminWorkspace';
+import AdminSettingsPage from './settings/AdminSettingsPage';
+import AdminMasterSettings from './master/AdminMasterSettings';
 import AdminHistory from './history/AdminHistory';
 import AdminReports from './reports/AdminReports';
 import AdminStats from './stats/AdminStats';
 import AdminUserBehaviour from './behaviour/AdminUserBehaviour';
 import AdminReceiptGenerator from './cupqr/AdminReceiptGenerator';
 import AdminTransactions from './transactions/AdminTransactions';
-import AdminActivityLog from './activity/AdminActivityLog';
 import AdminSupport from './support/AdminSupport';
 import AdminDonations from './donations/AdminDonations';
 import AdminByoRequests from './byorequests/AdminByoRequests';
@@ -31,19 +35,13 @@ import AdminFutureVendors from './futurevendors/AdminFutureVendors';
 import AdminAppDesign from './appdesign/AdminAppDesign';
 import AdminTikkieLog from './tikkielog/AdminTikkieLog';
 import AdminBackupCups from './backupcups/AdminBackupCups';
-import { TIKKIE_ONLY_PAGES } from './lib/orgModes';
 import { useAdminDraft } from './hooks/useAdminDraft';
+import './ui/ui.css';
 import './AdminApp.css';
 
-/* Keep-alive page wrapper.
- *
- * MUST live at module scope (not inside AdminApp): a component defined inside
- * another component's render gets a new function identity on every render, so
- * React would unmount + remount the whole page subtree on every AdminApp
- * re-render — wiping in-page state such as the selected reward, scroll, and
- * filters. With a stable identity here, a visited page stays mounted and just
- * toggles `hidden`, which is the whole point of keep-alive.
- */
+/* Keep-alive page wrapper. Must live at module scope: a component defined
+ * inside another's render gets a new identity each render, and React would
+ * remount the page and lose its state. */
 function KeepAlive({ id, activeId, visited, children }) {
   if (!visited.has(id)) return null;
   return <div hidden={activeId !== id}>{children}</div>;
@@ -53,319 +51,335 @@ export default function AdminApp() {
   return (
     <AuthProvider>
       <AuthGate>
-        <OrgProvider>
-          <AdminShell />
-        </OrgProvider>
+        <AccessProvider>
+          <OrgProvider>
+            <AdminShell />
+          </OrgProvider>
+        </AccessProvider>
       </AuthGate>
     </AuthProvider>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * URL routing model.
- *
- * The admin shell uses a single piece of React state (`page`) to track
- * the active tab, but mirrors it to `window.location.hash` so:
- *
- *   • A browser reload returns to the last-active tab (no more
- *     unwanted bounce-to-Overview).
- *   • The hash is a real link admins can share with teammates
- *     ("look at the claim view: /admin#claims").
- *   • The browser back/forward buttons navigate between tabs.
- *
- * Pages are also kept-alive once visited. The first time the admin
- * visits e.g. Claims, it mounts and fetches; subsequent visits just
- * `display: block` it back in, preserving filter / sort / scroll
- * state. Pages not yet visited stay unmounted so the first-paint
- * cost is the same as before.
- *
- * `cupqr` and `receipts` aren't shown in the sidebar but are real
- * routes — `cupqr` is its own page, `receipts` is a legacy redirect
- * that resolves to Claims.
+ * Routing: one piece of state (`page`) mirrored to the URL hash, so a
+ * reload keeps the tab, links can be shared and back/forward work.
+ * Visited pages stay mounted (KeepAlive). Which pages exist, and which
+ * this account may open, comes from lib/access.js.
  * ───────────────────────────────────────────────────────────────────── */
-const VALID_PAGES = new Set([
-  'overview', 'rewards', 'appdesign', 'users', 'claims', 'cupscans', 'cupqr',
-  'transactions', 'donations', 'byorequests', 'futurevendors', 'org', 'organizations', 'settings',
-  'history', 'reports', 'stats', 'behaviour', 'support', 'tikkielog', 'backupcups',
-  'smartbins', 'emailtemplates',
-]);
 const DEFAULT_PAGE = 'overview';
+const SIDEBAR_KEY = 'pp_admin_sidebar_collapsed';
 
-function readHashPage() {
-  if (typeof window === 'undefined') return DEFAULT_PAGE;
-  let raw = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim();
-  // B6: #receipts is a legacy bookmark for the old Receipt Check tab, now merged
-  // into Claims (its "Review" view). Translate it to claims instead of mounting a
-  // second, desync-prone AdminClaims copy. Do this BEFORE the validity check so
-  // the old link still resolves rather than falling back to the default page.
-  if (raw === 'receipts') raw = 'claims';
-  const resolved = VALID_PAGES.has(raw) ? raw : DEFAULT_PAGE;
-  // Settings and Organisation are now one merged page; #org redirects to it.
-  return resolved === 'org' ? 'settings' : resolved;
+function resolvePage(raw) {
+  const id = TAB_ALIASES[raw] || raw;
+  return TAB_BY_ID[id] ? id : null;
 }
 
-/* `#overview?as=vendor` — look at the dashboard exactly as a vendor
- * account does. Any staff role may use it, and it can only ever REMOVE access:
- * the guard below narrows the visible pages and the shell drops to the
- * vendor permission set, so previewing can't reveal anything the viewer
- * couldn't already reach. It is a rehearsal of the vendor's view, not a
- * way to grant one. */
-function readHashPreviewRole() {
-  return readVendorPreviewFlag() ? 'vendor' : null;
+function readHash() {
+  if (typeof window === 'undefined') return { page: DEFAULT_PAGE, section: null };
+  const [path, query = ''] = (window.location.hash || '').replace(/^#\/?/, '').split('?');
+  const raw = path.trim();
+  const params = new URLSearchParams(query);
+  return {
+    page: resolvePage(raw) || DEFAULT_PAGE,
+    // #organizations used to be its own page; it is now a Master Settings tab.
+    section: params.get('section') || (raw === 'organizations' ? 'organisations' : raw === 'org' ? 'organisation' : null),
+  };
 }
 
-// Optional cross-page scroll target carried in the hash query, e.g. a
-// notification deep-link `#users?section=merge` scrolls to the merge queue.
-function readHashSection() {
-  if (typeof window === 'undefined') return null;
-  const q = (window.location.hash || '').split('?')[1] || '';
-  return new URLSearchParams(q).get('section') || null;
+function readCollapsed() {
+  try { return localStorage.getItem(SIDEBAR_KEY) === '1'; } catch { return false; }
 }
 
 function AdminShell() {
-  const [page, setPageState] = useState(readHashPage);
+  const initial = readHash();
+  const [page, setPageState] = useState(initial.page);
+  const [section, setSection] = useState(initial.section);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   const draftState = useAdminDraft();
   const { profile } = useAuthRole();
-  const { activeOrgId, activeOrgSlug, activeOrgMode } = useOrg();
+  const { access, roles, workspace } = useAccess();
+  const { activeOrg, activeOrgId, activeOrgSlug, activeOrgMode, activeGroupMode, status: orgStatus } = useOrg();
 
-  /* Vendor-view preview (`?as=vendor`). Kept in state so leaving it is a
-   * single click rather than a URL edit. */
-  const [previewRole, setPreviewRole] = useState(readHashPreviewRole);
-
-  /* The role the dashboard actually renders as. Previewing is allowed
-   * only from a role that already outranks the one being previewed. */
-  const realRole = profile?.role || null;
-  // Every staff role can see all three vendor pages already, so a preview
-  // strictly narrows what they see. Gating it to owner/admin locked out the
-  // managers who demo the product — Nida's link silently ignored ?as=vendor.
-  const canPreview = !!realRole && realRole !== 'vendor';
+  /* Vendor preview (`?as=vendor`): a staff account looking at the dashboard
+   * exactly as a vendor does. It can only narrow what is shown. */
+  const [previewRole, setPreviewRole] = useState(() => (readVendorPreviewFlag() ? 'vendor' : null));
+  const canPreview = !!access && access.level !== 'vendor';
   const previewing = canPreview && previewRole === 'vendor';
-  const effectiveRole = previewing ? 'vendor' : realRole;
-  const isVendorView = effectiveRole === 'vendor';
+  const effectiveAccess = useMemo(
+    () => (previewing ? previewAccess(access, roles) : access),
+    [previewing, access, roles],
+  );
+  const isVendorView = effectiveAccess?.level === 'vendor';
 
   const [wizardOpen, setWizardOpen] = useState(false);
-  /* When another page (e.g. Cup Scans) wants to hand off to the Users
-   * page with a specific customer opened, it calls onNavigate('users',
-   * { focusUserId }). We stash the id here and pass it to AdminUsers,
-   * which selects that user and then clears it via onFocusConsumed. */
   const [focusUserId, setFocusUserId] = useState(null);
-  /* Cross-page scroll target for the Organizations page (currently only
-   * 'groups', fired by the group gear + "Manage groups" in the switcher). */
-  const [focusOrgSection, setFocusOrgSection] = useState(null);
-  /* Scroll target parsed from a notification deep-link hash (e.g.
-   * `#users?section=merge` → scroll the Users page to the merge queue). */
-  const [deepSection, setDeepSection] = useState(readHashSection);
+  const [visited, setVisited] = useState(() => new Set([initial.page]));
 
-  /* Track which pages have been visited so we can keep them mounted
-   * after first visit. Set is fine here — React's reference equality
-   * isn't checked because we only ever add, never remove. */
-  const [visited, setVisited] = useState(() => new Set([page]));
+  const settings = draftState?.draft?.settings || draftState?.published?.settings || null;
+  const mode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
+  const availabilityCtx = {
+    access: effectiveAccess,
+    mode,
+    settings,
+    hasGroup: !!activeOrg?.group_id,
+    workspace,
+  };
+  const tabs = TABS.filter(t => tabAvailability(t, availabilityCtx).visible);
+  const allowedPages = new Set(tabs.map(t => t.id));
+  const firstTab = tabs[0]?.id || 'support';
+  const current = tabAvailability(TAB_BY_ID[page], availabilityCtx);
 
-  /* Demo numbers: the org's own switch, and only ever for the vendor
-   * view. An owner looking at their own dashboard always sees the truth —
-   * otherwise the toggle would quietly lie to the person who set it. */
+  /* Demo numbers: the venue's switch, only ever in the vendor view. */
   const demoNumbers = !!(draftState?.draft?.settings?.vendorDemoNumbers
     ?? draftState?.published?.settings?.vendorDemoNumbers);
   const demoActive = isVendorView && demoNumbers;
-  // Set before the pages read it. Remounting them is handled by the <main>
-  // key below, the same mechanism an org switch already uses.
   setAdminDemoMode(demoActive);
 
-  /* Wrap setPage so URL hash and visited-set stay in sync. An optional
-   * second arg carries cross-page intent (currently { focusUserId }). */
   function setPage(next, opts) {
-    if (next === 'org') next = 'settings'; // merged page
-    if (!VALID_PAGES.has(next)) return;
+    const id = resolvePage(next);
+    if (!id) return;
     if (opts?.focusUserId) setFocusUserId(opts.focusUserId);
-    if (opts?.section) setFocusOrgSection(opts.section);
-    setPageState(next);
-    setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
-    // Update the hash without a scroll jump.
+    setSection(opts?.section || null);
+    setPageState(id);
+    setVisited(prev => (prev.has(id) ? prev : new Set([...prev, id])));
     if (typeof window !== 'undefined') {
-      const target = '#' + next + (readHashPreviewRole() ? '?as=vendor' : '');
+      const q = new URLSearchParams();
+      if (readVendorPreviewFlag()) q.set('as', 'vendor');
+      if (opts?.section) q.set('section', opts.section);
+      const target = `#${id}${q.toString() ? `?${q}` : ''}`;
       if (window.location.hash !== target) {
         history.replaceState(null, '', window.location.pathname + window.location.search + target);
       }
     }
   }
 
-  /* Listen for back/forward + manual hash edits so the active tab
-   * always matches the URL. */
   useEffect(() => {
     function onHashChange() {
-      const next = readHashPage();
-      setPageState(next);
-      setDeepSection(readHashSection());
-      setPreviewRole(readHashPreviewRole());
-      setVisited(prev => prev.has(next) ? prev : new Set([...prev, next]));
+      const h = readHash();
+      setPageState(h.page);
+      setSection(h.section);
+      setPreviewRole(readVendorPreviewFlag() ? 'vendor' : null);
+      setVisited(prev => (prev.has(h.page) ? prev : new Set([...prev, h.page])));
     }
     window.addEventListener('hashchange', onHashChange);
-    // If the page loaded with no hash, normalise to the default so
-    // a reload doesn't see an empty URL.
     if (!window.location.hash) {
       history.replaceState(null, '', window.location.pathname + window.location.search + '#' + DEFAULT_PAGE);
     }
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  /* Tikkie-only orgs: hiding sidebar items alone doesn't block a route —
-   * hash edits, bookmarks and the command palette all bypass it. This
-   * effect is the actual gate: any page outside the tikkie-only set snaps
-   * to the payout log. (Mode loads async, so it also catches the case
-   * where the page rendered before the mode arrived.) */
+  /* A page this venue's programme doesn't have (a Deferred Tikkie venue on
+   * Claims, say) just moves to the first page it does have. A page switched
+   * off for this account or venue shows why instead (below). */
+  const shouldRedirect = orgStatus === 'ready' && !current.visible
+    && (current.reason === 'mode' || current.reason === 'group' || current.reason === 'unknown');
+  if (shouldRedirect && firstTab !== page) {
+    setPageState(firstTab);
+    setSection(null);
+    setVisited(prev => (prev.has(firstTab) ? prev : new Set([...prev, firstTab])));
+  }
+  /* Keep the address bar on the page actually shown. */
   useEffect(() => {
-    if (activeOrgMode === 'tikkie_only' && !TIKKIE_ONLY_PAGES.has(page)) {
-      setPage('tikkielog');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeOrgMode, page]);
+    if (readHash().page === page) return;
+    const q = readVendorPreviewFlag() ? '?as=vendor' : '';
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${page}${q}`);
+  }, [page]);
 
-  /* Vendor route guard. Same reasoning as the tikkie-only gate above: the
-   * sidebar hides the other tabs, but hash edits and bookmarks don't care
-   * what the sidebar renders. */
-  useEffect(() => {
-    if (isVendorView && !VENDOR_TABS.includes(page)) setPage(VENDOR_TABS[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVendorView, page]);
+  function toggleCollapsed() {
+    setCollapsed(c => {
+      const next = !c;
+      try { localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   function exitVendorPreview() {
     setPreviewRole(null);
-    if (typeof window !== 'undefined') {
-      history.replaceState(null, '', window.location.pathname + window.location.search + '#' + page);
-    }
+    history.replaceState(null, '', window.location.pathname + window.location.search + '#' + page);
   }
 
   function handlePreview() {
-    // Multi-org: open the active org's user app slug so the preview
-    // matches what's actually being edited.
-    // We read activeOrg via useOrg() up above to avoid stale closures.
-    const slug = activeOrgSlug;
-    window.open(slug ? `/${slug}/` : '/', '_blank');
+    window.open(activeOrgSlug ? `/${activeOrgSlug}/` : '/', '_blank');
   }
 
+  const blocked = !current.visible && !shouldRedirect;
+  const roleLabel = effectiveAccess?.role
+    ? (effectiveAccess.role.label === LEVELS[effectiveAccess.level]?.label
+      ? effectiveAccess.role.label
+      : `${effectiveAccess.role.label} · ${LEVELS[effectiveAccess.level]?.label}`)
+    : profile?.role;
 
   return (
-    <div className={`admin-app${previewing ? ' admin-app--previewing' : ''}`}>
-      {previewing && (
-        <div className="vendor-preview-bar" role="status">
-          <span className="vendor-preview-bar__dot" aria-hidden="true" />
-          <span className="vendor-preview-bar__text">
-            Viewing as a <strong>vendor</strong> — five pages, read-only.
-            {demoNumbers
-              ? ' Demo numbers are on, so these figures are illustrative.'
-              : ' Demo numbers are off, so these are your real figures.'}
-          </span>
-          <button type="button" className="vendor-preview-bar__exit" onClick={exitVendorPreview}>
-            Back to my view
-          </button>
-        </div>
-      )}
+    <div
+      className={`admin-app${previewing ? ' admin-app--previewing' : ''}${collapsed ? ' admin-app--collapsed' : ''}`}
+      style={{ '--sidebar-w': collapsed ? '72px' : '248px' }}
+    >
+      <AdminSidebar
+        tabs={tabs}
+        activePage={page}
+        onNavigate={setPage}
+        onAddOrg={() => setWizardOpen(true)}
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
+        canManageOrgs={!!effectiveAccess?.isMaster}
+        roleLabel={roleLabel}
+      />
       <AdminTopBar
         draftState={draftState}
         onNavigate={setPage}
         onPreview={handlePreview}
         onOpenSupport={() => setPage('support')}
+        allowedPages={allowedPages}
+        canSeeSettings={allowedPages.has('settings')}
+        canPublish={['settings', 'rewards', 'appdesign'].some(t => effectiveAccess?.canEdit?.(t))}
       />
-      <ViewRoleCtx.Provider value={{ viewRole: effectiveRole, isVendorView, previewing }}>
-      <div className="admin-app__body">
-        <AdminSidebar
-          activePage={page}
-          onNavigate={setPage}
-          draftState={draftState}
-          role={effectiveRole}
-          onAddOrg={() => setWizardOpen(true)}
-        />
-        {/* Keying <main> by activeOrgId forces every admin page to
-            remount + re-fetch whenever the user switches orgs. The
-            top-level shell (topbar, sidebar) stays mounted so the
-            switch feels instant and doesn't lose hash routing. */}
-        <main className="admin-app__main" key={`${activeOrgId || 'bootstrap'}${demoActive ? ':demo' : ''}`}>
-          <KeepAlive id="overview" activeId={page} visited={visited}>
-            <AdminOverview draftState={draftState} onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="rewards" activeId={page} visited={visited}>
-            <AdminRewards draftState={draftState} onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="appdesign" activeId={page} visited={visited}>
-            <AdminAppDesign draftState={draftState} />
-          </KeepAlive>
-          <KeepAlive id="users" activeId={page} visited={visited}>
-            {/* One Users page for every mode — it hides the cup/reward
-                columns for Deferred Tikkie (profiles + accounts). */}
-            <AdminUsers onNavigate={setPage} focusUserId={focusUserId} onFocusConsumed={() => setFocusUserId(null)} focusSection={page === 'users' ? deepSection : null} onSectionConsumed={() => setDeepSection(null)} />
-          </KeepAlive>
-          <KeepAlive id="claims" activeId={page} visited={visited}>
-            <AdminClaims onNavigate={setPage} draftState={draftState} />
-          </KeepAlive>
-          <KeepAlive id="cupscans" activeId={page} visited={visited}>
-            <AdminCupScans onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="cupqr" activeId={page} visited={visited}>
-            <AdminReceiptGenerator onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="transactions" activeId={page} visited={visited}>
-            <AdminTransactions onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="organizations" activeId={page} visited={visited}>
-            <AdminOrganizations onNavigate={setPage} onAddOrg={() => setWizardOpen(true)} focusSection={focusOrgSection} onSectionConsumed={() => setFocusOrgSection(null)} />
-          </KeepAlive>
-          <KeepAlive id="settings" activeId={page} visited={visited}>
-            <AdminWorkspace draftState={draftState} onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="history" activeId={page} visited={visited}>
-            <AdminHistory draftState={draftState} onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="reports" activeId={page} visited={visited}>
-            <AdminReports onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="stats" activeId={page} visited={visited}>
-            <AdminStats onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="behaviour" activeId={page} visited={visited}>
-            <AdminUserBehaviour onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="donations" activeId={page} visited={visited}>
-            <AdminDonations onNavigate={setPage} draftState={draftState} />
-          </KeepAlive>
-          <KeepAlive id="byorequests" activeId={page} visited={visited}>
-            <AdminByoRequests onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="futurevendors" activeId={page} visited={visited}>
-            <AdminFutureVendors onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="tikkielog" activeId={page} visited={visited}>
-            <AdminTikkieLog onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="smartbins" activeId={page} visited={visited}>
-            <AdminSmartBins />
-          </KeepAlive>
-          <KeepAlive id="emailtemplates" activeId={page} visited={visited}>
-            <AdminEmailTemplates />
-          </KeepAlive>
-          <KeepAlive id="backupcups" activeId={page} visited={visited}>
-            <AdminBackupCups onNavigate={setPage} />
-          </KeepAlive>
-          <KeepAlive id="support" activeId={page} visited={visited}>
-            <AdminSupport onNavigate={setPage} />
-          </KeepAlive>
-          {/* B6: the old `#receipts` slot mounted a SECOND live AdminClaims copy
-              (its own data + approve actions, desynced from #claims). Removed —
-              readHashPage() now translates #receipts → claims, so old bookmarks
-              land on the single Claims instance. */}
-        </main>
-      </div>
+      <ViewRoleCtx.Provider value={{ viewRole: isVendorView ? 'vendor' : profile?.role, isVendorView, previewing, access: effectiveAccess, allowedPages }}>
+        <div className="admin-app__body">
+          {previewing && (
+            <div className="vendor-preview-bar" role="status">
+              <span className="vendor-preview-bar__dot" aria-hidden="true" />
+              <span className="vendor-preview-bar__text">
+                Viewing as a <strong>vendor</strong>: {tabs.length} page{tabs.length === 1 ? '' : 's'}, read-only.
+                {demoNumbers
+                  ? ' Demo numbers are on, so these figures are illustrative.'
+                  : ' Demo numbers are off, so these are the real figures.'}
+              </span>
+              <button type="button" className="vendor-preview-bar__exit" onClick={exitVendorPreview}>
+                Back to my view
+              </button>
+            </div>
+          )}
+          <main className="admin-app__main" key={`${activeOrgId || 'bootstrap'}${demoActive ? ':demo' : ''}`}>
+            {blocked ? (
+              <PageUnavailable
+                tab={TAB_BY_ID[page]}
+                reason={current.reason}
+                roleLabel={effectiveAccess?.role?.label}
+                orgName={activeOrg?.name}
+                onBack={() => setPage(firstTab)}
+                backLabel={TAB_BY_ID[firstTab]?.label}
+              />
+            ) : (
+              <>
+                <KeepAlive id="overview" activeId={page} visited={visited}>
+                  <AdminOverview draftState={draftState} onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="rewards" activeId={page} visited={visited}>
+                  <AdminRewards draftState={draftState} onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="appdesign" activeId={page} visited={visited}>
+                  <AdminAppDesign draftState={draftState} />
+                </KeepAlive>
+                <KeepAlive id="users" activeId={page} visited={visited}>
+                  <AdminUsers
+                    onNavigate={setPage}
+                    focusUserId={focusUserId}
+                    onFocusConsumed={() => setFocusUserId(null)}
+                    focusSection={page === 'users' ? section : null}
+                    onSectionConsumed={() => setSection(null)}
+                  />
+                </KeepAlive>
+                <KeepAlive id="claims" activeId={page} visited={visited}>
+                  <AdminClaims onNavigate={setPage} draftState={draftState} />
+                </KeepAlive>
+                <KeepAlive id="cupscans" activeId={page} visited={visited}>
+                  <AdminCupScans onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="cupqr" activeId={page} visited={visited}>
+                  <AdminReceiptGenerator onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="transactions" activeId={page} visited={visited}>
+                  <AdminTransactions onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="settings" activeId={page} visited={visited}>
+                  <AdminSettingsPage
+                    draftState={draftState}
+                    onNavigate={setPage}
+                    section={page === 'settings' ? section : null}
+                  />
+                </KeepAlive>
+                <KeepAlive id="master" activeId={page} visited={visited}>
+                  <AdminMasterSettings
+                    draftState={draftState}
+                    onNavigate={setPage}
+                    onAddOrg={() => setWizardOpen(true)}
+                    section={page === 'master' ? section : null}
+                  />
+                </KeepAlive>
+                <KeepAlive id="history" activeId={page} visited={visited}>
+                  <AdminHistory draftState={draftState} onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="reports" activeId={page} visited={visited}>
+                  <AdminReports onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="stats" activeId={page} visited={visited}>
+                  <AdminStats onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="behaviour" activeId={page} visited={visited}>
+                  <AdminUserBehaviour onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="donations" activeId={page} visited={visited}>
+                  <AdminDonations onNavigate={setPage} draftState={draftState} />
+                </KeepAlive>
+                <KeepAlive id="byorequests" activeId={page} visited={visited}>
+                  <AdminByoRequests onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="futurevendors" activeId={page} visited={visited}>
+                  <AdminFutureVendors onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="tikkielog" activeId={page} visited={visited}>
+                  <AdminTikkieLog onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="smartbins" activeId={page} visited={visited}>
+                  <AdminSmartBins />
+                </KeepAlive>
+                <KeepAlive id="emailtemplates" activeId={page} visited={visited}>
+                  <AdminEmailTemplates />
+                </KeepAlive>
+                <KeepAlive id="backupcups" activeId={page} visited={visited}>
+                  <AdminBackupCups onNavigate={setPage} />
+                </KeepAlive>
+                <KeepAlive id="support" activeId={page} visited={visited}>
+                  <AdminSupport onNavigate={setPage} />
+                </KeepAlive>
+              </>
+            )}
+          </main>
+        </div>
       </ViewRoleCtx.Provider>
 
-      {/* Create-org wizard — modal portal sibling so it overlays the
-          whole shell. State lives here so the switcher (sidebar) and
-          the Organisations management page (main area) can both
-          trigger it through the same `onAddOrg` callback. */}
       {wizardOpen && (
         <OrgOnboardingWizard
           onClose={() => setWizardOpen(false)}
           onCreated={() => setWizardOpen(false)}
         />
       )}
+    </div>
+  );
+}
+
+const REASONS = {
+  role: (tab, role) => `Your role${role ? `, ${role},` : ''} doesn't include ${tab.label}.`,
+  workspace: (tab) => `${tab.label} is switched off for everyone.`,
+  feature: (tab, _role, org) => `${tab.label} is switched off in the settings${org ? ` for ${org}` : ''}.`,
+};
+
+function PageUnavailable({ tab, reason, roleLabel, orgName, onBack, backLabel }) {
+  if (!tab) return null;
+  const text = (REASONS[reason] || REASONS.role)(tab, roleLabel, orgName);
+  const who = reason === 'feature' ? 'Turn it back on in Settings → Features.' : 'A master can change that in Master Settings.';
+  return (
+    <div className="ui-page">
+      <Card>
+        <EmptyState
+          icon={EyeOff}
+          title="This page is not available"
+          action={backLabel && <Button variant="outline" onClick={onBack}>Go to {backLabel}</Button>}
+        >
+          {text} {who}
+        </EmptyState>
+      </Card>
     </div>
   );
 }

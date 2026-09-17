@@ -1,5 +1,26 @@
 import { useAuth, hasPermission } from './AuthContext';
+import { useViewRole } from '../context/ViewRole';
+import { TAB_BY_ID } from '../lib/access';
 import './PermissionGate.css';
+
+/* The dashboard tab each action changes. A role that can only view that
+ * tab doesn't get the action, whatever its old role name allows. */
+const ACTION_TAB = {
+  'claim.approve': 'claims',
+  'claim.hide_image': 'claims',
+  'reward.edit': 'rewards',
+  'reward.publish': 'rewards',
+  'cupqr.generate': 'cupqr',
+  'customer.adjust': 'users',
+  'team.invite': 'master',
+  'team.role': 'master',
+  'team.password': 'master',
+  'team.block': 'master',
+  'team.delete': 'master',
+  'org.edit': 'master',
+  'audit.read': 'master',
+  'settings.maintenance': 'settings',
+};
 
 /* Permission-aware wrapper. Three render modes (pick whichever fits the
  * surrounding UI):
@@ -28,7 +49,10 @@ export default function PermissionGate({
   children,
 }) {
   const { profile } = useAuth();
-  const allowed = profile ? hasPermission(profile.role, action) : false;
+  const { access } = useViewRole();
+  const tab = ACTION_TAB[action];
+  const tabAllows = !access || !tab || access.canEdit(tab);
+  const allowed = profile ? hasPermission(profile.role, action) && tabAllows : false;
 
   if (allowed) return children;
 
@@ -37,7 +61,9 @@ export default function PermissionGate({
   // Disable mode — clone the child element with disabled + a hover tooltip.
   // We wrap in a span so the tooltip survives even if the child intercepts
   // pointer events when disabled.
-  const reason = tooltip || requiredRoleLabel(action);
+  const reason = tooltip || (!tabAllows && TAB_BY_ID[tab]
+    ? `Your role can view ${TAB_BY_ID[tab].label} but not change it`
+    : requiredRoleLabel(action));
   return (
     <span className="pg-wrap" data-tooltip={reason}>
       <span className="pg-blocker" aria-hidden="true" />
@@ -64,17 +90,17 @@ function requiredRoleLabel(action) {
   const minRole = {
     'claim.approve':       'Manager',
     'reward.edit':         'Manager',
-    'reward.publish':      'Admin',
+    'reward.publish':      'Manager',
     'cupqr.generate':      'Manager',
-    'customer.adjust':     'Admin',
-    'team.invite':         'Admin',
-    'team.role':           'Admin',
-    'team.password':       'Admin',
-    'team.block':          'Admin',
-    'team.delete':         'Owner',
-    'org.edit':            'Admin',
-    'audit.read':          'Admin',
-    'settings.maintenance':'Admin',
+    'customer.adjust':     'Master',
+    'team.invite':         'Master',
+    'team.role':           'Master',
+    'team.password':       'Master',
+    'team.block':          'Master',
+    'team.delete':         'Master',
+    'org.edit':            'Master',
+    'audit.read':          'Master',
+    'settings.maintenance':'Master',
   };
   const role = minRole[action] || 'a higher role';
   return `Requires ${role} access`;

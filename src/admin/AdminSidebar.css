@@ -1,312 +1,165 @@
-.admin-sidebar {
+/* ─────────────────────────────────────────────────────────────────────
+ * Sidebar — PackPulse layout: brand, organisation, grouped tabs, account.
+ * Width comes from --sidebar-w on .admin-app (248px, 72px collapsed).
+ * ───────────────────────────────────────────────────────────────────── */
+
+.sb {
   position: fixed;
-  top: 56px;
+  top: 0;
   left: 0;
   bottom: 0;
-  width: 220px;
-  background: #FCFAF6;
-  border-right: 1px solid #EAE5DB;
+  z-index: 150;
+  width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
-  z-index: 100;
-  /* No scrollbar: the sidebar fills exactly the viewport height (under
-   * the 56px top bar) and the nav + toggles section together pack
-   * densely enough to fit. If the viewport is unusually short, content
-   * clips silently instead of showing a scrollbar — per spec. */
-  overflow: hidden;
-  /* Make the column itself the height authority, so children that
-   * declare `min-height: 0` can actually shrink to fit. */
-  height: calc(100vh - 56px);
+  background: #FFFFFF;
+  border-right: 1px solid var(--ui-border);
+  font-family: var(--ui-font);
+  transition: width 0.2s var(--ui-ease);
 }
 
-.admin-sidebar__nav {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 8px 10px;
+.sb__brand {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 64px;
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.sb--collapsed .sb__brand {
   flex-direction: column;
-  gap: 1px;
-  /* Hide rather than scroll if the nav itself runs long. The items
-   * below are already tight; this is a safety net for very short
-   * laptop screens. */
-  overflow: hidden;
-}
-
-.admin-sidebar__item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: #5A554F;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s ease;
-  font-family: inherit;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.admin-sidebar__item:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
-}
-
-.admin-sidebar__item--active {
-  background: rgba(253, 111, 70, 0.18);
-  color: #FD6F46;
-  font-weight: 700;
-}
-.admin-sidebar__item--active .admin-sidebar__item-icon { color: #FD6F46; }
-
-.admin-sidebar__item--active:hover {
-  background: rgba(253, 111, 70, 0.26);
-}
-
-.admin-sidebar__item-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-.admin-sidebar__item-label {
-  flex: 1;
-}
-
-/* Pending-work count badge — a small numbered pill (Overview has none). */
-.admin-sidebar__badge {
-  flex-shrink: 0;
-  background: var(--pb-orange-warm);
-  color: #FFFFFF;
-  font-size: 10px;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  padding: 0 5px;
-}
-
-/* "Per group" section — the shared, group-wide tabs (Users, Future Vendors)
- * gathered under a labelled header tagged with the group's name. */
-.admin-sidebar__section {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #EAE5DB;
-}
-.admin-sidebar__section-head {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  padding: 0 8px 4px;
+  height: auto;
+  padding: 14px 0 10px;
 }
-.admin-sidebar__section-label {
-  font-size: 9px;
-  font-weight: 700;
-  color: #8A8175;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-/* "Group" chip — also used as the group-name tag in the Per group header. */
-.admin-sidebar__tag {
-  flex-shrink: 0;
-  font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6C4CE0;
-  background: rgba(108, 76, 224, 0.12);
-  padding: 2px 6px;
-  border-radius: 5px;
-  line-height: 1.2;
-}
-
-/* Quick Settings Toggles — pinned to bottom of sidebar, does not
- * scroll. Padding tightened from the original so the whole sidebar
- * fits inside the viewport on standard 13" laptops without a scrollbar. */
-.admin-sidebar__toggles {
-  flex: 0 0 auto;
-  padding: 8px 10px 6px;
-  border-top: 1px solid #EAE5DB;
-}
-
-.admin-sidebar__toggles-label {
-  font-size: 9px;
-  font-weight: 700;
-  color: #8A8175;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  padding: 0 4px;
-  margin-bottom: 6px;
-}
-
-/* Clickable variant of the section label — links to the full Settings
- * page. Right-arrow icon mirrors the standard "go to" affordance used
- * elsewhere in the dashboard. */
-.admin-sidebar__toggles-label--link {
+.sb__logo {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 4px;
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  font-size: 9px;
-  font-weight: 700;
-  color: #7A7166;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   cursor: pointer;
-  border-radius: 6px;
-  margin-bottom: 6px;
-  transition: background 0.14s ease, color 0.14s ease;
 }
-.admin-sidebar__toggles-label--link:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
-}
-.admin-sidebar__toggles-label--link svg {
-  opacity: 0.5;
-  transition: transform 0.14s ease, opacity 0.14s ease;
-}
-.admin-sidebar__toggles-label--link:hover svg {
-  opacity: 1;
-  transform: translateX(2px);
-}
-
-.admin-sidebar__rates {
-  background: var(--pb-orange-warm);
+.sb__wordmark { height: 27px; width: auto; display: block; }
+.sb__mark { width: 32px; height: 32px; display: block; border-radius: 9px; }
+.sb__collapse {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
   border-radius: 8px;
-  padding: 7px 8px;
-  margin-bottom: 4px;
+  background: transparent;
+  color: var(--ui-muted-2);
   cursor: pointer;
-  transition: background 0.12s, filter 0.12s;
-  display: flex;
-  gap: 6px;
+  transition: background-color 0.15s, color 0.15s;
 }
+.sb__collapse:hover { background: var(--ui-soft); color: var(--ui-fg); }
 
-.admin-sidebar__rates:hover {
-  background: var(--pb-orange-warm);
-  filter: brightness(1.06) saturate(1.1);
+.sb__org {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--ui-border);
 }
+.sb--collapsed .sb__org { padding: 10px 0; display: flex; justify-content: center; }
 
-.admin-sidebar__rate-item {
+.sb__nav {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 18px;
+  scrollbar-width: thin;
 }
+.sb--collapsed .sb__nav { padding: 12px 0; align-items: center; gap: 12px; }
 
-.admin-sidebar__rate-label {
-  font-size: 9px;
+.sb__group { display: flex; flex-direction: column; gap: 2px; }
+.sb--collapsed .sb__group { align-items: center; }
+.sb--collapsed .sb__group + .sb__group { padding-top: 12px; border-top: 1px solid var(--ui-border); }
+.sb__group-label {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.82);
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: rgba(103, 99, 116, 0.62);
 }
 
-.admin-sidebar__rate-val {
-  font-size: 12px;
-  font-weight: 800;
-  color: #FFFFFF;
-}
-
-.admin-sidebar__toggle-row {
+.sb__item {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 7px 8px;
-  border-radius: 7px;
+  gap: 11px;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ui-muted);
+  font: 500 13.5px/1 var(--ui-font);
+  text-align: left;
   cursor: pointer;
-  transition: background 0.12s;
-  margin-bottom: 2px;
+  transition: background-color 0.15s, color 0.15s;
 }
-
-.admin-sidebar__toggle-row:hover {
-  background: #F3EEE4;
+.sb__item:hover { background: var(--ui-soft); color: var(--ui-fg); }
+.sb__item--active {
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  font-weight: 600;
 }
-
-.admin-sidebar__toggle-name {
-  font-size: 12px;
-  color: #4A4540;
-  font-weight: 500;
+.sb__item--active:hover { background: var(--ui-primary-soft); color: var(--ui-primary); }
+.sb--collapsed .sb__item { width: 42px; height: 40px; justify-content: center; padding: 0; }
+.sb__item-icon { position: relative; display: grid; place-items: center; flex: none; }
+.sb__item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb__badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-
-.admin-sidebar__toggle-name--warn {
-  color: #C2410C;
+.sb__item--active .sb__badge { background: var(--ui-primary); }
+.sb__dot {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 2px #fff;
 }
-
-.admin-sidebar__toggle-pill {
+.sb__scope {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--ui-soft-2);
+  color: var(--ui-muted);
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 20px;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.02em;
 }
+.sb__item--active .sb__scope { background: #fff; color: var(--ui-primary); }
 
-.admin-sidebar__toggle-pill--on  { background: rgba(21, 122, 52, 0.14); color: #157A34; }
-.admin-sidebar__toggle-pill--off { background: #EFE9DE; color: #8A8175; }
-.admin-sidebar__toggle-pill--warn { background: rgba(194, 65, 12, 0.14); color: #C2410C; }
+.sb__foot {
+  padding: 12px;
+  border-top: 1px solid var(--ui-border);
+}
+.sb--collapsed .sb__foot { padding: 10px 0; display: flex; justify-content: center; }
 
-.admin-sidebar__footer {
-  padding: 12px 10px 16px;
-  border-top: 1px solid #EAE5DB;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-/* OrgBadge + ProfileMenu stretch to full width so they read as a stacked
- * me + workspace card inside the sidebar footer. */
-.admin-sidebar__footer .ob,
-.admin-sidebar__footer .pm__trigger {
-  width: 100%;
-  justify-content: flex-start;
-}
-.admin-sidebar__footer .ob__name,
-.admin-sidebar__footer .pm__name {
-  flex: 1;
-}
-/* Profile dropdown opens upward inside the sidebar so it doesn't get
- * clipped by the viewport bottom. */
-.admin-sidebar__footer .pm__dropdown {
-  top: auto;
-  bottom: calc(100% + 6px);
-  right: auto;
-  left: 0;
-  min-width: 260px;
-}
-
-.admin-sidebar__footer-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: 8px;
-  border: 1px solid #E0DAD0;
-  background: transparent;
-  color: #5A554F;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-}
-
-.admin-sidebar__footer-btn:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
-  border-color: #D5CDBE;
+@media (prefers-reduced-motion: reduce) {
+  .sb { transition: none; }
 }

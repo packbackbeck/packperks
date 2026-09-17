@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { updatePassword } from './authApi';
-import packperksLogo from '../../assets/images/packperks-logo.svg';
+import AuthLayout from './login/AuthLayout';
+import {
+  AuthHeading,
+  Field,
+  FormAlert,
+  PasswordInput,
+  PrimaryButton,
+} from './login/formParts';
+import { ArrowLeftIcon, CheckCircleIcon, LockKeyholeIcon } from './login/icons';
 import './LoginPage.css';
 
 /* ResetPasswordPage — shown when an admin opens a password-reset link.
@@ -9,7 +17,8 @@ import './LoginPage.css';
  * short-lived session (AuthContext flips `recovering` on). We collect a new
  * password, call updateUser, then sign the user out so they log in fresh with
  * the new password. `onFinish` performs the sign-out + clears the recovery
- * flag so AuthGate falls back to the normal login screen. */
+ * flag so AuthGate falls back to the normal login screen. Shares the sign-in
+ * page's layout (./login/AuthLayout). */
 export default function ResetPasswordPage({ onFinish }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
@@ -32,48 +41,40 @@ export default function ResetPasswordPage({ onFinish }) {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-card__brand">
-          <img src={packperksLogo} alt="PackPerks" className="auth-card__logo" />
-          <p className="auth-card__sub">Admin Console</p>
+    <AuthLayout>
+      {done ? (
+        <div className="pp-auth">
+          <AuthHeading icon={<CheckCircleIcon size={20} />} tone="success" title="Password updated">
+            Sign in with your new password to continue.
+          </AuthHeading>
+          <PrimaryButton type="button" onClick={() => onFinish?.()}>
+            Continue to sign in
+          </PrimaryButton>
         </div>
-
-        {done ? (
-          <div className="auth-form">
-            <div className="auth-locked" style={{ borderColor: '#CDEBD6', background: '#F1FBF4', color: '#1A8737' }}>
-              <CheckIcon />
-              <div>
-                <strong>Password updated</strong>
-                <span>Sign in with your new password to continue.</span>
-              </div>
-            </div>
-            <button type="button" className="auth-btn auth-btn--primary" onClick={() => onFinish?.()}>
-              Continue to sign in
-            </button>
-          </div>
-        ) : (
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <p className="auth-info auth-info--block">
-              Choose a new password for your admin account.
-            </p>
-            <label className="auth-field">
-              <span>New password</span>
-              <input
-                type="password"
+      ) : (
+        <form className="pp-auth" onSubmit={handleSubmit}>
+          <AuthHeading icon={<LockKeyholeIcon size={20} />} title="Set a new password">
+            Choose a new password for your admin account.
+          </AuthHeading>
+          <div className="pp-auth__fields">
+            <Field id="reset-password" label="New password">
+              <PasswordInput
+                id="reset-password"
+                name="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
                 autoComplete="new-password"
+                autoFocus
                 required
                 minLength={8}
                 disabled={busy}
               />
-            </label>
-            <label className="auth-field">
-              <span>Confirm new password</span>
-              <input
-                type="password"
+            </Field>
+            <Field id="reset-confirm" label="Confirm new password">
+              <PasswordInput
+                id="reset-confirm"
+                name="confirm-password"
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
                 placeholder="Re-enter your new password"
@@ -82,22 +83,24 @@ export default function ResetPasswordPage({ onFinish }) {
                 minLength={8}
                 disabled={busy}
               />
-            </label>
-            {err && <p className="auth-err">{err}</p>}
-            <button
-              type="submit"
-              className="auth-btn auth-btn--primary"
-              disabled={busy || password.length < 8 || password !== confirm}
-            >
-              {busy ? 'Updating…' : 'Update password'}
+            </Field>
+          </div>
+          <FormAlert>{err}</FormAlert>
+          <PrimaryButton
+            busy={busy}
+            busyLabel="Updating…"
+            disabled={busy || password.length < 8 || password !== confirm}
+          >
+            Update password
+          </PrimaryButton>
+          <div className="pp-auth__row">
+            <button type="button" className="pp-auth__link pp-auth__link--quiet" onClick={() => onFinish?.()}>
+              <ArrowLeftIcon size={14} /> Back to sign in
             </button>
-            <button type="button" className="auth-link auth-link--back" onClick={() => onFinish?.()}>
-              ← Back to sign in
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          </div>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
 
@@ -108,13 +111,4 @@ function friendlyError(e) {
   if (m.includes('token') && m.includes('expired')) return 'This reset link has expired. Request a new one from the sign-in screen.';
   if (m.includes('rate limit')) return 'Too many tries — please wait a minute and try again.';
   return e?.message || 'Something went wrong. Please try again.';
-}
-
-function CheckIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M8 12.5l2.5 2.5L16 9.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
 }

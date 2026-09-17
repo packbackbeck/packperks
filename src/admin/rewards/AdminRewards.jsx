@@ -4,6 +4,7 @@ import RewardEditPanel from './RewardEditPanel';
 import './AdminRewards.css';
 import { useAdminMoney } from '../lib/adminMoney';
 import { effectiveRates } from '../../lib/rates';
+import { useViewRole } from '../context/ViewRole';
 
 /* P-43: full status palette, with 'hidden' aliased to the paused
  * orange so legacy rows render coherently until edited. */
@@ -105,6 +106,8 @@ let nextTempId = Date.now();
 
 export default function AdminRewards({ draftState, onNavigate }) {
   const { draft, updateDraft } = draftState;
+  const { access } = useViewRole();
+  const readOnly = !!access && !access.canEdit('rewards');
   const rewards = draft.rewards;
 
   const [selectedId, setSelectedId] = useState(rewards[0]?.id || null);
@@ -428,6 +431,8 @@ export default function AdminRewards({ draftState, onNavigate }) {
           </p>
         </div>
         <div className="rew-header__actions">
+          {readOnly && <span className="rew-header__readonly">View only: your role can’t change rewards</span>}
+          {!readOnly && (<>
           <input
             ref={fileInputRef}
             type="file"
@@ -457,6 +462,7 @@ export default function AdminRewards({ draftState, onNavigate }) {
             </svg>
             Add Reward
           </button>
+          </>)}
         </div>
       </div>
 
@@ -494,7 +500,7 @@ export default function AdminRewards({ draftState, onNavigate }) {
                 <option value="popularity">Most claimed</option>
               </select>
             </div>
-            {rewards.length > 1 && (
+            {rewards.length > 1 && !readOnly && (
               <button
                 type="button"
                 className={'rew-reorder-toggle' + (reorderMode ? ' rew-reorder-toggle--active' : '')}
@@ -523,7 +529,7 @@ export default function AdminRewards({ draftState, onNavigate }) {
               <div className="rew-list__reorder-hint rew-list__reorder-hint--active">
                 Drag the products into the order you want. Changes auto-save; Publish to push them live.
               </div>
-            ) : rewards.length > 1 ? (
+            ) : rewards.length > 1 && !readOnly ? (
               <div className="rew-list__reorder-hint">
                 Tip: press “Rearrange order” to drag products into the order customers see.
               </div>
@@ -556,13 +562,15 @@ export default function AdminRewards({ draftState, onNavigate }) {
         {/* Right: edit panel */}
         <div className="rew-editor">
           {selectedReward ? (
-            <RewardEditPanel
-              reward={selectedReward}
-              onChange={handleUpdate}
-              onSetFeatured={() => handleSetFeatured(selectedReward.id)}
-              onArchive={() => handleArchive(selectedReward.id)}
-              cashbackRate={effectiveRates(draftState?.draft?.settings || {}).cashback}
-            />
+            <fieldset className="rew-editor__fieldset" disabled={readOnly}>
+              <RewardEditPanel
+                reward={selectedReward}
+                onChange={handleUpdate}
+                onSetFeatured={() => handleSetFeatured(selectedReward.id)}
+                onArchive={() => handleArchive(selectedReward.id)}
+                cashbackRate={effectiveRates(draftState?.draft?.settings || {}).cashback}
+              />
+            </fieldset>
           ) : (
             <div className="rew-editor__empty">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C8C4BC" strokeWidth="1.5">
@@ -571,7 +579,7 @@ export default function AdminRewards({ draftState, onNavigate }) {
                 <path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/>
                 <path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>
               </svg>
-              <p>Select a reward to edit</p>
+              <p>{readOnly ? 'Select a reward to see its details' : 'Select a reward to edit'}</p>
             </div>
           )}
         </div>

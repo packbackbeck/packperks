@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronsUpDown } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { sendPasswordReset, updateEmail, updateMyProfile, uploadAvatar } from './authApi';
 import './ProfileMenu.css';
@@ -8,7 +9,7 @@ import './ProfileMenu.css';
  * signed-in user's avatar + name, exposes "Edit profile", "Change
  * email", "Reset password" (sends an email link to the current
  * address), and "Sign out". */
-export default function ProfileMenu() {
+export default function ProfileMenu({ compact = false, roleLabel }) {
   const { profile, signOut, setProfile } = useAuth();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState('menu'); // 'menu' | 'profile' | 'email' | 'password'
@@ -80,27 +81,32 @@ export default function ProfileMenu() {
 
   if (!profile) return null;
   const initials = (profile.display_name || profile.email)[0].toUpperCase();
+  const roleText = roleLabel || profile.role;
 
   return (
     <div className="pm" ref={rootRef}>
       <button
         type="button"
-        className="pm__trigger"
+        className={`pm__trigger${compact ? ' pm__trigger--compact' : ''}`}
         onClick={() => { setOpen(o => !o); setView('menu'); }}
-        title={profile.display_name || profile.email}
+        title={compact ? `${profile.display_name || profile.email} · ${roleText}` : undefined}
+        aria-label="Account menu"
+        aria-expanded={open}
       >
-        <span className="pm__avatar" style={{ background: profile.color || '#FD6F46' }}>
+        <span className="pm__avatar" style={{ background: profile.color || '#5B3FD6' }}>
           {profile.avatar_url
             ? <img src={profile.avatar_url} alt="" />
             : initials}
         </span>
-        <span className="pm__name">
-          <span className="pm__name-display">{profile.display_name || profile.email.split('@')[0]}</span>
-          <span className="pm__name-role">{profile.role}</span>
-        </span>
-        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 8L10 13L15 8"/>
-        </svg>
+        {!compact && (
+          <>
+            <span className="pm__name">
+              <span className="pm__name-display">{profile.display_name || profile.email.split('@')[0]}</span>
+              <span className="pm__name-role">{roleText}</span>
+            </span>
+            <ChevronsUpDown size={15} className="pm__caret" aria-hidden="true" />
+          </>
+        )}
       </button>
 
       {open && createPortal(
@@ -115,6 +121,7 @@ export default function ProfileMenu() {
               onEditProfile={() => setView('profile')}
               onChangeEmail={() => setView('email')}
               onResetPassword={() => setView('password')}
+              roleText={roleText}
               onSignOut={async () => { setOpen(false); await signOut(); }}
             />
           )}
@@ -144,7 +151,7 @@ export default function ProfileMenu() {
   );
 }
 
-function MenuView({ profile, onEditProfile, onChangeEmail, onResetPassword, onSignOut }) {
+function MenuView({ profile, roleText, onEditProfile, onChangeEmail, onResetPassword, onSignOut }) {
   return (
     <>
       <div className="pm__header">
@@ -156,7 +163,7 @@ function MenuView({ profile, onEditProfile, onChangeEmail, onResetPassword, onSi
         <div className="pm__h-info">
           <div className="pm__h-name">{profile.display_name || '—'}</div>
           <div className="pm__h-email">{profile.email}</div>
-          <span className="pm__h-role">{profile.role}</span>
+          <span className="pm__h-role">{roleText}</span>
         </div>
       </div>
 
@@ -315,7 +322,7 @@ function ChangeEmailView({ currentEmail, onBack }) {
         </p>
         <label className="pm__field">
           <span>New email</span>
-          <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="newaddress@burgerking.nl" />
+          <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="you@packback.network" />
         </label>
         {err && <p className="pm__err">{err}</p>}
         {info && <p className="pm__info">{info}</p>}

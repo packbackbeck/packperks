@@ -1,29 +1,28 @@
-.pm { position: relative; display: inline-block; }
+.pm { position: relative; display: block; font-family: var(--ui-font, inherit); }
 
-/* Dark, squarer trigger that sits in the top bar without screaming
- * "look at me" — matches the rest of the admin chrome instead of the
- * earlier white pill. */
+/* Account card at the foot of the sidebar (PackPulse layout). */
 .pm__trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 12px 4px 4px;
+  width: 100%;
+  padding: 8px 10px 8px 8px;
   background: #FFFFFF;
-  border: 1px solid #E8E6E1;
-  border-radius: 10px;
+  border: 1px solid var(--ui-border, #E7E5EE);
+  border-radius: 12px;
   cursor: pointer;
   font-family: inherit;
-  transition: all 0.15s;
-  color: #1A1A1A;
+  text-align: left;
+  color: var(--ui-fg, #17151F);
+  transition: background-color 0.15s, border-color 0.15s;
 }
-.pm__trigger:hover {
-  background: #F3EEE4;
-  border-color: #D5CDBE;
-}
+.pm__trigger:hover { background: var(--ui-soft, #F2F1F7); border-color: var(--ui-border-2, #D9D6E4); }
+.pm__trigger--compact { width: auto; padding: 3px; border-color: transparent; border-radius: 50%; }
+.pm__trigger--compact:hover { border-color: transparent; }
 
 .pm__avatar {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -40,12 +39,21 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0;
-  text-align: left;
+  flex: 1;
+  min-width: 0;
 }
-.pm__name-display { font-size: 13px; font-weight: 700; line-height: 1.2; color: #1A1A1A; }
-.pm__name-role    { font-size: 10px; color: #8A8175; text-transform: uppercase; letter-spacing: 0.05em; }
-.pm__trigger > svg { color: #8A8175; margin-left: 2px; }
+.pm__name-display {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ui-fg, #17151F);
+}
+.pm__name-role { font-size: 11.5px; color: var(--ui-muted, #676374); line-height: 1.35; }
+.pm__caret { flex: none; color: var(--ui-muted-2, #8F8B9C); }
 
 /* Dropdown */
 .pm__dropdown {

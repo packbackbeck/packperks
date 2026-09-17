@@ -1,4 +1,4 @@
-# Handoff — state of play, 16 September 2026
+# Handoff — state of play, 17 September 2026
 
 A snapshot for whoever picks this up next. Durable guidance lives in
 `/CLAUDE.md`; this file is the "where we are right now" half and goes stale.
@@ -7,7 +7,43 @@ A snapshot for whoever picks this up next. Durable guidance lives in
 
 ## Recent work
 
-### 1. Architecture audit and the fixes that followed (16 Sep)
+### 1. Dashboard redesign, roles and Master Settings (17 Sep)
+
+The dashboard now follows PackPulse's layout and access model.
+
+- **One look for the stats pages.** Dashboard, System health and User
+  behaviour each have KPI tiles, a trend chart you drive from the tiles
+  (single, pairs, compare; line/area/bar/table; weekends, previous period,
+  CSV), an Insights card beside it, and detail cards below. The design system
+  is in `src/admin/ui/`.
+- **Shell.** The sidebar groups its tabs (Analytics, Customers, Programme,
+  Smart bin, Workspace) under labels, with the organisation switcher at the
+  top and the account at the bottom. The top bar has a new programme badge, and
+  a green cashback/refund badge where the settings gear used to be.
+- **Sign-in page** in PackPulse's layout: the form on the left, a dark panel
+  with the pulse animation and screenshots of the dashboard and the phone app
+  (`src/assets/images/login/`).
+- **Roles (migration `048`, applied).** Three levels: master, manager, vendor.
+  Roles live in `admin_roles`, with hidden/view/edit per tab; accounts carry
+  `access_role`, `org_ids` and `all_orgs`. Owner and admin became masters.
+  The four managers became managers who still see every organisation. The
+  built-in Viewer role replaces "checker". 110 rolled-back checks passed
+  before applying.
+- **Master Settings** (masters only): People (invite, role, organisations,
+  block, remove), Roles & permissions (the tab matrix, custom roles),
+  Organisations (profile, programme, archive, groups, regions), Workspace
+  (switch a tab off for everyone) and the Activity log.
+- **Settings** starts with Features, one tile and switch each. Switching off
+  cup sharing or donations hides its tab. Then Payouts (payment method,
+  rates, budget), Rules & limits, Locations, and Legal (the in-app privacy
+  policy, which had no editor). The home-screen headline and donation text
+  moved to Design & copy, so nothing is edited in two places. The unused
+  privacy/terms/cookie URL fields are no longer shown.
+- `activeGroupId` was missing from the organisation context. The old
+  Settings page therefore never showed the group switches and never locked
+  the programme for grouped venues.
+
+### 2. Architecture audit and the fixes that followed (16 Sep)
 
 An audit of the whole system turned up one critical problem, five high, eight
 medium and twelve low. What was done about them:
@@ -80,13 +116,13 @@ medium and twelve low. What was done about them:
 - NYU Abu Dhabi has a new logo, served from `public/brand/nyuad.png`
   (`logo_width` 110, the height of the header buttons).
 
-### 2. Slider voucher (8 Sep)
+### 3. Slider voucher (8 Sep)
 
 A second payment method beside Tikkie cashback: a full-screen voucher at the
 counter, slide to confirm. `VoucherPage.jsx`, `SlideToConfirm.jsx`,
 `redeem_voucher()` (now priced on the server, see above).
 
-### 3. UAE, the vendor role, the dashboard's currency (9–10 Sep)
+### 4. UAE, the vendor role, the dashboard's currency (9–10 Sep)
 
 AED everywhere for UAE venues (`adminMoney`), a read-only vendor role with
 three pages, and a "Demo numbers" toggle. `normalizeRegion` dropping
@@ -109,6 +145,28 @@ KFC: `https://perks.packback.network/kfc/`
 
 ## Open items
 
+**Two edge functions are written but not deployed:** `invite-admin` (v3:
+roles and organisation lists, masters only) and `bootstrap-admin` (applies
+them on first sign-in). The deploy was held for approval. Until they are
+live, the dashboard still writes the exact role and organisations onto each
+invitation. But the live `bootstrap-admin` gives a new non-vendor person
+every organisation on first sign-in, so set their organisations in People
+afterwards.
+
+**Shareable-link invitations don't work end to end.** Sign-in only matches
+invitations by email, and the sign-in page only creates accounts for
+@packback.network. People → Add person sends email invitations only.
+
+**Per-tab "view only" is enforced by the dashboard, not the database.** The
+database only knows whether an account can write at all. The dashboard checks
+the tab in Settings, Master Settings, Rewards, Design & copy, report
+alerts, the Publish button and the actions behind `PermissionGate` (approve
+claims, adjust balances). Other pages still show their edit buttons to a role
+that can only view them.
+
+**Managers still see every organisation** (as before the roles change).
+Narrow them in Master Settings → People.
+
 **Leaked-password protection is still off** according to Supabase's advisor
 (Authentication → Password security).
 
@@ -123,8 +181,12 @@ email): 94 from the banner (`source = 'app'`), 22 from the pre-ticked box
 (`signin_popup`), 8 from the wallet form (no source). Decide whether to reset
 those to off, or ask again, before sending any marketing email.
 
-**Org isolation is still a UI convention.** A vendor account can read every
-venue's rows through the API.
+**Org isolation is still a UI convention.** A vendor or scoped manager can
+read every venue's customer rows through the API. Enforcing `org_ids` in the
+policies (`admin_sees_org()` exists since 048) is the next step.
+
+**Three Titaan 2 reward photos don't load** (Lipton, Knorr): they point at
+`assets.unileversolutions.com`.
 
 **Smaller**
 - The rejection email says the cups are still on the balance; cashback cups
@@ -153,8 +215,8 @@ Short version; the reasoning is in `/CLAUDE.md` under **Landmines**.
 - A push is not a deploy. Vercel has silently skipped triggers — fingerprint
   the live bundle before believing a change is out.
 - Publishing from the dashboard overwrites settings written directly in SQL.
-- `eslint` is not clean and never was (~230 errors). Compare counts, don't
-  chase zero.
+- `eslint` is not clean and never was (~205 errors in `src/`). Compare
+  counts, don't chase zero.
 - There is no admin test login. Verify admin work by importing `adminApi`
   through the dev server's module graph, or with a throwaway harness page.
 - Test database rules inside a transaction that ends in `rollback`.

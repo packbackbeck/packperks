@@ -2,7 +2,7 @@
   padding: 28px 28px 32px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 56px);
+  height: calc(100vh - var(--topbar-h, 64px));
   overflow: hidden;
   gap: 12px;
 }

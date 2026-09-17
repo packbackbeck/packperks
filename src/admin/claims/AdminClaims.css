@@ -1,7 +1,7 @@
 /* Pin the page to the viewport so the table + review panel scroll INSIDE their
  * own boxes (sticky column headers stay put) instead of the whole page scrolling.
  * Matches the standalone receipts page, which already fit the screen this way. */
-.admin-claims { padding: 24px 32px 20px; display: flex; flex-direction: column; height: calc(100vh - 56px); overflow: hidden; }
+.admin-claims { padding: 24px 32px 20px; display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h, 64px)); overflow: hidden; }
 
 .ac-header { margin-bottom: 16px; flex-shrink: 0; }
 .ac-header__title { font-size: 22px; font-weight: 800; color: #1A1A1A; margin: 0 0 8px; }

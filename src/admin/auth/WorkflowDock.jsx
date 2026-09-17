@@ -1,18 +1,14 @@
 import { useMemo, useState } from 'react';
+import { CircleHelp, Eye, History, Send } from 'lucide-react';
 import './WorkflowDock.css';
 
 /* ─────────────────────────────────────────────────────────────────────
  * WorkflowDock — top-right command cluster, Framer-style.
  *
- * A static row of icon buttons that mirrors the structure Framer uses
- * in the top-right of its editor (Settings · Help · Version · Preview ·
- * Publish). No expand/collapse animation — that previous design jostled
- * the search bar every time the cursor brushed past, which was
- * distracting.
+ * A static row of buttons in the top-right (Help · History · Preview ·
+ * Publish). Settings lives in the sidebar.
  *
- *   • Settings        — gear icon, navigates to the Settings page.
- *   • Support         — question-mark icon, opens the help center
- *                       (external link).
+ *   • Support         — question-mark icon, opens Help & support.
  *   • Version history — clock-arrow icon, navigates to History page.
  *   • Preview         — labelled button, opens the live user app in a
  *                       new tab.
@@ -22,7 +18,7 @@ import './WorkflowDock.css';
  * Auto-save means there is no explicit Save button or contextual primary
  * cycling through unsaved → saved → published states. The Publish
  * button is always live and pushes the current draft to the user app. */
-export default function WorkflowDock({ draftState, onPreview, onOpenHistory, onOpenSettings, onOpenSupport }) {
+export default function WorkflowDock({ draftState, onPreview, onOpenHistory, onOpenSupport, canPublish = true }) {
   const { publishDraft, isDirty, published, draft } = draftState || {};
   const [publishModal, setPublishModal] = useState(false);
   const [publishNote, setPublishNote] = useState('');
@@ -59,70 +55,27 @@ export default function WorkflowDock({ draftState, onPreview, onOpenHistory, onO
   return (
     <>
       <div className="wd" role="toolbar" aria-label="Workflow actions">
-        {/* Settings */}
-        <button
-          type="button"
-          className="wd-icon"
-          onClick={onOpenSettings}
-          title="Settings"
-          aria-label="Settings"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-          </svg>
-        </button>
-
-        {/* Support */}
-        <button
-          type="button"
-          className="wd-icon"
-          onClick={onOpenSupport}
-          title="Help & support"
-          aria-label="Help & support"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-        </button>
-
-        {/* Version history */}
-        <button
-          type="button"
-          className="wd-icon"
-          onClick={onOpenHistory}
-          title="Version history"
-          aria-label="Version history"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3v5h5" />
-            <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="12" x2="15" y2="15" />
-          </svg>
-        </button>
-
-        {/* Preview — labelled */}
-        <button
-          type="button"
-          className="wd-preview"
-          onClick={onPreview}
-          title="Open the user app in a new tab"
-        >
+        {onOpenSupport && (
+          <button type="button" className="wd-icon" onClick={onOpenSupport} title="Help & support" aria-label="Help & support">
+            <CircleHelp size={17} aria-hidden="true" />
+          </button>
+        )}
+        {onOpenHistory && (
+          <button type="button" className="wd-icon" onClick={onOpenHistory} title="Version history" aria-label="Version history">
+            <History size={17} aria-hidden="true" />
+          </button>
+        )}
+        <button type="button" className="wd-preview" onClick={onPreview} title="Open the customer app in a new tab">
+          <Eye size={15} aria-hidden="true" />
           Preview
         </button>
-
-        {/* Publish — highlighted primary */}
-        <button
-          type="button"
-          className="wd-publish"
-          onClick={() => setPublishModal(true)}
-        >
-          Publish
-          {hasPending && <span className="wd-publish__dot" aria-hidden />}
-        </button>
+        {canPublish && (
+          <button type="button" className="wd-publish" onClick={() => setPublishModal(true)}>
+            <Send size={14} aria-hidden="true" />
+            Publish
+            {hasPending && <span className="wd-publish__dot" title="Changes waiting to be published" />}
+          </button>
+        )}
       </div>
 
       {publishModal && (
@@ -240,6 +193,8 @@ const SETTINGS_LABELS = {
   privacyUrl:            'Privacy URL',
   termsUrl:              'Terms URL',
   cookieUrl:             'Cookie URL',
+  privacyPolicyText:     'Privacy policy',
+  paymentMethod:         'Payment method',
 };
 
 const REWARD_DIFF_FIELDS = [

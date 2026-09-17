@@ -1,255 +1,141 @@
-/* OrgSwitcher — sidebar-footer dropdown for active-org selection */
+.osw { position: relative; font-family: var(--ui-font); }
 
-.orgsw {
-  position: relative;
-  width: 100%;
-}
-
-.orgsw__trigger {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  background: transparent;
-  border: 1px solid #E8E6E1;
-  border-radius: 8px;
-  color: #2A2724;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease;
-}
-.orgsw__trigger:hover { background: #F3EEE4; border-color: #D5CDBE; }
-
-.orgsw__chip {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFFFFF;
-}
-.orgsw__chip--sm {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  flex-shrink: 0;
-}
-
-.orgsw__chip-letter {
-  font-size: 10px;
+.osw__avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+  color: #fff;
   font-weight: 700;
-  color: #FFFFFF;
-  letter-spacing: 0.2px;
+  line-height: 1;
 }
+.osw__avatar--img { background: #fff; box-shadow: inset 0 0 0 1px var(--ui-border); }
+.osw__avatar--img img { width: 82%; height: 82%; object-fit: contain; }
+.osw__avatar--blank { width: 34px; height: 34px; border-radius: 10px; background: var(--ui-soft-2); color: var(--ui-muted); }
 
-/* Image variant for orgs with an uploaded logo. White background with
- * a touch of padding so transparent/dark logos read cleanly inside the
- * dark dropdown. */
-.orgsw__chip--img {
-  background: #FFFFFF;
-  border: 1px solid #E8E6E1;
-  padding: 1px;
-  object-fit: contain;
-}
-
-.orgsw__name {
-  flex: 1;
+.osw__trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px 7px 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: #fff;
   text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+.osw__trigger:not(:disabled):hover { border-color: var(--ui-border-2); background: #FCFBFE; }
+.osw__trigger:disabled { cursor: default; }
+.osw__trigger[aria-expanded="true"] { border-color: rgba(91, 63, 214, 0.45); box-shadow: 0 0 0 3px var(--ui-ring); }
+.osw--compact .osw__trigger { width: auto; padding: 3px; border-radius: 12px; }
+
+.osw--empty { display: flex; align-items: center; gap: 10px; padding: 7px; }
+.osw__meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.osw__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ui-fg);
+  line-height: 1.25;
 }
-
-.orgsw__caret {
-  flex-shrink: 0;
-  color: #7A7166;
+.osw__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--ui-muted);
+  line-height: 1.35;
 }
+.osw__caret { flex: none; color: var(--ui-muted-2); }
 
-/* ── Dropdown ───────────────────────────────────────────────────────── */
-.orgsw__dropdown {
+.osw__menu {
   position: absolute;
-  bottom: calc(100% + 6px);
+  z-index: 300;
+  top: calc(100% + 6px);
   left: 0;
-  right: 0;
-  z-index: 200;
-  background: #FFFFFF;
-  border: 1px solid #E8E6E1;
-  border-radius: 10px;
+  width: 292px;
   padding: 6px;
-  box-shadow: 0 16px 48px rgba(40, 30, 15, 0.18), 0 4px 12px rgba(40, 30, 15, 0.12);
-  max-height: 60vh;
-  overflow-y: auto;
-  animation: orgsw-pop 0.12s ease-out both;
+  border: 1px solid var(--ui-border);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: var(--ui-shadow-lg);
+  animation: ui-menu-in 0.14s var(--ui-ease) both;
 }
-
-@keyframes orgsw-pop {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.orgsw__section {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 4px 0;
-}
-
-.orgsw__section-label {
-  font-size: 9px;
-  font-weight: 700;
-  color: #8A8175;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  padding: 4px 8px 2px;
-}
-
-.orgsw__item {
+.osw__search {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: #3A342B;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  gap: 7px;
+  margin: 2px 2px 6px;
+  padding: 0 10px;
+  height: 34px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  color: var(--ui-muted-2);
 }
-.orgsw__item:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
-}
-
-.orgsw__item--active {
-  background: rgba(210, 84, 43, 0.12);
-  color: #C0451F;
-  cursor: default;
-  position: relative;
-}
-.orgsw__item--active:hover {
-  background: rgba(210, 84, 43, 0.18);
-  color: #C0451F;
-}
-
-/* Gear button — only visible on hover/focus of the active org row.
- * Click jumps to the org's settings page. */
-.orgsw__gear {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  background: transparent;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #C0451F;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s ease, background 0.12s ease;
-}
-.orgsw__item--active:hover .orgsw__gear,
-.orgsw__gear:focus-visible {
-  opacity: 1;
-}
-.orgsw__gear:hover {
-  background: rgba(255, 85, 51, 0.18);
-}
-
-.orgsw__item-name {
+.osw__search:focus-within { border-color: rgba(91, 63, 214, 0.5); box-shadow: 0 0 0 3px var(--ui-ring); }
+.osw__search input {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.orgsw__check {
-  flex-shrink: 0;
-  color: #C0451F;
-}
-
-/* ── Group rows (Phase 3): a group listed like an org, with its member
- * stores nested beneath it. ─────────────────────────────────────────── */
-.orgsw__groupblock { margin-top: 2px; }
-
-.orgsw__grouprow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 6px;
-  color: #2A2724;
-  font-size: 12px;
-  font-weight: 700;
-  position: relative;
-}
-.orgsw__grouprow:hover { background: #F3EEE4; }
-
-/* Group leading mark — green collection glyph. */
-.orgsw__chip--group {
-  background: rgba(58, 176, 106, 0.20);
-  color: #6BD79A;
-}
-
-/* Group-settings gear: hidden until the group row is hovered. */
-.orgsw__gear--group { color: #6BD79A; }
-.orgsw__grouprow:hover .orgsw__gear--group,
-.orgsw__gear--group:focus-visible { opacity: 1; }
-.orgsw__gear--group:hover { background: rgba(58, 176, 106, 0.18); }
-
-/* Member stores nested under their group, with a guide line. */
-.orgsw__item--nested {
-  box-sizing: border-box;
-  width: calc(100% - 12px);
-  margin-left: 12px;
-  border-left: 1.5px solid #E0DAD0;
-  border-radius: 0 6px 6px 0;
-}
-
-.orgsw__divider {
-  height: 1px;
-  background: #E8E6E1;
-  margin: 4px 0;
-}
-
-.orgsw__action {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 8px;
+  min-width: 0;
+  border: 0;
+  outline: 0;
   background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: #5A554F;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
+  font: 400 13px var(--ui-font);
+  color: var(--ui-fg);
+}
+.osw__list { max-height: 340px; overflow-y: auto; }
+.osw__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 8px 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted-2);
+}
+.osw__label--group { margin-top: 10px; }
+.osw__opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 36px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: 500 13px/1.3 var(--ui-font);
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
 }
-.orgsw__action:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
+.osw__opt:hover { background: var(--ui-soft); color: var(--ui-fg); }
+.osw__opt--nested { padding-left: 14px; }
+.osw__opt--active { color: var(--ui-primary); font-weight: 600; }
+.osw__opt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osw__check { color: var(--ui-primary); flex: none; }
+.osw__none { margin: 10px 8px; font-size: 12.5px; color: var(--ui-muted); }
+.osw__sep { height: 1px; margin: 6px 4px; background: var(--ui-border); }
+.osw__action {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: 500 13px/1.3 var(--ui-font);
+  text-align: left;
+  cursor: pointer;
 }
-.orgsw__action svg {
-  flex-shrink: 0;
-  color: inherit;
-}
-
-/* Vendor: one store, nothing to switch to — the trigger becomes a label.
-   Same metrics as the button so the top bar doesn't shift. */
-.orgsw__trigger--static { cursor: default; background: none; }
-.orgsw__trigger--static:hover { background: none; }
+.osw__action:hover { background: var(--ui-soft); color: var(--ui-fg); }
+.osw__action--primary { color: var(--ui-primary); font-weight: 600; }
+.osw__action--primary:hover { background: var(--ui-primary-soft); color: var(--ui-primary); }

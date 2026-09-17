@@ -1,4 +1,6 @@
 import './QuickLinks.css';
+import { useViewRole } from '../context/ViewRole';
+import { TAB_ALIASES } from '../lib/access';
 
 /* ─────────────────────────────────────────────────────────────────────
  * QuickLinks — contextual "related sections" cards at the bottom of
@@ -166,9 +168,9 @@ const PAGE_META = {
       </svg>
     ),
   },
-  org: {
-    label: 'Organisation',
-    desc: 'Workspace info, locations, team, and activity log.',
+  master: {
+    label: 'Master settings',
+    desc: 'People, roles, organisations and workspace tabs.',
     tone: 'slate',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -203,11 +205,11 @@ const RELATIONS = {
   cupqr:        ['cupscans', 'claims', 'transactions', 'reports'],
   transactions: ['donations', 'users', 'claims', 'reports'],
   donations:    ['transactions', 'reports', 'settings', 'history'],
-  settings:     ['org', 'rewards', 'history', 'support'],
+  settings:     ['master', 'rewards', 'history', 'support'],
   reports:      ['overview', 'transactions', 'users', 'history'],
-  history:      ['settings', 'reports', 'overview', 'org'],
-  org:          ['settings', 'history', 'reports', 'support'],
-  support:      ['overview', 'settings', 'history', 'org'],
+  history:      ['settings', 'reports', 'overview', 'master'],
+  master:       ['settings', 'history', 'reports', 'support'],
+  support:      ['overview', 'settings', 'history', 'master'],
 };
 
 const FALLBACK = ['overview', 'users', 'claims', 'transactions'];
@@ -215,7 +217,11 @@ const FALLBACK = ['overview', 'users', 'claims', 'transactions'];
 export default function QuickLinks({ currentPage, onNavigate, links, title = 'Quick links', subtitle = 'Related sections you might want to jump to next' }) {
   // Resolve which page ids to render. Explicit `links` prop wins, then
   // the page's RELATIONS entry, then the generic fallback.
-  const ids = (links || RELATIONS[currentPage] || FALLBACK).filter(id => id !== currentPage);
+  // Only pages this account can open for this venue (the sidebar's list).
+  const { allowedPages } = useViewRole();
+  const ids = (links || RELATIONS[currentPage] || FALLBACK)
+    .map(id => TAB_ALIASES[id] || id)
+    .filter(id => id !== currentPage && (!allowedPages || allowedPages.has(id)));
 
   if (ids.length === 0) return null;
 

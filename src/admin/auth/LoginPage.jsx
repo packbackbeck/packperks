@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -6,7 +6,17 @@ import {
   resendEmailOtp,
   sendPasswordReset,
 } from './authApi';
-import packperksLogo from '../../assets/images/packperks-logo.svg';
+import AuthLayout from './login/AuthLayout';
+import {
+  AuthHeading,
+  Field,
+  FormAlert,
+  PasswordInput,
+  PrimaryButton,
+  TextInput,
+} from './login/formParts';
+import { ArrowLeftIcon, KeyIcon, LockIcon, MailCheckIcon } from './login/icons';
+import '../ui/ui.css';
 import './LoginPage.css';
 
 /* Admin self-registration is restricted to the internal team domain. Anyone
@@ -19,16 +29,23 @@ function isPackbackEmail(email) {
   return email.slice(at + 1).trim().toLowerCase().replace(/\.$/, '') === ADMIN_EMAIL_DOMAIN;
 }
 
+/* Seconds before another verification code can be requested. Supabase turns
+ * down a second email to the same address inside a minute anyway. */
+const RESEND_WAIT = 60;
+
 /* Login / Signup page for admins.
  *
- * One UI, three modes:
- *   • 'signin'   — existing user enters email + password (or Google)
+ * One UI, four modes:
+ *   • 'signin'   — existing user enters email + password
  *   • 'signup'   — new user enters email + password; we send an OTP
  *   • 'verify'   — newly signed-up user enters the 6-digit OTP code
  *   • 'forgot'   — request a password reset email
  *
  * On successful sign-in / OTP verification the AuthContext sees the new
- * session and routes the user to the admin app. */
+ * session and routes the user to the admin app. The layout (logo, animated
+ * showcase panel) lives in ./login/AuthLayout. The email, password and code
+ * inputs keep the same ids in every mode: login-email, login-password,
+ * login-code. */
 export default function LoginPage() {
   const [mode, setMode]         = useState('signin');
   const [email, setEmail]       = useState('');
@@ -37,6 +54,18 @@ export default function LoginPage() {
   const [busy, setBusy]         = useState(false);
   const [err, setErr]           = useState(null);
   const [info, setInfo]         = useState(null);
+  const [resendIn, setResendIn] = useState(0);
+
+  // Count the resend wait down, one second at a time.
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  function switchMode(next) {
+    setMode(next); setErr(null); setInfo(null);
+  }
 
   async function handleSignIn(e) {
     e.preventDefault();
@@ -61,13 +90,14 @@ export default function LoginPage() {
     }
     try {
       await signUpWithEmail(email.trim(), password);
-      setMode('verify');
       // Supabase project is configured with Email OTP length = 6 digits,
       // so {{ .Token }} in the signup-confirmation email is a clean
       // 6-digit numeric code. (If that setting is ever flipped back to
       // the default alphanumeric token, also relax the verify input
-      // below — see the comment there.)
-      setInfo(`We sent a 6-digit code to ${email.trim()}. Enter it below to confirm your email.`);
+      // below — see the comment there.) The verify screen itself says
+      // where the code went, so `info` stays empty until a resend.
+      setMode('verify');
+      setResendIn(RESEND_WAIT);
     } catch (e) {
       setErr(friendlyError(e));
     } finally { setBusy(false); }
@@ -89,6 +119,7 @@ export default function LoginPage() {
     try {
       await resendEmailOtp(email.trim());
       setInfo('Sent another code — check your inbox.');
+      setResendIn(RESEND_WAIT);
     } catch (e) {
       setErr(friendlyError(e));
     } finally { setBusy(false); }
@@ -106,89 +137,128 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-card__brand">
-          <img src={packperksLogo} alt="PackPerks" className="auth-card__logo" />
-          <p className="auth-card__sub">Admin Console</p>
-        </div>
-
-        {mode !== 'verify' && (
-          <div className="auth-tabs">
-            <button
-              type="button"
-              className={`auth-tabs__btn${mode === 'signin' ? ' auth-tabs__btn--active' : ''}`}
-              onClick={() => { setMode('signin'); setErr(null); setInfo(null); }}
-              disabled={busy}
+    <AuthLayout>
+      {mode === 'signin' && (
+        <form className="pp-auth" onSubmit={handleSignIn}>
+          <AuthHeading title="Sign in">
+            Manage rewards, review claims and follow the cups coming back to
+            every venue. Sign in with your work email.
+          </AuthHeading>
+          <div className="pp-auth__fields">
+            <Field id="login-email" label="Work email">
+              <TextInput
+                id="login-email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@packback.network"
+                autoComplete="email"
+                autoFocus
+                required
+                disabled={busy}
+              />
+            </Field>
+            <Field
+              id="login-password"
+              label="Password"
+              action={(
+                <button type="button" className="pp-auth__link pp-auth__link--small" onClick={() => switchMode('forgot')}>
+                  Forgot password?
+                </button>
+              )}
             >
+              <PasswordInput
+                id="login-password"
+                name="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Your password"
+                autoComplete="current-password"
+                required
+                disabled={busy}
+              />
+            </Field>
+          </div>
+          <FormAlert>{err}</FormAlert>
+          <FormAlert tone="success">{info}</FormAlert>
+          <PrimaryButton busy={busy} busyLabel="Signing in…" disabled={busy}>
+            Sign in
+          </PrimaryButton>
+          <p className="pp-auth__switch">
+            New to the PackBack team?{' '}
+            <button type="button" className="pp-auth__link" onClick={() => switchMode('signup')} disabled={busy}>
+              Create an account
+            </button>
+          </p>
+        </form>
+      )}
+
+      {mode === 'signup' && (
+        <form className="pp-auth" onSubmit={handleSignUp}>
+          <AuthHeading title="Create account">
+            Admin accounts are for the PackBack team. We’ll email you a 6-digit
+            code to confirm it’s really you.
+          </AuthHeading>
+          <div className="pp-auth__fields">
+            <Field
+              id="login-email"
+              label="Work email"
+              hint={<><LockIcon size={12} /> Only <b>@{ADMIN_EMAIL_DOMAIN}</b> addresses can register.</>}
+            >
+              <TextInput
+                id="login-email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder={`you@${ADMIN_EMAIL_DOMAIN}`}
+                autoComplete="email"
+                aria-describedby="login-email-hint"
+                autoFocus
+                required
+                disabled={busy}
+              />
+            </Field>
+            <Field id="login-password" label="Choose a password">
+              <PasswordInput
+                id="login-password"
+                name="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                disabled={busy}
+              />
+            </Field>
+          </div>
+          <FormAlert>{err}</FormAlert>
+          <FormAlert tone="success">{info}</FormAlert>
+          <PrimaryButton busy={busy} busyLabel="Creating account…" disabled={busy || !isPackbackEmail(email)}>
+            Create account
+          </PrimaryButton>
+          <p className="pp-auth__fine">
+            By creating an account you agree to the staff data policy.
+          </p>
+          <p className="pp-auth__switch">
+            Already have an account?{' '}
+            <button type="button" className="pp-auth__link" onClick={() => switchMode('signin')} disabled={busy}>
               Sign in
             </button>
-            <button
-              type="button"
-              className={`auth-tabs__btn${mode === 'signup' ? ' auth-tabs__btn--active' : ''}`}
-              onClick={() => { setMode('signup'); setErr(null); setInfo(null); }}
-              disabled={busy}
-            >
-              Create account
-            </button>
-          </div>
-        )}
+          </p>
+        </form>
+      )}
 
-        {mode === 'signin' && (
-          <form className="auth-form" onSubmit={handleSignIn}>
-            <label className="auth-field">
-              <span>Work email</span>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@packback.network" autoComplete="email" required disabled={busy} />
-            </label>
-            <label className="auth-field">
-              <span>Password</span>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="current-password" required disabled={busy} />
-            </label>
-            {err && <p className="auth-err">{err}</p>}
-            {info && <p className="auth-info">{info}</p>}
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy}>
-              {busy ? 'Signing in…' : 'Sign in'}
-            </button>
-            <button type="button" className="auth-link" onClick={() => { setMode('forgot'); setErr(null); setInfo(null); }}>
-              Forgot password?
-            </button>
-          </form>
-        )}
-
-        {mode === 'signup' && (
-          <form className="auth-form" onSubmit={handleSignUp}>
-            <div className="auth-locked">
-              <LockIcon />
-              <div>
-                <strong>Restricted to the PackPerks team</strong>
-                <span>Only <b>@{ADMIN_EMAIL_DOMAIN}</b> email addresses can register for admin access.</span>
-              </div>
-            </div>
-            <label className="auth-field">
-              <span>Work email</span>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={`you@${ADMIN_EMAIL_DOMAIN}`} autoComplete="email" required disabled={busy} />
-            </label>
-            <label className="auth-field">
-              <span>Choose a password</span>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" required minLength={8} disabled={busy} />
-            </label>
-            {err && <p className="auth-err">{err}</p>}
-            {info && <p className="auth-info">{info}</p>}
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy || !isPackbackEmail(email)}>
-              {busy ? 'Creating account…' : 'Create account'}
-            </button>
-            <p className="auth-fineprint">
-              We'll send a verification code to confirm it's really you.
-              By creating an account you agree to the staff data policy.
-            </p>
-          </form>
-        )}
-
-        {mode === 'verify' && (
-          <form className="auth-form" onSubmit={handleVerify}>
-            <p className="auth-info auth-info--block">{info}</p>
-            <label className="auth-field">
-              <span>Verification code</span>
+      {mode === 'verify' && (
+        <form className="pp-auth" onSubmit={handleVerify}>
+          <AuthHeading icon={<MailCheckIcon size={20} />} tone="success" title="Check your email">
+            We sent a 6-digit code to <b>{email.trim()}</b>. Enter it below to
+            confirm your address.
+          </AuthHeading>
+          <div className="pp-auth__fields">
+            <Field id="login-code" label="Verification code" hint="Not arrived after a minute? Check your spam folder.">
               {/* Supabase project has "Email OTP" enabled with length=6,
                * so {{ .Token }} emits a 6-digit numeric code. We strip
                * any non-digit characters on paste — that way users
@@ -197,56 +267,75 @@ export default function LoginPage() {
                * Supabase OTP setting is ever flipped back to the default
                * alphanumeric token, swap inputMode to "text", drop the
                * digit-only filter, and relax the length check below. */}
-              <input
+              <TextInput
+                code
+                id="login-code"
+                name="code"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={6}
                 value={otp}
                 onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="123456"
+                placeholder="000000"
                 autoComplete="one-time-code"
+                aria-describedby="login-code-hint"
+                autoFocus
                 required
                 disabled={busy}
-                className="auth-otp"
               />
-            </label>
-            {err && <p className="auth-err">{err}</p>}
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy || otp.length !== 6}>
-              {busy ? 'Verifying…' : 'Verify & sign in'}
+            </Field>
+          </div>
+          <FormAlert>{err}</FormAlert>
+          <FormAlert tone="success">{info}</FormAlert>
+          <PrimaryButton busy={busy} busyLabel="Verifying…" disabled={busy || otp.length !== 6}>
+            Verify &amp; sign in
+          </PrimaryButton>
+          <div className="pp-auth__row">
+            <button type="button" className="pp-auth__link pp-auth__link--quiet" onClick={() => switchMode('signup')}>
+              <ArrowLeftIcon size={14} /> Different address
             </button>
-            <div className="auth-resend">
-              <span>Didn't get the code?</span>
-              <button type="button" className="auth-link" onClick={handleResend} disabled={busy}>
-                Resend
-              </button>
-            </div>
-            <button type="button" className="auth-link auth-link--back" onClick={() => { setMode('signup'); setErr(null); setInfo(null); }}>
-              ← Back
+            <button type="button" className="pp-auth__link" onClick={handleResend} disabled={busy || resendIn > 0}>
+              {resendIn > 0 ? `Resend in ${resendIn}s` : 'Send a new code'}
             </button>
-          </form>
-        )}
+          </div>
+        </form>
+      )}
 
-        {mode === 'forgot' && (
-          <form className="auth-form" onSubmit={handleForgot}>
-            <p className="auth-info auth-info--block">
-              Enter your email and we'll send you a link to reset your password.
-            </p>
-            <label className="auth-field">
-              <span>Work email</span>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@burgerking.nl" autoComplete="email" required disabled={busy} />
-            </label>
-            {err && <p className="auth-err">{err}</p>}
-            {info && <p className="auth-info">{info}</p>}
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={busy}>
-              {busy ? 'Sending…' : 'Send reset link'}
+      {mode === 'forgot' && (
+        <form className="pp-auth" onSubmit={handleForgot}>
+          <AuthHeading icon={<KeyIcon size={20} />} title="Reset your password">
+            Enter your work email and we’ll send you a link to choose a new
+            password.
+          </AuthHeading>
+          <div className="pp-auth__fields">
+            <Field id="login-email" label="Work email">
+              <TextInput
+                id="login-email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                autoComplete="email"
+                autoFocus
+                required
+                disabled={busy}
+              />
+            </Field>
+          </div>
+          <FormAlert>{err}</FormAlert>
+          <FormAlert tone="success">{info}</FormAlert>
+          <PrimaryButton busy={busy} busyLabel="Sending…" disabled={busy}>
+            Send reset link
+          </PrimaryButton>
+          <div className="pp-auth__row">
+            <button type="button" className="pp-auth__link pp-auth__link--quiet" onClick={() => switchMode('signin')}>
+              <ArrowLeftIcon size={14} /> Back to sign in
             </button>
-            <button type="button" className="auth-link auth-link--back" onClick={() => { setMode('signin'); setErr(null); setInfo(null); }}>
-              ← Back to sign in
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          </div>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
 
@@ -258,13 +347,4 @@ function friendlyError(e) {
   if (m.includes('token has expired') || m.includes('expired')) return 'That code has expired — request a new one.';
   if (m.includes('rate limit')) return 'Too many tries — please wait a minute and try again.';
   return e?.message || 'Something went wrong. Please try again.';
-}
-
-function LockIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="4" y="10.5" width="16" height="10" rx="2.2" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M7.5 10.5V7.8a4.5 4.5 0 0 1 9 0v2.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
 }

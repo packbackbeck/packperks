@@ -5,6 +5,7 @@ import { saveAppConfig } from '../../lib/api';
 import { uploadRewardImage } from '../lib/adminApi';
 import { GUIDE_ICONS, GUIDE_ICON_KEYS } from '../../components/HowItWorks';
 import { useOrg } from '../context/OrgContext';
+import { useViewRole } from '../context/ViewRole';
 import { logAction } from '../auth/actionLog';
 import './AdminAppDesign.css';
 import { useAdminMoney } from '../lib/adminMoney';
@@ -50,6 +51,8 @@ const TAB_STORAGE_KEY = 'pp_admin_appdesign_tab';
 
 export default function AdminAppDesign({ draftState }) {
   const { activeOrg } = useOrg();
+  const { access } = useViewRole();
+  const readOnly = !!access && !access.canEdit('appdesign');
   /* Tab persisted to localStorage so it survives any incidental
    * remounts (admin sidebar nav, org switch, HMR in dev). Without
    * this, editing a non-Colors tab would occasionally bounce the
@@ -88,6 +91,14 @@ export default function AdminAppDesign({ draftState }) {
       };
       return next;
     });
+    setSaveOk(false);
+  }
+
+  /* Customer copy that lives at the top level of the settings (the home
+   * screen headline and the donation text), edited here with the rest of
+   * the app's words. */
+  function patchSetting(key, value) {
+    draftState.updateDraft(prev => ({ ...prev, settings: { ...prev.settings, [key]: value } }));
     setSaveOk(false);
   }
 
@@ -170,14 +181,20 @@ export default function AdminAppDesign({ draftState }) {
           </p>
         </div>
         <div className="aad__actions">
-          {saveOk && <span className="aad__ok">Saved</span>}
-          {error && <span className="aad__error">{error}</span>}
-          <button className="aad__btn aad__btn--ghost" onClick={handleRevert} disabled={saving}>
-            Revert
-          </button>
-          <button className="aad__btn aad__btn--primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
+          {readOnly ? (
+            <span className="aad__readonly">View only: your role can’t change the app’s design</span>
+          ) : (
+            <>
+              {saveOk && <span className="aad__ok">Saved</span>}
+              {error && <span className="aad__error">{error}</span>}
+              <button className="aad__btn aad__btn--ghost" onClick={handleRevert} disabled={saving}>
+                Revert
+              </button>
+              <button className="aad__btn aad__btn--primary" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -197,7 +214,7 @@ export default function AdminAppDesign({ draftState }) {
             ))}
           </div>
 
-          <div className="aad__pane">
+          <fieldset className="aad__pane" disabled={readOnly}>
             {tab === 'colors' && (
               <ColorsPanel
                 colors={design.colors}
@@ -206,10 +223,15 @@ export default function AdminAppDesign({ draftState }) {
               />
             )}
             {tab === 'copy' && (
-              <CopyPanel copy={design.copy} onPatch={(p) => patchDesign('copy', p)} />
+              <CopyPanel
+                copy={design.copy}
+                onPatch={(p) => patchDesign('copy', p)}
+                settings={settings}
+                onSetting={patchSetting}
+              />
             )}
             {tab === 'sections' && (
-              <SectionsPanel sections={design.sections} onPatch={(p) => patchDesign('sections', p)} />
+              <SectionsPanel sections={design.sections} settings={settings} onPatch={(p) => patchDesign('sections', p)} />
             )}
             {tab === 'guide' && (
               <GuidePanel steps={design.guide?.steps || []} onChange={(steps) => patchDesign('guide', { steps })} />
@@ -217,12 +239,12 @@ export default function AdminAppDesign({ draftState }) {
             {tab === 'import' && (
               <SmartImportPanel onApply={replaceColors} />
             )}
-          </div>
+          </fieldset>
         </div>
 
         <aside className="aad__preview">
           <div className="aad__preview-label">Live preview</div>
-          <DevicePreview design={design} org={activeOrg} />
+          <DevicePreview design={design} org={activeOrg} heroHeadline={settings.heroHeadline} heroSubtext={settings.heroSubtext} />
           <p className="aad__preview-help">
             Reflects the current draft. Open the customer app at <code>/{activeOrg?.slug}/</code>
             after saving to see it live.
@@ -409,7 +431,28 @@ function relativeLuminance(hex) {
  * Activity. Char counts on each input warn when the label would
  * overflow the button it lives in — soft warning at 18 chars,
  * hard at 24 (matches the widest practical phone button width). */
-function CopyPanel({ copy, onPatch }) {
+/* Customer copy stored at the top level of the settings. */
+const SETTING_COPY_GROUPS = [
+  {
+    title: 'Home screen',
+    hint: 'The first thing customers read when they open the app.',
+    fields: [
+      { key: 'heroHeadline', label: 'Headline', maxSoft: 34, maxHard: 48, placeholder: 'Collect Cups & Get Rewards' },
+      { key: 'heroSubtext', label: 'Text under the headline', multiline: true, maxSoft: 120, maxHard: 180, hint: 'One or two short sentences.' },
+    ],
+  },
+  {
+    title: 'Donations',
+    hint: 'Shown when a customer gives cups away. Donations are switched on in Settings → Features.',
+    feature: 'featureDonations',
+    fields: [
+      { key: 'donationRecipient', label: 'Charity', maxSoft: 32, maxHard: 48, placeholder: 'Plastic Soup Foundation' },
+      { key: 'donationDescription', label: 'What the donation does', multiline: true, maxSoft: 140, maxHard: 220, hint: 'Shown on the donate confirmation screen.' },
+    ],
+  },
+];
+
+function CopyPanel({ copy, onPatch, settings = {}, onSetting }) {
   const GROUPS = [
     {
       title: 'Header',
@@ -441,9 +484,48 @@ function CopyPanel({ copy, onPatch }) {
     <div className="aad-copy">
       <div className="aad-section-head">
         <h2>App copy</h2>
-        <span className="aad__hint-inline">Headline, subhead, and donation copy live under <strong>Settings</strong>.</span>
+        <span className="aad__hint-inline">Every word customers read in the app, in one place. Changes go live when you publish.</span>
       </div>
       <div className="aad-copy__groups">
+        {SETTING_COPY_GROUPS.map(group => {
+          const off = group.feature && settings[group.feature] === false;
+          return (
+            <div key={group.title} className="aad-copy__group">
+              <div className="aad-copy__group-head">
+                <span className="aad-copy__group-title">{group.title}</span>
+                <span className="aad-copy__group-hint">{off ? 'Donations are off in Settings → Features, so customers don’t see this now.' : group.hint}</span>
+              </div>
+              <div className="aad-copy__list">
+                {group.fields.map(f => {
+                  const value = settings[f.key] || '';
+                  const overSoft = value.length > f.maxSoft;
+                  const overHard = value.length > f.maxHard;
+                  const Tag = f.multiline ? 'textarea' : 'input';
+                  return (
+                    <label key={f.key} className="aad-copy__row">
+                      <span className="aad-copy__label">
+                        {f.label}
+                        {f.hint && <span className="aad-copy__hint">{f.hint}</span>}
+                      </span>
+                      <span className="aad-copy__input-wrap">
+                        <Tag
+                          {...(f.multiline ? { rows: 3 } : { type: 'text' })}
+                          value={value}
+                          onChange={e => onSetting?.(f.key, e.target.value)}
+                          className={`aad-copy__input${f.multiline ? ' aad-copy__input--area' : ''}${overHard ? ' aad-copy__input--overflow' : ''}`}
+                          placeholder={f.placeholder}
+                        />
+                        <span className={`aad-copy__count ${overHard ? 'aad-copy__count--bad' : overSoft ? 'aad-copy__count--warn' : ''}`}>
+                          {value.length}/{f.maxSoft}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
         {GROUPS.map(group => (
           <div key={group.title} className="aad-copy__group">
             <div className="aad-copy__group-head">
@@ -492,14 +574,14 @@ function CopyPanel({ copy, onPatch }) {
 }
 
 /* ─── Sections panel ──────────────────────────────────────────────── */
-function SectionsPanel({ sections, onPatch }) {
+function SectionsPanel({ sections, onPatch, settings = {} }) {
   const rows = [
     { key: 'showPackbackLogo',   label: 'PackBack logo',         hint: 'The "PackBack" wordmark on the left of the header lockup. Hiding it also removes the × separator.' },
     { key: 'showBrandLogo',      label: 'Brand / restaurant logo', hint: 'The partner logo (BK, KFC, etc.) on the right of the header lockup.' },
-    { key: 'showShareCup',       label: 'Share a cup',           hint: 'Peer-to-peer cup transfer entry point.' },
-    { key: 'showDonate',         label: 'Donate cups',           hint: 'Donation CTA in the bottom actions.' },
-    { key: 'showNextCupForFree', label: '"Next cup for free"',    hint: 'Quick-share variant for the bottom row.' },
-    { key: 'showDirectRefund',   label: 'Direct refund',         hint: 'Quick cashout button on the home screen.' },
+    { key: 'showShareCup',       label: 'Share a cup',           hint: 'Peer-to-peer cup transfer entry point.', feature: 'featureCupSharing', featureLabel: 'Cup sharing' },
+    { key: 'showDonate',         label: 'Donate cups',           hint: 'Donation CTA in the bottom actions.', feature: 'featureDonations', featureLabel: 'Donations' },
+    { key: 'showNextCupForFree', label: '"Next cup for free"',    hint: 'Quick-share variant for the bottom row.', feature: 'featureCupSharing', featureLabel: 'Cup sharing' },
+    { key: 'showDirectRefund',   label: 'Direct refund',         hint: 'Quick cashout button on the home screen.', feature: 'featureDirectRefunds', featureLabel: 'Direct refunds' },
     { key: 'showActivity',       label: 'Activity / history',    hint: 'Recent cup + reward activity feed.' },
     { key: 'showImpact',         label: 'Impact metrics',        hint: 'Lifetime cups + plastic-avoided card in the customer profile.' },
   ];
@@ -507,22 +589,27 @@ function SectionsPanel({ sections, onPatch }) {
     <div className="aad-sections">
       <div className="aad-section-head">
         <h2>Visible UI sections</h2>
-        <span className="aad__hint-inline">Per-org. Feature flags (sharing, donations, refunds) still live in Quick Settings.</span>
+        <span className="aad__hint-inline">Hide a button without switching its feature off. The features themselves are in Settings → Features.</span>
       </div>
       <div className="aad-sections__list">
-        {rows.map(r => (
-          <div key={r.key} className="aad-section-row">
-            <div>
-              <div className="aad-section-row__label">{r.label}</div>
-              {r.hint && <div className="aad-section-row__hint">{r.hint}</div>}
+        {rows.map(r => {
+          const featureOff = r.feature && settings[r.feature] === false;
+          return (
+            <div key={r.key} className={`aad-section-row${featureOff ? ' aad-section-row--off' : ''}`}>
+              <div>
+                <div className="aad-section-row__label">{r.label}</div>
+                <div className="aad-section-row__hint">
+                  {featureOff ? `${r.featureLabel} is off in Settings → Features, so this never shows.` : r.hint}
+                </div>
+              </div>
+              <Toggle
+                value={!featureOff && !!sections[r.key]}
+                onChange={(v) => { if (!featureOff) onPatch({ [r.key]: v }); }}
+                label={r.label}
+              />
             </div>
-            <Toggle
-              value={!!sections[r.key]}
-              onChange={(v) => onPatch({ [r.key]: v })}
-              label={r.label}
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -851,7 +938,7 @@ function labelForKey(k) {
  *
  * If the admin wants pixel-perfect verification, they can open the
  * customer URL at /<slug>/ in a separate tab after saving. */
-function DevicePreview({ design, org }) {
+function DevicePreview({ design, org, heroHeadline, heroSubtext }) {
   const { money } = useAdminMoney();
   const c = design.colors;
   const copy = design.copy;
@@ -906,9 +993,9 @@ function DevicePreview({ design, org }) {
           </div>
         </div>
 
-        <h2 className="aad-preview__headline">Collect Cups &amp; Get Rewards</h2>
+        <h2 className="aad-preview__headline">{heroHeadline || 'Collect Cups & Get Rewards'}</h2>
         <p className="aad-preview__sub" style={{ color: c.textMuted }}>
-          Return your cups to earn cashback.
+          {heroSubtext || 'Return your cups to earn cashback.'}
         </p>
 
         {/* Progress bar — REAL gradient using both brand accent stops.

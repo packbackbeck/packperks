@@ -1,446 +1,421 @@
-import { useEffect, useState, useCallback } from 'react';
-import { getUserBehaviourStats, getUserBehaviourDailyHistory } from '../lib/adminApi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle, Download, HandCoins, Inbox, LayoutGrid, RefreshCw, SlidersHorizontal,
+} from 'lucide-react';
+import { getUserBehaviourStats } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
-import QuickLinks from '../shared/QuickLinks';
-import MetricIcon from './behaviourIcons';
-import DateRangePicker from './DateRangePicker';
-import MetricDetailModal from './MetricDetailModal';
+import { useViewRole } from '../context/ViewRole';
+import { useAdminMoney } from '../lib/adminMoney';
+import { resolveEffectiveMode } from '../lib/orgModes';
+import { TAB_BY_ID } from '../lib/access';
+import { formatMoney } from '../../lib/regions';
 import ScopeToggle from '../shared/ScopeToggle';
+import {
+  Button, Card, EmptyState, InsightsCard, PageHeader, TrendCard, useChartSelection, usePersistentState,
+} from '../ui';
+import ArrangeDialog from './ArrangeDialog';
+import BehaviourTiles from './BehaviourTiles';
+import { BreakdownCard, LinkSplitCard } from './BreakdownCard';
+import DateRangePicker from './DateRangePicker';
+import ExportDialog from './ExportDialog';
+import FunnelCard from './FunnelCard';
+import MetricDetailModal from './MetricDetailModal';
+import { BREAKDOWNS, GROUPS } from './behaviourCopy';
+import {
+  buildFunnels, buildInsights, buildLinkSplit, buildMetrics, chartMetricsFor, chartRangeFor, phraseFor,
+  previousRequestFor, requestFor, resolveWindow, skeletonMetrics, windowText,
+} from './behaviourModel';
 import './AdminUserBehaviour.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * AdminUserBehaviour — the behavioural funnel, separate from System Health.
+ * User behaviour — how customers move from a first scan to a claim.
  *
- * Every rate is computed from live rows; each card shows the numerator and
- * denominator it came from in two small inner cards. Metrics that need
- * event instrumentation we don't capture yet are shown as "Not tracked yet"
- * with a note, never a faked number.
+ * Laid out like the Dashboard: the primary metrics as tiles, one chart
+ * that plots whichever tile is picked (or several to compare), insights
+ * beside it, then the funnel, the secondary and optional metrics, and the
+ * category breakdowns. Every number comes from getUserBehaviourStats; the
+ * window before the selected one is read too, for the change on each
+ * tile. Deferred Tikkie venues get their own metric set from the same
+ * reader.
  *
- * On top of the cards: a time-window picker (defaults to all-time) scopes
- * every metric; a tile click opens a tailored detail modal with a trend
- * chart and a control to re-file the metric between sections; and the
- * whole board can be exported to a spreadsheet.
+ * Which section a metric sits in can be changed per browser (Customize,
+ * or "Show in" in a metric's details).
  * ───────────────────────────────────────────────────────────────────── */
 
-const GROUPS = [
-  { id: 'primary',   title: 'Primary',   desc: 'The core return-and-claim funnel.' },
-  { id: 'secondary', title: 'Secondary', desc: 'Supporting behaviour and claim mix.' },
-  { id: 'optional',  title: 'Optional',  desc: 'Derived or instrumentation-dependent signals.' },
-];
-
-/* Where the user's section re-assignments are remembered (per browser). */
 const OVERRIDES_KEY = 'ppk_behaviour_group_overrides';
 
-/* Export formats — same convention as Reports: the "Excel" entry is a
- * UTF-8-BOM CSV with a semicolon separator so Excel (Win/Mac) opens it as
- * a proper spreadsheet; the plain CSV keeps commas for other tooling. */
-const FORMATS = [
-  { id: 'xlsx-csv', label: 'Excel (.csv)', ext: 'csv', mime: 'text/csv' },
-  { id: 'csv',      label: 'CSV (plain)',  ext: 'csv', mime: 'text/csv' },
-];
-
-/* Columns written for each selected metric. */
-const EXPORT_COLUMNS = [
-  { key: 'group',       label: 'Group' },
-  { key: 'label',       label: 'Metric' },
-  { key: 'value',       label: 'Value' },
-  { key: 'numerator',   label: 'Numerator' },
-  { key: 'numLabel',    label: 'Numerator label' },
-  { key: 'denominator', label: 'Denominator' },
-  { key: 'denLabel',    label: 'Denominator label' },
-  { key: 'desc',        label: 'Description' },
-];
-
-function fmtPct(v) {
-  if (v === null || v === undefined || Number.isNaN(v)) return '—';
-  return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}%`;
-}
-
-function fmtNum(n) {
-  if (n === null || n === undefined) return '—';
-  return Number(n).toLocaleString();
-}
-
-/* The value as shown on the card, flattened to a string for export. */
-function metricValueText(m) {
-  if (!m.measurable) return 'Not tracked yet';
-  if (m.valueText) return m.valueText;
-  if (m.value == null || Number.isNaN(m.value)) return 'No data yet';
-  return fmtPct(m.value);
-}
-
-function escapeCsv(val) {
-  if (val === null || val === undefined) return '';
-  const s = String(val);
-  if (/[";,\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function buildCsv(rows, formatId) {
-  const isExcel = formatId === 'xlsx-csv';
-  const sep = isExcel ? ';' : ',';
-  const header = EXPORT_COLUMNS.map(c => c.label).join(sep);
-  const body = rows
-    .map(r => EXPORT_COLUMNS.map(c => escapeCsv(r[c.key])).join(sep))
-    .join('\n');
-  const bom = isExcel ? '﻿' : '';
-  return bom + header + '\n' + body;
-}
-
-function downloadFile(content, filename, mime) {
-  const blob = new Blob([content], { type: mime + ';charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-/* Unit shown in each history column header, and the raw cell value (kept as
- * a real number so the spreadsheet can chart it). Excel (.csv) gets a comma
- * decimal to match its semicolon-separated convention. */
-function unitSuffix(valueType) {
-  if (valueType === 'percent') return '%';
-  if (valueType === 'duration') return 'sec';
-  return 'count';
-}
-
-function histCell(valueType, v, isExcel) {
-  if (v === null || v === undefined || Number.isNaN(v)) return '';
-  let num;
-  if (valueType === 'percent') num = Math.round(v * 10) / 10;
-  else if (valueType === 'duration') num = Math.round((v / 1000) * 10) / 10; // ms → seconds
-  else num = Math.round(v);
-  const s = String(num);
-  return isExcel ? s.replace('.', ',') : s;
-}
-
-/* A second table: one row per day, one column per selected metric, each
- * cell the metric's cumulative value as of that day. Numeric cells are
- * written raw (no escaping) so Excel decimals survive the ';' separator. */
-function buildHistoryCsv(hist, selectedIds, formatId) {
-  const isExcel = formatId === 'xlsx-csv';
-  const sep = isExcel ? ';' : ',';
-  const cols = hist.metrics.filter(m => selectedIds.has(m.id));
-  const title = escapeCsv('Daily history — cumulative value per day');
-  const header = ['Date', ...cols.map(m => `${m.label} (${unitSuffix(m.valueType)})`)]
-    .map(escapeCsv).join(sep);
-  const rows = hist.dates.map((d, i) =>
-    [escapeCsv(d.iso.slice(0, 10)), ...cols.map(m => histCell(m.valueType, m.values[i], isExcel))].join(sep)
-  );
-  return [title, header, ...rows].join('\n');
-}
-
-/* Flatten one metric into an export row. desc can be a React node on a
- * couple of cards; only plain-string descriptions are exported. */
-function metricToRow(m, groupTitle) {
-  return {
-    group: groupTitle,
-    label: m.label,
-    value: metricValueText(m),
-    numerator: m.numerator ?? '',
-    numLabel: m.numLabel ?? '',
-    denominator: m.denominator ?? '',
-    denLabel: m.denLabel ?? '',
-    desc: typeof m.desc === 'string' ? m.desc : '',
-  };
-}
-
-function BehaviourCard({ m, onOpen }) {
-  const hasNum = m.numLabel != null && m.numerator != null;
-  const hasDen = m.denLabel != null && m.denominator != null;
-  const noData = m.measurable && !m.valueText && (m.denominator == null || m.denominator === 0);
-
-  let valueEl;
-  if (!m.measurable) valueEl = <span className="ub-card__na">Not tracked yet</span>;
-  else if (m.valueText) valueEl = m.valueText;
-  else if (noData) valueEl = <span className="ub-card__na">No data yet</span>;
-  else valueEl = fmtPct(m.value);
-
-  return (
-    <button
-      type="button"
-      className={`ub-card${!m.measurable ? ' ub-card--na' : ''}`}
-      onClick={() => onOpen(m)}
-      aria-label={`${m.label} — open details`}
-    >
-      <span className="ub-card__icon" aria-hidden="true"><MetricIcon id={m.id} width="18" height="18" /></span>
-
-      <div className="ub-card__label">{m.label}</div>
-
-      <div className="ub-card__value">{valueEl}</div>
-
-      {m.measurable ? (
-        (hasNum || hasDen) && (
-          <div className="ub-card__subs">
-            {hasNum && (
-              <div className="ub-sub">
-                <span className="ub-sub__num">{fmtNum(m.numerator)}</span>
-                <span className="ub-sub__lbl">{m.numLabel}</span>
-              </div>
-            )}
-            {hasNum && hasDen && <span className="ub-sub__op">/</span>}
-            {hasDen && (
-              <div className="ub-sub">
-                <span className="ub-sub__num">{fmtNum(m.denominator)}</span>
-                <span className="ub-sub__lbl">{m.denLabel}</span>
-              </div>
-            )}
-          </div>
-        )
-      ) : (
-        <div className="ub-card__note">{m.note}</div>
-      )}
-
-      <div className="ub-card__desc">{m.desc}</div>
-      <span className="ub-card__more">View details →</span>
-    </button>
-  );
-}
+const PAIRS = {
+  standard: [{
+    id: 'comeback', label: 'Second vs third scan',
+    hint: 'Customers who came back once, against those who came back twice', ids: ['second_scan', 'third_scan'],
+  }],
+  tikkie: [{
+    id: 'links', label: 'Collected vs expired',
+    hint: 'Payout links customers collected, against links that ran out', ids: ['tk_collect', 'tk_expired'],
+  }],
+};
+const KEY_METRIC = { standard: 'qr_scan_receipts', tikkie: 'tk_collect' };
+const BREAKDOWN_IDS = ['button_clicks', 'entry_source', 'audience_split', 'inapp_redirect'];
+const LOWER_GROUPS = GROUPS.filter(g => g.id !== 'primary');
 
 export default function AdminUserBehaviour({ onNavigate }) {
-  const { activeOrg, scopeOrgIds, statsScope, activeOrgMode } = useOrg();
-  const [metrics, setMetrics] = useState(null);
-  const [meta, setMeta] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { activeOrg, scopeOrgIds, statsScope, activeOrgMode, activeGroupMode } = useOrg();
+  const { access, isVendorView } = useViewRole();
+  const { region, currency } = useAdminMoney();
+  const money = useMemo(() => (n) => formatMoney(n, region), [region]);
+  const modeKey = activeOrgMode === 'tikkie_only' ? 'tikkie' : 'standard';
+  const tikkie = modeKey === 'tikkie';
 
-  // Time window (null/null = all-time).
-  const [range, setRange] = useState({ from: null, to: null });
-
-  // Detail modal + per-browser section re-assignments.
-  const [openId, setOpenId] = useState(null);
-  const [overrides, setOverrides] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; }
-    catch { return {}; }
-  });
-
-  // Export-to-spreadsheet state.
-  const [exportOpen, setExportOpen] = useState(false);
+  const [period, setPeriod] = usePersistentState('pp-behaviour:period', '30d');
+  const [custom, setCustom] = usePersistentState('pp-behaviour:custom', null);
+  const [overrides, setOverrides] = usePersistentState(OVERRIDES_KEY, {});
+  const [reloadKey, setReloadKey] = useState(0);
+  const [result, setResult] = useState(null);
+  const [failure, setFailure] = useState(null);
+  const [detailId, setDetailId] = useState(null);
+  const [dialog, setDialog] = useState(null);
+  const [excluded, setExcluded] = useState([]);
   const [format, setFormat] = useState('xlsx-csv');
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [includeHistory, setIncludeHistory] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const chartRef = useRef(null);
 
-  const orgName = activeOrg?.partner_brand_name || activeOrg?.name || 'this organisation';
+  /* Everything a load depends on. The data on screen belongs to one key;
+   * while the key it was loaded for differs, the page is loading. */
+  const requestKey = [
+    modeKey, period, period === 'custom' ? `${custom?.from}~${custom?.to}` : '', statsScope, activeOrg?.id || '', reloadKey,
+  ].join('|');
 
-  const load = useCallback(async (r) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getUserBehaviourStats(r || { from: null, to: null }, scopeOrgIds, activeOrgMode);
-      setMetrics(data.metrics);
-      setMeta(data.meta);
-    } catch (e) {
-      console.error('getUserBehaviourStats failed', e);
-      setError(e?.message || 'Failed to load behaviour metrics.');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!activeOrg?.id) return undefined;
+    let alive = true;
+    const key = requestKey;
+    const win = resolveWindow(period, custom, Date.now());
+    const current = getUserBehaviourStats(requestFor(win), scopeOrgIds, activeOrgMode);
+    current
+      .then((cur) => {
+        if (alive) setResult(r => ({ key, modeKey, win, cur, prev: r?.key === key ? r.prev : null }));
+      })
+      .catch((e) => {
+        console.error('getUserBehaviourStats failed', e);
+        if (alive) setFailure({ key, message: e?.message || 'The numbers could not be loaded.' });
+      });
+    // The window before, for the change on each tile. Optional: without it
+    // the tiles simply show no change.
+    const before = previousRequestFor(win);
+    if (before) {
+      Promise.all([current, getUserBehaviourStats(before, scopeOrgIds, activeOrgMode)])
+        .then(([cur, prev]) => { if (alive) setResult({ key, modeKey, win, cur, prev }); })
+        .catch(() => {});
     }
-    // scopeOrgIds is derived from statsScope + active org, so those deps cover it.
+    return () => { alive = false; };
+    // The window, scope and mode are all part of requestKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsScope, activeOrg?.id]);
+  }, [requestKey]);
 
-  useEffect(() => { load(range); }, [load, activeOrg?.id, range]);
+  const fresh = result?.key === requestKey ? result : null;
+  const error = failure?.key === requestKey ? failure.message : null;
+  const loading = !fresh && !error;
+  // The last numbers stay on screen (faded) while the next ones load, but
+  // not after a failed load: they would pass for the new period's.
+  const shown = fresh || (loading && result?.modeKey === modeKey ? result : null);
+  const win = shown?.win || null;
+  const meta = shown?.cur?.meta || null;
 
-  // Whenever the metric set changes, default every metric to "on" for export.
-  useEffect(() => {
-    if (metrics) setSelectedIds(new Set(metrics.map(m => m.id)));
-  }, [metrics]);
+  const built = useMemo(
+    () => (shown ? buildMetrics(shown.cur, shown.prev, shown.win, { money }) : null),
+    [shown, money],
+  );
+  const skeleton = useMemo(() => skeletonMetrics(modeKey), [modeKey]);
+  const metrics = built || skeleton;
+  const byId = useMemo(() => Object.fromEntries(metrics.map(m => [m.id, m])), [metrics]);
 
-  // Close the export sheet on Escape.
-  useEffect(() => {
-    if (!exportOpen) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') setExportOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [exportOpen]);
-
-  // Effective section for a metric = user's override, else its native group.
-  const effGroup = (m) => overrides[m.id] || m.group;
-
-  function changeGroup(id, g) {
-    setOverrides(prev => {
-      const next = { ...prev, [id]: g };
-      try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  const groupOf = useCallback((m) => {
+    const g = overrides?.[m.id];
+    return GROUPS.some(x => x.id === g) ? g : m.group;
+  }, [overrides]);
+  const changeGroup = useCallback((m, g) => {
+    setOverrides((prev) => {
+      const next = { ...(prev || {}) };
+      if (g === m.group) delete next[m.id];
+      else next[m.id] = g;
       return next;
     });
+  }, [setOverrides]);
+
+  // While loading, tiles keep their place but not their numbers.
+  const tiles = useMemo(() => (loading
+    ? metrics.map(m => ({ ...m, value: null, unavailable: null, delta: null, footnote: undefined, description: undefined }))
+    : metrics), [loading, metrics]);
+  const byGroup = useMemo(() => {
+    const out = { primary: [], secondary: [], optional: [] };
+    for (const m of tiles) (out[groupOf(m)] || out.optional).push(m);
+    return out;
+  }, [tiles, groupOf]);
+
+  const selection = useChartSelection({
+    metrics, defaultId: KEY_METRIC[modeKey], pairs: PAIRS[modeKey], storageKey: 'pp-behaviour:chart',
+  });
+  const chartMetrics = useMemo(() => chartMetricsFor(metrics), [metrics]);
+  const chartRange = useMemo(
+    () => (win ? chartRangeFor(win, meta, metrics, selection.activeIds) : null),
+    [win, meta, metrics, selection.activeIds],
+  );
+
+  const effMode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
+  const canOpen = useCallback((tab) => {
+    const t = TAB_BY_ID[tab];
+    if (!t || !onNavigate) return false;
+    if (t.modes && !t.modes.includes(effMode)) return false;
+    return !access?.tabAccess || access.tabAccess(tab) !== 'hidden';
+  }, [access, effMode, onNavigate]);
+
+  const insights = useMemo(
+    () => (built && win ? buildInsights({ metrics: built, win, tikkie, canOpen, onNavigate }) : []),
+    [built, win, tikkie, canOpen, onNavigate],
+  );
+  const funnels = useMemo(() => (built && !tikkie ? buildFunnels(byId) : []), [built, tikkie, byId]);
+  const linkSplit = useMemo(() => (built && tikkie ? buildLinkSplit(byId) : null), [built, tikkie, byId]);
+
+  /* A tile far below the chart scrolls the chart into view when picked. */
+  function revealChart() {
+    const el = chartRef.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    if (top >= 60 && top < window.innerHeight * 0.45) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }
+  function selectFromBelow(id) {
+    selection.select(id);
+    revealChart();
+  }
+  function chartFromDetails(id) {
+    selection.setMode('single');
+    selection.select(id);
+    setDetailId(null);
+    revealChart();
   }
 
-  function toggleMetric(id) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  const orgName = statsScope === 'group' ? 'this group' : (activeOrg?.name || 'this venue');
+  const phrase = phraseFor(win);
+  const dates = win ? windowText(win, meta) : '';
+  const windowLabel = win && win.id !== 'custom' && dates ? `${win.label} · ${dates}` : dates;
+  const focus = selection.mode === 'single' ? byId[selection.selectedId] : null;
+  const emptyHint = loading
+    ? 'Loading the numbers…'
+    : focus?.kind === 'text'
+      ? `${focus.label} is a screen name, so there is no line to draw. Open its details instead.`
+      : focus && !focus.chartable
+        ? `Nothing to plot for ${focus.label} ${phrase}.`
+        : undefined;
+  const quiet = !!built && built.every(m => m.value == null || m.value === 0);
+  const detailMetric = detailId ? byId[detailId] : null;
+  let exportPeriod = dates;
+  if (win && win.id !== 'custom') {
+    const name = win.id === 'all' ? 'all time' : win.id === 'ytd' ? 'this year so far' : `the ${win.noun}`;
+    exportPeriod = dates ? `${name} (${dates})` : name;
   }
-  const selectAll = () => setSelectedIds(new Set((metrics || []).map(m => m.id)));
-  const selectNone = () => setSelectedIds(new Set());
-
-  async function handleExport() {
-    if (!metrics || selectedIds.size === 0 || exporting) return;
-    setExporting(true);
-    try {
-      const groupTitle = Object.fromEntries(GROUPS.map(g => [g.id, g.title]));
-      // Preserve the on-screen order; only include checked metrics. Use the
-      // effective (possibly overridden) section in the export.
-      const rows = metrics
-        .filter(m => selectedIds.has(m.id))
-        .map(m => metricToRow(m, groupTitle[effGroup(m)] || effGroup(m)));
-      const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
-      let content = buildCsv(rows, fmt.id);
-
-      // Optional second table: each selected metric's value, day by day.
-      if (includeHistory) {
-        const hist = await getUserBehaviourDailyHistory(range, scopeOrgIds, activeOrgMode);
-        content += '\n\n' + buildHistoryCsv(hist, selectedIds, fmt.id);
-      }
-
-      const stamp = new Date().toISOString().slice(0, 10);
-      const slug = (orgName || 'org').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      const suffix = includeHistory ? '_with_daily_history' : '';
-      downloadFile(content, `packperks_user_behaviour${suffix}_${slug}_${stamp}.${fmt.ext}`, fmt.mime);
-      setExportOpen(false);
-    } catch (e) {
-      console.error('behaviour export failed', e);
-      setError(e?.message || 'Export failed. Please try again.');
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  const openMetric = metrics && openId ? metrics.find(m => m.id === openId) : null;
+  const stepDays = chartRange?.stepDays || 1;
+  const openDetails = setDetailId;
 
   return (
-    <div className="ub-page">
-      <div className="ub-header">
-        <div>
-          <h1 className="ub-header__title">User Behaviour</h1>
-          <p className="ub-header__sub">
-            Real behavioural rates for {orgName}. Every percentage shows the exact counts
-            it was calculated from. Pick a time window, or click any tile to dive in.
-          </p>
-        </div>
-        <div className="ub-header__actions">
-          <ScopeToggle />
-          <DateRangePicker value={range} meta={meta} onChange={setRange} />
-          <button
-            className="ub-export-btn"
-            onClick={() => setExportOpen(true)}
-            disabled={loading || !metrics}
-            title="Export these metrics to Excel / CSV"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Export
-          </button>
-          <button className="ub-refresh" onClick={() => load(range)} disabled={loading}>
-            {loading ? 'Loading…' : 'Refresh'}
-          </button>
-        </div>
-      </div>
+    <div className="ui-page ub-page">
+      <PageHeader
+        title="User behaviour"
+        subtitle={tikkie
+          ? `How customers use ${orgName}: scanning receipts, collecting payouts and saving an email.`
+          : `How customers use ${orgName}: scanning, coming back, claiming, and where they drop off.`}
+      >
+        <ScopeToggle />
+        <DateRangePicker
+          value={period}
+          custom={custom}
+          minDate={meta?.hasData ? meta.minDate : null}
+          onChange={(id, range) => { if (range) setCustom(range); setPeriod(id); }}
+        />
+        <Button
+          variant="outline"
+          icon={RefreshCw}
+          aria-label="Refresh"
+          title="Refresh"
+          onClick={() => setReloadKey(k => k + 1)}
+        />
+        {!isVendorView && (
+          <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog('arrange')}>Customize</Button>
+        )}
+        <Button variant="outline" icon={Download} onClick={() => setDialog('export')} disabled={!fresh}>Export</Button>
+      </PageHeader>
 
-      {error && <div className="ub-error">{error}</div>}
-
-      {exportOpen && metrics && (
-        <div className="ub-export-overlay" onClick={() => setExportOpen(false)} role="presentation">
-          <div className="ub-export" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Export behaviour metrics">
-            <div className="ub-export__head">
-              <h2 className="ub-export__title">Export metrics</h2>
-              <button className="ub-export__close" onClick={() => setExportOpen(false)} aria-label="Close">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-            <p className="ub-export__sub">Pick the metrics to include, then download as a spreadsheet. Each row carries the value plus the raw numerator and denominator it came from.</p>
-
-            <div className="ub-export__toolbar">
-              <span className="ub-export__count">{selectedIds.size} of {metrics.length} selected</span>
-              <div className="ub-export__toolbtns">
-                <button type="button" onClick={selectAll}>Select all</button>
-                <button type="button" onClick={selectNone}>Clear</button>
-              </div>
-            </div>
-
-            <div className="ub-export__list">
-              {GROUPS.map(g => {
-                const items = metrics.filter(m => effGroup(m) === g.id);
-                if (!items.length) return null;
-                return (
-                  <div key={g.id} className="ub-export__group">
-                    <div className="ub-export__group-title">{g.title}</div>
-                    {items.map(m => (
-                      <label key={m.id} className="ub-export__item">
-                        <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleMetric(m.id)} />
-                        <span>{m.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-
-            <label className="ub-export__history">
-              <input
-                type="checkbox"
-                className="ub-switch-input"
-                checked={includeHistory}
-                onChange={e => setIncludeHistory(e.target.checked)}
-              />
-              <span className="ub-switch" aria-hidden="true"><span className="ub-switch__dot" /></span>
-              <span className="ub-export__history-text">
-                <span className="ub-export__history-title">Include daily history</span>
-                <span className="ub-export__history-sub">Adds a second table: each selected metric's value day by day across the chosen period.</span>
-              </span>
-            </label>
-
-            <div className="ub-export__foot">
-              <div className="ub-export__formats">
-                {FORMATS.map(f => (
-                  <label key={f.id} className="ub-export__fmt">
-                    <input type="radio" name="ub-export-fmt" checked={format === f.id} onChange={() => setFormat(f.id)} />
-                    {f.label}
-                  </label>
-                ))}
-              </div>
-              <button className="ub-export__go" onClick={handleExport} disabled={selectedIds.size === 0 || exporting}>
-                {exporting ? 'Preparing…' : `Download${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
-              </button>
-            </div>
+      {error && (
+        <Card className="ub-alert" role="alert">
+          <span className="ub-alert__icon"><AlertTriangle size={17} aria-hidden="true" /></span>
+          <div className="ub-alert__text">
+            <p className="ub-alert__title">The numbers didn’t load</p>
+            <p className="ub-alert__sub">{error}</p>
           </div>
-        </div>
+          <Button size="sm" variant="outline" icon={RefreshCw} onClick={() => setReloadKey(k => k + 1)}>Try again</Button>
+        </Card>
       )}
 
-      {metrics && GROUPS.map(g => {
-        const cards = metrics.filter(m => effGroup(m) === g.id);
-        if (!cards.length) return null;
-        return (
-          <section key={g.id} className="ub-section">
-            <div className="ub-section__head">
-              <h2 className="ub-section__title">{g.title}</h2>
-              <p className="ub-section__desc">{g.desc}</p>
-            </div>
-            <div className="ub-grid">
-              {cards.map(m => <BehaviourCard key={m.id} m={m} onOpen={() => setOpenId(m.id)} />)}
-            </div>
-          </section>
-        );
-      })}
+      {byGroup.primary.length > 0 ? (
+        <BehaviourTiles
+          metrics={byGroup.primary}
+          allMetrics={metrics}
+          selection={selection}
+          keyMetricId={KEY_METRIC[modeKey]}
+          loading={loading}
+          onSelect={selection.select}
+          onDetails={openDetails}
+        />
+      ) : (
+        <Card>
+          <EmptyState
+            icon={LayoutGrid}
+            title="No tiles at the top"
+            action={!isVendorView && <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog('arrange')}>Customize</Button>}
+          >
+            Move a metric to Primary to show it here.
+          </EmptyState>
+        </Card>
+      )}
 
-      {openMetric && (
+      <div className="ui-grid-main ub-chart-row" ref={chartRef}>
+        <TrendCard
+          metrics={chartMetrics}
+          selection={selection}
+          pairs={PAIRS[modeKey]}
+          range={chartRange}
+          loading={loading}
+          storageKey="pp-behaviour:chart"
+          csvName="packperks-user-behaviour"
+          emptyHint={emptyHint}
+        />
+        <InsightsCard insights={insights} loading={loading} />
+      </div>
+
+      {built && quiet && !loading && (
+        <Card>
+          <EmptyState
+            icon={Inbox}
+            title={period === 'all' ? 'No customer activity yet' : 'No customer activity in this period'}
+            action={period !== 'all' && meta?.hasData && (
+              <Button variant="outline" onClick={() => setPeriod('all')}>Show all time</Button>
+            )}
+          >
+            {tikkie
+              ? 'The numbers fill in once customers scan the receipts the bin prints.'
+              : 'The numbers fill in once customers scan cup receipts or open the app.'}
+          </EmptyState>
+        </Card>
+      )}
+
+      {built && !quiet && (
+        <>
+          <div className="ub-sections">
+            {tikkie ? (
+              <>
+                <LinkSplitCard
+                  split={linkSplit}
+                  periodPhrase={phrase}
+                  loading={loading}
+                  icon={HandCoins}
+                  onOpenLog={canOpen('tikkielog') ? () => onNavigate('tikkielog') : undefined}
+                />
+                {byId.tk_audience && (
+                  <BreakdownCard
+                    metric={byId.tk_audience}
+                    copy={BREAKDOWNS.tk_audience}
+                    periodPhrase={phrase}
+                    loading={loading}
+                    onDetails={() => openDetails('tk_audience')}
+                  />
+                )}
+              </>
+            ) : (
+              <FunnelCard funnels={funnels} periodPhrase={phrase} loading={loading} />
+            )}
+          </div>
+
+          {LOWER_GROUPS.map(g => (byGroup[g.id].length > 0 && (
+            <section key={g.id} className="ub-group" aria-labelledby={`ub-group-${g.id}`}>
+              <div className="ub-group__head">
+                <h2 className="ub-group__title" id={`ub-group-${g.id}`}>{g.title}</h2>
+                <p className="ub-group__desc">{g.desc}</p>
+              </div>
+              <BehaviourTiles
+                metrics={byGroup[g.id]}
+                allMetrics={metrics}
+                selection={selection}
+                keyMetricId={KEY_METRIC[modeKey]}
+                sparklines
+                loading={loading}
+                onSelect={selectFromBelow}
+                onDetails={openDetails}
+              />
+            </section>
+          )))}
+
+          {!tikkie && (
+            <div className="ub-sections">
+              {BREAKDOWN_IDS.filter(id => byId[id]).map(id => (
+                <BreakdownCard
+                  key={id}
+                  metric={byId[id]}
+                  copy={BREAKDOWNS[id]}
+                  periodPhrase={phrase}
+                  loading={loading}
+                  onDetails={() => openDetails(id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {detailMetric && built && (
         <MetricDetailModal
-          metric={openMetric}
-          effectiveGroup={effGroup(openMetric)}
-          groups={GROUPS}
-          onChangeGroup={(g) => changeGroup(openMetric.id, g)}
-          onClose={() => setOpenId(null)}
+          metric={detailMetric}
+          group={groupOf(detailMetric)}
+          onGroupChange={(g) => changeGroup(detailMetric, g)}
+          onClose={() => setDetailId(null)}
+          onChart={() => chartFromDetails(detailMetric.id)}
+          granularity={chartRange?.granularity}
+          stepLabel={stepDays === 1 ? 'day' : `${stepDays} days`}
+          windowLabel={windowLabel}
+          breakdownCopy={BREAKDOWNS[detailMetric.id]}
         />
       )}
 
-      <QuickLinks currentPage="behaviour" onNavigate={onNavigate} />
+      {dialog === 'export' && built && win && (
+        <ExportDialog
+          metrics={built}
+          groupOf={groupOf}
+          excluded={excluded}
+          onExcludedChange={setExcluded}
+          format={format}
+          onFormatChange={setFormat}
+          includeHistory={includeHistory}
+          onIncludeHistoryChange={setIncludeHistory}
+          request={requestFor(win)}
+          scopeOrgIds={scopeOrgIds}
+          mode={activeOrgMode}
+          orgName={activeOrg?.partner_brand_name || activeOrg?.name}
+          periodText={exportPeriod}
+          currency={currency}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
+      {dialog === 'arrange' && (
+        <ArrangeDialog
+          metrics={metrics}
+          groupOf={groupOf}
+          onChange={changeGroup}
+          onReset={() => setOverrides({})}
+          changed={metrics.some(m => overrides?.[m.id])}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }

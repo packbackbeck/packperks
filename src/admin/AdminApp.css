@@ -8,7 +8,7 @@
 
 body:has(.admin-app) {
   justify-content: flex-start !important;
-  background-color: #F8F4EC !important;
+  background-color: #F6F5FA !important;
 }
 
 #root:has(.admin-app) {
@@ -50,27 +50,31 @@ body:has(.admin-app) {
    * Netherlands" don't truncate to "Burger King Netherlan…" in the
    * sidebar footer. Costs us 20px of content width per page, which is
    * trivial given the tables already responsive-collapse below 1100px. */
-  --sidebar-w:   240px;
-  --topbar-h:    56px;
+  /* --sidebar-w is set inline by the shell (248px, 72px collapsed). */
+  --topbar-h:    64px;
+  --pb-bg:       #F6F5FA;
+  --pb-text:     #17151F;
 
   min-height: 100vh;
   background: var(--pb-bg);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--pb-text);
   -webkit-font-smoothing: antialiased;
 }
 
 .admin-app__body {
-  display: flex;
   padding-top: var(--topbar-h);
+  padding-left: var(--sidebar-w);
+  transition: padding-left 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .admin-app__main {
-  margin-left: var(--sidebar-w);
-  flex: 1;
   min-width: 0;
   min-height: calc(100vh - var(--topbar-h));
-  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-app__body { transition: none; }
 }
 
 /* ── P-38: custom :focus-visible ring ──────────────────────────────
@@ -89,7 +93,7 @@ body:has(.admin-app) {
 .admin-app textarea:focus-visible,
 .admin-app [role="button"]:focus-visible,
 .admin-app [tabindex]:focus-visible {
-  outline: 2px solid var(--pb-purple);
+  outline: 2px solid var(--ui-primary, var(--pb-purple));
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -109,11 +113,12 @@ body:has(.admin-app) {
    A persistent, unmistakable strip: an owner who forgets they are in the
    vendor view would otherwise file bugs about missing pages. */
 .vendor-preview-bar {
+  position: sticky; top: var(--topbar-h); z-index: 120;
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 18px;
-  background: #2A2432; color: #F3EFE7;
+  padding: 9px 22px;
+  background: #221D2E; color: #F3EFE7;
   font-size: 13px; line-height: 1.4;
-  border-bottom: 1px solid #1B1720;
+  border-bottom: 1px solid #16121F;
 }
 .vendor-preview-bar__dot {
   width: 7px; height: 7px; border-radius: 50%; flex: none;

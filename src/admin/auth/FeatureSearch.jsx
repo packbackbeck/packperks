@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useOrg } from '../context/OrgContext';
-import { TIKKIE_ONLY_PAGES } from '../lib/orgModes';
+import { TAB_ALIASES as PAGE_ALIASES } from '../lib/access';
 import './FeatureSearch.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -155,24 +154,24 @@ const FEATURES = [
   { id: 'f-cust-device',  name: 'Customer device',         desc: 'Phone or web client used',          group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'device iphone android ipad mac phone agent' },
 
   // ── Organisation ──────────────────────────────────────────────────
-  { id: 'f-org',          name: 'Organisation',            desc: 'Org info, locations, team',         group: 'Organisation', page: 'org',    icon: Icon.org,      keywords: 'company burger king info kvk btw vat' },
-  { id: 'f-org-edit',     name: 'Edit organisation',       desc: 'Name, KvK, BTW, brand colour',      group: 'Organisation', page: 'org',    icon: Icon.org,      keywords: 'edit company kvk btw vat brand colour address' },
-  { id: 'f-locations',    name: 'Locations',               desc: 'Restaurants in your org',           group: 'Organisation', page: 'org',    icon: Icon.org,      keywords: 'restaurants stores branches address city damrak amsterdam rotterdam utrecht' },
-  { id: 'f-add-location', name: 'Add location',            desc: 'New restaurant in the program',     group: 'Organisation', page: 'org',    icon: Icon.org,      keywords: 'add new restaurant branch store location' },
-  { id: 'f-team',         name: 'Team members',            desc: 'Manage admins',                     group: 'Organisation', page: 'org',    icon: Icon.user,     keywords: 'team admins staff colleagues' },
-  { id: 'f-invite',       name: 'Invite teammate',         desc: 'Send invitation by email',          group: 'Organisation', page: 'org',    icon: Icon.user,     keywords: 'invite email new member role permission add' },
-  { id: 'f-role',         name: 'Change role',             desc: 'Owner / Admin / Manager / Checker', group: 'Organisation', page: 'org',    icon: Icon.user,     keywords: 'role permission promote demote owner admin manager checker' },
-  { id: 'f-block',        name: 'Block teammate',          desc: 'Disable login for an admin',        group: 'Organisation', page: 'org',    icon: Icon.user,     keywords: 'block disable suspend remove kick' },
-  { id: 'f-activity',     name: 'Activity Log',            desc: 'Audit trail of admin actions',      group: 'Organisation', page: 'org',    icon: Icon.activity, keywords: 'history audit log who what when changes diff' },
+  { id: 'f-org',          name: 'Organisation',            desc: 'Profile, programme, archive',         group: 'Organisation', page: 'master', section: 'organisations',    icon: Icon.org,      keywords: 'company burger king info kvk btw vat' },
+  { id: 'f-org-edit',     name: 'Edit organisation',       desc: 'Name, KvK, BTW, brand colour',      group: 'Organisation', page: 'master', section: 'organisations',    icon: Icon.org,      keywords: 'edit company kvk btw vat brand colour address' },
+  { id: 'f-locations',    name: 'Locations',               desc: 'Restaurants in your org',           group: 'Organisation', page: 'settings', section: 'locations',    icon: Icon.org,      keywords: 'restaurants stores branches address city damrak amsterdam rotterdam utrecht' },
+  { id: 'f-add-location', name: 'Add location',            desc: 'New restaurant in the program',     group: 'Organisation', page: 'settings', section: 'locations',    icon: Icon.org,      keywords: 'add new restaurant branch store location' },
+  { id: 'f-team',         name: 'People',            desc: 'Everyone with dashboard access',                     group: 'Organisation', page: 'master', section: 'people',    icon: Icon.user,     keywords: 'team admins staff colleagues' },
+  { id: 'f-invite',       name: 'Add a person',         desc: 'Invite someone by email',          group: 'Organisation', page: 'master', section: 'people',    icon: Icon.user,     keywords: 'invite email new member role permission add' },
+  { id: 'f-role',         name: 'Change role',             desc: 'Pick a role and organisations', group: 'Organisation', page: 'master', section: 'people',    icon: Icon.user,     keywords: 'role permission promote demote owner admin manager checker' },
+  { id: 'f-block',        name: 'Block someone',          desc: 'Stop an account signing in',        group: 'Organisation', page: 'master', section: 'people',    icon: Icon.user,     keywords: 'block disable suspend remove kick' },
+  { id: 'f-activity',     name: 'Activity Log',            desc: 'Audit trail of admin actions',      group: 'Organisation', page: 'master', section: 'activity',    icon: Icon.activity, keywords: 'history audit log who what when changes diff' },
 
   // ── Settings + meta ────────────────────────────────────────────────
   { id: 'f-settings',     name: 'Settings',                desc: 'Cashback rates, features',          group: 'System',     page: 'settings', icon: Icon.settings, keywords: 'rate refund features toggle config' },
-  { id: 'f-cashback-rate',name: 'Cashback rate',           desc: 'Paid to customers, per cup',       group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'rate price euros per cup cashback amount' },
-  { id: 'f-refund-rate',  name: 'Direct refund rate',      desc: 'Paid as a direct refund, per cup', group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'refund rate price euros per cup direct' },
-  { id: 'f-feat-share',   name: 'Cup sharing toggle',      desc: 'Enable/disable peer-to-peer shares',group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'cup sharing toggle on off feature flag' },
-  { id: 'f-feat-donate',  name: 'Donations toggle',        desc: 'Enable/disable donate flow',        group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'donate donation charity toggle plastic soup' },
-  { id: 'f-feat-direct',  name: 'Direct refund toggle',    desc: 'Enable/disable direct refunds',     group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'direct refund toggle' },
-  { id: 'f-maintenance',  name: 'Maintenance mode',        desc: 'Take user app offline',             group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'offline shutdown closed disabled emergency' },
+  { id: 'f-cashback-rate',name: 'Cashback rate',           desc: 'Paid to customers, per cup',       group: 'Settings',   page: 'settings', section: 'payouts', icon: Icon.settings, keywords: 'rate price euros per cup cashback amount' },
+  { id: 'f-refund-rate',  name: 'Direct refund rate',      desc: 'Paid as a direct refund, per cup', group: 'Settings',   page: 'settings', section: 'payouts', icon: Icon.settings, keywords: 'refund rate price euros per cup direct' },
+  { id: 'f-feat-share',   name: 'Cup sharing toggle',      desc: 'Enable/disable peer-to-peer shares',group: 'Settings',   page: 'settings', section: 'features', icon: Icon.settings, keywords: 'cup sharing toggle on off feature flag' },
+  { id: 'f-feat-donate',  name: 'Donations toggle',        desc: 'Enable/disable donate flow',        group: 'Settings',   page: 'settings', section: 'features', icon: Icon.settings, keywords: 'donate donation charity toggle plastic soup' },
+  { id: 'f-feat-direct',  name: 'Direct refund toggle',    desc: 'Enable/disable direct refunds',     group: 'Settings',   page: 'settings', section: 'features', icon: Icon.settings, keywords: 'direct refund toggle' },
+  { id: 'f-maintenance',  name: 'Maintenance mode',        desc: 'Take user app offline',             group: 'Settings',   page: 'settings', section: 'features', icon: Icon.settings, keywords: 'offline shutdown closed disabled emergency' },
   { id: 'f-reports',      name: 'Reports & alerts',        desc: 'Export CSV, digest, notifications', group: 'System',     page: 'reports',  icon: Icon.reports,  keywords: 'export csv data download report digest weekly alerts notifications email recipients' },
   { id: 'f-history',      name: 'Version History',         desc: 'Past published configs',            group: 'System',     page: 'history',  icon: Icon.history,  keywords: 'changelog rollback published versions snapshot' },
 
@@ -217,19 +216,23 @@ const FEATURES = [
   { id: 'f-auto-report',  name: 'Automated reports',       desc: 'Scheduled report email + test',     group: 'System',     page: 'reports',  icon: Icon.reports, keywords: 'automated report schedule email csv weekly claims vendor direct debit send test now' },
 
   // ── Organizations & Groups ─────────────────────────────────────────
-  { id: 'f-orgs',         name: 'Organizations & Groups',  desc: 'All stores, groups, regions',       group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'organisations organizations stores brands groups regions manage all switch add multi org list' },
-  { id: 'f-add-org',      name: 'Add organisation',        desc: 'Start the new store wizard',        group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'add new organisation organization store brand vendor wizard onboard create' },
-  { id: 'f-switch-org',   name: 'Switch store',            desc: 'Change the active organisation',    group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'switch change active store organisation org brand select' },
-  { id: 'f-group-settings',name: 'Group settings',         desc: 'Manage a store group',              group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'group settings bring your own byo shared balance members stores' },
-  { id: 'f-soft-delete',  name: 'Take a store offline',    desc: 'Soft-delete an organisation',       group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'soft delete offline hide remove store organisation restore archive duplicate' },
-  { id: 'f-regions',      name: 'Regions',                 desc: 'Multi-regional setup',              group: 'Organisation', page: 'organizations', icon: Icon.org, keywords: 'region country netherlands uae multi regional platform new region currency' },
+  { id: 'f-orgs',         name: 'Organisations',  desc: 'All stores, groups, regions',       group: 'Organisation', page: 'master', section: 'organisations', icon: Icon.org, keywords: 'organisations organizations stores brands groups regions manage all switch add multi org list' },
+  { id: 'f-add-org',      name: 'Add organisation',        desc: 'Start the new store wizard',        group: 'Organisation', page: 'master', section: 'organisations', icon: Icon.org, keywords: 'add new organisation organization store brand vendor wizard onboard create' },
+  { id: 'f-switch-org',   name: 'Switch store',            desc: 'Change the active organisation',    group: 'Organisation', page: 'master', section: 'organisations', icon: Icon.org, keywords: 'switch change active store organisation org brand select' },
+  { id: 'f-group-settings',name: 'Group settings',         desc: 'Manage a store group',              group: 'Organisation', page: 'master', section: 'groups', icon: Icon.org, keywords: 'group settings bring your own byo shared balance members stores' },
+  { id: 'f-soft-delete',  name: 'Archive a store',    desc: 'Hide a venue, keep its data',       group: 'Organisation', page: 'master', section: 'organisations', icon: Icon.org, keywords: 'soft delete offline hide remove store organisation restore archive duplicate' },
+  { id: 'f-regions',      name: 'Regions',                 desc: 'Multi-regional setup',              group: 'Organisation', page: 'master', section: 'regions', icon: Icon.org, keywords: 'region country netherlands uae multi regional platform new region currency' },
 
   // ── Settings tabs ──────────────────────────────────────────────────
-  { id: 'f-payout-rates', name: 'Payout rates',            desc: 'Cashback + refund per cup',         group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'payout rates cashback refund per cup euros price money tab' },
-  { id: 'f-cup-rules',    name: 'Cup rules',               desc: 'Max cups per scan + policies',      group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'cup rules policy max cups per scan limit tab' },
-  { id: 'f-feature-flags',name: 'Feature flags',           desc: 'Turn app features on / off',        group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'feature flags toggle on off sharing donations refunds activity impact tab' },
-  { id: 'f-reward-budget',name: 'Reward budget',           desc: 'Cap monthly cashback spend',        group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'reward budget cap spend limit cashback committed monthly money' },
-  { id: 'f-region-setting',name: 'Store country / region', desc: 'Sets currency + payout method',     group: 'Settings',   page: 'settings', icon: Icon.settings, keywords: 'country region netherlands uae currency payout tikkie aed eur profile' },
+  { id: 'f-payout-rates', name: 'Payout rates',            desc: 'Cashback + refund per cup',         group: 'Settings',   page: 'settings', section: 'payouts', icon: Icon.settings, keywords: 'payout rates cashback refund per cup euros price money tab' },
+  { id: 'f-cup-rules',    name: 'Rules & limits',               desc: 'Cups per scan, hold and daily limits',      group: 'Settings',   page: 'settings', section: 'rules', icon: Icon.settings, keywords: 'cup rules policy max cups per scan limit tab' },
+  { id: 'f-feature-flags',name: 'Features',           desc: 'Switch app features on or off',        group: 'Settings',   page: 'settings', section: 'features', icon: Icon.settings, keywords: 'feature flags toggle on off sharing donations refunds activity impact tab' },
+  { id: 'f-reward-budget',name: 'Reward budget',           desc: 'Cap cashback spend',        group: 'Settings',   page: 'settings', section: 'payouts', icon: Icon.settings, keywords: 'reward budget cap spend limit cashback committed monthly money' },
+  { id: 'f-region-setting',name: 'Store country / region', desc: 'Sets currency + payout method',     group: 'Settings',   page: 'master', section: 'organisations', icon: Icon.settings, keywords: 'country region netherlands uae currency payout tikkie aed eur profile' },
+  { id: 'f-payment-method', name: 'Payment method',        desc: 'Cashback after review or slider voucher', group: 'Settings', page: 'settings', section: 'payouts', icon: Icon.settings, keywords: 'payment method voucher slider tikkie cashback counter settle' },
+  { id: 'f-privacy',      name: 'Privacy policy',          desc: 'The policy customers read in the app', group: 'Settings', page: 'settings', section: 'legal', icon: Icon.settings, keywords: 'privacy policy legal gdpr cookies terms text' },
+  { id: 'f-roles',        name: 'Roles & permissions',     desc: 'What each role sees and changes',   group: 'Master',     page: 'master', section: 'roles', icon: Icon.user, keywords: 'roles permissions access tabs hidden view edit master manager vendor custom role' },
+  { id: 'f-workspace',    name: 'Workspace tabs',          desc: 'Switch a tab off for everyone',     group: 'Master',     page: 'master', section: 'workspace', icon: Icon.settings, keywords: 'workspace tabs hide disable everyone sidebar' },
   { id: 'f-merge-limit',  name: 'Weekly merge limit',      desc: 'Merges per customer per week',      group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'merge limit weekly per customer per week account 0 zero hold review' },
 
   // ── Merge + open a customer (Users) ────────────────────────────────
@@ -269,7 +272,7 @@ function scoreFeature(feature, query) {
   return 0;
 }
 
-export default function FeatureSearch({ onNavigate }) {
+export default function FeatureSearch({ onNavigate, allowedPages }) {
   const [open, setOpen]     = useState(false);
   const [query, setQuery]   = useState('');
   const [active, setActive] = useState(0);
@@ -277,14 +280,14 @@ export default function FeatureSearch({ onNavigate }) {
   const inputRef = useRef(null);
   const listRef  = useRef(null);
 
-  // Tikkie-only orgs: the palette must not resurface pages the sidebar and
-  // router hide — searching is the classic bypass, so filter at the source.
-  const { activeOrgMode } = useOrg();
+  // The palette only offers pages this account can open for this venue —
+  // the same list the sidebar shows (lib/access.js), so search is never a
+  // way around it.
   const searchable = useMemo(() => (
-    activeOrgMode === 'tikkie_only'
-      ? FEATURES.filter(f => TIKKIE_ONLY_PAGES.has(f.page))
+    allowedPages
+      ? FEATURES.filter(f => allowedPages.has(PAGE_ALIASES[f.page] || f.page))
       : FEATURES
-  ), [activeOrgMode]);
+  ), [allowedPages]);
 
   // Filter + rank.
   const results = useMemo(() => {
@@ -340,7 +343,7 @@ export default function FeatureSearch({ onNavigate }) {
   }, []);
 
   function navigateToItem(f) {
-    onNavigate?.(f.page);
+    onNavigate?.(f.page, f.section ? { section: f.section } : undefined);
     setOpen(false);
     setQuery('');
     inputRef.current?.blur();

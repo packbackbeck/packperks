@@ -369,6 +369,9 @@
   background: #FFFFFF;
 }
 .aad-copy__input:focus { outline: none; border-color: var(--pb-orange-warm); }
+.aad-copy__input--area { min-height: 72px; resize: vertical; line-height: 1.45; }
+.aad-copy__input-wrap:has(.aad-copy__input--area) .aad-copy__count { top: 10px; }
+.aad-section-row--off { opacity: 0.6; }
 .aad-copy__input--overflow {
   border-color: #C73E1D;
   box-shadow: 0 0 0 2px rgba(199, 62, 29, 0.12);
@@ -825,3 +828,18 @@
   font-family: inherit; font-size: 12.5px; text-transform: uppercase;
 }
 .aad-guide__add { margin-top: 14px; }
+
+/* The panel is a fieldset so a view-only role gets every control disabled. */
+fieldset.aad__pane { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset.aad__pane:disabled { opacity: 0.7; }
+.aad__readonly {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 99px;
+  background: #ECEAF4;
+  color: #676374;
+  font-size: 12.5px;
+  font-weight: 600;
+}

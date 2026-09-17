@@ -1,8 +1,8 @@
 /* Publish error banner */
 .admin-publish-error-bar {
   position: fixed;
-  top: 56px;
-  left: 0;
+  top: var(--topbar-h, 64px);
+  left: var(--sidebar-w, 248px);
   right: 0;
   z-index: 190;
   display: flex;
@@ -46,189 +46,157 @@
   z-index: 200;
 }
 
-/* ── Purple top bar: light-on-purple contrast for everything inside ──────
- * These use the `.admin-topbar` descendant form so they win over the base
- * (light-bar) rules defined later in this file. */
-/* PackPerks logo: use the dark-background asset (icon keeps its original
- * colours, wordmark text is cream/white) — NO colour filter. */
-.admin-topbar .admin-topbar__brand-x { color: rgba(255, 255, 255, 0.7); }  /* × between logos */
-/* Vendor (org) logo: flatten to a solid white silhouette so it sits cleanly on
- * purple. brightness(0) invert(1) whitens the opaque pixels and preserves the
- * PNG's transparency. The letter-chip fallback keeps a hairline ring instead. */
-.admin-topbar .admin-topbar__brand-bk { filter: brightness(0) invert(1); }
-.admin-topbar .admin-topbar__brand-chip { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); }
-.admin-topbar .fs-input-row { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.22); }
-.admin-topbar .fs-wrap--open .fs-input-row { background: rgba(255, 255, 255, 0.2); }
-.admin-topbar .fs-input { color: #FFFFFF; }
-.admin-topbar .fs-input::placeholder { color: rgba(255, 255, 255, 0.7); }
-.admin-topbar .fs-icon { color: rgba(255, 255, 255, 0.85); }
-.admin-topbar .fs-kbd { color: rgba(255, 255, 255, 0.8); border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.12); }
-/* Timezone clock pill — was a cream pill (invisible on purple). */
-.admin-topbar .admin-topbar__tz {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.24);
-  color: #FFFFFF;
-}
-.admin-topbar .admin-topbar__tz:hover { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
-/* WorkflowDock buttons on the purple bar */
-.admin-topbar .wd-icon { color: rgba(255, 255, 255, 0.85); }
-.admin-topbar .wd-icon:hover { background: rgba(255, 255, 255, 0.16); color: #FFFFFF; }
-.admin-topbar .wd-preview { color: #FFFFFF; border-color: rgba(255, 255, 255, 0.4); background: transparent; }
-.admin-topbar .wd-preview:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.6); color: #FFFFFF; }
-
-.admin-topbar__left {
-  flex: 0 0 auto;
+/* ─────────────────────────────────────────────────────────────────────
+ * Top bar — light, inside the content column (the sidebar carries the
+ * brand now). Left: programme model + pause state. Centre: search.
+ * Right: what a cup pays, the time zone, help, history, preview, publish.
+ * ───────────────────────────────────────────────────────────────────── */
+.admin-topbar {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-w);
+  right: 0;
+  height: var(--topbar-h);
+  z-index: 140;
   display: flex;
   align-items: center;
-  gap: 8px;
-  white-space: nowrap;
+  gap: 14px;
+  padding: 0 22px;
+  background: rgba(246, 245, 250, 0.86);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--ui-border);
+  font-family: var(--ui-font);
+  transition: left 0.2s var(--ui-ease);
 }
-
-.admin-topbar__logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.admin-topbar--maintenance {
+  background: linear-gradient(90deg, rgba(255, 236, 227, 0.95), rgba(246, 245, 250, 0.9) 55%);
+  border-bottom-color: #F7D3C3;
 }
+.admin-topbar__left { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; min-width: 0; }
+.admin-topbar__center { flex: 1; display: flex; justify-content: center; min-width: 0; }
+.admin-topbar__right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 0 auto; }
 
-.admin-topbar__logo-bk {
-  width: 32px;
-  height: 32px;
-  background: var(--pb-orange-warm);
-  color: #FFC52F;
-  font-weight: 900;
-  font-size: 13px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
-
-.admin-topbar__logo-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.admin-topbar__logo-title {
-  color: #14100A;
-  font-weight: 700;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.admin-topbar__logo-sub {
-  color: #6C6259;
-  font-size: 10px;
-  line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.admin-topbar__center {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.admin-topbar__status {
+/* Programme model chip */
+.tb-mode {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid transparent;
+  gap: 9px;
+  height: 36px;
+  padding: 0 12px 0 4px;
+  border-radius: 11px;
+  border: 1px solid var(--ui-border);
+  background: #fff;
+  color: var(--ui-fg);
+  box-shadow: var(--ui-shadow-sm);
+  cursor: default;
 }
-
-.admin-topbar__status--dirty {
-  background: rgba(166, 106, 0, 0.10);
-  border-color: rgba(166, 106, 0, 0.24);
-  color: #A66A00;
+.tb-mode__glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 3px 8px -3px var(--tb-mode-shadow, rgba(91, 63, 214, 0.55));
+  overflow: hidden;
 }
-
-.admin-topbar__status--published {
-  background: rgba(21, 122, 52, 0.10);
-  border-color: rgba(21, 122, 52, 0.24);
-  color: #157A34;
+.tb-mode__glyph::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
 }
+.tb-mode__glyph svg { position: relative; z-index: 1; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.12)); }
+.tb-mode--standard .tb-mode__glyph { background: linear-gradient(135deg, #8B6CFF 0%, #5B3FD6 55%, #4127A8 100%); --tb-mode-shadow: rgba(91, 63, 214, 0.6); }
+.tb-mode--byo .tb-mode__glyph { background: linear-gradient(135deg, #34D6A0 0%, #0E9E74 55%, #0A7A59 100%); --tb-mode-shadow: rgba(14, 158, 116, 0.55); }
+.tb-mode--tikkie_only .tb-mode__glyph { background: linear-gradient(135deg, #FF8FB8 0%, #E0467F 50%, #8E2E8F 100%); --tb-mode-shadow: rgba(224, 70, 127, 0.5); }
+.tb-mode__text { display: flex; flex-direction: column; line-height: 1.1; }
+.tb-mode__eyebrow { font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ui-muted-2); }
+.tb-mode__label { font-size: 13px; font-weight: 700; color: var(--ui-fg); white-space: nowrap; }
 
-.admin-topbar__status--saved {
-  background: #F1EDE6;
-  border-color: #E8E6E1;
-  color: #8A8175;
-}
-
-.admin-topbar__status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
-}
-
-.admin-topbar__status-time {
-  color: inherit;
-  opacity: 0.65;
-}
-
-.admin-topbar__right {
-  flex: 0 0 220px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.admin-topbar__btn {
+.tb-paused {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 0 0 4px rgba(242, 100, 58, 0.16);
+  animation: tb-paused 2.4s ease-in-out infinite;
+}
+@keyframes tb-paused { 50% { box-shadow: 0 0 0 7px rgba(242, 100, 58, 0.06); } }
+
+/* What a cup pays */
+.tb-rates {
+  display: inline-flex;
+  align-items: stretch;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #CDEBDD;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #F2FBF6, #E6F6EE);
+  color: #0B6B4C;
+  font-family: var(--ui-font);
   cursor: pointer;
-  border: none;
-  transition: all 0.15s ease;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tb-rates:hover { border-color: #9FD9BF; box-shadow: 0 4px 12px -6px rgba(14, 148, 104, 0.45); }
+.tb-rates__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  background: linear-gradient(135deg, #1FBF86, #0E9468);
+  color: #fff;
+}
+.tb-rates__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 11px;
+  line-height: 1.1;
+  text-align: left;
+}
+.tb-rates__item + .tb-rates__item { border-left: 1px solid #CDEBDD; }
+.tb-rates__label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #3E8E6F; }
+.tb-rates__value { font-size: 13px; font-weight: 700; color: #07563D; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tb-rates__value small { font-size: 11px; font-weight: 600; opacity: 0.7; }
+
+.admin-topbar__tz {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid var(--ui-border);
+  background: #fff;
+  color: var(--ui-muted);
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
-  font-family: inherit;
+  cursor: default;
 }
+.admin-topbar__tz-offset { opacity: 0.7; font-weight: 500; }
 
-.admin-topbar__btn--ghost {
-  background: transparent;
-  color: #5A554F;
-  border: 1px solid #E0DAD0;
+@media (max-width: 1320px) {
+  .admin-topbar__tz { display: none; }
+  .tb-mode__eyebrow { display: none; }
 }
-.admin-topbar__btn--ghost:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
-  border-color: #D5CDBE;
+@media (max-width: 1100px) {
+  .tb-rates__item:nth-child(3) { display: none; }
+  .tb-mode__text { display: none; }
+  .tb-mode { padding-right: 4px; }
 }
-
-.admin-topbar__btn--secondary {
-  background: #F3EEE4;
-  color: #2A2724;
-  border: 1px solid #E0DAD0;
-}
-.admin-topbar__btn--secondary:hover:not(:disabled) {
-  background: #EBE4D7;
-}
-.admin-topbar__btn--secondary:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.admin-topbar__btn--primary {
-  background: var(--pb-orange-warm);
-  color: #FFFFFF;
-}
-.admin-topbar__btn--primary:hover {
-  background: #E55A30;
+@media (prefers-reduced-motion: reduce) {
+  .tb-paused { animation: none; }
+  .admin-topbar { transition: none; }
 }
 
 /* Publish modal */
@@ -364,113 +332,3 @@
   cursor: default;
 }
 
-/* ── Brand block (PackPerks × Burger King) ──────────────────────────────
- * Replaces the old "BK" pill + text. The PackPerks SVG is wide
- * (icon + wordmark); height-based sizing keeps it crisp at this scale. */
-.admin-topbar__brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.admin-topbar__brand-pp {
-  height: 28px;
-  width: auto;
-  display: block;
-  /* Light-background wordmark (packperks-logo.svg) so it stays legible on the
-   * light top bar. */
-}
-.admin-topbar__brand-x {
-  color: rgba(20, 16, 10, 0.32);
-  font-size: 14px;
-  font-weight: 500;
-}
-.admin-topbar__brand-bk {
-  height: 28px;
-  width: 28px;
-  object-fit: contain;
-}
-
-/* Coloured initial chip — used when the active org has no logo_url
- * and isn't one of the bundled brand assets. The background colour
- * comes from the org's brand_color so it stays visually distinct. */
-.admin-topbar__brand-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  color: #FFFFFF;
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-}
-
-/* P-37: timezone pill in the top-bar right slot. Tiny enough that it
- * fades into the chrome but always visible so admins know which tz
- * the dashboard's clocks are speaking. */
-.admin-topbar__tz {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  margin-right: 8px;
-  background: #F3EEE4;
-  border: 1px solid #E8E6E1;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #6C6259;
-  cursor: help;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
-  white-space: nowrap;
-}
-.admin-topbar__tz:hover {
-  background: #EBE4D7;
-  border-color: #D5CDBE;
-  color: #2A2724;
-}
-.admin-topbar__tz-label { letter-spacing: -0.005em; }
-.admin-topbar__tz-offset { opacity: 0.65; }
-
-@media (max-width: 900px) {
-  .admin-topbar__tz-offset { display: none; }
-}
-@media (max-width: 720px) {
-  .admin-topbar__tz { display: none; }
-}
-
-/* ── Programme-mode chip: glyph + initials (DR / BYO / RR) ──
-   Compact on purpose — it sits beside the brand lockup all day, so it
-   reads as a status pip rather than a label competing with the logo.
-   The full mode name and description live in the tooltip. */
-.admin-topbar__mode {
-  display: inline-flex; align-items: center; gap: 5px;
-  flex: 0 0 auto;
-  padding: 4px 9px;
-  border-radius: 999px;
-  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em;
-  line-height: 1; white-space: nowrap; cursor: default;
-  background: rgba(255, 255, 255, 0.12); color: #E9E2D4;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-}
-.admin-topbar__mode--byo { background: rgba(76, 191, 110, 0.18); color: #7FD79C; border-color: rgba(76, 191, 110, 0.35); }
-.admin-topbar__mode--tikkie_only { background: rgba(70, 190, 170, 0.18); color: #6FD4C2; border-color: rgba(70, 190, 170, 0.35); }
-
-/* ── Maintenance mode: the whole bar goes orange + a pause badge ── */
-.admin-topbar--maintenance {
-  background: linear-gradient(180deg, #C05A1E 0%, #A84E18 100%) !important;
-}
-.admin-topbar__maint {
-  display: inline-flex; align-items: center; gap: 5px;
-  flex: 0 0 auto;
-  padding: 4px 9px;
-  border-radius: 999px;
-  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em;
-  line-height: 1; white-space: nowrap;
-  background: rgba(255, 255, 255, 0.92); color: #A84E18;
-  animation: admin-maint-pulse 2.2s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) { .admin-topbar__maint { animation: none; } }
-@keyframes admin-maint-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }

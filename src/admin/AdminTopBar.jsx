@@ -1,159 +1,102 @@
+import { CircleDollarSign, CupSoda, Gift, Pause, WalletCards } from 'lucide-react';
 import FeatureSearch from './auth/FeatureSearch';
 import WorkflowDock from './auth/WorkflowDock';
-import packperksLogoDark from '../assets/images/packperks-logo-dark.svg';
-import burgerKingLogo from '../assets/images/burger-king-logo.png';
 import { useOrg } from './context/OrgContext';
 import { ORG_MODE_META, resolveEffectiveMode } from './lib/orgModes';
+import { useAdminMoney } from './lib/adminMoney';
+import { effectiveRates } from '../lib/rates';
 import './AdminTopBar.css';
 
-/* Resolve the brand-mark for the right side of the "PackPerks × ___"
- * lockup. Resolution order:
- *   1. activeOrg.logo_url — uploaded / pasted in the wizard
- *   2. Bundled BK logo for the seed BK org (slug 'burger-king')
- *   3. Coloured initial chip using org.brand_color + first letter
- */
-function OrgMark({ org }) {
-  if (org?.logo_url) {
-    return <img src={org.logo_url} alt={org.name || 'Organisation'} className="admin-topbar__brand-bk" />;
-  }
-  if (org?.slug === 'burger-king' || org?.slug === 'burgerking') {
-    return <img src={burgerKingLogo} alt={org.name || 'Burger King'} className="admin-topbar__brand-bk" />;
-  }
-  const letter = (org?.name || '?').trim().charAt(0).toUpperCase() || '?';
+/* One glyph per programme model, on its own colour: a gift for Deposit
+ * Rewards (cups turn into rewards), a cup for Bring Your Own, a wallet for
+ * Deferred Tikkie (refunds collect in a wallet until paid out). */
+const MODE_GLYPH = { standard: Gift, byo: CupSoda, tikkie_only: WalletCards };
+
+function ModeChip({ mode }) {
+  const meta = ORG_MODE_META[mode] || ORG_MODE_META.standard;
+  const Glyph = MODE_GLYPH[mode] || Gift;
   return (
-    <span
-      className="admin-topbar__brand-chip"
-      style={{ background: org?.brand_color || '#FD6F46' }}
-      aria-label={org?.name || 'Organisation'}
-    >
-      {letter}
+    <span className={`tb-mode tb-mode--${mode}`} title={meta.blurb}>
+      <span className="tb-mode__glyph"><Glyph size={15} strokeWidth={2.2} aria-hidden="true" /></span>
+      <span className="tb-mode__text">
+        <span className="tb-mode__eyebrow">Programme</span>
+        <span className="tb-mode__label">{meta.label}</span>
+      </span>
     </span>
   );
 }
 
-/* One glyph per programme model, so the chip is scannable before the
- * initials are even read: a bin for deposit, a cup for bring-your-own, an
- * arrow into a coin for the Tikkie redirect. */
-function MODE_ICONS({ effMode }) {
-  const common = {
-    width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
-    stroke: 'currentColor', strokeWidth: 2.4,
-    strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
-  };
-  if (effMode === 'byo') {
-    return (
-      <svg {...common}>
-        <path d="M6 3h12l-1.2 15.3A2 2 0 0 1 14.8 20H9.2a2 2 0 0 1-2-1.7L6 3z" />
-        <path d="M5 3h14" />
-      </svg>
-    );
-  }
-  if (effMode === 'tikkie_only') {
-    return (
-      <svg {...common}>
-        <line x1="4" y1="12" x2="16" y2="12" />
-        <polyline points="12 7 17 12 12 17" />
-        <circle cx="20" cy="12" r="1.6" />
-      </svg>
-    );
-  }
+/* What a cup pays at this venue, from the settings being edited — the same
+ * resolution the server uses (lib/rates.js). Opens the payout settings. */
+function RatesBadge({ settings, mode, onOpen }) {
+  const { money } = useAdminMoney();
+  const rates = effectiveRates(settings || {}, mode === 'tikkie_only' ? 'tikkie_only' : mode === 'byo' ? 'byo' : 'standard');
+  const items = mode === 'tikkie_only'
+    ? [{ label: 'Refund', value: rates.refund }]
+    : [
+      { label: 'Cashback', value: rates.cashback },
+      ...((mode !== 'byo' || settings?.featureDirectRefunds) ? [{ label: 'Refund', value: rates.refund }] : []),
+    ];
   return (
-    <svg {...common}>
-      <polyline points="4 7 5.5 20.5 18.5 20.5 20 7" />
-      <line x1="3" y1="7" x2="21" y2="7" />
-      <path d="M9 4h6" />
-    </svg>
+    <button type="button" className="tb-rates" onClick={onOpen} title="What a returned cup is worth here. Change it in Settings → Payouts.">
+      <span className="tb-rates__icon"><CircleDollarSign size={16} aria-hidden="true" /></span>
+      {items.map(it => (
+        <span className="tb-rates__item" key={it.label}>
+          <span className="tb-rates__label">{it.label}</span>
+          <span className="tb-rates__value">{money(it.value)}<small>/cup</small></span>
+        </span>
+      ))}
+    </button>
   );
 }
 
-/* Stripped-down admin top bar.
- *
- * The Preview / Save / Publish / Version History controls and the
- * publish-status pill all used to live up here. They're now in the
- * floating WorkflowDock (bottom-right) which feels less crowded and
- * keeps the most-pressing action visible without occupying chrome
- * the user has to scan past every time.
- *
- * The org badge + profile menu also moved out — to the sidebar footer
- * (bottom-left), the canonical place for "me + my workspace" in modern
- * dashboards (Linear, Vercel, Notion all do this).
- *
- * What's left in the top bar:
- *   • brand block on the left (PackPerks × Burger King)
- *   • free-text feature search in the middle
- *   • publish-error bar at the very top when a publish fails (rare) */
-export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenSupport }) {
+export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenSupport, allowedPages, canSeeSettings, canPublish }) {
   const { publishError, clearPublishError } = draftState || {};
-  const { activeOrg, activeOrgMode, activeGroupMode } = useOrg();
-  // Which programme model this org runs — always visible so an admin
-  // switching between orgs never has to guess which dashboard shape
-  // they're looking at.
-  const effMode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
-  const modeMeta = ORG_MODE_META[effMode] || ORG_MODE_META.standard;
-  // Maintenance mode = the customer app is offline. That state must be
-  // impossible to miss, so the whole bar goes orange with a pause mark.
-  const maintenance = !!draftState?.draft?.settings?.maintenanceMode;
+  const { activeOrgMode, activeGroupMode } = useOrg();
+  const mode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
+  const settings = draftState?.draft?.settings;
+  const maintenance = !!settings?.maintenanceMode;
 
   return (
     <>
       {publishError && (
-        <div className="admin-publish-error-bar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+        <div className="admin-publish-error-bar" role="alert">
           <span><strong>Publish failed:</strong> {publishError}</span>
-          <span className="admin-publish-error-bar__sql" onClick={() => {
-            navigator.clipboard?.writeText(`-- Run this in Supabase SQL Editor:\ncreate table if not exists app_config (\n  key text primary key,\n  value jsonb not null,\n  updated_at timestamptz default now()\n);\nalter table app_config enable row level security;\ncreate policy "public_read"   on app_config for select using (true);\ncreate policy "public_insert" on app_config for insert with check (true);\ncreate policy "public_update" on app_config for update using (true);\n\n-- Allow claim status updates:\ncreate policy "admin_update_claims" on claims for update using (true);\n\n-- Fix claims status constraint (allows completed + failed):\nalter table claims drop constraint if exists claims_status_check;\nalter table claims add constraint claims_status_check\n  check (status in ('pending', 'completed', 'failed'));\n`);
-          }}>📋 Copy fix SQL</span>
-          <button className="admin-publish-error-bar__close" onClick={clearPublishError}>×</button>
+          <button type="button" className="admin-publish-error-bar__close" onClick={clearPublishError} aria-label="Dismiss">×</button>
         </div>
       )}
 
       <header className={`admin-topbar${maintenance ? ' admin-topbar--maintenance' : ''}`}>
         <div className="admin-topbar__left">
-          <div className="admin-topbar__brand">
-            <img src={packperksLogoDark} alt="PackPerks" className="admin-topbar__brand-pp" />
-            <span className="admin-topbar__brand-x">×</span>
-            <OrgMark org={activeOrg} />
-          </div>
-          <span
-            className={`admin-topbar__mode admin-topbar__mode--${effMode}`}
-            title={`${modeMeta.label} — ${modeMeta.blurb}`}
-          >
-            <MODE_ICONS effMode={effMode} />
-            {modeMeta.short}
-          </span>
+          <ModeChip mode={mode} />
           {maintenance && (
             <span
-              className="admin-topbar__maint"
-              title="Maintenance mode is ON — the customer app is showing the maintenance banner and blocking new scans and claims. Turn it off in Settings → Feature flags."
+              className="tb-paused"
+              title="Maintenance mode is on: customers see the maintenance page and can't scan or claim. Turn it off in Settings → Features."
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
+              <Pause size={12} fill="currentColor" aria-hidden="true" />
               Paused
             </span>
           )}
         </div>
 
         <div className="admin-topbar__center">
-          <FeatureSearch onNavigate={onNavigate} />
+          <FeatureSearch onNavigate={onNavigate} allowedPages={allowedPages} />
         </div>
 
-        {/* Top-right hosts the WorkflowDock — Framer-style contextual
-         *  Save/Publish/Preview/History cluster. Compact in the default
-         *  state, expands on hover. */}
         <div className="admin-topbar__right">
+          <RatesBadge
+            settings={settings}
+            mode={mode}
+            onOpen={canSeeSettings ? () => onNavigate?.('settings', { section: 'payouts' }) : undefined}
+          />
           <TimezoneHint />
           <WorkflowDock
             draftState={draftState}
             onPreview={onPreview}
-            onOpenHistory={() => onNavigate?.('history')}
-            onOpenSettings={() => onNavigate?.('settings')}
+            onOpenHistory={allowedPages?.has('history') ? () => onNavigate?.('history') : undefined}
             onOpenSupport={onOpenSupport}
+            canPublish={canPublish}
           />
         </div>
       </header>
@@ -161,46 +104,24 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, onOpenS
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * TimezoneHint — small pill in the top-bar right slot showing the
- * browser's current timezone abbreviation.
- *
- * P-37: the dashboard renders 55+ timestamps across pages with no
- * indication of which timezone "14:32" refers to. Renaming each
- * formatter call site to append the tz would be invasive; this pill
- * surfaces the global answer in one persistent place. Tooltip on
- * hover spells out the long IANA name + UTC offset for unambiguous
- * reading.
- *
- * Localised once on mount. Doesn't react to OS-level tz changes mid-
- * session — that's vanishingly rare and a page reload covers it. */
+/* The browser's time zone: every time in the dashboard is shown in it. */
 function TimezoneHint() {
-  const tz = (() => {
-    try {
-      const long = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const offset = -new Date().getTimezoneOffset();
-      const sign = offset >= 0 ? '+' : '-';
-      const h = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
-      const m = String(Math.abs(offset) % 60).padStart(2, '0');
-      // Cheap abbreviation: use the last segment of the IANA name
-      // (Europe/Amsterdam → Amsterdam) so it fits in the chip.
-      const shortName = (long || '').split('/').slice(-1)[0]?.replace(/_/g, ' ') || 'local';
-      return { shortName, long, offsetLabel: `UTC${sign}${h}:${m}` };
-    } catch {
-      return { shortName: 'local', long: 'local', offsetLabel: '' };
-    }
-  })();
+  let label = 'Local time';
+  let long = '';
+  let offsetLabel = '';
+  try {
+    long = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const offset = -new Date().getTimezoneOffset();
+    const sign = offset >= 0 ? '+' : '−';
+    const h = Math.floor(Math.abs(offset) / 60);
+    const m = Math.abs(offset) % 60;
+    offsetLabel = `UTC${sign}${h}${m ? `:${String(m).padStart(2, '0')}` : ''}`;
+    label = long.split('/').slice(-1)[0]?.replace(/_/g, ' ') || label;
+  } catch { /* keep the defaults */ }
   return (
-    <span
-      className="admin-topbar__tz"
-      title={`All timestamps in the dashboard are displayed in your browser's local timezone (${tz.long || tz.shortName}, ${tz.offsetLabel}). Hover any time cell to see the underlying UTC value where available.`}
-    >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-      <span className="admin-topbar__tz-label">{tz.shortName}</span>
-      {tz.offsetLabel && <span className="admin-topbar__tz-offset">· {tz.offsetLabel}</span>}
+    <span className="admin-topbar__tz" title={`Times are shown in your browser's time zone${long ? ` (${long})` : ''}.`}>
+      {label}
+      {offsetLabel && <span className="admin-topbar__tz-offset">{offsetLabel}</span>}
     </span>
   );
 }

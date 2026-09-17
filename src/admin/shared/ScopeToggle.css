@@ -1,49 +1,46 @@
-/* ScopeToggle — segmented "this store / whole group" analytics switch */
+/* ScopeToggle — "this store / whole group" switch, in the ui.css segmented style. */
 .scope-toggle {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 3px;
-  background: #F1EBDF;
-  border: 1px solid #E4DCCD;
-  border-radius: 9px;
+  padding: 2px;
+  background: var(--ui-soft, #F2F1F7);
+  border: 1px solid var(--ui-border, #E7E5EE);
+  border-radius: 10px;
 }
 .scope-toggle__opt {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  height: 30px;
+  padding: 0 12px;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
-  color: #6C6259;
-  font-family: inherit;
+  color: var(--ui-muted, #676374);
+  font-family: var(--ui-font, inherit);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+  transition: background-color 0.14s, color 0.14s, box-shadow 0.14s;
 }
-.scope-toggle__opt:hover:not(.is-on) { color: #0F0F0F; }
+.scope-toggle__opt:hover:not(.is-on) { color: var(--ui-fg, #17151F); }
 .scope-toggle__opt.is-on {
   background: #FFFFFF;
-  color: #1A6B38;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  color: var(--ui-fg, #17151F);
+  box-shadow: 0 1px 2px rgba(23, 21, 31, 0.08);
 }
 .scope-toggle__count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: rgba(26, 135, 55, 0.16);
-  color: #1A6B38;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ui-primary-soft, #EEEAFD);
+  color: var(--ui-primary, #5B3FD6);
   font-size: 10.5px;
   font-weight: 700;
-}
-.scope-toggle__opt:not(.is-on) .scope-toggle__count {
-  background: rgba(0, 0, 0, 0.08);
-  color: #6C6259;
 }

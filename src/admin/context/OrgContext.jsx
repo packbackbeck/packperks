@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { setActiveOrgId, setActiveOrgCountry } from './orgState';
-import { useAuth } from '../auth/AuthContext';
 import { readVendorPreviewFlag } from './ViewRole';
+import { useAccess } from './accessCtx';
 import { normalizeMode } from '../../lib/copyPresets';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -82,15 +82,16 @@ function writeUrlOrgParam(slug) {
 }
 
 export function OrgProvider({ children }) {
-  /* A vendor is the venue's own staff, not PackPerks staff: they see one
-   * store — theirs — and the switcher has nothing to switch to. Every
-   * other role keeps cross-org access (see the Phase 7 note above; this
-   * is the first role that actually needs the filter). */
-  const { profile } = useAuth();
-  const isVendor = profile?.role === 'vendor';
-  const vendorOrgId = isVendor ? (profile.org_id || null) : null;
-  /* `#…?as=vendor` — an owner rehearsing the vendor view. It must be a
-   * faithful rehearsal, and a vendor cannot change store, so the switcher
+  const { access } = useAccess();
+  /* Which organisations this account may open: every one for masters and
+   * accounts given all organisations, otherwise the list on the account
+   * (Master Settings → People). An empty list stays empty — falling open
+   * would hand one venue's people every other venue's numbers. */
+  const allOrgs = !!access?.allOrgs;
+  const allowedKey = allOrgs ? '*' : (access?.orgIds || []).slice().sort().join(',');
+  const isVendor = access?.level === 'vendor';
+  /* `#…?as=vendor` — a staff account rehearsing the vendor view. It must be
+   * a faithful rehearsal, and a vendor cannot change store, so the switcher
    * is locked to whichever org the link opened. Reading the URL here
    * rather than taking it from ViewRoleProvider is deliberate: this
    * context sits ABOVE the shell that provides it. */
@@ -126,10 +127,8 @@ export function OrgProvider({ children }) {
       // resolution chain below and every stored/URL override all operate
       // on the same, already-narrowed set.
       const all = data || [];
-      // A vendor sees exactly their assigned store. If none is assigned the
-      // list is EMPTY, never unfiltered — falling open here would hand one
-      // venue's staff every other venue's numbers.
-      const orgs = isVendor ? all.filter(o => o.id === vendorOrgId) : all;
+      const allowed = allowedKey === '*' ? null : new Set(allowedKey ? allowedKey.split(',') : []);
+      const orgs = allowed ? all.filter(o => allowed.has(o.id)) : all;
       setGroups(grpData || []);
 
       if (orgs.length === 0) {
@@ -169,7 +168,7 @@ export function OrgProvider({ children }) {
       setError(e.message || 'Failed to load organisations');
       setStatus('error');
     }
-  }, [isVendor, vendorOrgId, lockToActiveOrg]);
+  }, [allowedKey, lockToActiveOrg]);
 
   // Initial fetch on mount, and again if the signed-in role resolves to a
   // vendor after the first pass (the profile arrives asynchronously).
@@ -275,6 +274,7 @@ export function OrgProvider({ children }) {
     // group awareness
     groups,
     groupsById,
+    activeGroupId,        // the active org's group id | null
     activeGroup,          // { id, name, slug } | null
     groupMembers,         // full org rows in the active org's group
     groupMemberIds,

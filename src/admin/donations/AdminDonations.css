@@ -10,7 +10,7 @@
 
 .admin-donations {
   padding: 32px 32px 48px;
-  min-height: calc(100vh - 56px);
+  min-height: calc(100vh - var(--topbar-h, 64px));
   display: flex;
   flex-direction: column;
   gap: 24px;

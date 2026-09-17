@@ -8,10 +8,10 @@
  * clever in chrome that's always on screen.
  *
  * Layout (left-to-right):
- *   [ ⚙ ] [ ? ] [ ⟲ ] [ Preview ] [ Publish ]
+ *   [ ? ] [ ⟲ ] [ Preview ] [ Publish ]
  *
  *   .wd          — the row container
- *   .wd-icon     — icon-only ghost button (settings, support, history)
+ *   .wd-icon     — icon-only ghost button (support, history)
  *   .wd-preview  — labelled ghost button (Preview)
  *   .wd-publish  — highlighted primary button (Publish)
  */
@@ -19,10 +19,9 @@
 .wd {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
-/* ── Shared button shape ─────────────────────────────────────────── */
 .wd-icon,
 .wd-preview,
 .wd-publish {
@@ -30,79 +29,63 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
+  height: 34px;
   border: 1px solid transparent;
-  border-radius: 8px;
-  font-family: inherit;
+  border-radius: 10px;
+  font-family: var(--ui-font, inherit);
   font-weight: 600;
   font-size: 13px;
-  letter-spacing: -0.005em;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.08s ease;
+  transition: background-color 0.14s, color 0.14s, border-color 0.14s, box-shadow 0.14s, transform 0.08s;
 }
+.wd-icon:active, .wd-preview:active, .wd-publish:active { transform: translateY(1px); }
 
-.wd-icon:active,
-.wd-preview:active,
-.wd-publish:active { transform: translateY(1px); }
-
-/* ── Icon-only ghost buttons ─────────────────────────────────────── */
 .wd-icon {
-  width: 32px;
+  width: 34px;
   padding: 0;
   background: transparent;
-  color: #6C6259;
+  color: var(--ui-muted, #676374);
 }
-.wd-icon:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
-}
+.wd-icon:hover { background: #fff; color: var(--ui-fg, #17151F); border-color: var(--ui-border, #E7E5EE); }
 
-/* ── Preview (labelled ghost) ────────────────────────────────────── */
 .wd-preview {
-  padding: 0 14px;
-  background: transparent;
-  color: #4A4540;
-  border-color: #E0DAD0;
+  padding: 0 13px;
+  background: #fff;
+  color: var(--ui-fg-2, #3B3647);
+  border-color: var(--ui-border, #E7E5EE);
+  box-shadow: var(--ui-shadow-sm, none);
 }
-.wd-preview:hover {
-  background: #F3EEE4;
-  color: #1A1A1A;
-  border-color: #D5CDBE;
-}
+.wd-preview:hover { border-color: var(--ui-border-2, #D9D6E4); color: var(--ui-fg, #17151F); }
 
-/* ── Publish (highlighted primary) ───────────────────────────────── */
 .wd-publish {
-  padding: 0 14px;
-  background: #14100A; /* dark black — stands out on the purple top bar */
-  color: #FFFFFF;
   position: relative;
+  padding: 0 15px;
+  background: var(--ui-primary, #5B3FD6);
+  color: #fff;
+  box-shadow: 0 6px 16px -8px rgba(91, 63, 214, 0.8);
 }
-.wd-publish:hover { background: #000000; }
+.wd-publish:hover { background: var(--ui-primary-hover, #4C33BD); }
 
-/* Tiny pending-pulse dot when there are auto-saved-but-not-yet-published
- * changes. Sits at the top-right corner of the Publish button. */
+/* Changes saved but not yet live. */
 .wd-publish__dot {
   position: absolute;
-  top: 4px;
-  right: 6px;
-  width: 6px;
-  height: 6px;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: #FFFFFF;
-  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.65);
+  background: var(--ui-accent, #F2643A);
+  border: 2px solid #fff;
   animation: wd-pulse 1.8s ease-out infinite;
 }
 @keyframes wd-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.65); }
-  70%  { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(242, 100, 58, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(242, 100, 58, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(242, 100, 58, 0); }
 }
-
-/* ── Compact mode ────────────────────────────────────────────────── */
-@media (max-width: 720px) {
-  .wd-preview { display: none; }
-}
+@media (prefers-reduced-motion: reduce) { .wd-publish__dot { animation: none; } }
+@media (max-width: 900px) { .wd-preview { display: none; } }
 
 /* P-34: publish-diff block inside the publish modal. Goes between the
  * modal header and the change-summary input so the admin reads

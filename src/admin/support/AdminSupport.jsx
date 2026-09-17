@@ -348,7 +348,7 @@ export default function AdminSupport({ onNavigate }) {
         </div>
       </section>
 
-      <QuickLinks currentPage="support" onNavigate={onNavigate} links={['overview', 'settings', 'history', 'org']} />
+      <QuickLinks currentPage="support" onNavigate={onNavigate} links={['overview', 'settings', 'history', 'master']} />
     </div>
   );
 }

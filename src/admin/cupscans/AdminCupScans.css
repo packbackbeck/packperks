@@ -4,7 +4,7 @@
   flex-direction: column;
   /* Fill the viewport so the table (and review panel) scroll internally and
    * fit the screen height, like the Claims table. */
-  height: calc(100vh - 56px);
+  height: calc(100vh - var(--topbar-h, 64px));
   overflow: hidden;
 }
 

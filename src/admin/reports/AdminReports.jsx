@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { applyOrgFilter } from '../context/orgState';
 import { useAuth } from '../auth/AuthContext';
 import { useOrg } from '../context/OrgContext';
+import { useViewRole } from '../context/ViewRole';
 import { logAction } from '../auth/actionLog';
 import { getWeeklyDigest, saveWeeklyDigest, sendDigestTest, getDigestLog, DIGEST_VENDOR_METRICS, DIGEST_STAFF_METRICS, WEEKLY_DIGEST_DEFAULT, getNotificationCenter, saveNotificationCenter, sendNotificationTest, NOTIFICATION_EVENTS, NOTIFICATION_CENTER_DEFAULT } from '../lib/adminApi';
 import QuickLinks from '../shared/QuickLinks';
@@ -276,7 +277,9 @@ export default function AdminReports({ onNavigate }) {
   const canExportPii = role === 'owner' || role === 'admin';
   // Email configs (digest + notifications) can be set by any admin, managers
   // included — only view-only checkers are locked out.
-  const canManageAlerts = role !== 'checker';
+  // A role that can only view Reports can't change them either.
+  const { access } = useViewRole();
+  const canManageAlerts = role !== 'checker' && role !== 'vendor' && (!access || access.canEdit('reports'));
 
   // Deferred Tikkie orgs have no cup scans, cup balances or rewards —
   // the datasets and columns trim themselves to what that mode records.

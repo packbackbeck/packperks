@@ -1,33 +1,35 @@
 // ──────────────────────────────────────────────────────────────────────────
-// PackPerks — invite-admin Edge Function (v2 — email + link modes)
+// PackPerks — invite-admin Edge Function (v3 — roles and organisations)
 //
-// Owner / Admin invites a new teammate by EITHER:
+// A master invites a new person by EITHER:
 //
 //   email — Supabase sends the invitation email (default). When the
 //           recipient clicks the magic link, bootstrap-admin consumes
-//           the invitation row, assigns the role, and marks accepted.
+//           the invitation row, gives them the role and organisations,
+//           and marks it accepted.
 //
 //   link  — The function records the invitation row + token but skips
 //           the email send. The client builds a URL like
-//           `<origin>/admin?invite=<token>` and the inviting admin
-//           shares it manually (Slack, WhatsApp, etc.). Same token,
-//           same bootstrap flow.
+//           `<origin>/admin?invite=<token>` and the inviting master
+//           shares it manually (Slack, WhatsApp, etc.).
 //
 // `single_use` controls whether the invitation is consumed on first
 // sign-in (default true) or remains valid for any number of teammates
 // until the 14-day expiry passes.
 //
 // Body: {
-//   email?:      string                   // required when method='email'
-//   role:        'admin'|'manager'|'checker'|'vendor'
-//   org_id?:     uuid                     // the store this invite is for.
-//                                         // REQUIRED for 'vendor' (they are
-//                                         // scoped to one store); defaults to
-//                                         // the caller's org otherwise.
-//   method?:     'email' | 'link'         // default 'email'
-//   single_use?: boolean                  // default true (only meaningful for link mode)
+//   email?:       string            // required when method='email'
+//   access_role?: string            // an admin_roles key (migration 048)
+//   org_ids?:     uuid[]            // the organisations they will see
+//   all_orgs?:    boolean           // every organisation, now and later
+//   role?:        'admin'|'manager'|'checker'|'vendor'   // older clients
+//   org_id?:      uuid                                   // older clients
+//   method?:      'email' | 'link'  // default 'email'
+//   single_use?:  boolean           // default true (link mode only)
 // }
-// Returns: 200 { invitation } | 4xx { error }
+// A master role always sees every organisation. Any other role needs
+// `all_orgs` or at least one organisation.
+// Returns: 200 { invitation } | 4xx { error, detail }
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -48,7 +50,10 @@ const CORS_HEADERS = {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ALLOWED_ROLES = new Set(["admin", "manager", "checker", "vendor"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LEGACY_ROLES: Record<string, string> = {
+  admin: "master", manager: "manager", checker: "viewer", vendor: "vendor",
+};
 const ALLOWED_METHODS = new Set(["email", "link"]);
 
 function jsonResponse(body: unknown, status = 200) {
@@ -82,10 +87,8 @@ Deno.serve(async (req) => {
   const { data: { user }, error: userErr } = await supabase.auth.getUser(jwt);
   if (userErr || !user) return jsonResponse({ error: "invalid_token" }, 401);
 
-  // H-5: use a user-scoped client for this lookup so RLS (org membership
-  // policy) acts as a second layer — even if the JWT check above has a bug,
-  // the scoped client can only return rows the authenticated user is
-  // allowed to see. Service_role is kept only for the privileged writes below.
+  // H-5: read the caller through a client scoped to their own JWT, so row
+  // level security is a second layer on top of the token check above.
   const callerSupabase = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${jwt}` } },
@@ -93,52 +96,71 @@ Deno.serve(async (req) => {
 
   const { data: caller } = await callerSupabase
     .from("admin_profiles")
-    .select("id, role, org_id, email, display_name, status")
+    .select("id, role, email, display_name, status")
     .eq("id", user.id)
     .maybeSingle();
   if (!caller || caller.status !== "active")
     return jsonResponse({ error: "not_an_admin" }, 403);
-  if (caller.role !== "owner" && caller.role !== "admin")
-    return jsonResponse({ error: "insufficient_role" }, 403);
+  // Only masters add people. is_master() also covers accounts that still
+  // carry the old owner/admin role.
+  const { data: isMaster } = await callerSupabase.rpc("is_master");
+  if (isMaster !== true)
+    return jsonResponse({ error: "insufficient_role", detail: "Only a master can add people." }, 403);
 
-  // 10 invitations per admin per hour.
+  // 10 invitations per master per hour.
   if (!await rateLimit(`invite-admin:admin:${caller.id}`, 3600, 10))
     return jsonResponse({ error: "rate_limited", detail: "Too many invitations sent this hour. Try again later." }, 429);
 
-  let body: { email?: string; role?: string; method?: string; single_use?: boolean; org_id?: string };
+  let body: {
+    email?: string; access_role?: string; org_ids?: unknown; all_orgs?: boolean;
+    role?: string; org_id?: string; method?: string; single_use?: boolean;
+  };
   try { body = await req.json(); } catch { return jsonResponse({ error: "invalid_json" }, 400); }
-  const role = String(body?.role || "");
+
   const methodRaw = String(body?.method || "email").toLowerCase();
   if (!ALLOWED_METHODS.has(methodRaw))
-    return jsonResponse({ error: "invalid_method", detail: `method must be 'email' or 'link'` }, 400);
+    return jsonResponse({ error: "invalid_method", detail: "method must be 'email' or 'link'" }, 400);
   const method = methodRaw as "email" | "link";
   const singleUse = body?.single_use === undefined ? true : !!body.single_use;
-  if (!ALLOWED_ROLES.has(role))
-    return jsonResponse({ error: "invalid_role", detail: `role must be one of: ${[...ALLOWED_ROLES].join(", ")}` }, 400);
 
-  /* Which store the invitation is for. A vendor only ever sees this one
-   * org, so it must be present and must be a real, live org — an invite
-   * carrying a bad id would create an account that can see nothing, or
-   * (worse, if the client filter ever regressed) everything. */
-  const requestedOrgId = body?.org_id ? String(body.org_id) : null;
-  const orgId = requestedOrgId ?? caller.org_id ?? null;
-  if (requestedOrgId) {
-    const { data: org } = await supabase
+  // The role: an admin_roles key, or an old role name mapped onto one.
+  const roleKey = body?.access_role
+    ? String(body.access_role)
+    : LEGACY_ROLES[String(body?.role || "")] || "";
+  const { data: accessRole } = roleKey
+    ? await supabase.from("admin_roles").select("key, level").eq("key", roleKey).maybeSingle()
+    : { data: null };
+  if (!accessRole)
+    return jsonResponse({ error: "invalid_role", detail: "Pick a role that exists in Master Settings." }, 400);
+  const isMasterRole = accessRole.level === "master";
+
+  // The organisations.
+  const requested = Array.isArray(body?.org_ids)
+    ? body.org_ids
+    : (body?.org_id ? [body.org_id] : []);
+  const orgIds = [...new Set(requested.map(String))];
+  if (orgIds.some(id => !UUID_RE.test(id)))
+    return jsonResponse({ error: "invalid_org", detail: "One of those organisations does not exist." }, 400);
+  if (orgIds.length) {
+    const { data: live } = await supabase
       .from("organizations")
       .select("id")
-      .eq("id", requestedOrgId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (!org) return jsonResponse({ error: "invalid_org", detail: "That organisation does not exist." }, 400);
+      .in("id", orgIds)
+      .is("deleted_at", null);
+    if ((live || []).length !== orgIds.length)
+      return jsonResponse({ error: "invalid_org", detail: "One of those organisations does not exist." }, 400);
   }
-  if (role === "vendor" && !orgId)
-    return jsonResponse({ error: "org_required", detail: "A vendor invitation must name the store it is for." }, 400);
+  // Old clients sent staff invitations with no org: those saw everything.
+  const legacyGlobal = !body?.access_role && !body?.org_id && body?.role !== "vendor";
+  const allOrgs = isMasterRole || body?.all_orgs === true || legacyGlobal;
+  if (!allOrgs && orgIds.length === 0)
+    return jsonResponse({ error: "org_required", detail: "Pick at least one organisation, or they will see nothing." }, 400);
 
   const rawEmail = String(body?.email || "").trim().toLowerCase();
   if (method === "email" && !EMAIL_RE.test(rawEmail))
-    return jsonResponse({ error: "invalid_email" }, 400);
+    return jsonResponse({ error: "invalid_email", detail: "That email address doesn't look right." }, 400);
   if (method === "link" && rawEmail && !EMAIL_RE.test(rawEmail))
-    return jsonResponse({ error: "invalid_email" }, 400);
+    return jsonResponse({ error: "invalid_email", detail: "That email address doesn't look right." }, 400);
   const email = method === "link" && !rawEmail
     ? `link-invite+${makeToken().slice(0, 8)}@invites.local`
     : rawEmail;
@@ -146,65 +168,59 @@ Deno.serve(async (req) => {
   if (method === "email") {
     const { data: existing } = await supabase
       .from("admin_profiles")
-      .select("id")
+      .select("id, status")
       .eq("email", email)
-      .eq("org_id", orgId)
       .maybeSingle();
-    if (existing)
-      return jsonResponse({ error: "already_member", detail: `${email} is already on the team.` }, 409);
+    if (existing && existing.status !== "deleted")
+      return jsonResponse({ error: "already_member", detail: `${email} already has dashboard access. Change their role in People.` }, 409);
   }
 
+  const access = {
+    access_role: accessRole.key,
+    org_ids: allOrgs ? [] : orgIds,
+    all_orgs: allOrgs,
+  };
   let invitationId: string;
   const token = makeToken();
   const now = new Date().toISOString();
   const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  // `role` and `org_id` are derived from the fields above by a trigger; the
+  // insert still has to name a valid old role for the column's check.
+  const legacyRole = isMasterRole ? "admin" : accessRole.level === "vendor" ? "vendor" : "manager";
 
-  if (method === "email") {
-    const { data: pending } = await supabase
+  const { data: pending } = method === "email"
+    ? await supabase
       .from("admin_invitations")
       .select("id")
       .eq("email", email)
-      .eq("org_id", orgId)
       .eq("status", "pending")
-      .maybeSingle();
-    if (pending) {
-      invitationId = pending.id;
-      await supabase.from("admin_invitations").update({
-        role,
-        invited_by: caller.id,
-        invited_at: now,
-        expires_at: expires,
-        token,
-        method,
-        single_use: singleUse,
-      }).eq("id", invitationId);
-    } else {
-      const { data: inserted, error: insErr } = await supabase
-        .from("admin_invitations")
-        .insert({
-          org_id: orgId,
-          email,
-          role,
-          token,
-          invited_by: caller.id,
-          invited_at: now,
-          expires_at: expires,
-          status: "pending",
-          method,
-          single_use: singleUse,
-        })
-        .select("id")
-        .single();
-      if (insErr) return jsonResponse({ error: "db_error", detail: insErr.message }, 500);
-      invitationId = inserted.id;
-    }
+      .order("invited_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    : { data: null };
+
+  if (pending) {
+    invitationId = pending.id;
+    // No `role` here: the trigger derives it from access_role, and an old
+    // role name alongside an unchanged access_role would be read as a
+    // request to switch roles the old way.
+    const { error: updErr } = await supabase.from("admin_invitations").update({
+      ...access,
+      invited_by: caller.id,
+      invited_at: now,
+      expires_at: expires,
+      token,
+      method,
+      single_use: singleUse,
+    }).eq("id", invitationId);
+    if (updErr) return jsonResponse({ error: "db_error", detail: updErr.message }, 500);
   } else {
     const { data: inserted, error: insErr } = await supabase
       .from("admin_invitations")
       .insert({
-        org_id: orgId,
         email,
-        role,
+        role: legacyRole,
+        ...access,
         token,
         invited_by: caller.id,
         invited_at: now,
@@ -222,8 +238,7 @@ Deno.serve(async (req) => {
   if (method === "email") {
     const { error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: {
-        org_id: orgId,
-        role,
+        access_role: accessRole.key,
         invited_by: caller.display_name || caller.email,
         invitation_id: invitationId,
       },
@@ -242,11 +257,11 @@ Deno.serve(async (req) => {
   await supabase.from("admin_action_log").insert({
     actor_id: caller.id,
     actor_email: caller.email,
-    org_id: caller.org_id,
+    org_id: null,
     action: "team.invite",
     target_type: "admin_invitation",
     target_id: invitationId,
-    after_state: { email, role, method, single_use: singleUse, org_id: orgId },
+    after_state: { email, method, single_use: singleUse, ...access },
     ip: req.headers.get("x-forwarded-for") || null,
     user_agent: req.headers.get("user-agent") || null,
   });

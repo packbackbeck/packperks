@@ -43,6 +43,38 @@ The dashboard now follows PackPulse's layout and access model.
   Settings page therefore never showed the group switches and never locked
   the programme for grouped venues.
 
+### 0. PackPerks Staff (17 Sep, evening)
+
+A separate phone app at `/staff` where venue staff make cup QR codes.
+Migration `050` and the `staff-app` edge function (v2) are live; the app
+itself needs a push to reach perks.packback.network.
+
+- **Who:** masters add work emails in Master Settings → Staff app, per
+  venue, and switch the app on per venue. It is on for NYU Abu Dhabi only.
+  Nobody is on the list yet.
+- **Sign-in:** email and password. A 6-digit code, sent by the function
+  through Brevo, is used for sign-up, a forgotten password and an email
+  change. An address that already has a PackPerks login (customer or
+  dashboard) keeps that login; the new password is set on it.
+- **The screen:** a square that shows the code (with a making animation and
+  the code drawing itself in), a picker wheel for 1 to 20 cups that can also
+  be typed into, a package type (cups only for now) and the button. Below
+  it: today's totals and the history; tapping a code shows when it was made
+  and collected, cups and package, and lets a waiting code be shown again or
+  cancelled. The avatar opens name, photo and email.
+- **The code:** a normal cup batch (`/nyuad/?batch=<id>`), claimed through
+  claim-cups. It works for 15 minutes; the screen shows a countdown and
+  switches to Collected when the customer scans it. Limits: 60 codes an hour
+  and 400 cups a day per person.
+- **Tested** against the live function with a temporary account (since
+  deleted): sign-up, sign-in, wrong password, mint, list, status, cancel,
+  photo upload, name and email change, password reset, a paused account,
+  and the QR read back from the screen. Not tested: the master invite with
+  a real dashboard session, and delivery of the emails themselves.
+- **Migration `051`:** `cups` was readable with the public key (948 unclaimed
+  cup ids could be listed and claimed). Only dashboard accounts can read it
+  now.
+
 ### 1b. Dashboard redesign, second round (17 Sep, later)
 
 - **Sign-in page:** a PackPerks animation replaces the PackPulse pulse:
@@ -192,6 +224,11 @@ KFC: `https://perks.packback.network/kfc/`
 invited through them yet: the first real invitation is the end-to-end test
 (the new person should land with exactly the role and organisations chosen
 in People).
+
+**The Receipt generator's revoke, restore and expiry buttons do nothing.**
+They update `cups` from the browser, and the table has no update policy, so
+nothing is saved and no error shows. Printed batches keep working until
+claimed. Needs a SECURITY DEFINER function.
 
 **The weekly digest email still uses the old cream colours**
 (`supabase/functions/send-digest`). The preview in Reports copies the email,

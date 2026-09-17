@@ -161,7 +161,7 @@ export default function GroupEditor({ group, orgs, modes, stats, initialTab = 's
   async function save() {
     if (basicsChanges.length) {
       if (!basics.name.trim()) { setTab('settings'); setError('Give the group a name.'); return; }
-      if (!slugOk(basics.slug)) { setTab('settings'); setError('The address can use lowercase letters, numbers and dashes.'); return; }
+      if (!slugOk(basics.slug)) { setTab('settings'); setError('Use lowercase letters, numbers and dashes. admin, mockup, staff and support are taken by the site.'); return; }
     }
     await run(async () => {
       if (basicsChanges.length) await renameOrgGroup(group.id, basics.name.trim(), basics.slug.trim());

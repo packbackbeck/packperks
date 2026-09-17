@@ -786,3 +786,24 @@
   .ms-panel, .ms-drawer, .ms-drawer-scrim, .ms-drawer__body { animation: none; }
   .ms-org, .ms-choice { transition: none; }
 }
+
+/* ── Staff app ─────────────────────────────────────────────────────── */
+.sa-venues { border: 1px solid var(--ui-border); border-radius: 12px; overflow: hidden; }
+.sa-venues .ms-ws__row--off .ms-ws__name { text-decoration: none; }
+.sa-venues .ms-ws__row--off .osw__avatar { opacity: 0.6; filter: grayscale(0.6); }
+.sa-venue-select { min-width: 200px; }
+.sa-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; margin-bottom: 14px; }
+.sa-add .ui-field { margin: 0; }
+.sa-add__input { min-height: 44px; resize: vertical; }
+.sa-add > .ui-btn { margin-bottom: 22px; }
+@media (max-width: 720px) {
+  .sa-add { grid-template-columns: minmax(0, 1fr); }
+  .sa-add > .ui-btn { margin-bottom: 0; }
+}
+.sa-results { display: flex; flex-direction: column; gap: 4px; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--ui-soft); list-style: none; }
+.sa-results__row { font-size: 12.5px; color: var(--ui-fg-2); }
+.sa-results__row b { font-weight: 600; color: var(--ui-fg); }
+.sa-results__row--warn { color: var(--ui-warning); }
+.sa-table { border: 1px solid var(--ui-border); border-radius: 12px; }
+.sa-avatar { background: var(--ui-primary); }
+.sa-num { font-variant-numeric: tabular-nums; white-space: nowrap; }

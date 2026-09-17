@@ -79,7 +79,7 @@ export default function OrgEditor({
 
   async function save() {
     if (!draft.name.trim()) { setTab('profile'); setError('Give the organisation a name.'); return; }
-    if (!slugOk(draft.slug)) { setTab('profile'); setError('The address can use lowercase letters, numbers and dashes.'); return; }
+    if (!slugOk(draft.slug)) { setTab('profile'); setError('Use lowercase letters, numbers and dashes. admin, mockup, staff and support are taken by the site.'); return; }
     setSaving(true);
     setError(null);
     try {

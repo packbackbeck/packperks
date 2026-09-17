@@ -4,10 +4,13 @@ Reusable-cup rewards. Customers return a cup, collect cups in a wallet, and
 redeem them for a drink or cashback. React + Vite + Supabase, no server of our
 own beyond edge functions.
 
-There are two apps in one codebase:
+There are three apps in one codebase, picked by path in `src/main.jsx`:
 
-- **Customer app** — `src/` minus `src/admin`. Per-org, reached at `/<slug>/`.
+- **Customer app** — `src/` minus `src/admin` and `src/staff`. Per-org,
+  reached at `/<slug>/`.
 - **Admin dashboard** — `src/admin/`, served at `/admin`, behind a login.
+- **PackPerks Staff** — `src/staff/`, served at `/staff`: venue staff make
+  cup QR codes on their phone. Its own login (see *PackPerks Staff* below).
 
 ---
 
@@ -126,6 +129,21 @@ editable tab), and who may manage people, roles, organisations and the
 workspace tabs. Which tab a role may change, and which organisations it sees,
 is enforced by the dashboard (see *Org isolation* under Landmines).
 
+**PackPerks Staff** (`src/staff/`, `supabase/functions/staff-app`,
+migration 050). A phone app at `/staff`, on for an organisation only when
+`organizations.staff_app_enabled` is set (NYU Abu Dhabi first). Masters add
+staff emails in Master Settings → Staff app (`staff_members`, one venue per
+email); only those emails can sign up. Staff sign in with email and password;
+the function emails its own 6-digit codes (Brevo) for sign-up, password reset
+and email change, and sets the password on an existing login with the same
+email (a customer or dashboard account) rather than making a second one. A
+staff code is an ordinary cup batch (`cups` rows, source `admin_batch`) that
+expires after 15 minutes, logged in `staff_qr_codes`; the customer claims it
+at `/<slug>/?batch=<id>` like a printed receipt. Staff never read tables
+directly: everything goes through `staff-app` with the service role. The app
+uses its own Supabase client with storage key `pp-staff-auth`, so a staff
+login never mixes with a dashboard or customer session.
+
 `#overview?as=vendor` previews the vendor role. It can only ever *remove*
 access, so any account above vendor may use it.
 
@@ -139,6 +157,7 @@ access, so any account above vendor may use it.
 | `src/lib/regions.js` | currency, region seed, `formatMoney`, `payoutCopy` |
 | `src/lib/RegionContext.jsx` | `useRegion()`, `useMoney()` for the customer app |
 | `src/admin/lib/adminApi.js` | every admin query; ~5k lines |
+| `src/staff/` | PackPerks Staff: login, the QR screen, history, profile |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
 | `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |
@@ -281,6 +300,17 @@ scans, claims, customer history, charity transfers, bin sessions, app and
 system events) for one organisation. Customers, balances, rewards and
 printed cups are never deleted there. Add a kind in the function's list and
 in `ORG_DATA_TIME_COLUMN` (adminApi.js) together.
+
+**App paths are not venue addresses.** `src/main.jsx` sends `/admin…`,
+`/mockup…`, `/staff`, `/support…` and `/vendor-support…` to their own apps
+before any venue lookup, so an organisation or group with such a slug would
+be unreachable. `RESERVED_SLUGS` (`src/admin/master/orgShared.js`) and
+`isOrgSlugAvailable` refuse them; add a new app path to both.
+
+**`cups` is readable by dashboard accounts only** (migration 051). It used to
+be readable with the public key, which let anyone list unclaimed cup ids and
+claim them. Never add a broader read policy; the customer app claims through
+claim-cups.
 
 **Customer emails are email only.** Push notifications were removed; the
 `notify_push` column stays and is always false.

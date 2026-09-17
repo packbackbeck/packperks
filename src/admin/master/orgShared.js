@@ -40,8 +40,12 @@ export function payoutPromise(style, noun) {
     : "we'll send your cashback to you";
 }
 
+/* Paths the site already uses (src/main.jsx); a venue can't take them. */
+export const RESERVED_SLUGS = new Set(['admin', 'mockup', 'staff', 'support', 'vendor-support']);
+
 export function slugOk(slug) {
-  return /^[a-z0-9][a-z0-9-]*$/.test(String(slug || '').trim());
+  const s = String(slug || '').trim();
+  return /^[a-z0-9][a-z0-9-]*$/.test(s) && !RESERVED_SLUGS.has(s) && !s.startsWith('support');
 }
 
 export function plural(n, one, many = `${one}s`) {

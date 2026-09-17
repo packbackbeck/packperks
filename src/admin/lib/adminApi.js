@@ -3428,6 +3428,8 @@ export async function createOrganization(payload) {
 export async function isOrgSlugAvailable(slug) {
   const clean = (slug || '').trim().toLowerCase();
   if (!clean) return false;
+  // Paths the site already uses (src/main.jsx).
+  if (['admin', 'mockup', 'staff', 'vendor-support'].includes(clean) || clean.startsWith('support')) return false;
   const { data, error } = await supabase
     .from('organizations').select('id').eq('slug', clean).maybeSingle();
   if (error) return true; // don't block creation on a check that failed

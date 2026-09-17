@@ -1,0 +1,16 @@
+{
+  "name": "PackPerks Staff",
+  "short_name": "PP Staff",
+  "description": "Make cup QR codes for your customers.",
+  "id": "/staff",
+  "start_url": "/staff",
+  "scope": "/staff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4EBDC",
+  "theme_color": "#F4EBDC",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

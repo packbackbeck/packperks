@@ -183,3 +183,84 @@ export function daysUntil(iso) {
   if (!Number.isFinite(t)) return null;
   return Math.max(0, Math.ceil((t - Date.now()) / 86400000));
 }
+
+/* ── PackPerks Staff (migration 050) ───────────────────────────────── */
+
+export async function listStaff() {
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const [members, codes] = await Promise.all([
+    supabase.from('staff_members')
+      .select('id, org_id, email, name, avatar_url, status, auth_user_id, created_at, activated_at, last_seen_at')
+      .order('created_at'),
+    supabase.from('staff_qr_codes')
+      .select('staff_id, cups, cancelled_at')
+      .gte('created_at', since),
+  ]);
+  if (members.error) throw members.error;
+  const stats = {};
+  for (const c of codes.data || []) {
+    if (c.cancelled_at || !c.staff_id) continue;
+    const s = (stats[c.staff_id] ||= { codes: 0, cups: 0 });
+    s.codes += 1;
+    s.cups += c.cups;
+  }
+  return (members.data || []).map(m => ({ ...m, last30: stats[m.id] || { codes: 0, cups: 0 } }));
+}
+
+export async function setOrgStaffApp(org, on) {
+  const { error } = await supabase.from('organizations')
+    .update({ staff_app_enabled: on, updated_at: new Date().toISOString() })
+    .eq('id', org.id);
+  if (error) throw error;
+  logAction({
+    action: on ? 'staff.app_on' : 'staff.app_off',
+    targetType: 'organization',
+    targetId: org.id,
+    metadata: { org_name: org.name },
+  });
+}
+
+/* Adds people to a venue's staff list and emails them how to sign up. */
+export async function inviteStaff(orgId, emails) {
+  const { data, error } = await supabase.functions.invoke('staff-app', {
+    body: { action: 'admin_invite', org_id: orgId, emails },
+  });
+  if (error) {
+    let payload = null;
+    try { payload = await error.context?.json?.(); } catch { /* not json */ }
+    const code = payload?.error;
+    throw new Error(
+      code === 'app_off' ? 'Switch the staff app on for this venue first.'
+        : code === 'insufficient_role' ? 'Only a master can add staff.'
+          : code === 'rate_limited' ? 'Too many invitations this hour. Try again later.'
+            : code === 'too_many' ? 'Add at most 20 emails at a time.'
+              : payload?.detail || error.message,
+    );
+  }
+  return data?.results || [];
+}
+
+export async function setStaffStatus(member, status) {
+  const { error } = await supabase.from('staff_members')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', member.id);
+  if (error) throw error;
+  logAction({
+    action: status === 'blocked' ? 'staff.pause' : 'staff.resume',
+    targetType: 'staff_member',
+    targetId: member.id,
+    metadata: { email: member.email },
+  });
+}
+
+export async function removeStaff(member) {
+  const { error } = await supabase.from('staff_members').delete().eq('id', member.id);
+  if (error) throw error;
+  logAction({
+    action: 'staff.remove',
+    targetType: 'staff_member',
+    targetId: member.id,
+    before: { email: member.email, org_id: member.org_id, status: member.status },
+    metadata: { email: member.email },
+  });
+}

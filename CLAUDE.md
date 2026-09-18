@@ -142,7 +142,9 @@ expires after 15 minutes, logged in `staff_qr_codes`; the customer claims it
 at `/<slug>/?batch=<id>` like a printed receipt. Staff never read tables
 directly: everything goes through `staff-app` with the service role. The app
 uses its own Supabase client with storage key `pp-staff-auth`, so a staff
-login never mixes with a dashboard or customer session.
+login never mixes with a dashboard or customer session. The QR is drawn by
+the `<qr-code>` web component (`@bitjson/qr-code`, MIT), whose animations
+run on the browser's Web Animations engine.
 
 `#overview?as=vendor` previews the vendor role. It can only ever *remove*
 access, so any account above vendor may use it.
@@ -306,6 +308,12 @@ in `ORG_DATA_TIME_COLUMN` (adminApi.js) together.
 before any venue lookup, so an organisation or group with such a slug would
 be unreachable. `RESERVED_SLUGS` (`src/admin/master/orgShared.js`) and
 `isOrgSlugAvailable` refuse them; add a new app path to both.
+
+**Printed batches change through one master-only function.** Revoke,
+restore and expiry in the Receipt generator call `admin_set_cup_batch`
+(migration 052); `cups` has no update policy, so a browser `update` on it
+silently changes nothing. Batches generated before 18 Sep never got the
+expiry they were given.
 
 **`cups` is readable by dashboard accounts only** (migration 051). It used to
 be readable with the public key, which let anyone list unclaimed cup ids and

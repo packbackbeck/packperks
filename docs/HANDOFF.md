@@ -74,6 +74,14 @@ itself needs a push to reach perks.packback.network.
 - **Migration `051`:** `cups` was readable with the public key (948 unclaimed
   cup ids could be listed and claimed). Only dashboard accounts can read it
   now.
+- **Redesign (18 Sep):** a calmer look (paper ground, white surfaces with
+  hairlines, one purple accent), the two controls in one surface, a single
+  status line under the square, dots instead of pills in the history. The
+  QR is the `<qr-code>` web component (`@bitjson/qr-code`): while a code is
+  made its placeholder ripples and a Border Beam (after Magic UI) runs round
+  the square, then the code grows in from the centre.
+- **Receipt generator revoke, restore and expiry work** (migration `052`,
+  `admin_set_cup_batch`, masters only). They used to save nothing.
 
 ### 1b. Dashboard redesign, second round (17 Sep, later)
 
@@ -225,10 +233,10 @@ invited through them yet: the first real invitation is the end-to-end test
 (the new person should land with exactly the role and organisations chosen
 in People).
 
-**The Receipt generator's revoke, restore and expiry buttons do nothing.**
-They update `cups` from the browser, and the table has no update policy, so
-nothing is saved and no error shows. Printed batches keep working until
-claimed. Needs a SECURITY DEFINER function.
+**Printed batches made before 18 Sep have no expiry**, whatever was picked
+when they were generated (the old code never saved it). A customer scanning
+a revoked batch that was partly claimed is told "already claimed" rather
+than "cancelled" (claim-cups only says cancelled when every cup is revoked).
 
 **The weekly digest email still uses the old cream colours**
 (`supabase/functions/send-digest`). The preview in Reports copies the email,

@@ -3061,43 +3061,65 @@ export async function getDonationCollectedTotal() {
 
 /* P-21 — QR batch ops controls. Three helpers + one list query.
  *
- * `setBatchExpiry`  attaches an expires_at timestamp to every cup in
- *                   a batch. Pass null to clear (make eternal).
- * `revokeBatch`     marks a batch as revoked, with an audit reason.
- *                   The claim-cups edge function checks revoked_at
- *                   and rejects with `batch_revoked`.
+ * `setBatchExpiry`  sets expires_at on the batch's unclaimed cups.
+ *                   Pass null to clear (never expires).
+ * `revokeBatch`     marks the batch's unclaimed cups as revoked, with a
+ *                   reason. The claim-cups edge function checks
+ *                   revoked_at and rejects with `batch_revoked`.
  * `unrevokeBatch`   reverses an accidental revoke. Useful when the
  *                   admin clicked revoke on the wrong batch.
  * `listCupBatches`  pulls a recent-first list of batches with their
- *                   cup count, activated count, expiry, revocation. */
-export async function setBatchExpiry(batchId, expiresAt) {
-  const { error } = await applyOrgFilter(
-    supabase
-      .from('cups')
-      .update({ expires_at: expiresAt })
-      .eq('batch_id', batchId)
-  );
-  if (error) throw error;
+ *                   cup count, activated count, expiry, revocation.
+ *
+ * The three writes go through admin_set_cup_batch (migration 052), which
+ * only a master may call: `cups` has no update policy, so a direct update
+ * from the browser changes nothing and reports no error. Each returns the
+ * number of cups changed and throws when nothing changed. */
+const CUP_BATCH_ERRORS = {
+  not_authorized: 'Only a master can change printed batches.',
+  batch_not_found: 'This batch no longer exists. Reload the page and try again.',
+  reason_required: 'Give a reason of at least 3 characters.',
+  reason_too_long: 'Keep the reason to 200 characters or fewer.',
+  invalid_action: 'That change can’t be made to a printed batch.',
+};
+
+const CUP_BATCH_UNCHANGED = {
+  revoke: 'Nothing changed: every cup in this batch was already claimed.',
+  expiry: 'Nothing changed: every cup in this batch was already claimed.',
+  restore: 'Nothing changed: this batch wasn’t revoked.',
+};
+
+async function setCupBatch(batchId, action, { expiresAt = null, reason = null } = {}) {
+  const { data, error } = await supabase.rpc('admin_set_cup_batch', {
+    p_batch_id: batchId,
+    p_action: action,
+    p_expires_at: expiresAt,
+    p_reason: reason,
+  });
+  if (error) {
+    // 42501 is both the function's own refusal and "permission denied"
+    // for a caller without execute (signed out).
+    const msg = error.message || '';
+    const key = error.code === '42501'
+      ? 'not_authorized'
+      : Object.keys(CUP_BATCH_ERRORS).find(k => msg.includes(k));
+    throw new Error(CUP_BATCH_ERRORS[key] || msg || 'The batch couldn’t be changed. Try again.');
+  }
+  const changed = Number(data) || 0;
+  if (changed === 0) throw new Error(CUP_BATCH_UNCHANGED[action]);
+  return changed;
 }
 
-export async function revokeBatch(batchId, reason) {
-  const { error } = await applyOrgFilter(
-    supabase
-      .from('cups')
-      .update({ revoked_at: new Date().toISOString(), revoked_reason: reason || null })
-      .eq('batch_id', batchId)
-  );
-  if (error) throw error;
+export function setBatchExpiry(batchId, expiresAt) {
+  return setCupBatch(batchId, 'expiry', { expiresAt: expiresAt || null });
 }
 
-export async function unrevokeBatch(batchId) {
-  const { error } = await applyOrgFilter(
-    supabase
-      .from('cups')
-      .update({ revoked_at: null, revoked_reason: null })
-      .eq('batch_id', batchId)
-  );
-  if (error) throw error;
+export function revokeBatch(batchId, reason) {
+  return setCupBatch(batchId, 'revoke', { reason: reason || null });
+}
+
+export function unrevokeBatch(batchId) {
+  return setCupBatch(batchId, 'restore');
 }
 
 /* DANGER: permanently delete whole QR cup batches from the server. Removes

@@ -18,7 +18,7 @@ export default function CodeSheet({ code, now, onClose, onShow, onChanged }) {
 
   const meta = STATUS_META[code.status] || STATUS_META.expired;
   const Icon = STATUS_ICON[code.status] || Clock3;
-  const left = new Date(code.expires_at).getTime() - now;
+  const left = Math.min(new Date(code.expires_at).getTime() - now, 15 * 60_000);
   const waiting = code.status === 'waiting' && left > 0;
 
   async function cancel() {

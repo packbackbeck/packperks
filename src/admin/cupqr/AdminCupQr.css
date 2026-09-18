@@ -352,6 +352,7 @@
 
 /* ── Recent batches ─────────────────────────────────────────────────── */
 .acq-batches__loading { margin: 0; padding: 22px 20px; font-size: 13px; color: var(--ui-muted); }
+.acq-batches__notice { margin: 14px 16px 4px; }
 .acq-table-wrap { overflow-x: auto; }
 .acq-table { min-width: 760px; }
 .acq-table td { vertical-align: middle; white-space: nowrap; }

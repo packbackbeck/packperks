@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, MailCheck, QrCode, UserPlus } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import logo from '../assets/images/packperks-logo.svg';
 import { errorText, signIn, staffCall } from './staffApi';
 
@@ -32,11 +32,11 @@ function PasswordInput({ value, onChange, autoComplete, id, placeholder }) {
 }
 
 const HEAD = {
-  signin: { icon: QrCode, title: 'Sign in', sub: 'Make cup QR codes for your customers.' },
-  signup: { icon: UserPlus, title: 'Create your account', sub: 'Use the email address your manager added.' },
-  'signup-code': { icon: MailCheck, title: 'Check your email', sub: null },
-  reset: { icon: KeyRound, title: 'Forgot your password?', sub: 'We send a code to your email so you can set a new one.' },
-  'reset-code': { icon: MailCheck, title: 'Set a new password', sub: null },
+  signin: { title: 'Sign in', sub: 'Make cup QR codes for your customers.' },
+  signup: { title: 'Create your account', sub: 'Use the email address your manager added.' },
+  'signup-code': { title: 'Check your email', sub: null },
+  reset: { title: 'Forgot your password?', sub: 'We send a code to your email so you can set a new one.' },
+  'reset-code': { title: 'Set a new password', sub: null },
 };
 
 export default function StaffLogin({ notice, onNoticeSeen }) {
@@ -52,7 +52,6 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
   const [resendAt, setResendAt] = useState(0);
 
   const head = HEAD[mode];
-  const HeadIcon = head.icon;
   const cleanEmail = email.trim().toLowerCase();
 
   function go(next) {
@@ -122,14 +121,14 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
 
   return (
     <div className="st-login">
-      <header className="st-login__brand">
-        <img src={logo} alt="PackPerks" className="st-login__logo" />
-        <span className="st-tag">Staff</span>
+      <header className="st-brand">
+        <img src={logo} alt="PackPerks" className="st-brand__logo" />
+        <span className="st-brand__rule" aria-hidden="true" />
+        <span className="st-brand__app">Staff</span>
       </header>
 
       <main className="st-login__card">
         <div className="st-login__head" key={mode}>
-          <span className="st-login__icon"><HeadIcon size={24} aria-hidden="true" /></span>
           <h1 className="st-login__title">{head.title}</h1>
           <p className="st-login__sub">
             {codeStep
@@ -223,7 +222,6 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
             {(mode === 'signup' || mode === 'reset') && (busy ? 'Sending…' : 'Send code')}
             {mode === 'signup-code' && (busy ? 'Creating…' : 'Create account')}
             {mode === 'reset-code' && (busy ? 'Saving…' : 'Save password')}
-            {!busy && <ArrowRight size={18} aria-hidden="true" />}
           </button>
         </form>
 

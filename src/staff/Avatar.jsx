@@ -1,4 +1,4 @@
-const COLOURS = ['#5333A5', '#FD6F46', '#1A8737', '#0B7FB8', '#C2185B', '#E8930C'];
+const COLOURS = ['#5333A5', '#2E7D4F', '#A8620F', '#2F6F9E', '#9A3D5C', '#4F5D6B'];
 
 function initials(profile) {
   const source = (profile?.name || profile?.email || '?').trim();

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
  * instead. Arrow keys work when the wheel has focus.
  * ───────────────────────────────────────────────────────────────────── */
 
-const ITEM = 36;
+const ITEM = 32;
 
 export default function CupWheel({ value, max, onChange, disabled, id }) {
   const wheel = useRef(null);

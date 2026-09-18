@@ -9,6 +9,7 @@ import { jsPDF } from 'jspdf';
 import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches, deleteCupBatches } from '../lib/adminApi';
 import { printCupReceipt, getPrinterIp, setPrinterIp, getLogoKeys, setLogoKeys } from '../lib/eposPrint';
 import { useOrg } from '../context/OrgContext';
+import { useViewRole } from '../context/ViewRole';
 import { getReceiptCopy } from './receiptCopy';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
@@ -31,6 +32,9 @@ const EXPIRY_PRESETS = [
   { id: '7d',    label: 'Expires in 7 days',   ms: 7 * 24 * 60 * 60 * 1000 },
   { id: '30d',   label: 'Expires in 30 days',  ms: 30 * 24 * 60 * 60 * 1000 },
 ];
+
+// Shown on the Revoke and Restore buttons for anyone who isn't a master.
+const MASTER_ONLY_HINT = 'Only a master can revoke or restore printed batches.';
 
 // Public app URL the QR code points to. The QR ALWAYS targets the
 // production Vercel domain — a printed receipt is scanned by a real
@@ -62,6 +66,10 @@ const PROD_URL = APP_URL;
 export default function AdminCupQr() {
   const { money } = useAdminMoney();
   const { activeOrg, activeOrgMode, activeOrgSettings } = useOrg();
+  // Revoking, restoring and dating a printed batch is master-only in the
+  // database (admin_set_cup_batch), like minting the cups.
+  const { access } = useViewRole();
+  const canChangeBatches = !!access?.isMaster;
   // Tikkie-only orgs print a receipt that pays out on scan — no app, no
   // rewards — so the wording and the payout figure both change.
   const isTikkieOnly = activeOrgMode === 'tikkie_only';
@@ -96,6 +104,7 @@ export default function AdminCupQr() {
   const [recentLoading, setRecentLoading] = useState(false);
   const [revokingId, setRevokingId] = useState(null); // batch_id being acted on
   const [revokeModal, setRevokeModal] = useState(null); // { batch_id } | null
+  const [batchNotice, setBatchNotice] = useState(null); // { ok, text } | null
   const [batchPage, setBatchPage] = useState(0); // Recent-batches pagination
   // Re-open the QR for any past batch: the receipt can be reprinted, and a
   // bin-requested session can be checked without hunting through the bin.
@@ -184,9 +193,16 @@ export default function AdminCupQr() {
       const preset = EXPIRY_PRESETS.find(p => p.id === expiryId);
       let expiresAt = null;
       if (preset?.ms) {
-        expiresAt = new Date(Date.now() + preset.ms).toISOString();
-        try { await setBatchExpiry(res.batch_id, expiresAt); }
-        catch (e) { console.error('setBatchExpiry failed (continuing):', e); }
+        const wanted = new Date(Date.now() + preset.ms).toISOString();
+        try {
+          await setBatchExpiry(res.batch_id, wanted);
+          expiresAt = wanted;
+        } catch (e) {
+          // The cups exist and the QR code works; only the expiry is
+          // missing. Say so rather than show an expiry that isn't there.
+          console.error('setBatchExpiry failed (continuing):', e);
+          setError(`The QR code was made, but it has no expiry: ${e.message} Revoke it under Recent batches if it mustn’t stay valid.`);
+        }
       }
       setBatch({
         batch_id: res.batch_id,
@@ -210,37 +226,47 @@ export default function AdminCupQr() {
     }
   }
 
+  const cupsWord = (n) => `${n} cup${n === 1 ? '' : 's'}`;
+
   async function handleRevoke(batchId, reason) {
+    const short = batchId.slice(0, 8);
     setRevokingId(batchId);
+    setBatchNotice(null);
     try {
-      await revokeBatch(batchId, reason);
+      const changed = await revokeBatch(batchId, reason);
       logAction({
         action: 'cup_batch.revoke',
         targetType: 'cup_batch',
         targetId: batchId,
-        metadata: { reason },
+        metadata: { reason, cups: changed },
       });
-      await refreshRecent();
+      setBatchNotice({ ok: true, text: `Batch ${short} revoked. ${cupsWord(changed)} can no longer be claimed.` });
     } catch (e) {
-      alert('Revoke failed: ' + e.message);
+      setBatchNotice({ ok: false, text: `Batch ${short} wasn’t revoked. ${e.message}` });
     } finally {
+      // Reload either way: a failure is often a list that is out of date.
+      await refreshRecent();
       setRevokingId(null);
     }
   }
 
   async function handleUnrevoke(batchId) {
+    const short = batchId.slice(0, 8);
     setRevokingId(batchId);
+    setBatchNotice(null);
     try {
-      await unrevokeBatch(batchId);
+      const changed = await unrevokeBatch(batchId);
       logAction({
         action: 'cup_batch.unrevoke',
         targetType: 'cup_batch',
         targetId: batchId,
+        metadata: { cups: changed },
       });
-      await refreshRecent();
+      setBatchNotice({ ok: true, text: `Batch ${short} restored. Its ${cupsWord(changed)} can be claimed again.` });
     } catch (e) {
-      alert('Un-revoke failed: ' + e.message);
+      setBatchNotice({ ok: false, text: `Batch ${short} wasn’t restored. ${e.message}` });
     } finally {
+      await refreshRecent();
       setRevokingId(null);
     }
   }
@@ -704,6 +730,15 @@ export default function AdminCupQr() {
           actions={recent.length > 0 && <Badge tone="neutral">{recent.length} batch{recent.length === 1 ? '' : 'es'}</Badge>}
         />
         <CardBody flush>
+          {batchNotice && (
+            <div
+              className={`acq-status acq-batches__notice ${batchNotice.ok ? 'acq-status--ok' : 'acq-status--err'}`}
+              role={batchNotice.ok ? 'status' : 'alert'}
+            >
+              {batchNotice.ok ? <CheckCircle2 size={16} aria-hidden="true" /> : <AlertCircle size={16} aria-hidden="true" />}
+              <span>{batchNotice.text}</span>
+            </div>
+          )}
           {recentLoading && recent.length === 0 ? (
             <p className="acq-batches__loading">Loading batches…</p>
           ) : recent.length === 0 ? (
@@ -804,8 +839,8 @@ export default function AdminCupQr() {
                               size="sm"
                               icon={RotateCcw}
                               onClick={() => handleUnrevoke(b.batch_id)}
-                              disabled={busy}
-                              title="Re-enable this batch. Customers will be able to claim it again."
+                              disabled={busy || !canChangeBatches}
+                              title={!canChangeBatches ? MASTER_ONLY_HINT : 'Re-enable this batch. Customers will be able to claim it again.'}
                             >
                               {busy ? 'Restoring…' : 'Restore'}
                             </Button>
@@ -815,8 +850,12 @@ export default function AdminCupQr() {
                               size="sm"
                               icon={Ban}
                               onClick={() => setRevokeModal({ batch_id: b.batch_id })}
-                              disabled={busy || fullyUsed}
-                              title={fullyUsed ? 'All cups in this batch have already been claimed — nothing to revoke.' : 'Mark this batch as cancelled. Any pending scans of it will fail.'}
+                              disabled={busy || fullyUsed || !canChangeBatches}
+                              title={!canChangeBatches
+                                ? MASTER_ONLY_HINT
+                                : fullyUsed
+                                  ? 'Every cup in this batch has already been claimed, so there’s nothing to revoke.'
+                                  : 'Mark this batch as cancelled. Any pending scans of it will fail.'}
                             >
                               Revoke
                             </Button>
@@ -959,6 +998,7 @@ function RevokeBatchModal({ batchId, onCancel, onConfirm }) {
           placeholder="e.g. Misprinted batch, reprinted as XYZ"
           value={reason}
           onChange={e => setReason(e.target.value)}
+          maxLength={200}
           autoFocus
         />
       </Field>

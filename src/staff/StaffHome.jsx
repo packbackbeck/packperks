@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, CupSoda, History, Package, QrCode, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 import logo from '../assets/images/packperks-logo.svg';
 import QrStage from './QrStage';
 import CupWheel from './CupWheel';
@@ -12,7 +12,7 @@ import {
 
 /* The least time the making animation plays, so a fast answer still reads
  * as something happening. */
-const MIN_MAKING_MS = 900;
+const MIN_MAKING_MS = 1100;
 const POLL_MS = 3000;
 
 const localMidnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
@@ -27,11 +27,36 @@ function useNow(active) {
   return now;
 }
 
+/* When a code stops working, by this phone's clock. A code made here
+ * counts down from the moment it arrived, so a phone clock a few seconds
+ * off the server's doesn't show 15:05. */
+const expiresAt = (code) => (code?.localExpires ?? new Date(code.expires_at).getTime());
+
 /* Tells the code's real state from the clock too, so an expired code
  * reads as expired without waiting for the server. */
 function liveStatus(code, now) {
-  if (code?.status === 'waiting' && new Date(code.expires_at).getTime() <= now) return { ...code, status: 'expired', url: code.url };
+  if (code?.status === 'waiting' && expiresAt(code) <= now) return { ...code, status: 'expired' };
   return code;
+}
+
+/* The one line under the square. */
+function StatusLine({ code, making, remaining }) {
+  let text;
+  let tone = '';
+  if (making) text = 'Making the code…';
+  else if (!code) text = 'Choose the cups, then show the code';
+  else if (code.status === 'waiting') {
+    text = <>{cupsLabel(code.cups)}<span className="st-status__sep">·</span>works for <b>{countdown(remaining)}</b></>;
+    if (remaining < 60_000) tone = ' st-status--urgent';
+  } else if (code.status === 'claimed' || code.status === 'partly_claimed') {
+    text = <>Collected at <b>{timeLabel(code.claimed_at || code.created_at)}</b></>;
+    tone = ' st-status--good';
+  } else if (code.status === 'cancelled') {
+    text = <>Cancelled at <b>{timeLabel(code.cancelled_at || code.created_at)}</b></>;
+  } else {
+    text = <>Expired at <b>{timeLabel(code.expires_at)}</b></>;
+  }
+  return <p className={`st-status${tone}`} aria-live="polite">{text}</p>;
 }
 
 export default function StaffHome({ me, userId, onMe, onSignOut }) {
@@ -53,13 +78,15 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
   const anyWaiting = current?.status === 'waiting' || (codes || []).some(c => c.status === 'waiting');
   const now = useNow(anyWaiting || !!openCode);
   const shown = liveStatus(current, now);
-  const remaining = shown ? new Date(shown.expires_at).getTime() - now : 0;
+  // `now` ticks once a second, so cap at the code's life to never show 15:01.
+  const life = (limits.code_minutes || 15) * 60_000;
+  const remaining = shown ? Math.min(expiresAt(shown) - now, life) : 0;
 
   const mergeCode = useCallback((code) => {
     if (!code) return;
     setCodes(list => (list ? list.map(c => (c.id === code.id ? code : c)) : list));
     // Keep the link on screen so a finished code fades out instead of vanishing.
-    setCurrent(c => (c && c.id === code.id ? { ...code, url: code.url || c.url } : c));
+    setCurrent(c => (c && c.id === code.id ? { ...code, url: code.url || c.url, localExpires: c.localExpires } : c));
     setOpenCode(c => (c && c.id === code.id ? code : c));
   }, []);
 
@@ -103,9 +130,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
         if (stopped) return;
         if (res.code.status !== 'waiting') {
           mergeCode(res.code);
-          if (res.code.status === 'claimed' || res.code.status === 'partly_claimed') {
-            navigator.vibrate?.([12, 60, 18]);
-          }
+          if (res.code.status === 'claimed' || res.code.status === 'partly_claimed') navigator.vibrate?.([12, 60, 18]);
         }
       } catch { /* try again on the next tick */ }
     }, POLL_MS);
@@ -122,7 +147,8 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
       const res = await staffCall('mint', { cups, package_type: pkg });
       const wait = MIN_MAKING_MS - (Date.now() - started);
       if (wait > 0) await new Promise(r => setTimeout(r, wait));
-      setCurrent(res.code);
+      const life = new Date(res.code.expires_at).getTime() - new Date(res.code.created_at).getTime();
+      setCurrent({ ...res.code, localExpires: Date.now() + life });
       setCodes(list => [res.code, ...(list || [])]);
       setToday(t => ({ codes: t.codes + 1, cups: t.cups + res.code.cups }));
       navigator.vibrate?.(10);
@@ -138,7 +164,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     if (!last) return;
     setLoadingMore(true);
     try {
-      const res = await staffCall('list', { before: last.created_at });
+      const res = await staffCall('list', { before: last.created_at, day_start: localMidnight() });
       setCodes(list => [...(list || []), ...res.codes]);
       setHasMore(res.has_more);
     } catch (e) {
@@ -161,7 +187,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     }
   }
 
-  // Group the log by day.
+  // Group the history by day.
   const groups = [];
   for (const c of (codes || []).map(c => liveStatus(c, now))) {
     const label = dayLabel(c.created_at);
@@ -174,60 +200,61 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     <div className="st-home">
       <section className="st-screen" ref={stageRef}>
         <header className="st-top">
-          <div className="st-top__brand">
-            <img src={logo} alt="PackPerks" className="st-top__logo" />
-            <span className="st-tag">Staff</span>
+          <div className="st-brand">
+            <img src={logo} alt="PackPerks" className="st-brand__logo" />
+            <span className="st-brand__rule" aria-hidden="true" />
+            <span className="st-brand__app">Staff</span>
           </div>
-          <button type="button" className="st-top__me" onClick={() => setProfileOpen(true)} aria-label="Your profile">
-            <Avatar profile={me.profile} size={38} />
+          <button type="button" className="st-me" onClick={() => setProfileOpen(true)} aria-label="Your profile">
+            <Avatar profile={me.profile} size={36} />
           </button>
         </header>
 
-        <div className="st-stage-wrap">
-          <QrStage code={shown} making={making} remainingMs={remaining} venueName={venue.name} />
-        </div>
+        <div className="st-main">
+          <p className="st-venue">{venue.name}</p>
+          <QrStage code={shown} making={making} />
+          <StatusLine code={shown} making={making} remaining={remaining} />
 
-        <div className="st-controls">
-          <div className="st-tile st-tile--wheel">
-            <div className="st-tile__side">
-              <label className="st-tile__label" htmlFor="st-cups"><CupSoda size={14} aria-hidden="true" />Cups</label>
-              <span className="st-tile__hint">Scroll, or tap to type</span>
+          <div className="st-panel">
+            <div className="st-panel__cell st-panel__cell--cups">
+              <label className="st-panel__label" htmlFor="st-cups">Cups</label>
+              <CupWheel id="st-cups" value={cups} max={limits.max_cups} onChange={setCups} disabled={making} />
             </div>
-            <CupWheel id="st-cups" value={cups} max={limits.max_cups} onChange={setCups} disabled={making} />
+            <span className="st-panel__rule" aria-hidden="true" />
+            <label className="st-panel__cell st-panel__cell--pkg">
+              <span className="st-panel__label">Package</span>
+              <span className="st-pick">
+                <span className="st-pick__value">{PACKAGE_LABEL[pkg] || pkg}</span>
+                <ChevronDown size={18} aria-hidden="true" />
+                <select value={pkg} onChange={e => setPkg(e.target.value)} disabled={making} aria-label="Package type">
+                  {limits.packages.map(p => <option key={p} value={p}>{PACKAGE_LABEL[p] || p}</option>)}
+                </select>
+              </span>
+            </label>
           </div>
-          <label className="st-tile st-tile--select">
-            <span className="st-tile__label"><Package size={14} aria-hidden="true" />Package</span>
-            <span className="st-select">
-              <select value={pkg} onChange={e => setPkg(e.target.value)} disabled={making}>
-                {limits.packages.map(p => <option key={p} value={p}>{PACKAGE_LABEL[p] || p}</option>)}
-              </select>
-              <ChevronDown size={18} aria-hidden="true" />
-            </span>
-            <span className="st-tile__hint">More package types are coming</span>
-          </label>
+
+          {error && <p className="st-alert" role="alert">{error}</p>}
+
+          <button type="button" className="st-cta" onClick={make} disabled={making}>
+            {making ? <span className="st-spin st-spin--light" aria-hidden="true" /> : null}
+            {making ? 'Making the code' : 'Show QR code'}
+          </button>
         </div>
 
-        {error && <p className="st-alert st-alert--tight" role="alert">{error}</p>}
-
-        <button type="button" className={`st-cta${making ? ' st-cta--busy' : ''}`} onClick={make} disabled={making}>
-          <span className="st-cta__shine" aria-hidden="true" />
-          {making ? <span className="st-spin st-spin--light" /> : <QrCode size={21} aria-hidden="true" />}
-          <span>{making ? 'Making code' : `Show QR code for ${cupsLabel(cups)}`}</span>
-        </button>
-
-        <span className="st-peek" aria-hidden="true"><History size={13} /> History below</span>
+        <span className="st-peek" aria-hidden="true">History</span>
       </section>
 
       <section className="st-log" aria-labelledby="st-log-title">
         <div className="st-log__head">
-          <h2 id="st-log-title" className="st-log__title">History</h2>
+          <div>
+            <h2 id="st-log-title" className="st-log__title">History</h2>
+            <p className="st-log__today">
+              Today: {today.codes} {today.codes === 1 ? 'code' : 'codes'}, {cupsLabel(today.cups)}
+            </p>
+          </div>
           <button type="button" className="st-iconbtn" onClick={loadList} aria-label="Refresh history">
             <RefreshCw size={16} aria-hidden="true" />
           </button>
-        </div>
-        <div className="st-today">
-          <div><b>{today.codes}</b><span>{today.codes === 1 ? 'code' : 'codes'} today</span></div>
-          <div><b>{today.cups}</b><span>{today.cups === 1 ? 'cup' : 'cups'} today</span></div>
         </div>
 
         {listError && <p className="st-alert" role="alert">{listError}</p>}
@@ -235,10 +262,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
           <div className="st-log__skeleton" aria-hidden="true"><i /><i /><i /></div>
         )}
         {codes && codes.length === 0 && (
-          <div className="st-empty">
-            <QrCode size={26} aria-hidden="true" />
-            <p>Codes you make show up here, with whether the customer collected them.</p>
-          </div>
+          <p className="st-empty">Codes you make show up here, with whether the customer collected them.</p>
         )}
 
         {groups.map(g => (
@@ -247,16 +271,17 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
             <ul className="st-log__list">
               {g.items.map(c => {
                 const meta = STATUS_META[c.status] || STATUS_META.expired;
-                const left = new Date(c.expires_at).getTime() - now;
+                const left = Math.min(new Date(c.expires_at).getTime() - now, life);
                 return (
                   <li key={c.id}>
                     <button type="button" className="st-row" onClick={() => setOpenCode(c)}>
-                      <span className={`st-row__icon st-tone--${meta.tone}`}><CupSoda size={18} aria-hidden="true" /></span>
+                      <span className="st-row__count">{c.cups}</span>
                       <span className="st-row__main">
                         <span className="st-row__title">{cupsLabel(c.cups)}</span>
                         <span className="st-row__sub">{timeLabel(c.created_at)} · {PACKAGE_LABEL[c.package_type] || c.package_type}</span>
                       </span>
-                      <span className={`st-pill st-tone--${meta.tone}`}>
+                      <span className={`st-state st-state--${meta.tone}`}>
+                        <i aria-hidden="true" />
                         {c.status === 'waiting' ? countdown(left) : meta.label}
                       </span>
                       <ChevronRight size={16} className="st-row__chev" aria-hidden="true" />

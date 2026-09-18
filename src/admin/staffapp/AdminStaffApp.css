@@ -1,0 +1,158 @@
+/* Programme → Staff app. Uses the dashboard tokens (ui/ui.css) and the
+ * person/table helpers from Master Settings (MasterSettings.css). */
+
+.sfa { display: flex; flex-direction: column; gap: 16px; }
+.sfa-stack { display: flex; flex-direction: column; gap: 16px; }
+
+.sfa-alert,
+.sfa-ok {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--ui-radius);
+  font-size: 13px;
+  font-weight: 500;
+}
+.sfa-alert { background: var(--ui-danger-soft); color: var(--ui-danger); }
+.sfa-ok { background: var(--ui-success-soft); color: var(--ui-success); }
+.sfa-hint { margin: -6px 0 0; color: var(--ui-muted); font-size: 12.5px; }
+.sfa-hint--flat { margin: 0; }
+
+.sfa-skeleton { display: flex; flex-direction: column; gap: 12px; }
+.sfa-skeleton i { display: block; height: 120px; border-radius: var(--ui-radius-lg); background: var(--ui-soft); }
+.sfa-skeleton i + i { height: 260px; }
+
+/* ── The big switch ────────────────────────────────────────────────── */
+.sfa-power {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
+  padding: 22px 24px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow-sm);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+.sfa-power.is-on { border-color: color-mix(in srgb, var(--ui-primary) 28%, var(--ui-border)); background: var(--ui-primary-softer); }
+.sfa-power__icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--ui-soft-2);
+  color: var(--ui-muted);
+  transition: background-color 0.2s, color 0.2s;
+}
+.sfa-power.is-on .sfa-power__icon { background: var(--ui-primary); color: var(--ui-primary-fg); }
+.sfa-power__text { min-width: 0; }
+.sfa-power__title { margin: 0; color: var(--ui-fg); font-size: 19px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.sfa-power__sub { max-width: 62ch; margin: 4px 0 0; color: var(--ui-fg-2); font-size: 13.5px; line-height: 1.5; }
+.sfa-power__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 16px 0 0;
+}
+.sfa-power__facts div { display: flex; flex-direction: column-reverse; gap: 2px; }
+.sfa-power__facts dt { color: var(--ui-muted); font-size: 11.5px; font-weight: 500; }
+.sfa-power__facts dd { margin: 0; color: var(--ui-fg); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sfa-power__switch { display: flex; align-items: center; gap: 12px; padding-top: 6px; }
+.sfa-power__state { color: var(--ui-muted); font-size: 13px; font-weight: 600; }
+.sfa-power.is-on .sfa-power__state { color: var(--ui-primary); }
+.sfa-power .ui-switch { width: 60px; height: 34px; }
+.sfa-power .ui-switch::after { top: 4px; left: 4px; width: 26px; height: 26px; }
+.sfa-power .ui-switch[aria-checked="true"]::after { transform: translateX(26px); }
+@media (max-width: 640px) {
+  .sfa-power { grid-template-columns: auto minmax(0, 1fr); padding: 18px; }
+  .sfa-power__switch { grid-column: 1 / -1; justify-content: space-between; padding: 12px 0 0; border-top: 1px solid var(--ui-border); }
+}
+
+/* ── Requests ──────────────────────────────────────────────────────── */
+.sfa-requests { display: flex; flex-direction: column; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+.sfa-request {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 30%, var(--ui-border));
+  border-radius: var(--ui-radius);
+  background: var(--ui-warning-soft);
+}
+.sfa-request__label { color: var(--ui-warning); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.sfa-request__actions { display: flex; gap: 8px; }
+.sfa-request .ms-person__email { max-width: 360px; }
+@media (max-width: 640px) {
+  .sfa-request { grid-template-columns: minmax(0, 1fr); }
+  .sfa-request__label { display: none; }
+}
+
+/* ── Tables ────────────────────────────────────────────────────────── */
+.sfa-avatar { background: var(--ui-primary); }
+.sfa-table td { vertical-align: middle; }
+.sfa-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sfa-num b { font-weight: 700; }
+.sfa-num__sub { display: block; color: var(--ui-muted); font-size: 11.5px; }
+.sfa-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.sfa-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 2px 10px 2px 3px;
+  border-radius: 999px;
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sfa-tag__dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--ui-primary);
+  color: var(--ui-primary-fg);
+  font-size: 10.5px;
+}
+.sfa-tag__dot img { width: 100%; height: 100%; object-fit: cover; }
+.sfa-tag--gone { padding: 2px 10px; background: var(--ui-soft-2); color: var(--ui-muted); }
+
+.sfa-filters { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.sfa-filters .ui-select { width: auto; min-width: 150px; max-width: 220px; }
+.sfa-more { display: flex; justify-content: center; padding: 14px; border-top: 1px solid var(--ui-border); }
+
+/* ── Preview ───────────────────────────────────────────────────────── */
+.sfa-preview { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 32px; }
+.sfa-phone {
+  flex: none;
+  width: 350px;
+  max-width: 100%;
+  padding: 10px;
+  border-radius: 46px;
+  background: #16141C;
+  box-shadow: var(--ui-shadow-lg);
+}
+.sfa-phone__screen {
+  display: block;
+  width: 100%;
+  height: 700px;
+  border: 0;
+  border-radius: 37px;
+  background: #F6F2EC;
+}
+.sfa-preview__text { flex: 1 1 280px; min-width: 0; max-width: 520px; padding-top: 8px; }
+.sfa-preview__text h3 { margin: 0 0 8px; color: var(--ui-fg); font-size: 17px; font-weight: 700; }
+.sfa-preview__text p { margin: 0 0 14px; color: var(--ui-fg-2); font-size: 13.5px; line-height: 1.6; }
+.sfa-preview__text ul { display: flex; flex-direction: column; gap: 8px; margin: 0 0 20px; padding-left: 18px; list-style: disc; color: var(--ui-fg-2); font-size: 13px; line-height: 1.55; }
+.sfa-requests:last-child { margin-bottom: 0; }
+.sfa-table th.sfa-num { text-align: right; }

@@ -2401,18 +2401,20 @@ export async function getMergeRequestDetail(reqId) {
 }
 
 /* Lightweight pending-work counts for the sidebar signal dots: claims awaiting
- * review, held cup scans, and account-merge requests. Scoped to the active org
- * (head counts only — no rows pulled). */
+ * review, held cup scans, account-merge requests and people asking for the
+ * staff app. Scoped to the active org (head counts only — no rows pulled). */
 export async function getPendingCounts() {
-  const [claimsRes, scansRes, mergesRes] = await Promise.all([
+  const [claimsRes, scansRes, mergesRes, staffRes] = await Promise.all([
     applyOrgFilter(supabase.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
     applyOrgFilter(supabase.from('cup_scans').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
     applyOrgFilter(supabase.from('merge_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+    applyOrgFilter(supabase.from('staff_members').select('id', { count: 'exact', head: true }).eq('status', 'requested')),
   ]);
   return {
     claims: claimsRes.count || 0,
     scans: scansRes.count || 0,
     merges: mergesRes.count || 0,
+    staff: staffRes.count || 0,
   };
 }
 

@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef } from 'react';
 import { defineCustomElements } from '@bitjson/qr-code';
 import { Ban, Check, Clock3 } from 'lucide-react';
 import { cupsLabel } from './staffApi';
+import { ToneContext } from './staffTheme';
 
 /* ─────────────────────────────────────────────────────────────────────
  * The square that shows the code. The QR itself is <qr-code>
@@ -19,8 +20,6 @@ if (typeof window !== 'undefined' && !window.customElements.get('qr-code')) {
   defineCustomElements(window);
 }
 
-const INK = '#1C1A17';
-const ACCENT = '#5333A5';
 const PLACEHOLDER = 'https://perks.packback.network/staff';
 
 /* Dots appear from the centre outwards, then the three corner markers
@@ -73,11 +72,9 @@ function QrCode({ contents, tone = 'ink', play }) {
     return () => { clearTimeout(first); clearInterval(loop); };
   }, [play]);
 
-  const colours = tone === 'ink'
-    ? { module: INK, ring: INK, center: ACCENT }
-    : tone === 'active'
-      ? { module: '#CDC3EC', ring: '#B9ABE6', center: '#9A86DD' }
-      : { module: '#EAE4DA', ring: '#E2DBCF', center: '#E2DBCF' };
+  // The venue's colours (staffTheme.js): ink for a real code, a tint of
+  // the accent while making one, a whisper of ink when idle.
+  const colours = useContext(ToneContext)[tone];
 
   return (
     <qr-code

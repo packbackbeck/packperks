@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import logo from '../assets/images/packperks-logo.svg';
 import { errorText, signIn, staffCall } from './staffApi';
+import VenuePicker from './VenuePicker';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Sign in with email and password. A code by email is used only to create
  * the account and to set a new password.
  *   signin → (create) signup → signup-code → signed in
+ *                            → venue → signup-code   (not on a list yet:
+ *                              ask to join; approved on the dashboard)
  *          → (forgot) reset → reset-code → signin
  * ───────────────────────────────────────────────────────────────────── */
 
@@ -33,7 +36,8 @@ function PasswordInput({ value, onChange, autoComplete, id, placeholder }) {
 
 const HEAD = {
   signin: { title: 'Sign in', sub: 'Make cup QR codes for your customers.' },
-  signup: { title: 'Create your account', sub: 'Use the email address your manager added.' },
+  signup: { title: 'Create your account', sub: 'Use your work email address.' },
+  venue: { title: 'Where do you work?', sub: null },
   'signup-code': { title: 'Check your email', sub: null },
   reset: { title: 'Forgot your password?', sub: 'We send a code to your email so you can set a new one.' },
   'reset-code': { title: 'Set a new password', sub: null },
@@ -49,6 +53,10 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
   const [venue, setVenue] = useState(null);
+  const [venues, setVenues] = useState([]);
+  const [trusted, setTrusted] = useState(false);
+  const [orgId, setOrgId] = useState(null);
+  const [request, setRequest] = useState(false);
   const [resendAt, setResendAt] = useState(0);
 
   const head = HEAD[mode];
@@ -76,8 +84,28 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
       run(() => signIn(cleanEmail, password));
     } else if (mode === 'signup') {
       run(async () => {
-        const res = await staffCall('signup_request', { email: cleanEmail });
+        try {
+          const res = await staffCall('signup_request', { email: cleanEmail });
+          setOrgId(null);
+          setRequest(false);
+          setVenue(res.venue || null);
+          setResendAt(Date.now() + 60_000);
+          setMode('signup-code');
+        } catch (e) {
+          if (e.code !== 'not_on_list') throw e;
+          const list = e.data.venues || [];
+          if (!list.length) throw Object.assign(new Error('no_venues'), { code: 'no_venues' });
+          setVenues(list);
+          setTrusted(!!e.data.trusted);
+          setOrgId(list.length === 1 ? list[0].id : null);
+          setMode('venue');
+        }
+      });
+    } else if (mode === 'venue') {
+      run(async () => {
+        const res = await staffCall('signup_request', { email: cleanEmail, org_id: orgId, name });
         setVenue(res.venue || null);
+        setRequest(!!res.request);
         setResendAt(Date.now() + 60_000);
         setMode('signup-code');
       });
@@ -111,7 +139,10 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
       return;
     }
     run(async () => {
-      await staffCall(mode === 'signup-code' ? 'signup_request' : 'reset_request', { email: cleanEmail });
+      await staffCall(
+        mode === 'signup-code' ? 'signup_request' : 'reset_request',
+        { email: cleanEmail, ...(mode === 'signup-code' && orgId ? { org_id: orgId, name } : {}) },
+      );
       setResendAt(Date.now() + 60_000);
       setInfo('A new code is on its way.');
     });
@@ -133,14 +164,18 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
           <p className="st-login__sub">
             {codeStep
               ? <>We sent a 6-digit code to <b>{cleanEmail}</b>{mode === 'signup-code' && venue ? <> for <b>{venue}</b></> : null}.</>
-              : head.sub}
+              : mode === 'venue'
+                ? (trusted
+                  ? <>PackBack addresses get access straight away. Pick the venue you work at.</>
+                  : <><b>{cleanEmail}</b> is not on a staff list yet. Pick your venue and we ask the people who run it to let you in.</>)
+                : head.sub}
           </p>
         </div>
 
         {notice && mode === 'signin' && <p className="st-alert" role="alert">{notice}</p>}
 
         <form className="st-form" onSubmit={submit} noValidate={false}>
-          {!codeStep && (
+          {!codeStep && mode !== 'venue' && (
             <label className="st-field">
               <span className="st-field__label">Email</span>
               <input
@@ -155,6 +190,23 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
                 required
               />
             </label>
+          )}
+
+          {mode === 'venue' && (
+            <>
+              <VenuePicker venues={venues} value={orgId} onChange={setOrgId} disabled={busy} />
+              <label className="st-field">
+                <span className="st-field__label">Your name</span>
+                <input
+                  className="st-input"
+                  autoComplete="name"
+                  placeholder="So they know who is asking"
+                  value={name}
+                  maxLength={60}
+                  onChange={e => setName(e.target.value)}
+                />
+              </label>
+            </>
           )}
 
           {codeStep && (
@@ -175,7 +227,7 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
             </label>
           )}
 
-          {mode === 'signup-code' && (
+          {mode === 'signup-code' && !orgId && (
             <label className="st-field">
               <span className="st-field__label">Your name</span>
               <input
@@ -211,16 +263,19 @@ export default function StaffLogin({ notice, onNoticeSeen }) {
 
           {error && <p className="st-alert" role="alert">{error}</p>}
           {info && !error && <p className="st-note" role="status">{info}</p>}
+          {mode === 'signup-code' && request && !info && !error && (
+            <p className="st-hint">After this, someone at {venue || 'your venue'} approves your account. We email you when it is ready.</p>
+          )}
 
           <button
             type="submit"
             className="st-btn st-btn--primary st-btn--big"
-            disabled={busy || (codeStep && (code.length !== 6 || password.length < 8))}
+            disabled={busy || (codeStep && (code.length !== 6 || password.length < 8)) || (mode === 'venue' && !orgId)}
           >
             {busy ? <span className="st-spin st-spin--light" /> : null}
             {mode === 'signin' && (busy ? 'Signing in…' : 'Sign in')}
-            {(mode === 'signup' || mode === 'reset') && (busy ? 'Sending…' : 'Send code')}
-            {mode === 'signup-code' && (busy ? 'Creating…' : 'Create account')}
+            {(mode === 'signup' || mode === 'reset' || mode === 'venue') && (busy ? 'Sending…' : 'Send code')}
+            {mode === 'signup-code' && (busy ? 'Creating…' : request ? 'Create account and ask' : 'Create account')}
             {mode === 'reset-code' && (busy ? 'Saving…' : 'Save password')}
           </button>
         </form>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 import logo from '../assets/images/packperks-logo.svg';
 import QrStage from './QrStage';
@@ -6,6 +6,7 @@ import CupWheel from './CupWheel';
 import CodeSheet from './CodeSheet';
 import ProfileSheet from './ProfileSheet';
 import Avatar from './Avatar';
+import { demoCalls } from './demoCalls';
 import {
   countdown, cupsLabel, dayLabel, errorText, PACKAGE_LABEL, staffCall, STATUS_META, timeLabel,
 } from './staffApi';
@@ -59,11 +60,16 @@ function StatusLine({ code, making, remaining }) {
   return <p className={`st-status${tone}`} aria-live="polite">{text}</p>;
 }
 
-export default function StaffHome({ me, userId, onMe, onSignOut }) {
+export default function StaffHome({ me, userId, onMe, onSignOut, demo = false }) {
   const { venue, limits } = me;
+  // The dashboard's preview answers locally (demoCalls.js).
+  const call = useMemo(() => (demo ? demoCalls(venue) : staffCall), [demo, venue]);
   const [cups, setCups] = useState(1);
   const [pkg, setPkg] = useState(limits.packages[0] || 'cup');
   const [making, setMaking] = useState(false);
+  // Set when the cups or package are touched. A code still on screen keeps
+  // the button off until then, so one tap can't make a second code by mistake.
+  const [touched, setTouched] = useState(false);
   const [current, setCurrent] = useState(null);
   const [error, setError] = useState(null);
   const [codes, setCodes] = useState(null);
@@ -82,6 +88,10 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
   const life = (limits.code_minutes || 15) * 60_000;
   const remaining = shown ? Math.min(expiresAt(shown) - now, life) : 0;
 
+  const locked = !touched && shown?.status === 'waiting' && remaining > 0;
+  const touch = () => setTouched(true);
+  const pickCups = (n) => { setCups(n); setTouched(true); };
+
   const mergeCode = useCallback((code) => {
     if (!code) return;
     setCodes(list => (list ? list.map(c => (c.id === code.id ? code : c)) : list));
@@ -92,7 +102,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
 
   const loadList = useCallback(async () => {
     try {
-      const res = await staffCall('list', { day_start: localMidnight() });
+      const res = await call('list', { day_start: localMidnight() });
       setCodes(res.codes);
       setToday(res.today);
       setHasMore(res.has_more);
@@ -100,11 +110,11 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     } catch (e) {
       setListError(errorText(e));
     }
-  }, []);
+  }, [call]);
 
   useEffect(() => {
     let alive = true;
-    staffCall('list', { day_start: localMidnight() })
+    call('list', { day_start: localMidnight() })
       .then(res => {
         if (!alive) return;
         setCodes(res.codes);
@@ -115,7 +125,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     const onVisible = () => { if (document.visibilityState === 'visible') loadList(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => { alive = false; document.removeEventListener('visibilitychange', onVisible); };
-  }, [loadList]);
+  }, [call, loadList]);
 
   /* While a code is on screen and not collected yet, ask every few seconds
    * whether it has been scanned. */
@@ -126,7 +136,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     const t = setInterval(async () => {
       if (document.visibilityState !== 'visible') return;
       try {
-        const res = await staffCall('status', { id: currentId });
+        const res = await call('status', { id: currentId });
         if (stopped) return;
         if (res.code.status !== 'waiting') {
           mergeCode(res.code);
@@ -135,7 +145,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
       } catch { /* try again on the next tick */ }
     }, POLL_MS);
     return () => { stopped = true; clearInterval(t); };
-  }, [currentId, mergeCode]);
+  }, [call, currentId, mergeCode]);
 
   async function make() {
     if (making) return;
@@ -144,11 +154,12 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     setCurrent(null);
     const started = Date.now();
     try {
-      const res = await staffCall('mint', { cups, package_type: pkg });
+      const res = await call('mint', { cups, package_type: pkg });
       const wait = MIN_MAKING_MS - (Date.now() - started);
       if (wait > 0) await new Promise(r => setTimeout(r, wait));
       const life = new Date(res.code.expires_at).getTime() - new Date(res.code.created_at).getTime();
       setCurrent({ ...res.code, localExpires: Date.now() + life });
+      setTouched(false);
       setCodes(list => [res.code, ...(list || [])]);
       setToday(t => ({ codes: t.codes + 1, cups: t.cups + res.code.cups }));
       navigator.vibrate?.(10);
@@ -164,7 +175,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
     if (!last) return;
     setLoadingMore(true);
     try {
-      const res = await staffCall('list', { before: last.created_at, day_start: localMidnight() });
+      const res = await call('list', { before: last.created_at, day_start: localMidnight() });
       setCodes(list => [...(list || []), ...res.codes]);
       setHasMore(res.has_more);
     } catch (e) {
@@ -177,6 +188,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
   function showAgain(code) {
     setOpenCode(null);
     setCurrent(code);
+    setTouched(false);
     stageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -205,28 +217,30 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
             <span className="st-brand__rule" aria-hidden="true" />
             <span className="st-brand__app">Staff</span>
           </div>
-          <button type="button" className="st-me" onClick={() => setProfileOpen(true)} aria-label="Your profile">
+          <button type="button" className="st-me" onClick={() => !demo && setProfileOpen(true)} aria-label="Your profile">
             <Avatar profile={me.profile} size={36} />
           </button>
         </header>
 
         <div className="st-main">
-          <p className="st-venue">{venue.name}</p>
+          {venue.logo_url
+            ? <img className="st-venue-logo" src={venue.logo_url} alt={venue.name} />
+            : <p className="st-venue">{venue.name}</p>}
           <QrStage code={shown} making={making} />
           <StatusLine code={shown} making={making} remaining={remaining} />
 
           <div className="st-panel">
-            <div className="st-panel__cell st-panel__cell--cups">
+            <div className="st-panel__cell st-panel__cell--cups" onPointerDown={touch}>
               <label className="st-panel__label" htmlFor="st-cups">Cups</label>
-              <CupWheel id="st-cups" value={cups} max={limits.max_cups} onChange={setCups} disabled={making} />
+              <CupWheel id="st-cups" value={cups} max={limits.max_cups} onChange={pickCups} disabled={making} />
             </div>
             <span className="st-panel__rule" aria-hidden="true" />
-            <label className="st-panel__cell st-panel__cell--pkg">
+            <label className="st-panel__cell st-panel__cell--pkg" onPointerDown={touch}>
               <span className="st-panel__label">Package</span>
               <span className="st-pick">
                 <span className="st-pick__value">{PACKAGE_LABEL[pkg] || pkg}</span>
                 <ChevronDown size={18} aria-hidden="true" />
-                <select value={pkg} onChange={e => setPkg(e.target.value)} disabled={making} aria-label="Package type">
+                <select value={pkg} onChange={e => { setPkg(e.target.value); touch(); }} disabled={making} aria-label="Package type">
                   {limits.packages.map(p => <option key={p} value={p}>{PACKAGE_LABEL[p] || p}</option>)}
                 </select>
               </span>
@@ -235,10 +249,17 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
 
           {error && <p className="st-alert" role="alert">{error}</p>}
 
-          <button type="button" className="st-cta" onClick={make} disabled={making}>
+          <button
+            type="button"
+            className={`st-cta${locked && !making ? ' st-cta--locked' : ''}`}
+            onClick={make}
+            disabled={making || locked}
+            aria-describedby={locked ? 'st-cta-hint' : undefined}
+          >
             {making ? <span className="st-spin st-spin--light" aria-hidden="true" /> : null}
             {making ? 'Making the code' : 'Show QR code'}
           </button>
+          {locked && <span id="st-cta-hint" className="st-sr">Change the cups or package to make a new code</span>}
         </div>
 
         <span className="st-peek" aria-hidden="true">History</span>
@@ -307,6 +328,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut }) {
           onClose={() => setOpenCode(null)}
           onShow={showAgain}
           onChanged={onCodeChanged}
+          call={call}
         />
       )}
       <ProfileSheet

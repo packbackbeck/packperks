@@ -130,10 +130,20 @@ workspace tabs. Which tab a role may change, and which organisations it sees,
 is enforced by the dashboard (see *Org isolation* under Landmines).
 
 **PackPerks Staff** (`src/staff/`, `supabase/functions/staff-app`,
-migration 050). A phone app at `/staff`, on for an organisation only when
-`organizations.staff_app_enabled` is set (NYU Abu Dhabi first). Masters add
-staff emails in Master Settings → Staff app (`staff_members`, one venue per
-email); only those emails can sign up. Staff sign in with email and password;
+migrations 050, 053, 055). A phone app at `/staff`, on for an organisation
+only when `organizations.staff_app_enabled` is set (NYU Abu Dhabi first).
+Each venue runs it from Programme → Staff app (`src/admin/staffapp/`, tab
+`staffapp`): the on/off switch, accounts, a log of every code tagged with who
+made it, and a preview (`/staff?preview=<orgId>`: sample data, nothing
+minted). Staff are added by email there (`staff_members`, one venue per
+email), or ask for access from the app: they pick a venue, the row waits as
+`status = 'requested'`, and anyone who can *view* the tab approves it
+(masters, managers, vendors). `@packback.network` addresses skip the wait.
+Changing the switch or adding people needs *edit* on the tab; the function
+checks the role and the venue itself (`adminCtx`), because the dashboard's
+tab rules are not in the database. The app wears the venue's customer-app
+colours (`settings.design.colors` of `published:<orgId>`, mapped in
+`src/staff/staffTheme.js`) and shows its logo. Staff sign in with email and password;
 the function emails its own 6-digit codes (Brevo) for sign-up, password reset
 and email change, and sets the password on an existing login with the same
 email (a customer or dashboard account) rather than making a second one. A
@@ -160,6 +170,7 @@ access, so any account above vendor may use it.
 | `src/lib/RegionContext.jsx` | `useRegion()`, `useMoney()` for the customer app |
 | `src/admin/lib/adminApi.js` | every admin query; ~5k lines |
 | `src/staff/` | PackPerks Staff: login, the QR screen, history, profile |
+| `src/admin/staffapp/` | Programme → Staff app: switch, accounts and requests, logs, preview |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
 | `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |

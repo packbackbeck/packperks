@@ -10,7 +10,7 @@ const STATUS_ICON = { waiting: Timer, claimed: Check, partly_claimed: Check, exp
 /* One code from the log: when it was made, whether it was collected,
  * how many cups and what kind of package. A waiting code can be shown
  * again or cancelled. */
-export default function CodeSheet({ code, now, onClose, onShow, onChanged }) {
+export default function CodeSheet({ code, now, onClose, onShow, onChanged, call = staffCall }) {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState(null);
@@ -25,7 +25,7 @@ export default function CodeSheet({ code, now, onClose, onShow, onChanged }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await staffCall('cancel', { id: code.id });
+      const res = await call('cancel', { id: code.id });
       onChanged?.(res.code);
       setConfirming(false);
     } catch (e) {

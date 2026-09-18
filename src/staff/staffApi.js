@@ -20,11 +20,12 @@ export const staffSupabase = createClient(URL, KEY, {
 });
 
 export class StaffError extends Error {
-  constructor(code, detail, status) {
+  constructor(code, detail, status, data) {
     super(code);
     this.code = code;
     this.detail = detail;
     this.status = status;
+    this.data = data || {};
   }
 }
 
@@ -45,7 +46,7 @@ export async function staffCall(action, body = {}) {
     throw new StaffError('offline');
   }
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new StaffError(json.error || 'server_error', json.detail, res.status);
+  if (!res.ok) throw new StaffError(json.error || 'server_error', json.detail, res.status, json);
   return json;
 }
 
@@ -104,11 +105,13 @@ const MESSAGES = {
   bad_login: 'That email and password do not match.',
   sign_in_failed: 'Signing in did not work. Try again.',
   invalid_email: 'Enter a valid email address.',
-  not_on_list: 'This email is not on a staff list yet. Ask your manager to add it.',
+  not_on_list: 'This email is not on a staff list yet. Pick your venue to ask for access.',
+  pending_approval: 'Your request is waiting for approval. Sign in to check on it.',
+  no_venues: 'No venue runs the staff app right now.',
   blocked: 'This staff account is paused. Ask your manager.',
   already_signed_up: 'This email already has an account. Sign in instead.',
-  app_off: 'The staff app is not switched on for your venue.',
-  not_staff: 'This login is not a staff account. Ask your manager to add your email.',
+  app_off: 'The staff app is not switched on for this venue.',
+  not_staff: 'This login is not a staff account yet.',
   rate_limited: 'Too many tries. Wait a few minutes and try again.',
   code_invalid: 'That code is not right. Check the email and try again.',
   code_expired: 'That code has expired. Send a new one.',

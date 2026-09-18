@@ -1,19 +1,26 @@
 // ──────────────────────────────────────────────────────────────────────────
-// PackPerks: staff-app Edge Function (v1)
+// PackPerks: staff-app Edge Function (v3)
 //
-// Everything the PackPerks Staff web app (/staff) does, plus the one master
-// action that invites staff from the dashboard. Migration 050 has the tables.
+// Everything the PackPerks Staff web app (/staff) does, plus the dashboard's
+// Staff app page. Migrations 050 and 053 have the tables.
 //
 // Body: { action, ...fields }
 //
 // Without a login:
-//   signup_request  { email }                          emails a 6-digit code
+//   signup_request  { email, org_id?, name? }          emails a 6-digit code
+//                   An email on no staff list gets `not_on_list` with the
+//                   venues that run the app; asked again with org_id, it is
+//                   a request to join that venue.
 //   signup_verify   { email, code, password, name? }   creates or links the login
 //   reset_request   { email }                          emails a code (always "ok")
 //   reset_verify    { email, code, password }          sets a new password
+//   preview         { org_id }                         venue, colours, limits
+//
+// Signed in, not yet staff:
+//   join            { org_id }           asks to join a venue with this login
 //
 // Signed in as staff (Authorization: Bearer <jwt>):
-//   me                                   profile, venue and limits
+//   me                                   profile, venue, colours and limits
 //   mint            { cups, package_type }  a cup batch and its QR link
 //   list            { before?, day_start? }  this person's codes, newest first
 //   status          { id }               one code, for the live QR screen
@@ -22,8 +29,18 @@
 //   email_request   { new_email }        emails a code to the new address
 //   email_verify    { code }             switches the login to that address
 //
-// Signed in as a master:
-//   admin_invite    { org_id, emails[] } adds staff and emails them
+// Signed in to the dashboard, for one venue (the Staff app tab):
+//   admin_state     { org_id, before? }  switch, staff with totals, requests, log
+//   admin_approve   { org_id, id }       view access is enough
+//   admin_decline   { org_id, id }       view access is enough
+//   admin_toggle    { org_id, enabled }  edit access
+//   admin_invite    { org_id, emails[] } edit access
+//   admin_status    { org_id, id, status }  edit access (active | blocked)
+//   admin_remove    { org_id, id }       edit access
+//   admin_resend    { org_id, id }       edit access
+//
+// Requests wait for approval, except PackBack's own addresses
+// (TRUSTED_DOMAIN), which are active at once.
 //
 // A staff QR code is a normal cup batch (`cups` rows sharing a batch_id,
 // source admin_batch), so the customer app claims it through claim-cups
@@ -33,7 +50,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") ?? "noreply@packback.network";
 const BREVO_SENDER_NAME = Deno.env.get("BREVO_SENDER_NAME") ?? "PackPerks";
@@ -58,16 +74,18 @@ const CUPS_PER_DAY = 400;            // per staff member, rolling 24 hours
 const EMAIL_CODE_TTL_MIN = 10;
 const EMAIL_CODE_ATTEMPTS = 5;
 const PASSWORD_MIN = 8;
+const TRUSTED_DOMAIN = "packback.network"; // joins without approval
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const STAFF_COLS = "id, org_id, email, name, avatar_url, auth_user_id, status, created_at, activated_at";
+const STAFF_COLS = "id, org_id, email, name, avatar_url, auth_user_id, status, created_at, activated_at, requested_at, approved_at, last_seen_at";
 const ORG_COLS = "id, name, slug, logo_url, brand_color, country, staff_app_enabled, deleted_at";
 
 type Json = Record<string, unknown>;
 type Staff = {
   id: string; org_id: string; email: string; name: string | null; avatar_url: string | null;
   auth_user_id: string | null; status: string; created_at: string; activated_at: string | null;
+  requested_at: string | null; approved_at: string | null; last_seen_at: string | null;
 };
 type Org = {
   id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null;
@@ -80,7 +98,8 @@ function json(body: unknown, status = 200) {
     headers: { ...CORS_HEADERS, "content-type": "application/json" },
   });
 }
-const fail = (error: string, status: number, detail?: string) => json({ error, ...(detail ? { detail } : {}) }, status);
+const fail = (error: string, status: number, detail?: string, extra?: Json) =>
+  json({ error, ...(detail ? { detail } : {}), ...(extra || {}) }, status);
 
 function clientIp(req: Request): string {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
@@ -89,6 +108,7 @@ function bearer(req: Request): string {
   return (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
 }
 const normEmail = (v: unknown) => String(v ?? "").trim().toLowerCase();
+const trusted = (email: string) => email.endsWith(`@${TRUSTED_DOMAIN}`);
 
 async function rateLimit(key: string, windowSecs: number, maxCalls: number): Promise<boolean> {
   const { data: count, error } = await supabase.rpc("check_rate_limit", {
@@ -158,13 +178,21 @@ const CODE_COPY: Record<string, { lead: string; subject: string }> = {
   email_change: { lead: "Here is your code to use this email address for PackPerks Staff", subject: "is your PackPerks Staff email code" },
 };
 
-async function sendCode(purpose: string, email: string, staffId: string, venue: string): Promise<boolean> {
+/* Who a code belongs to: an existing staff row, or (a request to join)
+ * the venue and name the person asked with. */
+type CodeOwner = { staffId: string | null; orgId?: string | null; name?: string | null };
+
+async function sendCode(purpose: string, email: string, owner: CodeOwner, venue: string): Promise<boolean> {
   const code = sixDigits();
-  await supabase.from("staff_email_codes").delete().eq("purpose", purpose).eq("staff_id", staffId);
+  let clear = supabase.from("staff_email_codes").delete().eq("purpose", purpose);
+  clear = owner.staffId ? clear.eq("staff_id", owner.staffId) : clear.eq("email", email).is("staff_id", null);
+  await clear;
   const { data: row, error } = await supabase.from("staff_email_codes").insert({
     purpose,
     email,
-    staff_id: staffId,
+    staff_id: owner.staffId,
+    org_id: owner.orgId ?? null,
+    name: owner.name ?? null,
     code_hash: await sha256Hex(`${purpose}:${email}:${code}`),
     expires_at: new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60_000).toISOString(),
   }).select("id").single();
@@ -181,30 +209,35 @@ async function sendCode(purpose: string, email: string, staffId: string, venue: 
   return sent;
 }
 
-/* Checks a code and uses it up. Returns an error code, or null when valid. */
-async function useCode(purpose: string, staffId: string, email: string | null, code: string): Promise<string | null> {
-  if (!/^\d{6}$/.test(code)) return "code_invalid";
+type CodeRowOut = { email: string; org_id: string | null; name: string | null };
+
+/* Checks a code and uses it up. Returns an error code, or the code's row. */
+async function useCode(
+  purpose: string, staffId: string | null, email: string | null, code: string,
+): Promise<{ error: string } | { row: CodeRowOut }> {
+  if (!/^\d{6}$/.test(code)) return { error: "code_invalid" };
   let q = supabase.from("staff_email_codes")
-    .select("id, email, code_hash, attempts, expires_at")
-    .eq("purpose", purpose).eq("staff_id", staffId);
+    .select("id, email, org_id, name, code_hash, attempts, expires_at")
+    .eq("purpose", purpose);
+  q = staffId ? q.eq("staff_id", staffId) : q.is("staff_id", null);
   if (email) q = q.eq("email", email);
   const { data: row } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (!row) return "code_invalid";
+  if (!row) return { error: "code_invalid" };
   if (new Date(row.expires_at).getTime() <= Date.now()) {
     await supabase.from("staff_email_codes").delete().eq("id", row.id);
-    return "code_expired";
+    return { error: "code_expired" };
   }
   if (row.attempts >= EMAIL_CODE_ATTEMPTS) {
     await supabase.from("staff_email_codes").delete().eq("id", row.id);
-    return "too_many_attempts";
+    return { error: "too_many_attempts" };
   }
   const hash = await sha256Hex(`${purpose}:${row.email}:${code}`);
   if (!sameHex(hash, row.code_hash)) {
     await supabase.from("staff_email_codes").update({ attempts: row.attempts + 1 }).eq("id", row.id);
-    return row.attempts + 1 >= EMAIL_CODE_ATTEMPTS ? "too_many_attempts" : "code_invalid";
+    return { error: row.attempts + 1 >= EMAIL_CODE_ATTEMPTS ? "too_many_attempts" : "code_invalid" };
   }
   await supabase.from("staff_email_codes").delete().eq("id", row.id);
-  return null;
+  return { row: { email: row.email, org_id: row.org_id, name: row.name } };
 }
 
 // ── Lookups ─────────────────────────────────────────────────────────────
@@ -218,7 +251,35 @@ async function orgById(id: string): Promise<Org | null> {
 }
 const appOn = (org: Org | null) => !!org && !org.deleted_at && org.staff_app_enabled;
 
-function profileOut(staff: Staff, org: Org) {
+/* Venues that run the app, for someone asking to join one. */
+async function openVenues() {
+  const { data } = await supabase.from("organizations")
+    .select("id, name, logo_url")
+    .eq("staff_app_enabled", true).is("deleted_at", null)
+    .order("name");
+  return (data || []) as { id: string; name: string; logo_url: string | null }[];
+}
+
+/* The venue's customer-app colours (App design), so the staff app matches. */
+const COLOUR_KEYS = ["primary", "accent", "accentDeep", "background", "surface", "text", "textMuted", "success"];
+async function designFor(orgId: string) {
+  const { data } = await supabase.from("app_config").select("value").eq("key", `published:${orgId}`).maybeSingle();
+  const raw = (data?.value as Json | undefined)?.settings as Json | undefined;
+  const colours = ((raw?.design as Json | undefined)?.colors || {}) as Record<string, unknown>;
+  const out: Record<string, string> = {};
+  for (const k of COLOUR_KEYS) {
+    const v = colours[k];
+    if (typeof v === "string" && /^#[0-9a-f]{3,8}$/i.test(v.trim())) out[k] = v.trim();
+  }
+  return { colors: out };
+}
+
+const venueOut = (org: Org) => ({
+  id: org.id, name: org.name, slug: org.slug, logo_url: org.logo_url, brand_color: org.brand_color, country: org.country,
+});
+const LIMITS = { max_cups: MAX_CUPS, packages: PACKAGES, code_minutes: CODE_TTL_MIN };
+
+function profileOut(staff: Staff, org: Org, design?: unknown) {
   return {
     profile: {
       id: staff.id,
@@ -227,13 +288,16 @@ function profileOut(staff: Staff, org: Org) {
       avatar_url: staff.avatar_url,
       since: staff.activated_at || staff.created_at,
     },
-    venue: { id: org.id, name: org.name, slug: org.slug, logo_url: org.logo_url, brand_color: org.brand_color, country: org.country },
-    limits: { max_cups: MAX_CUPS, packages: PACKAGES, code_minutes: CODE_TTL_MIN },
+    venue: venueOut(org),
+    ...(design ? { design } : {}),
+    limits: LIMITS,
   };
 }
 
+type Ctx = { userId: string; staff: Staff; org: Org };
+
 /* The signed-in staff member, or an error response. */
-async function authStaff(req: Request): Promise<{ userId: string; staff: Staff; org: Org } | Response> {
+async function authStaff(req: Request): Promise<Ctx | Response> {
   const jwt = bearer(req);
   if (!jwt) return fail("missing_token", 401);
   const { data: { user }, error } = await supabase.auth.getUser(jwt);
@@ -248,7 +312,7 @@ async function authStaff(req: Request): Promise<{ userId: string; staff: Staff; 
   // customer or dashboard account) is linked on its first sign-in.
   if (!staff && user.email && user.email_confirmed_at) {
     const invited = await staffByEmail(normEmail(user.email));
-    if (invited && !invited.auth_user_id && invited.status !== "blocked") {
+    if (invited && !invited.auth_user_id && invited.status === "invited") {
       const now = new Date().toISOString();
       const { data } = await supabase.from("staff_members")
         .update({ auth_user_id: user.id, status: "active", activated_at: invited.activated_at || now, updated_at: now })
@@ -257,10 +321,23 @@ async function authStaff(req: Request): Promise<{ userId: string; staff: Staff; 
       staff = (data as Staff) || null;
     }
   }
-  if (!staff) return fail("not_staff", 403);
+  if (!staff) {
+    // A confirmed login can ask to join a venue from the app.
+    const email = normEmail(user.email);
+    return fail("not_staff", 403, undefined, {
+      venues: user.email_confirmed_at ? await openVenues() : [],
+      trusted: trusted(email),
+      email,
+    });
+  }
   if (staff.status === "blocked") return fail("blocked", 403);
   const org = await orgById(staff.org_id);
   if (!appOn(org)) return fail("app_off", 403);
+  if (staff.status === "requested") {
+    return fail("pending_approval", 403, undefined, {
+      venue: venueOut(org!), design: await designFor(org!.id), email: staff.email, requested_at: staff.requested_at,
+    });
+  }
   return { userId: user.id, staff, org: org! };
 }
 
@@ -320,15 +397,77 @@ async function signupRequest(req: Request, body: Json) {
   const email = normEmail(body.email);
   if (!EMAIL_RE.test(email)) return fail("invalid_email", 400);
   if (!await rateLimit(`staff-code:ip:${clientIp(req)}`, 3600, 20)) return fail("rate_limited", 429);
-  if (!await rateLimit(`staff-code:signup:${email}`, 900, 3)) return fail("rate_limited", 429);
   const staff = await staffByEmail(email);
-  if (!staff) return fail("not_on_list", 404);
+
+  // Not on a list: offer the venues that run the app, then take a request.
+  if (!staff) {
+    const venues = await openVenues();
+    const orgId = String(body.org_id || "");
+    if (!orgId) return fail("not_on_list", 404, undefined, { venues, trusted: trusted(email) });
+    const venue = venues.find((v) => v.id === orgId);
+    if (!venue) return fail("app_off", 403);
+    const name = String(body.name ?? "").trim().slice(0, 60) || null;
+    if (!await rateLimit(`staff-code:signup:${email}`, 900, 3)) return fail("rate_limited", 429);
+    if (!await sendCode("signup", email, { staffId: null, orgId, name }, venue.name)) return fail("email_failed", 502);
+    return json({ ok: true, venue: venue.name, request: !trusted(email) });
+  }
+
   if (staff.status === "blocked") return fail("blocked", 403);
+  if (staff.status === "requested") return fail("pending_approval", 409);
   if (staff.auth_user_id && staff.status === "active") return fail("already_signed_up", 409);
   const org = await orgById(staff.org_id);
   if (!appOn(org)) return fail("app_off", 403);
-  if (!await sendCode("signup", email, staff.id, org!.name)) return fail("email_failed", 502);
-  return json({ ok: true, venue: org!.name });
+  if (!await rateLimit(`staff-code:signup:${email}`, 900, 3)) return fail("rate_limited", 429);
+  if (!await sendCode("signup", email, { staffId: staff.id }, org!.name)) return fail("email_failed", 502);
+  return json({ ok: true, venue: org!.name, request: false });
+}
+
+/* The login for an email: an existing one (a customer or dashboard account
+ * keeps it, with the new password) or a new one. */
+async function loginFor(email: string, password: string, name: string, staffId: string | null) {
+  const { data: existingId } = await supabase.rpc("staff_auth_user_id", { p_email: email });
+  let authId = existingId as string | null;
+  if (authId) {
+    const { data: taken } = await supabase.from("staff_members").select("id").eq("auth_user_id", authId).maybeSingle();
+    if (taken && taken.id !== staffId) return { error: fail("email_taken", 409) };
+    const { error } = await supabase.auth.admin.updateUserById(authId, { password, email_confirm: true });
+    if (error) return { error: fail("auth_failed", 500, error.message) };
+  } else {
+    const { data, error } = await supabase.auth.admin.createUser({
+      email, password, email_confirm: true, user_metadata: name ? { name } : {},
+    });
+    if (error || !data?.user) return { error: fail("auth_failed", 500, error?.message) };
+    authId = data.user.id;
+  }
+  return { authId: authId!, existing: !!existingId };
+}
+
+/* A new staff row for someone who asked to join: active straight away for
+ * PackBack addresses, otherwise waiting for approval. */
+async function addMember(org: Org, email: string, authId: string, name: string | null) {
+  const now = new Date().toISOString();
+  const active = trusted(email);
+  const { data, error } = await supabase.from("staff_members").insert({
+    org_id: org.id,
+    email,
+    name,
+    auth_user_id: authId,
+    status: active ? "active" : "requested",
+    requested_at: now,
+    activated_at: active ? now : null,
+    approved_at: active ? now : null,
+  }).select(STAFF_COLS).single();
+  if (error) return { error: fail(error.code === "23505" ? "email_taken" : "db_error", error.code === "23505" ? 409 : 500, error.message) };
+  await supabase.from("admin_action_log").insert({
+    actor_id: null,
+    actor_email: email,
+    org_id: org.id,
+    action: active ? "staff.joined" : "staff.request",
+    target_type: "staff_member",
+    target_id: (data as Staff).id,
+    after_state: { email, name, status: (data as Staff).status },
+  });
+  return { staff: data as Staff };
 }
 
 async function signupVerify(req: Request, body: Json) {
@@ -340,40 +479,59 @@ async function signupVerify(req: Request, body: Json) {
   if (password.length < PASSWORD_MIN || password.length > 72) return fail("weak_password", 400);
   if (!await rateLimit(`staff-verify:ip:${clientIp(req)}`, 3600, 40)) return fail("rate_limited", 429);
   const staff = await staffByEmail(email);
-  if (!staff) return fail("not_on_list", 404);
+
+  // A request to join: the code carries the venue.
+  if (!staff) {
+    const used = await useCode("signup", null, email, code);
+    if ("error" in used) return fail(used.error, 400);
+    const org = used.row.org_id ? await orgById(used.row.org_id) : null;
+    if (!appOn(org)) return fail("app_off", 403);
+    const login = await loginFor(email, password, name, null);
+    if ("error" in login) return login.error;
+    const added = await addMember(org!, email, login.authId, name || used.row.name || null);
+    if ("error" in added) return added.error;
+    return json({ ok: true, existing_login: login.existing, pending: added.staff.status === "requested" });
+  }
+
   if (staff.status === "blocked") return fail("blocked", 403);
+  if (staff.status === "requested") return fail("pending_approval", 409);
   if (staff.auth_user_id && staff.status === "active") return fail("already_signed_up", 409);
   const org = await orgById(staff.org_id);
   if (!appOn(org)) return fail("app_off", 403);
-  const codeErr = await useCode("signup", staff.id, email, code);
-  if (codeErr) return fail(codeErr, 400);
+  const used = await useCode("signup", staff.id, email, code);
+  if ("error" in used) return fail(used.error, 400);
 
-  // Someone who already has a PackPerks login (a customer, or a dashboard
-  // account) keeps it: the new password is set on that login.
-  const { data: existingId } = await supabase.rpc("staff_auth_user_id", { p_email: email });
-  let authId = existingId as string | null;
-  if (authId) {
-    const { data: taken } = await supabase.from("staff_members").select("id").eq("auth_user_id", authId).maybeSingle();
-    if (taken && taken.id !== staff.id) return fail("email_taken", 409);
-    const { error } = await supabase.auth.admin.updateUserById(authId, { password, email_confirm: true });
-    if (error) return fail("auth_failed", 500, error.message);
-  } else {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email, password, email_confirm: true, user_metadata: name ? { name } : {},
-    });
-    if (error || !data?.user) return fail("auth_failed", 500, error?.message);
-    authId = data.user.id;
-  }
+  const login = await loginFor(email, password, name, staff.id);
+  if ("error" in login) return login.error;
   const now = new Date().toISOString();
   const { error: upErr } = await supabase.from("staff_members").update({
-    auth_user_id: authId,
+    auth_user_id: login.authId,
     status: "active",
     activated_at: staff.activated_at || now,
     name: name || staff.name,
     updated_at: now,
   }).eq("id", staff.id);
   if (upErr) return fail("db_error", 500, upErr.message);
-  return json({ ok: true, existing_login: !!existingId });
+  return json({ ok: true, existing_login: login.existing, pending: false });
+}
+
+/* A signed-in login that is not staff anywhere asks to join a venue. */
+async function join(req: Request, body: Json) {
+  const jwt = bearer(req);
+  if (!jwt) return fail("missing_token", 401);
+  const { data: { user }, error } = await supabase.auth.getUser(jwt);
+  if (error || !user) return fail("invalid_token", 401);
+  const email = normEmail(user.email);
+  if (!email || !user.email_confirmed_at) return fail("not_staff", 403);
+  if (!await rateLimit(`staff-join:${user.id}`, 3600, 10)) return fail("rate_limited", 429);
+  const { data: mine } = await supabase.from("staff_members").select("id").eq("auth_user_id", user.id).maybeSingle();
+  if (mine || await staffByEmail(email)) return fail("already_signed_up", 409);
+  const org = await orgById(String(body.org_id || ""));
+  if (!appOn(org)) return fail("app_off", 403);
+  const name = String(user.user_metadata?.name || user.user_metadata?.full_name || "").trim().slice(0, 60) || null;
+  const added = await addMember(org!, email, user.id, name);
+  if ("error" in added) return added.error;
+  return json({ ok: true, pending: added.staff.status === "requested" });
 }
 
 async function resetRequest(req: Request, body: Json) {
@@ -385,7 +543,7 @@ async function resetRequest(req: Request, body: Json) {
   // The answer is the same whether or not the address has an account.
   if (staff && staff.auth_user_id && staff.status === "active") {
     const org = await orgById(staff.org_id);
-    if (appOn(org) && !await sendCode("reset", email, staff.id, org!.name)) return fail("email_failed", 502);
+    if (appOn(org) && !await sendCode("reset", email, { staffId: staff.id }, org!.name)) return fail("email_failed", 502);
   }
   return json({ ok: true });
 }
@@ -399,14 +557,14 @@ async function resetVerify(req: Request, body: Json) {
   if (!await rateLimit(`staff-verify:ip:${clientIp(req)}`, 3600, 40)) return fail("rate_limited", 429);
   const staff = await staffByEmail(email);
   if (!staff || !staff.auth_user_id || staff.status !== "active") return fail("code_invalid", 400);
-  const codeErr = await useCode("reset", staff.id, email, code);
-  if (codeErr) return fail(codeErr, 400);
+  const used = await useCode("reset", staff.id, email, code);
+  if ("error" in used) return fail(used.error, 400);
   const { error } = await supabase.auth.admin.updateUserById(staff.auth_user_id, { password });
   if (error) return fail("auth_failed", 500, error.message);
   return json({ ok: true });
 }
 
-async function mint(ctx: { userId: string; staff: Staff; org: Org }, body: Json) {
+async function mint(ctx: Ctx, body: Json) {
   const { staff, org, userId } = ctx;
   const cups = Number(body.cups);
   const packageType = String(body.package_type || "cup");
@@ -453,7 +611,7 @@ async function mint(ctx: { userId: string; staff: Staff; org: Org }, body: Json)
   return json({ code });
 }
 
-async function list(ctx: { staff: Staff; org: Org }, body: Json) {
+async function list(ctx: Ctx, body: Json) {
   let q = supabase.from("staff_qr_codes")
     .select("batch_id, cups, package_type, created_at, expires_at, cancelled_at")
     .eq("staff_id", ctx.staff.id)
@@ -479,7 +637,7 @@ async function list(ctx: { staff: Staff; org: Org }, body: Json) {
   });
 }
 
-async function oneCode(ctx: { staff: Staff; org: Org }, id: string) {
+async function oneCode(ctx: Ctx, id: string) {
   if (!UUID_RE.test(id)) return null;
   const { data } = await supabase.from("staff_qr_codes")
     .select("batch_id, cups, package_type, created_at, expires_at, cancelled_at")
@@ -489,7 +647,7 @@ async function oneCode(ctx: { staff: Staff; org: Org }, id: string) {
   return code;
 }
 
-async function cancel(ctx: { userId: string; staff: Staff; org: Org }, body: Json) {
+async function cancel(ctx: Ctx, body: Json) {
   const code = await oneCode(ctx, String(body.id || ""));
   if (!code) return fail("not_found", 404);
   if (code.status !== "waiting") return json({ code });
@@ -501,7 +659,7 @@ async function cancel(ctx: { userId: string; staff: Staff; org: Org }, body: Jso
   return json({ code: await oneCode(ctx, code.id) });
 }
 
-async function updateProfile(ctx: { userId: string; staff: Staff; org: Org }, body: Json) {
+async function updateProfile(ctx: Ctx, body: Json) {
   const patch: Json = { updated_at: new Date().toISOString() };
   if ("name" in body) {
     const name = String(body.name ?? "").trim().slice(0, 60);
@@ -516,10 +674,10 @@ async function updateProfile(ctx: { userId: string; staff: Staff; org: Org }, bo
   const { data, error } = await supabase.from("staff_members")
     .update(patch).eq("id", ctx.staff.id).select(STAFF_COLS).single();
   if (error) return fail("db_error", 500, error.message);
-  return json(profileOut(data as Staff, ctx.org));
+  return json(profileOut(data as Staff, ctx.org, await designFor(ctx.org.id)));
 }
 
-async function emailRequest(req: Request, ctx: { userId: string; staff: Staff; org: Org }, body: Json) {
+async function emailRequest(req: Request, ctx: Ctx, body: Json) {
   const next = normEmail(body.new_email);
   if (!EMAIL_RE.test(next)) return fail("invalid_email", 400);
   if (next === ctx.staff.email) return fail("same_email", 400);
@@ -527,19 +685,19 @@ async function emailRequest(req: Request, ctx: { userId: string; staff: Staff; o
   if (await staffByEmail(next)) return fail("email_taken", 409);
   const { data: owner } = await supabase.rpc("staff_auth_user_id", { p_email: next });
   if (owner && owner !== ctx.userId) return fail("email_taken", 409);
-  if (!await sendCode("email_change", next, ctx.staff.id, ctx.org.name)) return fail("email_failed", 502);
+  if (!await sendCode("email_change", next, { staffId: ctx.staff.id }, ctx.org.name)) return fail("email_failed", 502);
   return json({ ok: true });
 }
 
-async function emailVerify(ctx: { userId: string; staff: Staff; org: Org }, body: Json) {
+async function emailVerify(ctx: Ctx, body: Json) {
   const code = String(body.code ?? "").trim();
   const { data: pending } = await supabase.from("staff_email_codes")
     .select("email").eq("purpose", "email_change").eq("staff_id", ctx.staff.id)
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!pending) return fail("code_invalid", 400);
   const next = pending.email as string;
-  const codeErr = await useCode("email_change", ctx.staff.id, next, code);
-  if (codeErr) return fail(codeErr, 400);
+  const used = await useCode("email_change", ctx.staff.id, next, code);
+  if ("error" in used) return fail(used.error, 400);
   if (await staffByEmail(next)) return fail("email_taken", 409);
   const { data: owner } = await supabase.rpc("staff_auth_user_id", { p_email: next });
   if (owner && owner !== ctx.userId) return fail("email_taken", 409);
@@ -549,26 +707,188 @@ async function emailVerify(ctx: { userId: string; staff: Staff; org: Org }, body
     .update({ email: next, updated_at: new Date().toISOString() })
     .eq("id", ctx.staff.id).select(STAFF_COLS).single();
   if (upErr) return fail("db_error", 500, upErr.message);
-  return json(profileOut(data as Staff, ctx.org));
+  return json(profileOut(data as Staff, ctx.org, await designFor(ctx.org.id)));
 }
 
-async function adminInvite(req: Request, body: Json) {
+// ── Dashboard: the Staff app page ───────────────────────────────────────
+type AdminCtx = { userId: string; email: string; level: string; access: "view" | "edit"; org: Org; req: Request };
+
+const LEGACY_LEVEL: Record<string, string> = { owner: "master", admin: "master", manager: "manager", checker: "manager", vendor: "vendor" };
+
+/* A dashboard account that can see this venue's Staff app page, and whether
+ * it can change it (the `staffapp` tab of its role). */
+async function adminCtx(req: Request, body: Json): Promise<AdminCtx | Response> {
   const jwt = bearer(req);
   if (!jwt) return fail("missing_token", 401);
   const { data: { user }, error } = await supabase.auth.getUser(jwt);
   if (error || !user) return fail("invalid_token", 401);
-  const caller = createClient(SUPABASE_URL, ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-  });
-  const { data: isMaster } = await caller.rpc("is_master");
-  if (isMaster !== true) return fail("insufficient_role", 403);
-  if (!await rateLimit(`staff-invite:${user.id}`, 3600, 60)) return fail("rate_limited", 429);
+  const { data: p } = await supabase.from("admin_profiles")
+    .select("id, email, role, status, access_role, org_id, org_ids, all_orgs")
+    .eq("id", user.id).eq("status", "active").maybeSingle();
+  if (!p) return fail("insufficient_role", 403);
+
+  let level = LEGACY_LEVEL[p.role as string] || "vendor";
+  let tabs: Record<string, string> = {};
+  if (p.access_role) {
+    const { data: role } = await supabase.from("admin_roles").select("level, tabs").eq("key", p.access_role).maybeSingle();
+    if (role) { level = role.level; tabs = (role.tabs || {}) as Record<string, string>; }
+  }
 
   const orgId = String(body.org_id || "");
   if (!UUID_RE.test(orgId)) return fail("invalid_org", 400);
   const org = await orgById(orgId);
   if (!org || org.deleted_at) return fail("invalid_org", 400);
+  const sees = level === "master" || p.all_orgs ||
+    (!p.access_role && !p.org_id && ["manager", "checker"].includes(p.role)) ||
+    (p.org_ids || []).includes(orgId) || p.org_id === orgId;
+  if (!sees) return fail("insufficient_role", 403);
+
+  let access: string;
+  if (level === "master") access = "edit";
+  else if (tabs.staffapp) access = tabs.staffapp;
+  else if (level === "manager") access = p.role === "checker" || tabs.settings === "view" ? "view" : "edit";
+  else access = "view";
+  if (access !== "view" && access !== "edit") return fail("insufficient_role", 403);
+  return { userId: user.id, email: normEmail(user.email), level, access: access as "view" | "edit", org, req };
+}
+
+async function adminLog(ctx: AdminCtx, action: string, targetId: string | null, before: unknown, after: unknown) {
+  const ip = clientIp(ctx.req);
+  const { error } = await supabase.from("admin_action_log").insert({
+    actor_id: ctx.userId,
+    actor_email: ctx.email,
+    org_id: ctx.org.id,
+    action,
+    target_type: targetId ? "staff_member" : "organization",
+    target_id: targetId || ctx.org.id,
+    before_state: before ?? null,
+    after_state: after ?? null,
+    ip: ip === "unknown" ? null : ip,
+    user_agent: ctx.req.headers.get("user-agent") || null,
+  });
+  if (error) console.error("[staff-app] admin log failed:", error.message);
+}
+
+const staffOut = (s: Staff) => ({
+  id: s.id, email: s.email, name: s.name, avatar_url: s.avatar_url, status: s.status,
+  created_at: s.created_at, requested_at: s.requested_at, activated_at: s.activated_at,
+  approved_at: s.approved_at, last_seen_at: s.last_seen_at, signed_up: s.status === "active" || s.status === "blocked",
+});
+
+async function adminState(ctx: AdminCtx, body: Json) {
+  const { org } = ctx;
+  const { data: members } = await supabase.from("staff_members").select(STAFF_COLS)
+    .eq("org_id", org.id).order("created_at", { ascending: false });
+  const staff = (members || []) as Staff[];
+
+  // Totals per person: every code they made that was not cancelled.
+  const month = Date.now() - 30 * 86400_000;
+  const totals = new Map<string, { codes: number; cups: number; codes30: number; cups30: number; last: string | null }>();
+  const { data: made } = await supabase.from("staff_qr_codes")
+    .select("staff_id, cups, created_at").eq("org_id", org.id).is("cancelled_at", null).limit(20000);
+  for (const r of made || []) {
+    if (!r.staff_id) continue;
+    const t = totals.get(r.staff_id) || { codes: 0, cups: 0, codes30: 0, cups30: 0, last: null };
+    t.codes += 1; t.cups += r.cups;
+    if (Date.parse(r.created_at) >= month) { t.codes30 += 1; t.cups30 += r.cups; }
+    if (!t.last || r.created_at > t.last) t.last = r.created_at;
+    totals.set(r.staff_id, t);
+  }
+
+  // The log: codes made at this venue, newest first, with who made them.
+  let q = supabase.from("staff_qr_codes")
+    .select("batch_id, staff_id, cups, package_type, created_at, expires_at, cancelled_at")
+    .eq("org_id", org.id).order("created_at", { ascending: false }).limit(100);
+  if (body.before && !Number.isNaN(Date.parse(String(body.before)))) q = q.lt("created_at", String(body.before));
+  const { data: rows } = await q;
+  const codes = await describe((rows || []) as CodeRow[], org);
+  const who = new Map(staff.map((s) => [s.id, s]));
+  const log = codes.map((c, i) => {
+    const s = who.get((rows as { staff_id: string | null }[])[i].staff_id || "");
+    return { ...c, url: undefined, staff: s ? { id: s.id, name: s.name, email: s.email, avatar_url: s.avatar_url } : null };
+  });
+
+  return json({
+    org: { id: org.id, name: org.name, slug: org.slug, logo_url: org.logo_url, enabled: !!org.staff_app_enabled },
+    can_edit: ctx.access === "edit",
+    staff: staff.map((s) => ({
+      ...staffOut(s),
+      totals: totals.get(s.id) || { codes: 0, cups: 0, codes30: 0, cups30: 0, last: null },
+    })),
+    log,
+    has_more: (rows || []).length === 100,
+    limits: LIMITS,
+  });
+}
+
+async function memberOf(ctx: AdminCtx, id: unknown): Promise<Staff | null> {
+  if (!UUID_RE.test(String(id || ""))) return null;
+  const { data } = await supabase.from("staff_members").select(STAFF_COLS)
+    .eq("id", String(id)).eq("org_id", ctx.org.id).maybeSingle();
+  return (data as Staff) || null;
+}
+
+function inviteEmail(org: Org, email: string) {
+  const link = `${APP_BASE}/staff`;
+  const html = emailShell(
+    `<p style="margin:0 0 12px;font-size:20px;font-weight:800">You can now make cup QR codes for ${esc(org.name)}</p>` +
+    `<p style="margin:0 0 20px;color:#3F3A34">PackPerks Staff turns returned cups into a QR code your customers scan to collect them. Create your account with this email address: <b>${esc(email)}</b></p>` +
+    `<p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#5333A5;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:14px">Open PackPerks Staff</a></p>` +
+    `<p style="margin:0;color:#6C6259;font-size:13px">Choose Create account, enter your email and we send you a code. Tip: add the page to your home screen.</p>`,
+  );
+  const text = `You can now make cup QR codes for ${org.name} with PackPerks Staff.\n\nOpen ${link}, choose Create account and use this email address: ${email}`;
+  return sendEmail(email, `Your PackPerks Staff access for ${org.name}`, html, text);
+}
+
+function approvedEmail(org: Org, email: string) {
+  const link = `${APP_BASE}/staff`;
+  const html = emailShell(
+    `<p style="margin:0 0 12px;font-size:20px;font-weight:800">You're in at ${esc(org.name)}</p>` +
+    `<p style="margin:0 0 20px;color:#3F3A34">Your staff account was approved. Sign in with <b>${esc(email)}</b> and the password you chose to start making cup QR codes.</p>` +
+    `<p style="margin:0"><a href="${link}" style="display:inline-block;background:#5333A5;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:14px">Open PackPerks Staff</a></p>`,
+  );
+  const text = `Your PackPerks Staff account for ${org.name} was approved. Sign in at ${link} with ${email} and the password you chose.`;
+  return sendEmail(email, `You're approved for PackPerks Staff at ${org.name}`, html, text);
+}
+
+async function adminApprove(ctx: AdminCtx, body: Json) {
+  const s = await memberOf(ctx, body.id);
+  if (!s) return fail("not_found", 404);
+  if (s.status !== "requested") return fail("not_requested", 409);
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from("staff_members")
+    .update({ status: "active", approved_by: ctx.userId, approved_at: now, activated_at: s.activated_at || now, updated_at: now })
+    .eq("id", s.id).eq("status", "requested").select(STAFF_COLS).single();
+  if (error) return fail("db_error", 500, error.message);
+  const emailed = await approvedEmail(ctx.org, s.email);
+  await adminLog(ctx, "staff.approve", s.id, { status: s.status }, { email: s.email, status: "active", emailed });
+  return json({ member: staffOut(data as Staff), emailed });
+}
+
+async function adminDecline(ctx: AdminCtx, body: Json) {
+  const s = await memberOf(ctx, body.id);
+  if (!s) return fail("not_found", 404);
+  if (s.status !== "requested") return fail("not_requested", 409);
+  // The login stays (it may also be a customer or dashboard account); only
+  // the request goes, so the person can ask again.
+  const { error } = await supabase.from("staff_members").delete().eq("id", s.id).eq("status", "requested");
+  if (error) return fail("db_error", 500, error.message);
+  await adminLog(ctx, "staff.decline", s.id, { email: s.email, status: s.status }, null);
+  return json({ ok: true });
+}
+
+async function adminToggle(ctx: AdminCtx, body: Json) {
+  const enabled = body.enabled === true;
+  const { error } = await supabase.from("organizations").update({ staff_app_enabled: enabled }).eq("id", ctx.org.id);
+  if (error) return fail("db_error", 500, error.message);
+  await adminLog(ctx, enabled ? "staff.app_on" : "staff.app_off", null,
+    { staff_app_enabled: ctx.org.staff_app_enabled }, { staff_app_enabled: enabled });
+  return json({ enabled });
+}
+
+async function adminInvite(ctx: AdminCtx, body: Json) {
+  const { org } = ctx;
+  if (!await rateLimit(`staff-invite:${ctx.userId}`, 3600, 60)) return fail("rate_limited", 429);
   if (!org.staff_app_enabled) return fail("app_off", 409);
 
   const emails = [...new Set((Array.isArray(body.emails) ? body.emails : []).map(normEmail).filter(Boolean))];
@@ -582,34 +902,78 @@ async function adminInvite(req: Request, body: Json) {
     if (existing && existing.org_id !== org.id) { results.push({ email, result: "other_venue" }); continue; }
     if (existing?.status === "active") { results.push({ email, result: "already_active" }); continue; }
     if (existing?.status === "blocked") { results.push({ email, result: "blocked" }); continue; }
+    // Adding someone who already asked approves them.
+    if (existing?.status === "requested") {
+      const now = new Date().toISOString();
+      await supabase.from("staff_members")
+        .update({ status: "active", approved_by: ctx.userId, approved_at: now, activated_at: now, updated_at: now })
+        .eq("id", existing.id);
+      const sent = await approvedEmail(org, email);
+      results.push({ email, result: sent ? "approved" : "approved_email_failed" });
+      continue;
+    }
     if (!existing) {
-      const { error: insErr } = await supabase.from("staff_members").insert({ org_id: org.id, email, invited_by: user.id });
+      const { error: insErr } = await supabase.from("staff_members").insert({ org_id: org.id, email, invited_by: ctx.userId });
       if (insErr) { results.push({ email, result: "failed" }); continue; }
     }
-    const link = `${APP_BASE}/staff`;
-    const html = emailShell(
-      `<p style="margin:0 0 12px;font-size:20px;font-weight:800">You can now make cup QR codes for ${esc(org.name)}</p>` +
-      `<p style="margin:0 0 20px;color:#3F3A34">PackPerks Staff turns returned cups into a QR code your customers scan to collect them. Create your account with this email address: <b>${esc(email)}</b></p>` +
-      `<p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#5333A5;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:14px">Open PackPerks Staff</a></p>` +
-      `<p style="margin:0;color:#6C6259;font-size:13px">Choose Create account, enter your email and we send you a code. Tip: add the page to your home screen.</p>`,
-    );
-    const text = `You can now make cup QR codes for ${org.name} with PackPerks Staff.\n\nOpen ${link}, choose Create account and use this email address: ${email}`;
-    const sent = await sendEmail(email, `Your PackPerks Staff access for ${org.name}`, html, text);
+    const sent = await inviteEmail(org, email);
     results.push({ email, result: existing ? (sent ? "reminded" : "email_failed") : (sent ? "invited" : "added_email_failed") });
   }
-
-  await supabase.from("admin_action_log").insert({
-    actor_id: user.id,
-    actor_email: user.email,
-    org_id: org.id,
-    action: "staff.invite",
-    target_type: "organization",
-    target_id: org.id,
-    after_state: { results },
-    ip: clientIp(req) === "unknown" ? null : clientIp(req),
-    user_agent: req.headers.get("user-agent") || null,
-  });
+  await adminLog(ctx, "staff.invite", null, null, { results });
   return json({ results });
+}
+
+async function adminStatus(ctx: AdminCtx, body: Json) {
+  const s = await memberOf(ctx, body.id);
+  if (!s) return fail("not_found", 404);
+  const want = String(body.status || "");
+  if (want !== "active" && want !== "blocked") return fail("invalid_status", 400);
+  if (s.status === "requested") return fail("not_approved", 409);
+  // Unpausing someone who never signed up puts them back on the invite list.
+  const status = want === "blocked" ? "blocked" : s.auth_user_id ? "active" : "invited";
+  const { data, error } = await supabase.from("staff_members")
+    .update({ status, updated_at: new Date().toISOString() }).eq("id", s.id).select(STAFF_COLS).single();
+  if (error) return fail("db_error", 500, error.message);
+  await adminLog(ctx, want === "blocked" ? "staff.block" : "staff.unblock", s.id, { status: s.status }, { email: s.email, status });
+  return json({ member: staffOut(data as Staff) });
+}
+
+async function adminRemove(ctx: AdminCtx, body: Json) {
+  const s = await memberOf(ctx, body.id);
+  if (!s) return fail("not_found", 404);
+  const { error } = await supabase.from("staff_members").delete().eq("id", s.id);
+  if (error) return fail("db_error", 500, error.message);
+  await adminLog(ctx, "staff.remove", s.id, { email: s.email, status: s.status }, null);
+  return json({ ok: true });
+}
+
+async function adminResend(ctx: AdminCtx, body: Json) {
+  const s = await memberOf(ctx, body.id);
+  if (!s) return fail("not_found", 404);
+  if (s.status !== "invited") return fail("not_invited", 409);
+  if (!ctx.org.staff_app_enabled) return fail("app_off", 409);
+  if (!await rateLimit(`staff-invite:${ctx.userId}`, 3600, 60)) return fail("rate_limited", 429);
+  const sent = await inviteEmail(ctx.org, s.email);
+  if (!sent) return fail("email_failed", 502);
+  await adminLog(ctx, "staff.invite", s.id, null, { results: [{ email: s.email, result: "reminded" }] });
+  return json({ ok: true });
+}
+
+const ADMIN: Record<string, { edit: boolean; run: (ctx: AdminCtx, body: Json) => Promise<Response> }> = {
+  admin_state: { edit: false, run: adminState },
+  admin_approve: { edit: false, run: adminApprove },
+  admin_decline: { edit: false, run: adminDecline },
+  admin_toggle: { edit: true, run: adminToggle },
+  admin_invite: { edit: true, run: adminInvite },
+  admin_status: { edit: true, run: adminStatus },
+  admin_remove: { edit: true, run: adminRemove },
+  admin_resend: { edit: true, run: adminResend },
+};
+
+async function preview(body: Json) {
+  const org = await orgById(String(body.org_id || ""));
+  if (!org || org.deleted_at) return fail("invalid_org", 404);
+  return json({ venue: venueOut(org), design: await designFor(org.id), limits: LIMITS, enabled: !!org.staff_app_enabled });
 }
 
 // ── Router ──────────────────────────────────────────────────────────────
@@ -626,7 +990,16 @@ Deno.serve(async (req) => {
       case "signup_verify": return await signupVerify(req, body);
       case "reset_request": return await resetRequest(req, body);
       case "reset_verify": return await resetVerify(req, body);
-      case "admin_invite": return await adminInvite(req, body);
+      case "preview": return await preview(body);
+      case "join": return await join(req, body);
+    }
+
+    const admin = ADMIN[action];
+    if (admin) {
+      const actx = await adminCtx(req, body);
+      if (actx instanceof Response) return actx;
+      if (admin.edit && actx.access !== "edit") return fail("insufficient_role", 403);
+      return await admin.run(actx, body);
     }
 
     const ctx = await authStaff(req);
@@ -634,7 +1007,7 @@ Deno.serve(async (req) => {
     switch (action) {
       case "me": {
         await supabase.from("staff_members").update({ last_seen_at: new Date().toISOString() }).eq("id", ctx.staff.id);
-        return json(profileOut(ctx.staff, ctx.org));
+        return json(profileOut(ctx.staff, ctx.org, await designFor(ctx.org.id)));
       }
       case "mint": return await mint(ctx, body);
       case "list": return await list(ctx, body);

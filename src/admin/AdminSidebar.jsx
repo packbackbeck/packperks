@@ -23,9 +23,9 @@ const GROUP_SCOPED = new Set(['users', 'futurevendors']);
 export default function AdminSidebar({ tabs, activePage, onNavigate, onAddOrg, collapsed, onToggleCollapsed, canManageOrgs, roleLabel }) {
   const { activeOrgId, activeGroup } = useOrg();
 
-  // Work waiting in a queue: claims to review, scans on hold, merges to
-  // approve. Refreshed on org switch and when the page changes.
-  const [pending, setPending] = useState({ claims: 0, scans: 0, merges: 0 });
+  // Work waiting in a queue: claims to review, scans on hold, merges and
+  // staff app requests to approve. Refreshed on org switch and page change.
+  const [pending, setPending] = useState({ claims: 0, scans: 0, merges: 0, staff: 0 });
   useEffect(() => {
     let alive = true;
     getPendingCounts().then(c => { if (alive) setPending(c); }).catch(() => {});

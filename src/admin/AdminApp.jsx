@@ -32,6 +32,7 @@ import AdminSupport from './support/AdminSupport';
 import AdminDonations from './donations/AdminDonations';
 import AdminByoRequests from './byorequests/AdminByoRequests';
 import AdminFutureVendors from './futurevendors/AdminFutureVendors';
+import AdminStaffApp from './staffapp/AdminStaffApp';
 import AdminAppDesign from './appdesign/AdminAppDesign';
 import AdminTikkieLog from './tikkielog/AdminTikkieLog';
 import AdminBackupCups from './backupcups/AdminBackupCups';
@@ -291,6 +292,9 @@ function AdminShell() {
                   </KeepAlive>
                   <KeepAlive id="cupscans" activeId={page} visited={visited}>
                     <AdminCupScans onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="staffapp" activeId={page} visited={visited}>
+                    <AdminStaffApp />
                   </KeepAlive>
                   <KeepAlive id="cupqr" activeId={page} visited={visited}>
                     <AdminReceiptGenerator onNavigate={setPage} />

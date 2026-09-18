@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, DatabaseZap, History, KeyRound, LayoutGrid, ShieldCheck, Smartphone, Users } from 'lucide-react';
+import { Building2, DatabaseZap, History, KeyRound, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
 import { useAccess } from '../context/accessCtx';
 import { useOrg } from '../context/OrgContext';
 import { useViewRole } from '../context/ViewRole';
@@ -11,14 +11,12 @@ import RolesPanel from './RolesPanel';
 import OrganisationsPanel from './OrganisationsPanel';
 import WorkspacePanel from './WorkspacePanel';
 import DataPanel from './DataPanel';
-import StaffAppPanel from './StaffAppPanel';
 import './MasterSettings.css';
 
 const TABS = [
   { id: 'people', label: 'People', icon: Users },
   { id: 'roles', label: 'Roles & permissions', icon: KeyRound },
   { id: 'organisations', label: 'Organisations', icon: Building2 },
-  { id: 'staff', label: 'Staff app', icon: Smartphone },
   { id: 'workspace', label: 'Workspace', icon: LayoutGrid },
   { id: 'data', label: 'Data', icon: DatabaseZap },
   { id: 'activity', label: 'Activity log', icon: History },
@@ -30,7 +28,6 @@ const SECTION_TO = {
   organisations: ['organisations', 'organisations'], organisation: ['organisations', 'organisations'],
   groups: ['organisations', 'groups'], regions: ['organisations', 'regions'],
   workspace: ['workspace'], data: ['data'], activity: ['activity'],
-  staff: ['staff'], 'staff-app': ['staff'],
 };
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -56,13 +53,12 @@ export default function AdminMasterSettings({ onNavigate, onAddOrg, section, dra
 
   /* Every organisation, archived included, for the people pickers. */
   const [orgs, setOrgs] = useState([]);
-  const [orgsVersion, setOrgsVersion] = useState(0);
   useEffect(() => {
     let alive = true;
     if (!access?.isMaster) return undefined;
     listAllOrganizations().then(list => { if (alive) setOrgs(list); }).catch(() => {});
     return () => { alive = false; };
-  }, [access?.isMaster, orgsVersion]);
+  }, [access?.isMaster]);
 
   if (!access?.isMaster) {
     return (
@@ -104,7 +100,6 @@ export default function AdminMasterSettings({ onNavigate, onAddOrg, section, dra
           />
         )}
         {tab === 'workspace' && <WorkspacePanel />}
-        {tab === 'staff' && <StaffAppPanel orgs={orgs} onOrgsChanged={() => setOrgsVersion(v => v + 1)} />}
         {tab === 'data' && <DataPanel orgs={orgs} />}
         {tab === 'activity' && (
           <Card>

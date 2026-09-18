@@ -5,7 +5,7 @@
  * app sits in a 460px column.
  * ───────────────────────────────────────────────────────────────────── */
 
-#root:has(.st-app) { max-width: none !important; background: #F6F2EC; }
+#root:has(.st-app) { max-width: none !important; background: var(--st-page, #F6F2EC); }
 
 .st-app {
   --st-bg: #F6F2EC;
@@ -72,7 +72,7 @@
 .st-btn--primary { background: var(--st-accent); color: #fff; }
 .st-btn--primary:hover:not(:disabled) { background: var(--st-accent-hover); }
 .st-btn--quiet { background: var(--st-tint); color: var(--st-ink); }
-.st-btn--quiet:hover:not(:disabled) { background: #EDE7DE; }
+.st-btn--quiet:hover:not(:disabled) { background: var(--st-line-2); }
 .st-btn--danger { background: var(--st-red); color: #fff; }
 .st-btn--danger-text { color: var(--st-red); }
 .st-btn--small { height: 42px; padding: 0 14px; font-size: 14px; flex: none; }
@@ -182,7 +182,7 @@
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
 .st-input::placeholder { color: var(--st-faint); }
-.st-input:focus { outline: none; border-color: var(--st-accent); background: #fff; box-shadow: 0 0 0 4px rgba(83, 51, 165, 0.1); }
+.st-input:focus { outline: none; border-color: var(--st-accent); background: #fff; box-shadow: 0 0 0 4px var(--st-accent-ring, rgba(83, 51, 165, 0.1)); }
 .st-input--code { padding-left: 0.4em; text-align: center; font-size: 24px; font-weight: 600; letter-spacing: 0.4em; font-variant-numeric: tabular-nums; }
 
 .st-pw { position: relative; }
@@ -261,7 +261,7 @@
 .st-screen {
   /* Room left for the square once the header, venue, status line,
    * controls, button and gaps are placed. */
-  --st-avail: calc(100svh - 384px - env(safe-area-inset-top, 0px));
+  --st-avail: calc(100svh - 398px - env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -289,6 +289,15 @@
   margin-block: auto;
 }
 .st-venue { margin: 0 0 -4px; color: var(--st-muted); font-size: 13px; font-weight: 500; text-align: center; }
+.st-venue-logo {
+  display: block;
+  align-self: center;
+  width: auto;
+  max-width: 62%;
+  height: 30px;
+  margin-bottom: -2px;
+  object-fit: contain;
+}
 
 /* The square */
 .st-stage {
@@ -333,7 +342,7 @@
   position: absolute;
   width: 110px;
   aspect-ratio: 1;
-  background: linear-gradient(to left, #B9A5FF, var(--st-accent), transparent);
+  background: linear-gradient(to left, var(--st-beam, #B9A5FF), var(--st-accent), transparent);
   offset-path: rect(0 auto auto 0 round 30px);
   offset-anchor: 90% 50%;
   animation: st-beam 1.9s linear infinite;
@@ -342,7 +351,7 @@
 @supports not (offset-path: rect(0 auto auto 0)) {
   .st-beam { display: none; }
   .st-stage--making { animation: st-edge 1.2s var(--st-ease) infinite alternate; }
-  @keyframes st-edge { to { border-color: #CFC4EF; } }
+  @keyframes st-edge { to { border-color: var(--st-edge, #CFC4EF); } }
 }
 
 /* Done: collected, expired, cancelled */
@@ -518,13 +527,20 @@
   font-size: 16.5px;
   font-weight: 600;
   letter-spacing: 0.005em;
-  box-shadow: 0 12px 26px -16px rgba(83, 51, 165, 0.9);
+  box-shadow: 0 12px 26px -16px var(--st-accent-glow, rgba(83, 51, 165, 0.9));
   cursor: pointer;
   transition: background-color 0.15s, transform 0.14s var(--st-ease);
 }
 .st-cta:hover:not(:disabled) { background: var(--st-accent-hover); }
 .st-cta:active:not(:disabled) { transform: scale(0.98); }
 .st-cta:disabled { cursor: default; }
+/* A code is still on screen: grey until the cups or package are touched. */
+.st-cta--locked {
+  background: var(--st-line);
+  color: var(--st-muted);
+  box-shadow: none;
+  transition: background-color 0.25s, color 0.25s;
+}
 
 .st-peek {
   flex: none;
@@ -584,7 +600,7 @@
   cursor: pointer;
   transition: background-color 0.12s;
 }
-.st-row:active { background: #FAF7F2; }
+.st-row:active { background: var(--st-tint); }
 .st-row__count {
   display: grid;
   place-items: center;
@@ -601,7 +617,7 @@
 .st-row__main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .st-row__title { font-size: 15px; font-weight: 600; }
 .st-row__sub { color: var(--st-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-.st-row__chev { flex: none; color: #CFC7BC; }
+.st-row__chev { flex: none; color: var(--st-faint); }
 
 .st-state {
   display: inline-flex;
@@ -636,7 +652,7 @@
   display: block;
   height: 64px;
   border-radius: 16px;
-  background: linear-gradient(90deg, #EFE9E0 0%, #F7F3EE 50%, #EFE9E0 100%);
+  background: linear-gradient(90deg, var(--st-line-2) 0%, var(--st-tint) 50%, var(--st-line-2) 100%);
   background-size: 200% 100%;
   animation: st-shimmer 1.2s linear infinite;
 }
@@ -743,4 +759,65 @@
 @media (prefers-reduced-motion: reduce) {
   .st-app *, .st-app *::before, .st-app *::after { animation: none !important; transition: none !important; }
   .st-beam { display: none; }
+}
+
+/* ── Asking to join ────────────────────────────────────────────────── */
+.st-hint { margin: 0; color: var(--st-muted); font-size: 13.5px; line-height: 1.5; }
+.st-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.st-venues { display: flex; flex-direction: column; gap: 8px; }
+.st-venues__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px 10px 10px;
+  border: 1px solid var(--st-line);
+  border-radius: 16px;
+  background: var(--st-card);
+  color: var(--st-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.st-venues__item.is-on { border-color: var(--st-accent); box-shadow: 0 0 0 3px var(--st-accent-soft); }
+.st-venues__logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--st-tint);
+}
+.st-venues__logo img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+.st-venues__logo b { color: var(--st-muted); font-size: 17px; }
+.st-venues__name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+.st-venues__tick {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--st-line);
+  border-radius: 50%;
+  color: #fff;
+}
+.st-venues__item.is-on .st-venues__tick { border-color: var(--st-accent); background: var(--st-accent); }
+
+.st-wait { display: flex; justify-content: center; padding: 4px 0 2px; }
+.st-wait__logo { width: auto; max-width: 70%; height: 44px; object-fit: contain; }
+.st-wait__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--st-accent-soft);
+  color: var(--st-accent);
 }

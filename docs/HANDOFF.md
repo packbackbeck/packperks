@@ -43,7 +43,32 @@ The dashboard now follows PackPulse's layout and access model.
   Settings page therefore never showed the group switches and never locked
   the programme for grouped venues.
 
-### 0. PackPerks Staff (17 Sep, evening)
+### 0. Staff app per venue, access requests (18 Sep)
+
+- **Programme → Staff app** (new tab `staffapp`, every mode) replaces Master
+  Settings → Staff app. For the open venue: a big on/off switch with the
+  numbers, then Accounts (requests, add by email, the staff list with cups
+  made all time and in 30 days), Logs (every code, tagged with who made it,
+  filter by person and status) and Preview (the app in a phone frame, sample
+  data only). Vendors get it as view.
+- **Requests:** an email on no list picks a venue in the app, confirms the
+  emailed code and waits (`staff_members.status = 'requested'`, migration
+  `053`). Masters, managers and vendors of that venue approve or decline;
+  approval emails the person. `@packback.network` addresses are active at
+  once. A dashboard login that is not staff can ask from the app too
+  (`join`). The sidebar badge counts requests (migration `055` lets
+  dashboard accounts read the staff of venues they see).
+- **The app:** the venue's colours and logo; after a code is shown the
+  button stays grey until the cups or package are touched.
+- **staff-app v3** is live. Tested against it with two temporary accounts
+  (deleted): request, pending screen, vendor approve, vendor refused the
+  switch and another venue, mint, log tag and totals, cancel, the
+  packback.network path. Dashboard screens checked headless as vendor and
+  manager.
+- `beke@packback.network` is on NYU's list as invited: signing in to
+  `/staff` with the dashboard password links it.
+
+### 0a. PackPerks Staff (17 Sep, evening)
 
 A separate phone app at `/staff` where venue staff make cup QR codes.
 Migration `050` and the `staff-app` edge function (v2) are live; the app

@@ -1,7 +1,7 @@
 import {
   Activity, Blocks, CircleDollarSign, CircleHelp, ClipboardList, Clock, Eye, Gauge, Gift, HandCoins,
   HeartHandshake, HeartPulse, History, LayoutDashboard, Mail, MapPin, Palette, QrCode, Receipt, Repeat, ScanLine,
-  Search, Send, Settings, ShieldCheck, Smartphone, Store, Users,
+  Search, Send, Settings, ShieldCheck, Smartphone, Store, TabletSmartphone, Users,
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -110,6 +110,8 @@ export const TABS = [
     description: 'Print cup batches and receipts.' },
   { id: 'byorequests', label: 'BYO QR codes', group: 'programme', icon: QrCode, modes: ['byo'], editable: true,
     description: 'Counter QR codes and the auto-credit queue.' },
+  { id: 'staffapp', label: 'Staff app', group: 'programme', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff',
+    description: 'The phone app staff use to make cup QR codes: on or off, accounts, requests and every code made. Viewing is enough to approve requests.' },
   { id: 'futurevendors', label: 'Future vendors', group: 'programme', icon: Store, modes: APP_MODES, needsGroup: true, editable: true,
     description: 'Venues customers ask for, and the ones coming soon.' },
 
@@ -161,7 +163,7 @@ export const BUILT_IN_ROLES = {
     description: 'Read-only reporting for their venue.',
     tabs: {
       ...everything('hidden'),
-      overview: 'view', behaviour: 'view', reports: 'view', support: 'view', settings: 'hidden',
+      overview: 'view', behaviour: 'view', reports: 'view', support: 'view', settings: 'hidden', staffapp: 'view',
     },
   },
 };

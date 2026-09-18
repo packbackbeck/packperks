@@ -99,8 +99,8 @@ export const TABS = [
     description: 'Every cup scanned back, and the ones on hold.' },
   { id: 'transactions', label: 'Cup transfers', group: 'customers', icon: Repeat, modes: APP_MODES, feature: 'featureCupSharing', editable: false,
     description: 'Cups customers shared with each other.' },
-  { id: 'donations', label: 'Donations', group: 'customers', icon: HeartHandshake, modes: APP_MODES, feature: 'featureDonations', editable: true,
-    description: 'Cups given to charity and the transfers made for them.' },
+  { id: 'donations', label: 'Donations', group: 'customers', icon: HeartHandshake, modes: ALL_MODES, feature: 'featureDonations', editable: true,
+    description: 'Cups and balances given to charity, and the transfers made for them.' },
 
   { id: 'rewards', label: 'Rewards & offers', group: 'programme', icon: Gift, modes: APP_MODES, editable: true,
     description: 'What customers can unlock with their cups.' },

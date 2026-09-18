@@ -1,89 +1,161 @@
-/* Root-path venue-model chooser — deliberately minimal (logo, prompt, 3 tiles). */
+/* Root-path venue directory: the PackPerks logo, then one tile per live
+   venue (logo, name, mode) in alphabetical order. */
+
+/* index.css caps #root at a phone's width for the customer app; the
+   directory uses the whole window, like the dashboard does. */
+#root:has(.mc) {
+  max-width: none;
+}
+
 .mc {
   min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--sp-5);
+  box-sizing: border-box;
+  padding: 56px 16px 48px;
   background: var(--pb-cream);
+  font-family: var(--font-primary);
 }
 
-.mc__inner {
+.mc__head {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
-  width: 100%;
-  max-width: 360px;
+  gap: 14px;
+  margin: 0 auto 36px;
   text-align: center;
 }
-
 .mc__logo {
-  width: 148px;
+  width: min(340px, 78vw);
   height: auto;
 }
-
 .mc__prompt {
-  font-family: var(--font-primary);
-  font-size: var(--fs-lg);
-  font-weight: var(--fw-semibold);
-  color: var(--black);
   margin: 0;
+  font-size: var(--fs-md, 16px);
+  font-weight: var(--fw-semibold, 600);
+  color: var(--text-light, #8A8175);
 }
 
-.mc__tiles {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: 100%;
+.mc__grid {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 980px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 16px;
 }
+@media (max-width: 520px) {
+  .mc__grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+.mc__cell {
+  display: flex;
+  animation: mc-rise 0.4s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@keyframes mc-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mc__cell { animation: none; } }
 
 .mc__tile {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 26px 18px;
-  background: var(--white);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-screen);
-  color: var(--black);
+  gap: 10px;
+  padding: 14px 14px 18px;
+  background: var(--white, #fff);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
+  color: var(--black, #1D1D1D);
   text-decoration: none;
-  transition: transform 0.14s var(--ease-out-expo), box-shadow 0.14s ease;
+  text-align: center;
+  transition: transform 0.16s var(--ease-out-expo, ease), box-shadow 0.16s ease;
 }
-.mc__tile:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.10); }
-.mc__tile:active { transform: scale(0.99); }
+a.mc__tile:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.10); }
+a.mc__tile:active { transform: scale(0.98); }
+a.mc__tile:focus-visible { outline: 3px solid var(--pb-orange-warm, #FD6F46); outline-offset: 3px; }
 
-.mc__tile-icon {
-  display: inline-flex;
+/* The logo well: every brand gets the same box, whatever its aspect. */
+.mc__logo-box {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  box-sizing: border-box;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-md);
-  margin-bottom: 4px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #F7F4EC;
+  overflow: hidden;
 }
-.mc__tile--byo .mc__tile-icon { color: var(--pb-green-500); background: var(--pb-green-100); }
-.mc__tile--bin .mc__tile-icon { color: var(--pb-brown); background: #F1E7DF; }
-.mc__tile--refund .mc__tile-icon { color: #47478A; background: #ECECF6; }
+.mc__logo-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.mc__monogram {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
 
-/* Maintenance: greyed and inert. The sub line says why. */
-.mc__tile--off {
-  filter: grayscale(1);
-  opacity: 0.55;
-  pointer-events: none;
-  cursor: default;
-  box-shadow: none;
+.mc__name {
+  max-width: 100%;
+  font-size: var(--fs-md, 16px);
+  font-weight: var(--fw-bold, 700);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
-.mc__tile--off:hover { transform: none; box-shadow: none; }
 
-.mc__tile-title {
-  font-family: var(--font-primary);
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
+.mc__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
-.mc__tile-sub {
-  font-family: var(--font-primary);
-  font-size: var(--fs-sm);
-  color: var(--text-light);
+.mc__mode--byo { color: var(--pb-green-500, #1A8737); background: var(--pb-green-100, #E4F5E9); }
+.mc__mode--standard { color: var(--pb-brown, #502314); background: #F1E7DF; }
+.mc__mode--tikkie_only { color: #47478A; background: #ECECF6; }
+
+@media (max-width: 380px) {
+  .mc__mode { font-size: 11px; padding: 4px 8px; gap: 4px; }
+  .mc__name { font-size: 14px; }
+}
+
+/* Loading placeholders. */
+.mc__tile--skeleton .mc__logo-box { background: #EFEAE0; }
+.mc__bar { display: block; height: 12px; border-radius: 999px; background: #EFEAE0; }
+.mc__bar--name { width: 60%; height: 14px; }
+.mc__bar--chip { width: 45%; }
+.mc__tile--skeleton > * { animation: mc-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes mc-pulse { from { opacity: 1; } to { opacity: 0.5; } }
+
+.mc__state {
+  max-width: 360px;
+  margin: 0 auto;
+  text-align: center;
+  color: var(--text-light, #8A8175);
+  font-size: var(--fs-sm, 14px);
+}
+.mc__retry {
+  margin-top: 6px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--black, #1D1D1D);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }

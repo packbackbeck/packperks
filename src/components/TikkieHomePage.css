@@ -260,3 +260,37 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
   font-size: 12px; font-weight: 800; color: #8A6D1F;
   background: #FBF0D6; border-radius: 999px; padding: 4px 10px;
 }
+
+/* ── Collect + Donate: two big buttons under the wallet tile, with its
+   corner radius. One button spans the row when donations are off. ── */
+.tikkie-home__actions {
+  width: 100%;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-top: 10px;
+}
+.tikkie-home__actions--single { grid-template-columns: 1fr; }
+.tikkie-home__action {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
+  gap: 14px;
+  min-height: 104px;
+  padding: 16px;
+  border: none; border-radius: var(--radius-lg, 16px);
+  font-family: inherit; text-align: left; color: #fff; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, opacity 0.15s ease;
+}
+.tikkie-home__action:active:not(:disabled) { transform: scale(0.97); }
+.tikkie-home__action:disabled { cursor: default; opacity: 0.45; }
+.tikkie-home__action--tikkie  { background: #47478A; box-shadow: 0 10px 24px rgba(71, 71, 138, 0.3); }
+.tikkie-home__action--collect { background: var(--pb-red, #E24400); box-shadow: 0 10px 24px rgba(226, 68, 0, 0.26); }
+.tikkie-home__action--scan    { background: #1F1B16; box-shadow: 0 10px 24px rgba(31, 27, 22, 0.24); }
+.tikkie-home__action--donate  { background: #1A8737; box-shadow: 0 10px 24px rgba(26, 135, 55, 0.28); }
+.tikkie-home__action:disabled { box-shadow: none; }
+.tikkie-home__action-icon {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+}
+.tikkie-home__action-label { font-size: 16px; font-weight: 800; line-height: 1.2; }
+
+.tikkie-home__row-icon--gift { background: #E4F5E9; color: #1A8737; }

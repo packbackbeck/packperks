@@ -63,6 +63,11 @@ export const scanBackupCups = (cupIds) =>
 export const redeemWallet = (orgId) =>
   invokeBinTikkie({ action: 'redeem', org_id: orgId, device_id: deviceId() }, 25000);
 
+/* Give some or all of the balance to the charity partner. The server caps
+ * the amount at the balance, so a stale number can only give less. */
+export const donateWallet = (orgId, amount) =>
+  invokeBinTikkie({ action: 'donate', org_id: orgId, device_id: deviceId(), amount });
+
 export const setEmail = (orgId, email, marketing) =>
   invokeBinTikkie({
     action: 'set_email', org_id: orgId, device_id: deviceId(),

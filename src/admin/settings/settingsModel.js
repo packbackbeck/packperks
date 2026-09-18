@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Banknote, Construction, EyeOff, HeartHandshake, Link2Off, MailCheck, MapPin, Presentation,
+  Banknote, Construction, EyeOff, HeartHandshake, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
   ScrollText, Share2, SlidersHorizontal, Sparkles, ToggleRight, Wallet,
 } from 'lucide-react';
 
@@ -31,6 +31,7 @@ export const SECTION_ALIASES = {
 
 const APP = ['standard', 'byo'];
 const ALL = ['standard', 'byo', 'tikkie_only'];
+const TIKKIE = ['tikkie_only'];
 
 /* source: 'draft' (published with the rest of the settings) or 'group'
  * (written straight to the group's config). */
@@ -50,11 +51,17 @@ export const FEATURES = [
     tab: 'transactions',
   },
   {
-    key: 'featureDonations', group: 'app', icon: HeartHandshake, tone: 'rose', modes: APP, fallback: true,
+    key: 'featureDonations', group: 'app', icon: HeartHandshake, tone: 'rose', modes: ALL, fallback: true,
     label: 'Donations',
-    summary: 'Customers give their cups to your charity partner.',
-    detail: 'Switching it off removes the donate button from the app and the Donations tab from this dashboard. The charity’s name and text are in Design & copy.',
+    summary: 'Customers give their cups, or their wallet balance, to your charity partner.',
+    detail: 'Switching it off removes the donate button from the app and the Donations tab from this dashboard. In Deferred Tikkie the customer picks how much of their balance to give. The charity’s name is set in Design & copy (Plastic Soup Foundation unless changed).',
     tab: 'donations',
+  },
+  {
+    key: 'tikkieActionButtons', group: 'app', icon: LayoutGrid, tone: 'violet', modes: TIKKIE, fallback: true,
+    label: 'Collect and Donate buttons',
+    summary: 'Two big buttons under the wallet: collect via Tikkie, and donate.',
+    detail: 'With nothing to collect, the first button becomes Scan a QR code. Donate shows only while Donations is on. Switched off, the wallet tile carries a single collect button instead, as before. Tapping the wallet always opens the collect instructions.',
   },
   {
     key: 'featureDirectRefunds', group: 'app', icon: Banknote, tone: 'emerald', modes: APP, fallback: true,

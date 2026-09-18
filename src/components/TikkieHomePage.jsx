@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { getSmartbinLocations } from '../lib/api';
 import {
   readStoredProfile, storeProfile, fetchWallet, scanBatch,
-  scanBackupCups, redeemWallet, setEmail, savePendingEmail, checkBatch,
+  scanBackupCups, redeemWallet, donateWallet, setEmail, savePendingEmail, checkBatch,
 } from '../lib/tikkieWallet';
 import { animalForProfile } from '../lib/animals';
 import { useRegion } from '../lib/RegionContext';
@@ -23,8 +23,12 @@ import './TikkieHomePage.css';
  * credits the receipt's value to this device's wallet — the first scan
  * is what creates the profile (adjective+animal identity, like every
  * other mode). No Tikkie link exists per return: the customer collects
- * in bulk by tapping the orange tile → "Open Tikkie", which mints ONE
- * link for the whole available balance.
+ * in bulk with the purple Collect button under the orange tile (or the
+ * tile itself → "Open Tikkie"), which mints ONE link for the whole
+ * available balance. The green Donate button beside it gives some or all
+ * of the balance to the charity partner instead. Both buttons are the
+ * `tikkieActionButtons` feature; switched off, the tile carries a single
+ * collect pill as before.
  *
  * Everything that used to be the redirect page is now a popup on this
  * screen: credited, already-claimed, held-for-review, errors, and the
@@ -249,6 +253,12 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   // sentence that only makes sense when we hand over a Tikkie link.
   const { money, collectLabel, payout } = useRegion();
   const isLinkPayout = payout.style === 'link';
+  // Both default on, like every feature switch: an org that never touched
+  // them gets the two big buttons, and donations follow the same
+  // featureDonations flag the server checks (venue_flag).
+  const actionButtons = settings?.tikkieActionButtons !== false;
+  const donationsOn = settings?.featureDonations !== false;
+  const charity = settings?.donationRecipient || 'Plastic Soup Foundation';
   const [profile, setProfile] = useState(() => {
     if (DEMO && DEMO !== 'empty') return DEMO_WALLET.profile;
     if (DEMO) return null;
@@ -266,6 +276,8 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     if (DEMO === 'claimed') return { type: 'claimed', yours: false };
     if (DEMO === 'pending') return { type: 'pending' };
     if (DEMO === 'redeem') return { type: 'redeem' };
+    if (DEMO === 'donate') return { type: 'donate' };
+    if (DEMO === 'donated') return { type: 'donated', amount: 0.5, left: 0.4 };
     return null;
   });
   const [login, setLogin] = useState(null);
@@ -273,6 +285,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   const [showAccount, setShowAccount] = useState(false);
   const [impactOpen, setImpactOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
+  const [donating, setDonating] = useState(false);
   const scanStartedRef = useRef(false);
   // The batch the "held for review" popup is waiting on — the URL's, or one
   // the camera just read.
@@ -405,6 +418,30 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     refreshWallet();
   }
 
+  /* Donate: give `amount` of the balance to the charity partner. */
+  async function handleDonate(amount) {
+    if (DEMO) { setPopup({ type: 'donated', amount, left: Math.max(0, balance - amount) }); return; }
+    setDonating(true);
+    const data = await donateWallet(org?.id, amount);
+    setDonating(false);
+    if (data?.status === 'donated') {
+      const left = Number(data.balance || 0);
+      setBalance(left);
+      setPopup({ type: 'donated', amount: Number(data.amount || amount), left });
+      refreshWallet();
+      return;
+    }
+    setPopup({
+      type: 'error',
+      message: data?.error === 'no_balance'
+        ? 'There’s nothing to donate yet. Return some cups first.'
+        : data?.error === 'donations_disabled'
+          ? 'Donations aren’t available here right now. Your balance is unchanged.'
+          : 'We couldn’t record your donation just now. Your balance is safe — please try again in a moment.',
+    });
+    refreshWallet();
+  }
+
   /* ── The in-app scanner: add another receipt without leaving the app ── */
   if (scanner) {
     return (
@@ -455,6 +492,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
 
   const returns = history.filter(h => h.kind === 'return');
   const lifetimeCups = returns.reduce((t, h) => t + Number(h.cups || 0), 0);
+  const canCollect = balance > 0 || !!outstanding;
 
   return (
     <div className="app tikkie-home">
@@ -473,17 +511,62 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       <button
         type="button"
         className="tikkie-home__hero"
-        onClick={() => (balance > 0 || outstanding ? setPopup({ type: 'redeem' }) : setScanner(true))}
+        onClick={() => (canCollect ? setPopup({ type: 'redeem' }) : setScanner(true))}
       >
         <div className="tikkie-home__hero-copy">
           <span className="tikkie-home__hero-label">Available to collect</span>
           <div className="tikkie-home__hero-amount">{money(shownBalance)}</div>
-          <span className="tikkie-home__hero-cta">
-            {balance > 0 || outstanding ? collectLabel : 'Scan a receipt'}
-          </span>
+          {!actionButtons && (
+            <span className="tikkie-home__hero-cta">
+              {canCollect ? collectLabel : 'Scan a receipt'}
+            </span>
+          )}
         </div>
         <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
       </button>
+
+      {/* ── Collect and Donate, as two big buttons under the tile ── */}
+      {actionButtons && (
+        <div className={`tikkie-home__actions${donationsOn ? '' : ' tikkie-home__actions--single'}`}>
+          {canCollect ? (
+            <button
+              type="button"
+              className={`tikkie-home__action ${isLinkPayout ? 'tikkie-home__action--tikkie' : 'tikkie-home__action--collect'}`}
+              onClick={handleOpenTikkie}
+              disabled={redeeming}
+            >
+              <span className="tikkie-home__action-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" /><path d="M2.5 10h19" /><path d="M6.5 14.5h4" /></svg>
+              </span>
+              <span className="tikkie-home__action-label">{redeeming ? 'Preparing…' : collectLabel}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="tikkie-home__action tikkie-home__action--scan"
+              onClick={() => setScanner(true)}
+            >
+              <span className="tikkie-home__action-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" /><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" /><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" /><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" /><rect x="8.5" y="8.5" width="7" height="7" rx="1" /></svg>
+              </span>
+              <span className="tikkie-home__action-label">Scan a QR code</span>
+            </button>
+          )}
+          {donationsOn && (
+            <button
+              type="button"
+              className="tikkie-home__action tikkie-home__action--donate"
+              onClick={() => setPopup({ type: 'donate' })}
+              disabled={donating || balance <= 0}
+            >
+              <span className="tikkie-home__action-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" /></svg>
+              </span>
+              <span className="tikkie-home__action-label">{donating ? 'Donating…' : 'Donate'}</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Save the balance to an email (profiles without one) ── */}
       {profile && !profile.email && (
@@ -509,15 +592,18 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                 <span
                   className={`tikkie-home__row-icon${
                     h.kind === 'payout' ? ' tikkie-home__row-icon--done' : ''
-                  }${h.kind === 'pending' ? ' tikkie-home__row-icon--wait' : ''}`}
+                  }${h.kind === 'pending' ? ' tikkie-home__row-icon--wait' : ''}${
+                    h.kind === 'donation' ? ' tikkie-home__row-icon--gift' : ''}`}
                   aria-hidden="true"
                 >
-                  {h.kind === 'payout' ? '✓' : h.kind === 'pending' ? '◷' : '♻︎'}
+                  {h.kind === 'payout' ? '✓' : h.kind === 'pending' ? '◷' : h.kind === 'donation' ? '♥' : '♻︎'}
                 </span>
                 <div className="tikkie-home__row-main">
                   <span className="tikkie-home__row-title">
                     {h.kind === 'payout'
                       ? (isLinkPayout ? 'Collected via Tikkie' : 'Cashback sent')
+                      : h.kind === 'donation'
+                        ? `Donated to ${charity}`
                       : h.kind === 'pending'
                         ? 'Scanned and held for a review'
                         : `${h.cups} cup${h.cups === 1 ? '' : 's'} returned`}
@@ -533,8 +619,8 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                 {h.kind === 'pending' ? (
                   <span className="tikkie-home__row-amount tikkie-home__row-amount--wait">Pending</span>
                 ) : (
-                  <span className={`tikkie-home__row-amount${h.kind === 'payout' ? ' tikkie-home__row-amount--out' : ''}`}>
-                    {h.kind === 'payout' ? '−' : '+'}{money(Number(h.amount || 0))}
+                  <span className={`tikkie-home__row-amount${h.kind === 'payout' || h.kind === 'donation' ? ' tikkie-home__row-amount--out' : ''}`}>
+                    {h.kind === 'payout' || h.kind === 'donation' ? '−' : '+'}{money(Number(h.amount || 0))}
                   </span>
                 )}
               </li>
@@ -584,7 +670,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           <h2 className="tk-sheet__title">{money(Number(popup.amount))} added</h2>
           <p className="tk-sheet__sub">
             {popup.cups} cup{popup.cups === 1 ? '' : 's'} returned. Your balance is {money(balance)} —
-            collect it whenever you like from the orange tile.
+            collect it whenever you like{actionButtons ? '.' : ' from the orange tile.'}
           </p>
           <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Nice</button>
         </Sheet>
@@ -661,6 +747,31 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         </Sheet>
       )}
 
+      {popup?.type === 'donate' && (
+        <DonateSheet
+          balance={balance}
+          charity={charity}
+          money={money}
+          busy={donating}
+          onClose={() => setPopup(null)}
+          onDonate={handleDonate}
+        />
+      )}
+
+      {popup?.type === 'donated' && (
+        <Sheet onClose={() => setPopup(null)} label="Thank you">
+          <div className="tk-icon tk-icon--ok" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" /></svg>
+          </div>
+          <h2 className="tk-sheet__title tk-sheet__title--center">Thank you!</h2>
+          <p className="tk-sheet__sub tk-sheet__sub--center">
+            You gave {money(Number(popup.amount))} to {charity}.
+            {popup.left > 0 ? ` ${money(popup.left)} is still in your wallet.` : ''}
+          </p>
+          <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Close</button>
+        </Sheet>
+      )}
+
       {impactOpen && (
         <ImpactDetailModal cups={lifetimeCups} onClose={() => setImpactOpen(false)} />
       )}
@@ -680,6 +791,83 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         />
       )}
     </div>
+  );
+}
+
+/* ── Donate: pick how much of the balance to give. Starts at all of it;
+   the slider and the quick picks move in cents. ── */
+const DONATE_PICKS = [
+  { label: '25%', share: 0.25 },
+  { label: '50%', share: 0.5 },
+  { label: '75%', share: 0.75 },
+  { label: 'All', share: 1 },
+];
+
+function DonateSheet({ balance, charity, money, busy, onClose, onDonate }) {
+  const cents = Math.max(0, Math.round(balance * 100));
+  const [pick, setPick] = useState(cents);
+  const amount = Math.min(pick, cents);
+  const fill = cents > 1 ? ((amount - 1) / (cents - 1)) * 100 : 100;
+
+  return (
+    <Sheet onClose={busy ? undefined : onClose} label="Donate your balance">
+      <div className="tk-donate__badge" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" /></svg>
+      </div>
+      <h2 className="tk-sheet__title">Donate to {charity}</h2>
+      <p className="tk-sheet__sub">
+        Choose how much of your balance to give. Whatever you keep stays in your wallet to collect later.
+      </p>
+
+      <div className="tk-donate__amount" aria-live="polite">{money(amount / 100)}</div>
+      <p className="tk-donate__of">of {money(cents / 100)}</p>
+
+      {cents > 1 && (
+        <input
+          type="range"
+          className="tk-donate__range"
+          min={1}
+          max={cents}
+          step={1}
+          value={amount}
+          onChange={e => setPick(Number(e.target.value))}
+          disabled={busy}
+          aria-label="Amount to donate"
+          style={{ '--fill': `${fill}%` }}
+        />
+      )}
+
+      <div className="tk-donate__picks">
+        {DONATE_PICKS.map(p => {
+          const value = Math.max(1, Math.round(cents * p.share));
+          return (
+            <button
+              key={p.label}
+              type="button"
+              className={`tk-donate__pick${amount === value ? ' tk-donate__pick--on' : ''}`}
+              onClick={() => setPick(value)}
+              disabled={busy}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="tk-sheet__actions">
+        <button
+          type="button"
+          className="tk-btn tk-btn--donate tk-btn--full"
+          onClick={() => onDonate(amount / 100)}
+          disabled={busy || amount < 1}
+        >
+          {busy ? 'Donating…' : `Donate ${money(amount / 100)}`}
+        </button>
+        <button type="button" className="tk-btn tk-btn--full" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </Sheet>
   );
 }
 

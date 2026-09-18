@@ -377,9 +377,8 @@ async function mintForClaim(claim: ClaimRow): Promise<Response> {
 /* ── Backup cups ───────────────────────────────────────────────────────
  * The offline path. When the bin can't reach us it still prints a
  * receipt, carrying one or more of its RESERVED cup ids instead of a
- * freshly-minted batch. Those ids are permanently valid and mint a NEW
- * cashback every time, because the same ten ids are handed to many
- * different customers over the life of the bin.
+ * freshly-minted batch. Those ids are permanently valid — the same ten
+ * are handed to many different customers over the life of the bin.
  *
  * The customer must never be able to tell — the response shape is
  * identical to a normal batch. What differs is entirely on our side:
@@ -520,9 +519,7 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
 }
 
 /* ── Accounts ────────────────────────────────────────────────────────────
- * Redirect Refund now has a (light) user base: a customer may leave their
- * email to save a refund for later, or to be notified when a pending
- * receipt is validated. One account per device per org — the same
+ * Redirect Refund's user base: one profile per device per org — the same
  * users_device_org uniqueness the rest of PackPerks relies on. */
 interface ProfileRow {
   id: string;
@@ -585,15 +582,19 @@ async function findOrCreateUser(orgId: string, deviceId: string, email: string, 
 }
 
 /* The wallet's arithmetic, in one place: available = credits not yet swept
- * into a payout. Legacy per-return links (credits that carry their own
- * tikkie_url from the pre-wallet era) are excluded — their money already
- * left through that link. */
+ * into a payout or a donation. A credit is a scanned receipt (batch_id), or
+ * the change a part-donation left behind (type wallet_change, migration
+ * 054). Legacy per-return links (credits that carry their own tikkie_url
+ * from the pre-wallet era) are excluded — their money already left through
+ * that link. */
+const WALLET_CREDIT = "batch_id.not.is.null,type.eq.wallet_change";
+
 async function walletBalance(userId: string): Promise<{ balance: number; credits: number }> {
   const { data } = await supabase
     .from("claims")
     .select("payout_amount")
     .eq("user_id", userId)
-    .not("batch_id", "is", null)
+    .or(WALLET_CREDIT)
     .is("payout_claim_id", null)
     .is("tikkie_url", null);
   const rows = data || [];
@@ -618,13 +619,12 @@ async function validateTikkieOrg(orgId: string): Promise<boolean> {
   return settings.mode === "tikkie_only";
 }
 
-/* ── One-time email codes ──────────────────────────────────────────────
+/* ── One-time email codes ────────────────────────────────────────────────
  * Two flows share these codes:
  *   login  — "Already have an account? Log in": prove the email, get the
  *            refund account back on this device.
- *   attach — "save for later" hit an email that already has an account on
- *            a DIFFERENT device: the code proves the saver owns it before
- *            the refund is attached to that account.
+ *   attach — an email that already has an account on a DIFFERENT device:
+ *            the code proves the saver owns it before anything is linked.
  * Codes: 6 digits, hashed at rest, 10 minutes, 5 attempts. */
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
@@ -777,8 +777,6 @@ async function loginVerify(body: Record<string, unknown>): Promise<Response> {
   const user = await userByEmail(orgId, email);
   if (!user) return json({ error: "no_account" }, 404);
 
-  // Attach the receipt that started this flow (the save-for-later that
-  // needed verification, or a login opened from a receipt page).
   const batchId = String(body.batch_id || otp.batch_id || "").trim().toLowerCase();
   if (UUID_RE.test(batchId)) {
     // Attach the receipt — but never MOVE money: a claim already credited
@@ -793,10 +791,9 @@ async function loginVerify(body: Record<string, unknown>): Promise<Response> {
   return json({ status: "ok", user_id: user.id, email });
 }
 
-/* save_email — the "save for later" / "notify me" action from the
- * redirect page. Two situations:
- *   • the batch is KNOWN (claim exists): attach the account to the claim
- *     so it shows in their refund history.
+/* save_email — the held-for-review popup's email capture. Two situations:
+ *   • the batch is KNOWN (claim exists): only the wallet that owns it may
+ *     touch it; the email lands on that profile.
  *   • the batch is PENDING (bin hasn't delivered the session yet): store
  *     the email on the pending row; bin-mint-batch emails them when the
  *     session lands, and the claim is attached at creation time. */
@@ -805,10 +802,6 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
   const email = String(body.email || "").trim().toLowerCase();
   const deviceId = String(body.device_id || "").trim().slice(0, 64);
   const marketing = body.marketing_consent === true;
-  // create_account defaults to true (the redirect page's "save for later"
-  // always makes an account). The pending screen may send false: the
-  // customer just wants the ready-email. Those rows — email, no account —
-  // are what the dashboard calls "mailos".
   const createAccount = body.create_account !== false;
   if (!UUID_RE.test(batchId)) return json({ error: "invalid_batch" }, 400);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "invalid_email" }, 400);
@@ -880,7 +873,7 @@ async function saveEmail(body: Record<string, unknown>): Promise<Response> {
   return json({ status: "saved_pending", user_id: userId });
 }
 
-/* ── The wallet ──────────────────────────────────────────────────────
+/* ── The wallet ──────────────────────────────────────────────────────────────
  * action:"wallet" {org_id, device_id} — everything the home screen needs
  * in one read-only call: the profile (name/animal/email), the available
  * balance, the return history, and any outstanding bulk-payout link. */
@@ -900,7 +893,7 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
   const [{ balance }, { data: rows }, { data: pendingRows }] = await Promise.all([
     walletBalance(profile.id),
     supabase.from("claims")
-      .select("id, created_at, cups_redeemed, payout_amount, batch_id, payout_claim_id, tikkie_url, tikkie_status")
+      .select("id, type, created_at, cups_redeemed, payout_amount, batch_id, payout_claim_id, tikkie_url, tikkie_status")
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(100),
@@ -914,9 +907,11 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
       .limit(50),
   ]);
 
-  const history = (rows || []).map(r => ({
+  // A part-donation's change is bookkeeping, not something the customer
+  // did: it stays out of the list (its amount is already in the balance).
+  const history = (rows || []).filter(r => r.type !== "wallet_change").map(r => ({
     id: r.id,
-    kind: r.batch_id ? "return" : "payout",
+    kind: r.batch_id ? "return" : r.type === "donation" ? "donation" : "payout",
     cups: r.cups_redeemed,
     amount: Number(r.payout_amount || 0),
     created_at: r.created_at,
@@ -940,6 +935,7 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
   }
   history.sort((a, b) =>
     new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
   // An outstanding bulk link: money already swept out of the balance but
   // (as far as we know) not collected yet — "Open Tikkie" reopens it.
   const outstanding = (rows || []).find(r =>
@@ -958,7 +954,7 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
   });
 }
 
-/* ── Bulk redemption ─────────────────────────────────────────────────
+/* ── Bulk redemption ─────────────────────────────────────────────────────────
  * action:"redeem" {org_id, device_id} — sweep every available credit into
  * ONE payout row, mint ONE Tikkie link for the total, return it. No email
  * required: holding the device that earned the credits IS the identity.
@@ -1012,7 +1008,7 @@ async function redeemAction(body: Record<string, unknown>): Promise<Response> {
   const { data: swept, error: sweepErr } = await supabase.from("claims")
     .update({ payout_claim_id: payout.id })
     .eq("user_id", profile.id)
-    .not("batch_id", "is", null)
+    .or(WALLET_CREDIT)
     .is("payout_claim_id", null)
     .is("tikkie_url", null)
     .select("id, payout_amount, cups_redeemed");
@@ -1041,7 +1037,42 @@ async function redeemAction(body: Record<string, unknown>): Promise<Response> {
   return minted;
 }
 
-/* ── Email on the profile ────────────────────────────────────────────
+/* ── Donation ────────────────────────────────────────────────────────
+ * action:"donate" {org_id, device_id, amount} — give some or all of the
+ * available balance to the venue's charity partner. wallet_donate (migration
+ * 054) sweeps every credit into one donation row and hands back the rest as
+ * change, in one transaction, so it can't race a payout. The amount is
+ * capped at the balance there; the client's number only ever lowers it. */
+async function donateAction(body: Record<string, unknown>): Promise<Response> {
+  const orgId = String(body.org_id || "").trim();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  const amount = Number(body.amount);
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+  if (!Number.isFinite(amount) || amount < 0.01) return json({ error: "invalid_amount" }, 400);
+
+  const { data: profile } = await supabase
+    .from("users").select("id")
+    .eq("org_id", orgId).eq("device_id", deviceId)
+    .is("merged_into", null)
+    .maybeSingle();
+  if (!profile) return json({ error: "no_balance" }, 404);
+
+  const { data, error } = await supabase.rpc("wallet_donate", {
+    p_user_id: profile.id,
+    p_amount: Math.round(amount * 100) / 100,
+  });
+  if (error) {
+    const code = ["no_balance", "donations_disabled", "invalid_amount"]
+      .find(c => (error.message || "").includes(c));
+    if (code) return json({ error: code }, code === "donations_disabled" ? 403 : 409);
+    console.error(`[bin-tikkie] donate failed: ${error.message}`);
+    return json({ error: "db_error" }, 500);
+  }
+  return json({ status: "donated", ...(data as Record<string, unknown>) });
+}
+
+/* ── Email on the profile ──────────────────────────────────────────────────
  * action:"set_email" {org_id, device_id, email, privacy_accepted,
  * marketing_consent} — the home page's "save your balance" section. If
  * the email already belongs to a DIFFERENT device's profile, the email
@@ -1072,7 +1103,7 @@ async function setEmailAction(body: Record<string, unknown>): Promise<Response> 
   });
 }
 
-/* action:"check" — the pending screen's poll. Read-only and cheap: is the
+/* action:"check" — the pending popup's poll. Read-only and cheap: is the
  * batch validated yet? Never mints, never activates cups, never writes —
  * the client makes ONE real scan call once this says the wait is over. */
 async function checkBatch(body: Record<string, unknown>): Promise<Response> {
@@ -1125,10 +1156,13 @@ Deno.serve(async (req) => {
   // Bulk redemption: the ONLY place a Tikkie link is minted now.
   if (body.action === "redeem") return redeemAction(body);
 
+  // Give some or all of the balance to the charity partner.
+  if (body.action === "donate") return donateAction(body);
+
   // The home page's "save your balance" email section.
   if (body.action === "set_email") return setEmailAction(body);
 
-  // Pending-receipt notification signup (kept for the held-for-review popup).
+  // Pending-receipt notification signup (the held-for-review popup).
   if (body.action === "save_email") return saveEmail(body);
 
   // The offline receipt carries cup ids rather than a batch.
@@ -1270,8 +1304,7 @@ Deno.serve(async (req) => {
     // through another flow. Distinguish the common cases for the UI.
     const race = await claimForBatch(batchId);
     if (race) {
-      if (race.tikkie_url) return claimReply(race, "exists");
-      return json({ status: "in_progress" }, 202);
+      return json({ status: "already_claimed", yours: false, amount: race.payout_amount, cups: race.cups_redeemed }, 409);
     }
     if (cups.some((c) => c.revoked_at)) return json({ error: "batch_revoked" }, 409);
     if (cups.some((c) => c.expires_at && c.expires_at <= nowIso)) return json({ error: "batch_expired" }, 409);

@@ -61,6 +61,7 @@ export function resolveEffectiveMode(orgMode, groupMode) {
 export const TIKKIE_ONLY_PAGES = new Set([
   'cupqr',        // Receipt Generator — mints the same batches the bin does
   'tikkielog',    // the payout log
+  'donations',    // wallet balances given to the charity partner
   'backupcups',   // the bin's offline fallback codes + outage alarm
   'smartbins',    // the bin locations behind the customer map
   'emailtemplates', // the automated customer emails

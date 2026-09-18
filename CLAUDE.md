@@ -62,7 +62,11 @@ exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
   with no group is Deposit Rewards.
 - **Deferred Tikkie** (`tikkie_only`, on the org's own config) — smart bin
   prints a receipt; scans credit a wallet (`TikkieHomePage.jsx`) collected
-  later as one Tikkie link. No rewards.
+  later as one Tikkie link. No rewards. The customer can instead donate
+  some or all of the balance (`bin-tikkie` action `donate` →
+  `wallet_donate()`, migration 054): it sweeps every credit into one
+  `donation` claim and hands the rest back as a `wallet_change` claim,
+  which the wallet counts like a receipt. Count wallet credits with both.
 
 Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund only”,
 “Titaan Direct Refund”, “Rewards only” — are stale. The code keys stay.

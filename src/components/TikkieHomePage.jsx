@@ -14,6 +14,7 @@ import PrivacyPolicyView from './PrivacyPolicyView';
 import CupScanPage from './CupScanPage';
 import UserPage, { ImpactSummary, ImpactDetailModal } from './UserPage';
 import Header from './Header';
+import TikkieActivitySheet from './TikkieActivitySheet';
 import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
 
@@ -285,6 +286,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   const [showPolicy, setShowPolicy] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [impactOpen, setImpactOpen] = useState(false);
+  const [openItem, setOpenItem] = useState(null);   // an activity row, opened
   const [redeeming, setRedeeming] = useState(false);
   const [donating, setDonating] = useState(false);
   const scanStartedRef = useRef(false);
@@ -492,6 +494,13 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   }
 
   const returns = history.filter(h => h.kind === 'return');
+  /* The wallet names one payout link nobody has collected yet (outstanding).
+   * It belongs to the newest uncollected payout of that amount, so that row
+   * can offer the link again. */
+  const openPayoutId = outstanding?.url
+    ? history.find(h => h.kind === 'payout' && !h.redeemed
+      && Math.abs(Number(h.amount || 0) - Number(outstanding.amount || 0)) < 0.005)?.id || null
+    : null;
   const lifetimeCups = returns.reduce((t, h) => t + Number(h.cups || 0), 0);
   const canCollect = balance > 0 || !!outstanding;
 
@@ -589,20 +598,23 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         ) : (
           <ul className="tikkie-home__history">
             {history.map(h => (
-              <li key={h.id} className="tikkie-home__row">
+              <li key={h.id}>
+                <button type="button" className="tikkie-home__row" onClick={() => setOpenItem(h)}>
                 <span
                   className={`tikkie-home__row-icon${
-                    h.kind === 'payout' ? ' tikkie-home__row-icon--done' : ''
-                  }${h.kind === 'pending' ? ' tikkie-home__row-icon--wait' : ''}${
+                    h.kind === 'payout' && h.redeemed !== false ? ' tikkie-home__row-icon--done' : ''
+                  }${h.kind === 'pending' || (h.kind === 'payout' && h.redeemed === false) ? ' tikkie-home__row-icon--wait' : ''}${
                     h.kind === 'donation' ? ' tikkie-home__row-icon--gift' : ''}`}
                   aria-hidden="true"
                 >
-                  {h.kind === 'payout' ? '✓' : h.kind === 'pending' ? '◷' : h.kind === 'donation' ? '♥' : '♻︎'}
+                  {h.kind === 'payout' ? (h.redeemed === false ? '→' : '✓') : h.kind === 'pending' ? '◷' : h.kind === 'donation' ? '♥' : '♻︎'}
                 </span>
                 <div className="tikkie-home__row-main">
                   <span className="tikkie-home__row-title">
                     {h.kind === 'payout'
-                      ? (isLinkPayout ? 'Collected via Tikkie' : 'Cashback sent')
+                      ? (h.redeemed === false
+                        ? (isLinkPayout ? (h.id === openPayoutId ? 'Tikkie ready to collect' : 'Tikkie payout') : 'Cashback on its way')
+                        : (isLinkPayout ? 'Collected via Tikkie' : 'Cashback sent'))
                       : h.kind === 'donation'
                         ? `Donated to ${charity}`
                       : h.kind === 'pending'
@@ -624,6 +636,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                     {h.kind === 'payout' || h.kind === 'donation' ? '−' : '+'}{money(Number(h.amount || 0))}
                   </span>
                 )}
+                </button>
               </li>
             ))}
           </ul>
@@ -662,6 +675,18 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       </section>
 
       {/* ═══ Popups ═══ */}
+
+      {openItem && (
+        <TikkieActivitySheet
+          item={openItem}
+          money={money}
+          isLinkPayout={isLinkPayout}
+          charity={charity}
+          payoutUrl={openItem.id === openPayoutId ? outstanding?.url : null}
+          email={profile?.email || null}
+          onClose={() => setOpenItem(null)}
+        />
+      )}
 
       {popup?.type === 'credited' && (
         <Sheet onClose={() => setPopup(null)} label="Refund added">

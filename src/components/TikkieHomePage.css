@@ -89,9 +89,15 @@
 }
 .tikkie-home__row {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px; border-bottom: 1px solid #F5F0E6;
+  width: 100%; padding: 12px 14px;
+  border: 0; border-bottom: 1px solid #F5F0E6; background: none;
+  font: inherit; text-align: left; color: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s;
 }
-.tikkie-home__row:last-child { border-bottom: none; }
+.tikkie-home__history li:last-child .tikkie-home__row { border-bottom: none; }
+.tikkie-home__row:active { background: #FAF6EE; }
+.tikkie-home__row:focus-visible { outline: 2px solid var(--primary, #502314); outline-offset: -2px; border-radius: 12px; }
 .tikkie-home__row-icon {
   flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -266,7 +272,6 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
 .tikkie-home__actions {
   width: 100%;
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-  margin-top: 10px;
 }
 .tikkie-home__actions--single { grid-template-columns: 1fr; }
 .tikkie-home__action {
@@ -294,3 +299,7 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
 .tikkie-home__action-label { font-size: 16px; font-weight: 800; line-height: 1.2; }
 
 .tikkie-home__row-icon--gift { background: #E4F5E9; color: #1A8737; }
+
+/* The activity popup (TikkieActivitySheet) borrows ActivityDetailModal's
+   card; its values are sentences and email addresses, so keep their case. */
+.tk-activity .adm-row__val { text-transform: none; }

@@ -17,8 +17,8 @@
   font-weight: 600;
 }
 .acq-status svg { flex: none; }
-.acq-status--ok { background: #EEF8F3; border-color: #D5EFE2; color: var(--ui-success); }
-.acq-status--err { background: #FDF0F3; border-color: #F7D9E1; color: var(--ui-danger); }
+.acq-status--ok { background: var(--ui-success-tint); border-color: var(--ui-success-line); color: var(--ui-success); }
+.acq-status--err { background: var(--ui-danger-tint); border-color: var(--ui-danger-line); color: var(--ui-danger); }
 
 /* Two columns: controls on the left, the receipt preview on the right. */
 .acq-layout {
@@ -100,8 +100,8 @@
   margin: 14px 0 0;
   padding: 9px 12px;
   border-radius: 9px;
-  border: 1px solid #F7D9E1;
-  background: #FDF0F3;
+  border: 1px solid var(--ui-danger-line);
+  background: var(--ui-danger-tint);
   color: var(--ui-danger);
   font-size: 12.5px;
   line-height: 1.45;

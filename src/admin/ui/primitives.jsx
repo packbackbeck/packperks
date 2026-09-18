@@ -123,6 +123,10 @@ export function Badge({ tone = 'neutral', icon: Icon, children, title }) {
   );
 }
 
+export function BetaChip({ title = 'Still in beta: it works, but expect changes.' }) {
+  return <span className="ui-beta" title={title}>Beta</span>;
+}
+
 /* Hover/focus explanation next to a number. The trigger is a focusable
  * span, not a button: it often sits inside a clickable tile. */
 export function InfoTip({ label, children, formula, note }) {

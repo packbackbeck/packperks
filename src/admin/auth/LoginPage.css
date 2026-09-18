@@ -278,7 +278,7 @@
   z-index: 1;
   /* As high as it needs to be to show the whole phone (it is 2.22 times as
    * tall as it is wide), but never above the dashboard's header row. */
-  top: clamp(56px, 100cqh - var(--pp-phone-w) * 2.22 - 32px, 200px);
+  top: clamp(96px, 100cqh - var(--pp-phone-w) * 2.22 - 8px, 300px);
   left: -18px;
   width: var(--pp-phone-w);
   animation: pp-login-rise-far 1.1s var(--ui-ease) 0.45s both;

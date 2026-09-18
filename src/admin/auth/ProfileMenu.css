@@ -7,7 +7,7 @@
   gap: 10px;
   width: 100%;
   padding: 8px 10px 8px 8px;
-  background: #FFFFFF;
+  background: var(--ui-card);
   border: 1px solid var(--ui-border, #E7E5EE);
   border-radius: 12px;
   cursor: pointer;

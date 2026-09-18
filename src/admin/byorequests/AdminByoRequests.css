@@ -93,8 +93,8 @@
   line-height: 1.45;
 }
 .byoreq__msg svg { flex: none; margin-top: 1px; }
-.byoreq__msg--err { background: #FDF0F3; border-color: #F7D9E1; color: var(--ui-danger); }
-.byoreq__msg--ok { background: #EEF8F3; border-color: #D5EFE2; color: var(--ui-success); }
+.byoreq__msg--err { background: var(--ui-danger-tint); border-color: var(--ui-danger-line); color: var(--ui-danger); }
+.byoreq__msg--ok { background: var(--ui-success-tint); border-color: var(--ui-success-line); color: var(--ui-success); }
 .byoreq__loading { margin: 0; padding: 22px 20px; font-size: 13px; color: var(--ui-muted); }
 
 .byoreq__table-wrap { overflow-x: auto; }

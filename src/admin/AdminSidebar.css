@@ -12,7 +12,7 @@
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
-  background: #FFFFFF;
+  background: var(--ui-card);
   border-right: 1px solid var(--ui-border);
   font-family: var(--ui-font);
   transition: width 0.2s var(--ui-ease);
@@ -141,7 +141,7 @@
   height: 8px;
   border-radius: 50%;
   background: var(--ui-accent);
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px var(--ui-card);
 }
 .sb__scope {
   padding: 1px 6px;
@@ -152,7 +152,7 @@
   font-weight: 700;
   letter-spacing: 0.02em;
 }
-.sb__item--active .sb__scope { background: #fff; color: var(--ui-primary); }
+.sb__item--active .sb__scope { background: var(--ui-card); color: var(--ui-primary); }
 
 .sb__foot {
   padding: 12px;

@@ -30,7 +30,7 @@
   white-space: nowrap;
 }
 .dz-stack { display: flex; flex-direction: column; gap: 16px; }
-.dz-card--quiet { background: #FBFAFD; box-shadow: none; }
+.dz-card--quiet { background: var(--ui-hover); box-shadow: none; }
 .dz-card--quiet .ui-card__title svg { color: var(--ui-muted-2); }
 
 /* Small shared bits */
@@ -94,7 +94,7 @@
 .dz-callout__action { flex: none; align-self: center; }
 .dz-callout--info { background: var(--ui-primary-softer); border-color: rgba(91, 63, 214, 0.18); }
 .dz-callout--info .dz-callout__icon { color: var(--ui-primary); }
-.dz-callout--warning { background: #FEF7EA; border-color: #F7E4BE; }
+.dz-callout--warning { background: var(--ui-warning-tint); border-color: var(--ui-warning-line); }
 .dz-callout--warning .dz-callout__icon { color: var(--ui-warning); }
 .dz-callout--danger { background: var(--ui-danger-soft); border-color: #F7D0DA; }
 .dz-callout--danger .dz-callout__icon { color: var(--ui-danger); }
@@ -219,7 +219,7 @@
   padding: 12px;
   border: 1px dashed var(--ui-border-2);
   border-radius: 12px;
-  background: #FBFAFD;
+  background: var(--ui-hover);
   transition: border-color 0.15s, background 0.15s;
 }
 .dz-import__drop.is-drag { border-color: var(--ui-primary); background: var(--ui-primary-softer); }

@@ -23,9 +23,9 @@
 .aet-callout svg { flex: none; margin-top: 1px; }
 .aet-callout p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ui-fg-2); }
 .aet-callout code { font-family: var(--ui-mono); font-size: 12px; color: var(--ui-fg); }
-.aet-callout--danger { background: var(--ui-danger-soft); border-color: #F7D9E1; color: var(--ui-danger); }
-.aet-callout--success { background: var(--ui-success-soft); border-color: #D5EFE2; color: var(--ui-success); }
-.aet-callout--warning { background: #FEF7EA; border-color: #F7E4BE; color: var(--ui-warning); }
+.aet-callout--danger { background: var(--ui-danger-soft); border-color: var(--ui-danger-line); color: var(--ui-danger); }
+.aet-callout--success { background: var(--ui-success-soft); border-color: var(--ui-success-line); color: var(--ui-success); }
+.aet-callout--warning { background: var(--ui-warning-tint); border-color: var(--ui-warning-line); color: var(--ui-warning); }
 
 /* ── Template switcher ── */
 .aet-tabs { align-self: flex-start; max-width: 100%; overflow-x: auto; }
@@ -107,7 +107,7 @@
 
 .ui-textarea.aet-code {
   min-height: 300px;
-  background: #FCFBFE;
+  background: var(--ui-tint);
   font-family: var(--ui-mono);
   font-size: 12.5px;
   line-height: 1.7;

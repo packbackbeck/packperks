@@ -120,7 +120,7 @@
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
-.rew-card:hover { border-color: var(--ui-border-2); background: #FBFAFD; }
+.rew-card:hover { border-color: var(--ui-border-2); background: var(--ui-hover); }
 .rew-card--active,
 .rew-card--active:hover {
   border-color: rgba(91, 63, 214, 0.55);

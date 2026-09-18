@@ -152,7 +152,7 @@
   padding: 10px 12px;
   border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: #FAFAFC;
+  background: var(--ui-tint-3);
 }
 .udp__meta-item--wide { grid-column: span 2; }
 .udp__meta-item--row { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }

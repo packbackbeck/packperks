@@ -44,7 +44,7 @@
   align-items: center;
   gap: 14px;
   padding: 0 22px;
-  background: rgba(246, 245, 250, 0.86);
+  background: var(--ui-topbar-bg, rgba(246, 245, 250, 0.86));
   backdrop-filter: saturate(1.4) blur(10px);
   -webkit-backdrop-filter: saturate(1.4) blur(10px);
   border-bottom: 1px solid var(--ui-border);
@@ -68,7 +68,7 @@
   padding: 0 12px 0 4px;
   border-radius: 11px;
   border: 1px solid var(--ui-border);
-  background: #fff;
+  background: var(--ui-card);
   color: var(--ui-fg);
   box-shadow: var(--ui-shadow-sm);
   cursor: default;

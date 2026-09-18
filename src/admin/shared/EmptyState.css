@@ -70,7 +70,7 @@
 }
 .empty-state__btn--primary:hover { background: var(--ui-primary-hover, #4C33BD); }
 .empty-state__btn--ghost {
-  background: #FFFFFF;
+  background: var(--ui-card);
   border-color: var(--ui-border, #E7E5EE);
   color: var(--ui-fg-2, #3B3647);
 }

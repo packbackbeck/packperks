@@ -16,9 +16,9 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.ad-status--clear { border-color: #D5EFE2; background: var(--ui-success-soft); color: var(--ui-success); }
-.ad-status--owed  { border-color: #F7E4BE; background: var(--ui-warning-soft); color: var(--ui-warning); }
-.ad-status--over  { border-color: #DCD4FA; background: var(--ui-primary-soft); color: var(--ui-primary); }
+.ad-status--clear { border-color: var(--ui-success-line); background: var(--ui-success-soft); color: var(--ui-success); }
+.ad-status--owed  { border-color: var(--ui-warning-line); background: var(--ui-warning-soft); color: var(--ui-warning); }
+.ad-status--over  { border-color: var(--ui-primary-line); background: var(--ui-primary-soft); color: var(--ui-primary); }
 
 /* Stat trio: KPI tiles without the chart hook-up */
 .ad-stats .ui-kpi { min-height: 140px; }
@@ -59,13 +59,13 @@
   padding: 12px 14px;
   border: 1px dashed var(--ui-border-2);
   border-radius: 10px;
-  background: #FAFAFC;
+  background: var(--ui-tint-3);
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .ad-add__file:hover { border-color: rgba(91, 63, 214, 0.55); background: var(--ui-card); }
 .ad-add__file:focus-within { border-color: rgba(91, 63, 214, 0.55); box-shadow: 0 0 0 3px var(--ui-ring); }
-.ad-add__file--has { border-style: solid; border-color: #DCD4FA; background: var(--ui-primary-softer); }
+.ad-add__file--has { border-style: solid; border-color: var(--ui-primary-line); background: var(--ui-primary-softer); }
 .ad-add__file-input {
   position: absolute;
   inset: 0;
@@ -109,7 +109,7 @@
   justify-content: flex-end;
   padding: 12px 20px;
   border-top: 1px solid var(--ui-border);
-  background: #FCFBFE;
+  background: var(--ui-tint);
   border-radius: 0 0 var(--ui-radius) var(--ui-radius);
 }
 
@@ -138,7 +138,7 @@
   padding-top: 12px;
   padding-bottom: 12px;
   border-top: 1px solid var(--ui-border-2);
-  background: #F8F7FB;
+  background: var(--ui-tint-2);
 }
 .ad-transfers__tf-label {
   text-align: right;

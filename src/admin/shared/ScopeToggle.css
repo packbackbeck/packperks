@@ -27,7 +27,7 @@
 }
 .scope-toggle__opt:hover:not(.is-on) { color: var(--ui-fg, #17151F); }
 .scope-toggle__opt.is-on {
-  background: #FFFFFF;
+  background: var(--ui-card);
   color: var(--ui-fg, #17151F);
   box-shadow: 0 1px 2px rgba(23, 21, 31, 0.08);
 }

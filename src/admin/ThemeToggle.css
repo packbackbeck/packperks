@@ -1,0 +1,48 @@
+.theme-toggle {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  background: var(--ui-card);
+  color: var(--ui-fg-2);
+  box-shadow: var(--ui-shadow-md);
+  cursor: pointer;
+  transition: transform 0.18s var(--ui-ease), background 0.18s var(--ui-ease),
+              color 0.18s var(--ui-ease), border-color 0.18s var(--ui-ease);
+}
+.theme-toggle:hover {
+  transform: translateY(-2px);
+  border-color: var(--ui-primary);
+  color: var(--ui-primary);
+}
+.theme-toggle:active { transform: translateY(0); }
+
+/* The button floats over the bottom-right corner, where the sticky save
+ * and bulk-action bars keep their buttons. Give those bars room so the
+ * switch never covers a Save. */
+.admin-app--themed .ms-savebar,
+.admin-app--themed .afv__savebar { padding-right: 78px; }
+.admin-app--themed .bulkbar { margin-right: 78px; }
+
+/* The growing circle is painted by the browser's view transition, so the
+ * two snapshots must simply sit on top of each other rather than run the
+ * default cross-fade. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle { transition: none; }
+  .theme-toggle:hover { transform: none; }
+}

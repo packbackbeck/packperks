@@ -12,8 +12,8 @@
   margin: 0;
   padding: 10px 14px;
   border-radius: 11px;
-  border: 1px solid #F7D9E1;
-  background: #FDF0F3;
+  border: 1px solid var(--ui-danger-line);
+  background: var(--ui-danger-tint);
   color: var(--ui-danger);
   font-size: 13px;
 }
@@ -105,7 +105,7 @@
   transition: background-color 0.12s;
 }
 .asb__row:last-child { border-bottom: 0; }
-.asb__row:hover { background: #FBFAFD; }
+.asb__row:hover { background: var(--ui-hover); }
 .asb__row--off > :not(.asb__rowactions) { opacity: 0.55; }
 .asb__rowpin {
   flex: none;

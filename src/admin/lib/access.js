@@ -39,21 +39,34 @@ export const TOPBAR_KEY = 'workspace:topbar';
  * number tiles; on unless set to false). */
 export const DISPLAY_KEY = 'workspace:display';
 
-/* What the top bar can show. `fixed` items can't be switched off. */
+/* What the top bar can show. `fixed` items can't be switched off;
+ * `defaultOff` items start hidden until a master turns them on. */
 export const TOPBAR_ITEMS = [
   { id: 'programme', label: 'Programme badge', icon: Gift,
     description: 'Which programme the open venue runs.' },
   { id: 'search', label: 'Search', icon: Search,
     description: 'Find any page or setting, also with ⌘K.' },
-  { id: 'rates', label: 'Cashback and refund', icon: CircleDollarSign,
+  { id: 'rates', label: 'Cashback and refund', icon: CircleDollarSign, defaultOff: true,
     description: 'What a returned cup is worth at the open venue.' },
-  { id: 'timezone', label: 'Time zone', icon: Clock,
+  { id: 'timezone', label: 'Time zone', icon: Clock, defaultOff: true,
     description: 'The time zone every time in the dashboard is shown in.' },
   { id: 'preview', label: 'Preview', icon: Eye,
     description: 'Opens the venue’s customer app in a new tab.' },
   { id: 'publish', label: 'Publish', icon: Send, fixed: true,
     description: 'Puts draft changes live. Shown to everyone who can change settings, rewards or design.' },
 ];
+
+export const TOPBAR_BY_ID = Object.fromEntries(TOPBAR_ITEMS.map(i => [i.id, i]));
+
+/* Whether the top bar shows an item: what the master saved, or the item's
+ * own default when nothing is saved for it. */
+export function topbarShows(topbar, id) {
+  const item = TOPBAR_BY_ID[id];
+  if (!item) return true;
+  if (item.fixed) return true;
+  const saved = topbar?.[id];
+  return typeof saved === 'boolean' ? saved : !item.defaultOff;
+}
 
 /* Old role names (before migration 048) and what they are now. */
 export function levelForLegacyRole(role) {
@@ -97,20 +110,20 @@ export const TABS = [
     description: 'Cashback and refund claims to review and pay.' },
   { id: 'cupscans', label: 'Cup scans', group: 'customers', icon: ScanLine, modes: APP_MODES, editable: true, badge: 'scans',
     description: 'Every cup scanned back, and the ones on hold.' },
-  { id: 'transactions', label: 'Cup transfers', group: 'customers', icon: Repeat, modes: APP_MODES, feature: 'featureCupSharing', editable: false,
+  { id: 'transactions', label: 'Cup transfers', group: 'customers', icon: Repeat, modes: APP_MODES, feature: 'featureCupSharing', editable: false, beta: true,
     description: 'Cups customers shared with each other.' },
-  { id: 'donations', label: 'Donations', group: 'customers', icon: HeartHandshake, modes: ALL_MODES, feature: 'featureDonations', editable: true,
+  { id: 'donations', label: 'Donations', group: 'customers', icon: HeartHandshake, modes: ALL_MODES, feature: 'featureDonations', editable: true, beta: true,
     description: 'Cups and balances given to charity, and the transfers made for them.' },
 
   { id: 'rewards', label: 'Rewards & offers', group: 'programme', icon: Gift, modes: APP_MODES, editable: true,
     description: 'What customers can unlock with their cups.' },
-  { id: 'appdesign', label: 'Design & copy', group: 'programme', icon: Palette, modes: APP_MODES, editable: true,
+  { id: 'appdesign', label: 'Design & copy', group: 'programme', icon: Palette, modes: APP_MODES, editable: true, beta: true,
     description: 'Colours, texts and sections of the customer app.' },
   { id: 'cupqr', label: 'Receipt generator', group: 'programme', icon: QrCode, modes: ['standard', 'tikkie_only'], editable: true,
     description: 'Print cup batches and receipts.' },
   { id: 'byorequests', label: 'BYO QR codes', group: 'programme', icon: QrCode, modes: ['byo'], editable: true,
     description: 'Counter QR codes and the auto-credit queue.' },
-  { id: 'staffapp', label: 'Staff app', group: 'programme', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff',
+  { id: 'staffapp', label: 'Staff app', group: 'programme', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff', beta: true,
     description: 'The phone app staff use to make cup QR codes: on or off, accounts, requests and every code made. Viewing is enough to approve requests.' },
   { id: 'futurevendors', label: 'Future vendors', group: 'programme', icon: Store, modes: APP_MODES, needsGroup: true, editable: true,
     description: 'Venues customers ask for, and the ones coming soon.' },
@@ -119,7 +132,7 @@ export const TABS = [
     description: 'Every refund paid out through Tikkie.' },
   { id: 'smartbins', label: 'Smart bins', group: 'smartbin', icon: MapPin, modes: ['tikkie_only'], editable: true,
     description: 'Bin locations on the customer map.' },
-  { id: 'backupcups', label: 'Backup cups', group: 'smartbin', icon: Blocks, modes: ['tikkie_only'], editable: true,
+  { id: 'backupcups', label: 'Backup cups', group: 'smartbin', icon: Blocks, modes: ['tikkie_only'], editable: true, beta: true,
     description: 'Offline fallback codes and their alarm.' },
   { id: 'emailtemplates', label: 'Email templates', group: 'smartbin', icon: Mail, modes: ['tikkie_only'], editable: true,
     description: 'The automated customer emails.' },
@@ -128,13 +141,13 @@ export const TABS = [
     description: 'Features, payouts, limits, locations and the privacy policy.' },
   { id: 'master', label: 'Master settings', group: 'workspace', icon: ShieldCheck, modes: ALL_MODES, masterOnly: true, fixed: true, editable: true,
     description: 'People, roles, organisations, the workspace and its data.' },
-  { id: 'history', label: 'Version history', group: 'workspace', icon: History, modes: ALL_MODES, editable: true,
+  { id: 'history', label: 'Version history', group: 'workspace', icon: History, modes: ALL_MODES, editable: true, beta: true,
     description: 'Everything published, and the audit log.' },
   { id: 'support', label: 'Help & support', group: 'workspace', icon: CircleHelp, modes: ALL_MODES, fixed: true, editable: false,
     description: 'Guides and the support inbox.' },
-  { id: 'mockup', label: 'MockupMaster', group: 'workspace', icon: Smartphone, modes: ALL_MODES, editable: false, href: '/mockup',
+  { id: 'mockup', label: 'MockupMaster', group: 'workspace', icon: Smartphone, modes: ALL_MODES, editable: false, href: '/mockup', beta: true,
     description: 'Build a pitch mockup of the customer app without creating an organisation. Opens in a new tab.' },
-  { id: 'packpulse', label: 'PackPulse', group: 'workspace', icon: HeartPulse, modes: ALL_MODES, editable: false,
+  { id: 'packpulse', label: 'PackPulse', group: 'workspace', icon: HeartPulse, modes: ALL_MODES, editable: false, beta: true,
     href: 'https://pack-pulse-v1-5.vercel.app/',
     description: 'The PackPulse dashboard. Opens in a new tab.' },
 ];

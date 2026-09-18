@@ -21,12 +21,12 @@
   padding: 7px 9px 7px 7px;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--ui-card);
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
-.osw__trigger:not(:disabled):hover { border-color: var(--ui-border-2); background: #FCFBFE; }
+.osw__trigger:not(:disabled):hover { border-color: var(--ui-border-2); background: var(--ui-tint); }
 .osw__trigger:disabled { cursor: default; }
 .osw__trigger[aria-expanded="true"] { border-color: rgba(91, 63, 214, 0.45); box-shadow: 0 0 0 3px var(--ui-ring); }
 .osw--compact .osw__trigger { width: auto; padding: 3px; border-radius: 12px; }
@@ -61,7 +61,7 @@
   padding: 6px;
   border: 1px solid var(--ui-border);
   border-radius: 13px;
-  background: #fff;
+  background: var(--ui-card);
   box-shadow: var(--ui-shadow-lg);
   animation: ui-menu-in 0.14s var(--ui-ease) both;
 }

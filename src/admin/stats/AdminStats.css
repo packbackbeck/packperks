@@ -24,7 +24,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px 10px 14px;
-  border: 1px solid #F7D9E1;
+  border: 1px solid var(--ui-danger-line);
   border-radius: var(--ui-radius);
   background: var(--ui-danger-soft);
   color: var(--ui-danger);
@@ -214,11 +214,11 @@
   padding: 18px 20px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
-  background: #FAFAFC;
+  background: var(--ui-tint-3);
 }
-.hl-ai__score--go { background: #EEF8F3; border-color: #D5EFE2; }
-.hl-ai__score--cond { background: #FEF7EA; border-color: #F7E4BE; }
-.hl-ai__score--nogo { background: #FDF0F3; border-color: #F7D9E1; }
+.hl-ai__score--go { background: var(--ui-success-tint); border-color: var(--ui-success-line); }
+.hl-ai__score--cond { background: var(--ui-warning-tint); border-color: var(--ui-warning-line); }
+.hl-ai__score--nogo { background: var(--ui-danger-tint); border-color: var(--ui-danger-line); }
 .hl-ai__num {
   margin: 0;
   font-size: 40px;

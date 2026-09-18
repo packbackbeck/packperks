@@ -37,7 +37,10 @@ import AdminAppDesign from './appdesign/AdminAppDesign';
 import AdminTikkieLog from './tikkielog/AdminTikkieLog';
 import AdminBackupCups from './backupcups/AdminBackupCups';
 import { useAdminDraft } from './hooks/useAdminDraft';
+import { ThemeProvider } from './context/ThemeContext';
+import ThemeToggle from './ThemeToggle';
 import './ui/ui.css';
+import './ui/dark.css';
 import './AdminApp.css';
 
 /* Keep-alive page wrapper. Must live at module scope: a component defined
@@ -115,6 +118,9 @@ function AdminShell() {
   const isVendorView = effectiveAccess?.level === 'vendor';
   // Mini graphs on number tiles, for everyone (Master Settings → Workspace).
   const tileDisplay = useMemo(() => ({ sparklines: display?.sparklines !== false }), [display?.sparklines]);
+  // Dark mode, for everyone (Master Settings → Workspace).
+  const darkSwitch = display?.darkModeSwitch !== false;
+  const darkAuto = display?.darkModeAuto === true;
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [focusUserId, setFocusUserId] = useState(null);
@@ -217,10 +223,12 @@ function AdminShell() {
     : profile?.role;
 
   return (
+    <ThemeProvider auto={darkAuto}>
     <div
-      className={`admin-app${previewing ? ' admin-app--previewing' : ''}${collapsed ? ' admin-app--collapsed' : ''}`}
+      className={`admin-app${previewing ? ' admin-app--previewing' : ''}${collapsed ? ' admin-app--collapsed' : ''}${darkSwitch ? ' admin-app--themed' : ''}`}
       style={{ '--sidebar-w': collapsed ? '72px' : '248px' }}
     >
+      {darkSwitch && <ThemeToggle />}
       <AdminSidebar
         tabs={tabs}
         activePage={page}
@@ -367,6 +375,7 @@ function AdminShell() {
         />
       )}
     </div>
+    </ThemeProvider>
   );
 }
 

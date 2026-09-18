@@ -4,6 +4,7 @@ import OrgSwitcher from './context/OrgSwitcher';
 import ProfileMenu from './auth/ProfileMenu';
 import { getPendingCounts } from './lib/adminApi';
 import { TAB_GROUPS } from './lib/access';
+import { BetaChip } from './ui';
 import { useOrg } from './context/OrgContext';
 import packperksLogo from '../assets/images/packperks-logo.svg';
 import './AdminSidebar.css';
@@ -75,6 +76,7 @@ export default function AdminSidebar({ tabs, activePage, onNavigate, onAddOrg, c
                   >
                     <span className="sb__item-icon"><Icon size={17} aria-hidden="true" /></span>
                     {!collapsed && <span className="sb__item-label">{item.label}</span>}
+                    {!collapsed && item.beta && <BetaChip />}
                     {!collapsed && <ArrowUpRight size={14} className="sb__item-out" aria-label="Opens in a new tab" />}
                   </a>
                 );
@@ -96,6 +98,7 @@ export default function AdminSidebar({ tabs, activePage, onNavigate, onAddOrg, c
                     {collapsed && count > 0 && <span className="sb__dot" aria-hidden="true" />}
                   </span>
                   {!collapsed && <span className="sb__item-label">{item.label}</span>}
+                  {!collapsed && item.beta && <BetaChip />}
                   {!collapsed && groupScoped && <span className="sb__scope">Group</span>}
                   {!collapsed && count > 0 && (
                     <span className="sb__badge" aria-label={`${count} waiting`}>{count > 99 ? '99+' : count}</span>

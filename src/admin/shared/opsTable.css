@@ -243,7 +243,7 @@ button.ot-person:hover { background: var(--ui-soft-2); }
   flex-shrink: 0;
   padding: 12px 18px 16px;
   border-top: 1px solid var(--ui-border);
-  background: #FCFBFE;
+  background: var(--ui-tint);
 }
 .ot-panel__label {
   margin: 0 0 6px;
@@ -294,7 +294,7 @@ button.ot-person:hover { background: var(--ui-soft-2); }
 button.ot-thumb:hover { border-color: var(--ui-border-2); box-shadow: var(--ui-shadow-md); }
 .ot-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ot-thumb--empty { background: var(--ui-soft); cursor: default; }
-.ot-thumb--bad { background: var(--ui-danger-soft); border-color: #F7D9E1; color: var(--ui-danger); cursor: default; }
+.ot-thumb--bad { background: var(--ui-danger-soft); border-color: var(--ui-danger-line); color: var(--ui-danger); cursor: default; }
 
 /* ── Lightbox ───────────────────────────────────────────────────────── */
 .ot-lightbox {
@@ -350,12 +350,12 @@ button.ot-thumb:hover { border-color: var(--ui-border-2); box-shadow: var(--ui-s
 .ot-notice__icon { flex: none; }
 .ot-notice__text { flex: 1; min-width: 0; margin: 0; font-size: 13px; line-height: 1.45; color: var(--ui-fg-2); overflow-wrap: anywhere; }
 .ot-notice__text b, .ot-notice__text strong { color: var(--ui-fg); font-weight: 700; }
-.ot-notice--danger { background: var(--ui-danger-soft); border-color: #F7D9E1; }
+.ot-notice--danger { background: var(--ui-danger-soft); border-color: var(--ui-danger-line); }
 .ot-notice--danger .ot-notice__icon { color: var(--ui-danger); }
 .ot-notice--danger .ot-notice__text b, .ot-notice--danger .ot-notice__text strong { color: var(--ui-danger); }
-.ot-notice--success { background: #EEF8F3; border-color: #D5EFE2; }
+.ot-notice--success { background: var(--ui-success-tint); border-color: var(--ui-success-line); }
 .ot-notice--success .ot-notice__icon { color: var(--ui-success); }
-.ot-notice--warning { background: #FEF7EA; border-color: #F7E4BE; }
+.ot-notice--warning { background: var(--ui-warning-tint); border-color: var(--ui-warning-line); }
 .ot-notice--warning .ot-notice__icon { color: var(--ui-warning); }
 .ot-notice--info { background: var(--ui-primary-softer); border-color: #E3DDFB; }
 .ot-notice--info .ot-notice__icon { color: var(--ui-primary); }
@@ -381,9 +381,9 @@ button.ot-thumb:hover { border-color: var(--ui-border-2); box-shadow: var(--ui-s
   gap: 9px;
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #F7E4BE;
+  border: 1px solid var(--ui-warning-line);
   border-radius: 10px;
-  background: #FEF7EA;
+  background: var(--ui-warning-tint);
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--ui-fg-2);

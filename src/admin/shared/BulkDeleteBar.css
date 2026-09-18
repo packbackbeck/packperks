@@ -23,7 +23,7 @@
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
-.bulkbar--confirm { border-color: #F7D9E1; }
+.bulkbar--confirm { border-color: var(--ui-danger-line); }
 .bulkbar__left { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .bulkbar__icon {
   display: grid;

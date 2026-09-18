@@ -52,7 +52,7 @@
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
-.mum__row:hover { border-color: var(--ui-border-2); background: #FBFAFD; }
+.mum__row:hover { border-color: var(--ui-border-2); background: var(--ui-hover); }
 .mum__row.is-selected {
   border-color: rgba(91, 63, 214, 0.5);
   background: var(--ui-primary-softer);
@@ -70,7 +70,7 @@
 
 .mum__error {
   padding: 10px 12px;
-  border: 1px solid #F7D9E1;
+  border: 1px solid var(--ui-danger-line);
   border-radius: 10px;
   background: var(--ui-danger-soft);
   color: var(--ui-danger);

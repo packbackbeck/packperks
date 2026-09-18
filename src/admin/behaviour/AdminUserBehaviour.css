@@ -116,7 +116,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-color: #F7D9E1;
+  border-color: var(--ui-danger-line);
   background: #FDF6F8;
 }
 .ub-alert__icon {
@@ -285,7 +285,7 @@
   padding: 11px 13px;
   border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: #FAFAFC;
+  background: var(--ui-tint-3);
   min-width: 0;
 }
 .ub-detail__stat .ui-mini-stat__label { line-height: 1.35; }
@@ -319,7 +319,7 @@
   padding: 12px;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
-  background: #FAFAFC;
+  background: var(--ui-tint-3);
 }
 @media (max-width: 700px) { .ub-export__groups { grid-template-columns: minmax(0, 1fr); } }
 .ub-export__group { margin: 0; padding: 0; border: 0; min-width: 0; }

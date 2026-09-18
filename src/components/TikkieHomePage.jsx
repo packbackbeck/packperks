@@ -8,6 +8,7 @@ import {
 } from '../lib/tikkieWallet';
 import { animalForProfile } from '../lib/animals';
 import { useRegion } from '../lib/RegionContext';
+import { mergeDesign } from '../admin/appdesign/designDefaults';
 import { TikkieExplainer, Sheet, LoginSheet } from './tikkie/TikkieBits';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import CupScanPage from './CupScanPage';
@@ -501,7 +502,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         onBadgeClick={() => setShowAccount(true)}
         onAddCup={() => setScanner(true)}
         org={org}
-        design={null}
+        design={mergeDesign(settings?.design)}
         claimStatus={balance > 0 ? 'ready' : null}
         showAdd
         showCups={false}

@@ -37,7 +37,7 @@
   background: var(--ui-card);
 }
 .mrm-acct--keep  { border-color: #BFE6D3; background: #F3FBF7; }
-.mrm-acct--merge { border-color: #DCD4FA; background: var(--ui-primary-softer); }
+.mrm-acct--merge { border-color: var(--ui-primary-line); background: var(--ui-primary-softer); }
 .mrm-acct__badge {
   display: inline-flex;
   align-items: center;

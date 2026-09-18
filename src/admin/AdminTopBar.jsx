@@ -4,6 +4,7 @@ import WorkflowDock from './auth/WorkflowDock';
 import { useOrg } from './context/OrgContext';
 import { ORG_MODE_META, resolveEffectiveMode } from './lib/orgModes';
 import { useAdminMoney } from './lib/adminMoney';
+import { topbarShows } from './lib/access';
 import { effectiveRates } from '../lib/rates';
 import './AdminTopBar.css';
 
@@ -51,7 +52,7 @@ function RatesBadge({ settings, mode, onOpen }) {
 }
 
 export default function AdminTopBar({ draftState, onNavigate, onPreview, allowedPages, canSeeSettings, canPublish, topbar = {} }) {
-  const shows = (id) => topbar[id] !== false;
+  const shows = (id) => topbarShows(topbar, id);
   const { publishError, clearPublishError } = draftState || {};
   const { activeOrgMode, activeGroupMode } = useOrg();
   const mode = resolveEffectiveMode(activeOrgMode, activeGroupMode);

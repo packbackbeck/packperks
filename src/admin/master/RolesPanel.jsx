@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { useAccess } from '../context/accessCtx';
 import { BUILT_IN_ROLES, LEVELS, TABS, TAB_GROUPS } from '../lib/access';
-import { Badge, Button, Card, CardBody, CardHeader, Field, Menu, MenuItem, MenuLabel, MenuSeparator, Modal, Segmented } from '../ui';
+import { Badge, BetaChip, Button, Card, CardBody, CardHeader, Field, Menu, MenuItem, MenuLabel, MenuSeparator, Modal, Segmented } from '../ui';
 import { listPeople, roleCounts, slugForRole } from './masterApi';
 
 const CELL_OPTIONS = [
@@ -236,6 +236,7 @@ export default function RolesPanel({ workspace }) {
                           <span className="ms-matrix__tab-text">
                             <span className="ms-matrix__tab-name">
                               {tab.label}
+                              {tab.beta && <BetaChip />}
                               {off && <span className="ms-chip ms-chip--off">Off for everyone</span>}
                             </span>
                             <span className="ms-matrix__tab-desc">

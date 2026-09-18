@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ChartSpline, LayoutGrid, Lock, PanelTop } from 'lucide-react';
+import { ChartSpline, LayoutGrid, Lock, MoonStar, PanelTop, SunMoon } from 'lucide-react';
 import { useAccess } from '../context/accessCtx';
-import { TABS, TAB_GROUPS, TOPBAR_ITEMS } from '../lib/access';
-import { Badge, Card, CardBody, CardHeader, Switch } from '../ui';
+import { TABS, TAB_GROUPS, TOPBAR_ITEMS, topbarShows } from '../lib/access';
+import { Badge, BetaChip, Card, CardBody, CardHeader, Switch } from '../ui';
 
 const MODE_SHORT = { standard: 'Deposit Rewards', byo: 'Bring Your Own', tikkie_only: 'Deferred Tikkie' };
 
@@ -14,6 +14,7 @@ export default function WorkspacePanel() {
   return (
     <div className="ms-stack">
       <TopbarCard />
+      <DarkModeCard />
       <DisplayCard />
       <TabsCard />
     </div>
@@ -28,7 +29,8 @@ function TopbarCard() {
 
   async function toggle(item, on) {
     const next = { ...topbar };
-    if (on) delete next[item.id]; else next[item.id] = false;
+    // Only store a choice that differs from the item's own default.
+    if (on === !item.defaultOff) delete next[item.id]; else next[item.id] = on;
     setSaving(item.id);
     setMessage(null);
     const { error } = await saveTopbar(next);
@@ -38,7 +40,7 @@ function TopbarCard() {
       : { ok: true, text: `${item.label} is ${on ? 'shown' : 'hidden'} in the top bar for everyone.` });
   }
 
-  const hidden = TOPBAR_ITEMS.filter(i => !i.fixed && topbar?.[i.id] === false).length;
+  const hidden = TOPBAR_ITEMS.filter(i => !i.fixed && !topbarShows(topbar, i.id)).length;
 
   return (
     <Card>
@@ -54,7 +56,7 @@ function TopbarCard() {
         <ul className="ms-ws__list ms-ws__list--grid">
           {TOPBAR_ITEMS.map(item => {
             const Icon = item.icon;
-            const on = item.fixed || topbar?.[item.id] !== false;
+            const on = topbarShows(topbar, item.id);
             return (
               <li key={item.id} className={`ms-ws__row${on ? '' : ' ms-ws__row--off'}`}>
                 <span className="ms-ws__icon" aria-hidden="true"><Icon size={16} /></span>
@@ -77,6 +79,73 @@ function TopbarCard() {
               </li>
             );
           })}
+        </ul>
+      </CardBody>
+    </Card>
+  );
+}
+
+/* The dark-mode switch in the corner of every page, for everyone. */
+function DarkModeCard() {
+  const { display, saveDisplay } = useAccess();
+  const [saving, setSaving] = useState(null);
+  const [message, setMessage] = useState(null);
+  const shown = display?.darkModeSwitch !== false;
+  const auto = display?.darkModeAuto === true;
+
+  async function save(patch, text) {
+    setSaving(Object.keys(patch)[0]);
+    setMessage(null);
+    const { error } = await saveDisplay({ ...display, ...patch });
+    setSaving(null);
+    setMessage(error
+      ? { ok: false, text: /row-level security/i.test(error) ? 'Only a master can change this.' : error }
+      : { ok: true, text });
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Dark mode"
+        icon={MoonStar}
+        ruled
+        subtitle="The round switch in the bottom-right corner of every dashboard page. Each person's choice is remembered in their own browser; previews of the customer app, emails and receipts always stay light."
+        actions={!shown && <Badge tone="warning">Switch hidden</Badge>}
+      />
+      <CardBody>
+        {message && <p className={message.ok ? 'ms-ok' : 'ms-error'} role="status">{message.text}</p>}
+        <ul className="ms-ws__list ms-ws__list--grid">
+          <li className={`ms-ws__row${shown ? '' : ' ms-ws__row--off'}`}>
+            <span className="ms-ws__icon" aria-hidden="true"><MoonStar size={16} /></span>
+            <div className="ms-ws__text">
+              <p className="ms-ws__name">Dark mode switch</p>
+              <p className="ms-ws__desc">Off hides the switch completely, for everyone.</p>
+            </div>
+            <Switch
+              checked={shown}
+              disabled={saving === 'darkModeSwitch'}
+              label="Show the dark mode switch"
+              onChange={v => save({ darkModeSwitch: v }, `The dark mode switch is ${v ? 'shown' : 'hidden'} for everyone.`)}
+            />
+          </li>
+          <li className={`ms-ws__row${auto ? '' : ' ms-ws__row--off'}`}>
+            <span className="ms-ws__icon" aria-hidden="true"><SunMoon size={16} /></span>
+            <div className="ms-ws__text">
+              <p className="ms-ws__name">Automatic</p>
+              <p className="ms-ws__desc">
+                Follow the sunrise and sunset of each person’s own time zone: light by day, dark after dark.
+                Their own choice still wins until the next sunrise or sunset.
+              </p>
+            </div>
+            <Switch
+              checked={auto}
+              disabled={saving === 'darkModeAuto'}
+              label="Follow sunrise and sunset"
+              onChange={v => save({ darkModeAuto: v }, v
+                ? 'The dashboard now follows sunrise and sunset.'
+                : 'The dashboard stays light until someone switches it.')}
+            />
+          </li>
         </ul>
       </CardBody>
     </Card>
@@ -114,7 +183,7 @@ function DisplayCard() {
           <li className={`ms-ws__row${sparklines ? '' : ' ms-ws__row--off'}`}>
             <span className="ms-ws__icon" aria-hidden="true"><ChartSpline size={16} /></span>
             <div className="ms-ws__text">
-              <p className="ms-ws__name">Mini graphs</p>
+              <p className="ms-ws__name">Mini graphs<BetaChip /></p>
               <p className="ms-ws__desc">A small line in each tile showing how the number moved over the period.</p>
             </div>
             <Switch
@@ -176,7 +245,7 @@ function TabsCard() {
                       <li key={tab.id} className={`ms-ws__row${on ? '' : ' ms-ws__row--off'}`}>
                         <span className="ms-ws__icon" aria-hidden="true"><Icon size={16} /></span>
                         <div className="ms-ws__text">
-                          <p className="ms-ws__name">{tab.label}</p>
+                          <p className="ms-ws__name">{tab.label}{tab.beta && <BetaChip />}</p>
                           <p className="ms-ws__desc">
                             {tab.description}
                             <span className="ms-ws__modes">

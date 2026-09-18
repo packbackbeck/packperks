@@ -50,7 +50,7 @@
 .alog-feed { margin: 0; padding: 6px 0; list-style: none; }
 .alog-row { border-bottom: 1px solid var(--ui-border); }
 .alog-row:last-child { border-bottom: 0; }
-.alog-row--open { background: #FCFBFE; }
+.alog-row--open { background: var(--ui-tint); }
 
 .alog-row__main {
   display: flex;
@@ -65,7 +65,7 @@
   color: inherit;
   cursor: pointer;
 }
-.alog-row__main:hover { background: #FBFAFD; }
+.alog-row__main:hover { background: var(--ui-hover); }
 .alog-row__main:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ui-ring); }
 
 .alog-avatar {
@@ -125,7 +125,7 @@
 .alog-block__title {
   padding: 7px 12px;
   border-bottom: 1px solid var(--ui-border);
-  background: #F8F7FB;
+  background: var(--ui-tint-2);
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.07em;

@@ -26,7 +26,7 @@
 
 .wd-preview {
   padding: 0 13px;
-  background: #fff;
+  background: var(--ui-card);
   color: var(--ui-fg-2, #3B3647);
   border-color: var(--ui-border, #E7E5EE);
   box-shadow: var(--ui-shadow-sm, none);
@@ -51,7 +51,7 @@
   height: 10px;
   border-radius: 50%;
   background: var(--ui-accent, #F2643A);
-  border: 2px solid #fff;
+  border: 2px solid var(--ui-card);
   animation: wd-pulse 1.8s ease-out infinite;
 }
 @keyframes wd-pulse {

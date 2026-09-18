@@ -53,7 +53,7 @@
 
 /* ── Step rail + body ───────────────────────────────────────────────── */
 .oow-main { flex: 1; min-height: 0; display: grid; grid-template-columns: 210px minmax(0, 1fr); }
-.oow-rail { overflow-y: auto; padding: 16px 10px; border-right: 1px solid var(--ui-border); background: #FAF9FD; }
+.oow-rail { overflow-y: auto; padding: 16px 10px; border-right: 1px solid var(--ui-border); background: var(--ui-hover); }
 .oow-rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .oow-rail__btn {
   display: flex;
@@ -172,7 +172,7 @@
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
-.oow-model:hover { border-color: var(--ui-border-2); background: #FBFAFD; }
+.oow-model:hover { border-color: var(--ui-border-2); background: var(--ui-hover); }
 .oow-model--on,
 .oow-model--on:hover { border-color: rgba(91, 63, 214, 0.55); background: var(--ui-primary-softer); box-shadow: 0 0 0 3px var(--ui-ring); }
 .oow-model__head { display: flex; align-items: center; gap: 11px; margin-bottom: 2px; }
@@ -221,7 +221,7 @@
 .oow-choice__extra { padding: 0 14px 14px 43px; }
 
 /* ── Cards, lists, toggles ──────────────────────────────────────────── */
-.oow-card { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--ui-border); border-radius: 12px; background: #FBFAFD; }
+.oow-card { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-hover); }
 .oow-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .oow-card__title { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ui-fg); }
 .oow-add { align-self: flex-start; }
@@ -234,7 +234,7 @@
   padding: 22px 16px;
   border: 1px dashed var(--ui-border-2);
   border-radius: 12px;
-  background: #FAFAFC;
+  background: var(--ui-tint-3);
   text-align: center;
   font-size: 13px;
   color: var(--ui-muted);
@@ -261,7 +261,7 @@
 .oow-invite-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.7fr) minmax(0, 1fr) auto; align-items: end; gap: 10px; }
 .oow-invite-row__remove { margin-bottom: 4px; }
 
-.oow-econ-preview { padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 12px; background: #FBFAFD; }
+.oow-econ-preview { padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-hover); }
 .oow-econ-preview__head { margin-bottom: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ui-muted-2); }
 .oow-econ-preview__row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 13px; color: var(--ui-muted); }
 .oow-econ-preview__row strong { font-size: 14px; color: var(--ui-fg); font-variant-numeric: tabular-nums; }
@@ -269,14 +269,14 @@
 /* ── Review ─────────────────────────────────────────────────────────── */
 .oow-review { margin: 0; overflow: hidden; border: 1px solid var(--ui-border); border-radius: 12px; }
 .oow-review__row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 14px; border-bottom: 1px solid var(--ui-border); font-size: 13px; }
-.oow-review__row:nth-child(even) { background: #FBFAFD; }
+.oow-review__row:nth-child(even) { background: var(--ui-hover); }
 .oow-review__row:last-child { border-bottom: 0; }
 .oow-review__k { color: var(--ui-muted); }
 .oow-review__v { display: inline-flex; align-items: center; gap: 7px; margin: 0; font-weight: 600; color: var(--ui-fg); text-align: right; }
 .oow-swatch { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); }
 
 /* ── Notes ──────────────────────────────────────────────────────────── */
-.oow-note { margin: 4px 0 0; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 10px; background: #F7F6FB; font-size: 12px; line-height: 1.55; color: var(--ui-muted); }
+.oow-note { margin: 4px 0 0; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-tint-2); font-size: 12px; line-height: 1.55; color: var(--ui-muted); }
 .oow-warn { display: flex; align-items: flex-start; gap: 7px; margin: 0; font-size: 12px; line-height: 1.45; font-weight: 600; color: var(--ui-warning); }
 .oow-warn svg { flex: none; margin-top: 1px; }
 
@@ -288,7 +288,7 @@
   gap: 10px;
   padding: 12px 20px;
   border-top: 1px solid var(--ui-border);
-  background: #FCFBFE;
+  background: var(--ui-tint);
 }
 .oow-footer__msg { flex: 1; min-width: 0; text-align: right; font-size: 12.5px; line-height: 1.4; color: var(--ui-danger); }
 

@@ -21,7 +21,7 @@
   align-items: center;
   gap: 8px;
   padding: 7px 8px 7px 14px;
-  border: 1px solid #DCD4FA;
+  border: 1px solid var(--ui-primary-line);
   border-radius: var(--ui-radius);
   background: var(--ui-primary-softer);
   animation: ac-bar-in 0.16s var(--ui-ease) both;
@@ -30,7 +30,7 @@
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: none; }
 }
-.ac-bulk-bar--confirm { border-color: #F7D9E1; background: var(--ui-danger-soft); }
+.ac-bulk-bar--confirm { border-color: var(--ui-danger-line); background: var(--ui-danger-soft); }
 .ac-bulk-bar__count { margin-right: 6px; font-size: 13px; font-weight: 700; color: var(--ui-primary); }
 .ac-bulk-bar__warn {
   display: inline-flex;
@@ -78,8 +78,8 @@
   gap: 3px;
   cursor: default;
 }
-.ac-thumb--hidden-ai { background: var(--ui-danger-soft); border-color: #F7D9E1; color: var(--ui-danger); }
-.ac-thumb--hidden-admin { background: var(--ui-warning-soft); border-color: #F7E4BE; color: var(--ui-warning); }
+.ac-thumb--hidden-ai { background: var(--ui-danger-soft); border-color: var(--ui-danger-line); color: var(--ui-danger); }
+.ac-thumb--hidden-admin { background: var(--ui-warning-soft); border-color: var(--ui-warning-line); color: var(--ui-warning); }
 .ac-thumb__hidden-label {
   font-size: 8px;
   font-weight: 700;
@@ -249,7 +249,7 @@
 .ac-tk-nolink { margin: 0; text-align: center; font-size: 12.5px; color: var(--ui-muted); }
 .ac-tk-error {
   padding: 10px 12px;
-  border: 1px solid #F7D9E1;
+  border: 1px solid var(--ui-danger-line);
   border-radius: 10px;
   background: var(--ui-danger-soft);
   color: var(--ui-fg-2);

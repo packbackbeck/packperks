@@ -14,7 +14,7 @@
 
 /* "N awaiting review" — jumps to the held queue */
 .cs-held-btn {
-  border-color: #F7E4BE;
+  border-color: var(--ui-warning-line);
   background: var(--ui-warning-soft);
   color: var(--ui-warning);
 }
@@ -102,7 +102,7 @@
   gap: 8px;
   padding: 26px 12px;
   border: 1px dashed var(--ui-border-2);
-  background: #FAFAFC;
+  background: var(--ui-tint-3);
   color: var(--ui-muted);
   font-size: 12.5px;
   text-align: center;
@@ -122,7 +122,7 @@
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.cs-detail__user:hover { border-color: var(--ui-border-2); background: #FBFAFD; box-shadow: var(--ui-shadow-sm); }
+.cs-detail__user:hover { border-color: var(--ui-border-2); background: var(--ui-hover); box-shadow: var(--ui-shadow-sm); }
 .cs-detail__user-arrow { flex-shrink: 0; margin-left: auto; color: var(--ui-muted-2); }
 .cs-detail__user:hover .cs-detail__user-arrow { color: var(--ui-primary); }
 

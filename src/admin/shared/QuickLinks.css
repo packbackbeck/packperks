@@ -56,7 +56,7 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
-  background: #FFFFFF;
+  background: var(--ui-card);
   border: 1px solid var(--ui-border, #E7E5EE);
   border-radius: 12px;
   cursor: pointer;

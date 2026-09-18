@@ -1,0 +1,233 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * Dark mode — dashboard only.
+ *
+ * The palette is neutral: near-black grounds, grey surfaces and borders,
+ * with the violet kept for what it already meant (the primary action, the
+ * first chart series). Purple is an accent here, not a background.
+ *
+ * `data-theme` sits on <html> so menus and modals that portal to <body>
+ * are covered too. The customer app never sets it.
+ *
+ * Previews are the exception: the phone, the emails and the printed
+ * receipts show what a customer or a printer will see, so every token
+ * they read is put back to its light value further down.
+ * ───────────────────────────────────────────────────────────────────── */
+
+html[data-theme="dark"] body:has(.admin-app) {
+  background-color: #0D0D0F !important;
+}
+
+/* Two selectors, deliberately: the bare <html> one reaches the menus and
+ * modals that portal to <body>, outside the shell; the `.admin-app` one is
+ * needed to out-specify that element's own light block in ui.css. */
+html[data-theme="dark"],
+html[data-theme="dark"] .admin-app {
+  color-scheme: dark;
+
+  --ui-bg: #0D0D0F;
+  --ui-card: #17171B;
+  --ui-fg: #F3F3F5;
+  --ui-fg-2: #CFCFD6;
+  --ui-muted: #9B9BA6;
+  --ui-muted-2: #74747F;
+  --ui-border: #27272E;
+  --ui-border-2: #35353E;
+  --ui-soft: #1C1C21;
+  --ui-soft-2: #23232A;
+
+  --ui-primary: #8B6DFF;
+  --ui-primary-hover: #9E85FF;
+  --ui-primary-soft: #241F35;
+  --ui-primary-softer: #1B1926;
+  --ui-primary-fg: #FFFFFF;
+  --ui-ring: rgba(139, 109, 255, 0.36);
+
+  --ui-accent: #FF7A4D;
+  --ui-accent-soft: #2E1C14;
+
+  --ui-success: #35C48D;
+  --ui-success-soft: #122620;
+  --ui-warning: #E0A33A;
+  --ui-warning-soft: #272014;
+  --ui-danger: #F2557A;
+  --ui-danger-soft: #2B151C;
+  --ui-info: #4FAEE2;
+  --ui-info-soft: #13222C;
+
+  --ui-hover: #1F1F26;
+  --ui-tint: #1A1A1F;
+  --ui-tint-2: #1C1C22;
+  --ui-tint-3: #1B1B20;
+  --ui-success-tint: #122620;
+  --ui-success-line: #1F4838;
+  --ui-warning-tint: #272014;
+  --ui-warning-line: #4B3A18;
+  --ui-danger-tint: #2B151C;
+  --ui-danger-line: #4D2331;
+  --ui-info-tint: #13222C;
+  --ui-info-line: #21404F;
+  --ui-primary-line: #38305A;
+  --ui-topbar-bg: rgba(13, 13, 15, 0.86);
+  --ui-switch-off: #3A3A44;
+
+  --ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ui-shadow-md: 0 8px 24px -10px rgba(0, 0, 0, 0.7);
+  --ui-shadow-lg: 0 24px 60px -24px rgba(0, 0, 0, 0.85);
+
+  --ui-series-1: #8B6DFF;
+  --ui-series-2: #35C48D;
+  --ui-series-3: #E8A13C;
+  --ui-series-4: #F2557A;
+  --ui-series-5: #4FAEE2;
+  --ui-series-6: #9AA3B0;
+
+  /* The legacy names the older pages still read. */
+  --pb-purple-500:    #9E85FF;
+  --pb-purple-600:    #8B6DFF;
+  --pb-purple-700:    #7A57FF;
+  --pb-purple:        #8B6DFF;
+  --pb-purple-hover:  #9E85FF;
+  --pb-purple-soft:   #241F35;
+  --pb-orange-warm:   #8B6DFF;
+  --pb-orange:        #8B6DFF;
+  --pb-orange-hover:  #9E85FF;
+  --pb-orange-soft:   #241F35;
+  --pb-red:           #F2557A;
+  --pb-brown:         #F3F3F5;
+  --pb-cream:         #27272E;
+  --pb-cream-soft:    #1C1C21;
+  --pb-cream-deep:    #35353E;
+  --pb-green:         #35C48D;
+  --pb-green-100:     #122620;
+  --pb-green-light:   #122620;
+  --pb-green-500:     #35C48D;
+  --pb-green-600:     #2FB27F;
+
+  --bk-red:      #8B6DFF;
+  --bk-yellow:   #E8A13C;
+  --bk-dark:     #F3F3F5;
+  --bk-bg:       #0D0D0F;
+  --bk-surface:  #17171B;
+  --bk-border:   #27272E;
+  --bk-text:     #F3F3F5;
+  --bk-muted:    #9B9BA6;
+  --bk-success:  #35C48D;
+  --pb-bg:       #0D0D0F;
+  --pb-text:     #F3F3F5;
+}
+
+/* Tone chips: the same hues at a weight that works on a dark ground. */
+html[data-theme="dark"] .admin-app .ui-tone--violet  { background: #241F35; color: #A98FFF; }
+html[data-theme="dark"] .admin-app .ui-tone--emerald { background: #122620; color: #45D19B; }
+html[data-theme="dark"] .admin-app .ui-tone--amber   { background: #272014; color: #E8B055; }
+html[data-theme="dark"] .admin-app .ui-tone--sky     { background: #13222C; color: #5FB9E8; }
+html[data-theme="dark"] .admin-app .ui-tone--rose    { background: #2B151C; color: #F7708E; }
+html[data-theme="dark"] .admin-app .ui-tone--teal    { background: #102725; color: #3FC2B4; }
+html[data-theme="dark"] .admin-app .ui-tone--orange  { background: #2E1C14; color: #FF8F66; }
+html[data-theme="dark"] .admin-app .ui-tone--slate   { background: #22222A; color: #A0A0AC; }
+html[data-theme="dark"] .admin-app .ui-tone--lime    { background: #1B2413; color: #93C455; }
+
+/* The vendor-preview strip is dark already; it only needs to stop being
+   the single lightest thing on the page. */
+html[data-theme="dark"] .admin-app .vendor-preview-bar {
+  background: #1A1A20;
+  border-bottom-color: #27272E;
+}
+
+/* ── Previews stay light ───────────────────────────────────────────────
+ * Each of these shows something that lives outside the dashboard — the
+ * customer app, an email, a printed receipt — so it keeps the light
+ * palette whatever the dashboard is wearing. Setting the tokens on the
+ * preview root is enough: custom properties resolve from the nearest
+ * ancestor that declares them. */
+html[data-theme="dark"] .dzp,
+html[data-theme="dark"] .sfa-phone,
+html[data-theme="dark"] .rep-mail,
+html[data-theme="dark"] .aet-mail,
+html[data-theme="dark"] .acq-receipt,
+html[data-theme="dark"] .rrg-receipt {
+  color-scheme: light;
+
+  --ui-bg: #F6F5FA;
+  --ui-card: #FFFFFF;
+  --ui-fg: #17151F;
+  --ui-fg-2: #3B3647;
+  --ui-muted: #676374;
+  --ui-muted-2: #8F8B9C;
+  --ui-border: #E7E5EE;
+  --ui-border-2: #D9D6E4;
+  --ui-soft: #F2F1F7;
+  --ui-soft-2: #ECEAF4;
+
+  --ui-primary: #5B3FD6;
+  --ui-primary-hover: #4C33BD;
+  --ui-primary-soft: #EEEAFD;
+  --ui-primary-softer: #F6F4FE;
+  --ui-primary-fg: #FFFFFF;
+  --ui-ring: rgba(91, 63, 214, 0.28);
+
+  --ui-accent: #F2643A;
+  --ui-accent-soft: #FFEEE7;
+
+  --ui-success: #0E9468;
+  --ui-success-soft: #E4F6EE;
+  --ui-warning: #C77A06;
+  --ui-warning-soft: #FDF3E1;
+  --ui-danger: #D92D55;
+  --ui-danger-soft: #FDE9EE;
+  --ui-info: #0B7FB8;
+  --ui-info-soft: #E4F3FA;
+
+  --ui-hover: #FBFAFD;
+  --ui-tint: #FCFBFE;
+  --ui-tint-2: #F8F7FB;
+  --ui-tint-3: #FAFAFC;
+  --ui-success-tint: #EEF8F3;
+  --ui-success-line: #D5EFE2;
+  --ui-warning-tint: #FEF7EA;
+  --ui-warning-line: #F7E4BE;
+  --ui-danger-tint: #FDF0F3;
+  --ui-danger-line: #F7D9E1;
+  --ui-info-tint: #EAF4FB;
+  --ui-info-line: #D2E7F4;
+  --ui-primary-line: #DCD4FA;
+
+  --ui-shadow-sm: 0 1px 2px rgba(23, 21, 31, 0.05);
+  --ui-shadow-md: 0 8px 24px -10px rgba(23, 21, 31, 0.16);
+  --ui-shadow-lg: 0 24px 60px -24px rgba(23, 21, 31, 0.28);
+
+  --pb-purple-500:    #6A4FE6;
+  --pb-purple-600:    #5B3FD6;
+  --pb-purple-700:    #4C33BD;
+  --pb-purple:        #5B3FD6;
+  --pb-purple-hover:  #4C33BD;
+  --pb-purple-soft:   #EEEAFD;
+  --pb-orange-warm:   #5B3FD6;
+  --pb-orange:        #5B3FD6;
+  --pb-orange-hover:  #4C33BD;
+  --pb-orange-soft:   #EEEAFD;
+  --pb-red:           #D92D55;
+  --pb-brown:         #17151F;
+  --pb-cream:         #E7E5EE;
+  --pb-cream-soft:    #F2F1F7;
+  --pb-cream-deep:    #D9D6E4;
+  --pb-green:         #0E9468;
+  --pb-green-100:     #E4F6EE;
+  --pb-green-light:   #E4F6EE;
+  --pb-green-500:     #0E9468;
+  --pb-green-600:     #0B7A56;
+
+  --bk-red:      #5B3FD6;
+  --bk-yellow:   #E8930C;
+  --bk-dark:     #17151F;
+  --bk-bg:       #F6F5FA;
+  --bk-surface:  #FFFFFF;
+  --bk-border:   #E7E5EE;
+  --bk-text:     #17151F;
+  --bk-muted:    #676374;
+  --bk-success:  #0E9468;
+  --pb-bg:       #F6F5FA;
+  --pb-text:     #17151F;
+
+  color: var(--ui-fg);
+}

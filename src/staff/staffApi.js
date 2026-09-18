@@ -60,6 +60,13 @@ export async function signIn(email, password) {
   }
 }
 
+/* PackBack addresses sign in with an emailed code: the staff-app function
+ * checks it and hands back a one-time token that becomes a session here. */
+export async function signInWithToken(tokenHash) {
+  const { error } = await staffSupabase.auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' });
+  if (error) throw new StaffError('sign_in_failed', error.message);
+}
+
 export function signOut() {
   return staffSupabase.auth.signOut();
 }
@@ -108,6 +115,10 @@ const MESSAGES = {
   not_on_list: 'This email is not on a staff list yet. Pick your venue to ask for access.',
   pending_approval: 'Your request is waiting for approval. Sign in to check on it.',
   no_venues: 'No venue runs the staff app right now.',
+  already_listed: 'This email is already on a staff list. Go back and enter it again.',
+  use_code: 'PackBack addresses sign in with a code. Go back and enter it again.',
+  use_password: 'Sign in with your password instead.',
+  pick_venue: 'Pick the venue you work at.',
   blocked: 'This staff account is paused. Ask your manager.',
   already_signed_up: 'This email already has an account. Sign in instead.',
   app_off: 'The staff app is not switched on for this venue.',

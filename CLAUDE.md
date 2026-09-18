@@ -147,10 +147,16 @@ Changing the switch or adding people needs *edit* on the tab; the function
 checks the role and the venue itself (`adminCtx`), because the dashboard's
 tab rules are not in the database. The app wears the venue's customer-app
 colours (`settings.design.colors` of `published:<orgId>`, mapped in
-`src/staff/staffTheme.js`) and shows its logo. Staff sign in with email and password;
-the function emails its own 6-digit codes (Brevo) for sign-up, password reset
-and email change, and sets the password on an existing login with the same
-email (a customer or dashboard account) rather than making a second one. A
+`src/staff/staffTheme.js`) and shows its logo. Signing in starts with the
+email (`lookup` in the function, migration 056): `@packback.network` always
+signs in with an emailed one-time code (`code_request` / `code_verify`, which
+returns a token the app turns into a session with `auth.verifyOtp`); an
+account with a password is asked for it; someone added or approved sets a
+password with an emailed code; anyone else picks a venue and asks
+(`request_access`), with no login until someone approves it. The function
+emails its own 6-digit codes (Brevo), and sets the password on an existing
+login with the same email (a customer or dashboard account) rather than
+making a second one. A
 staff code is an ordinary cup batch (`cups` rows, source `admin_batch`) that
 expires after 15 minutes, logged in `staff_qr_codes`; the customer claims it
 at `/<slug>/?batch=<id>` like a printed receipt. Staff never read tables
@@ -159,6 +165,12 @@ uses its own Supabase client with storage key `pp-staff-auth`, so a staff
 login never mixes with a dashboard or customer session. The QR is drawn by
 the `<qr-code>` web component (`@bitjson/qr-code`, MIT), whose animations
 run on the browser's Web Animations engine.
+
+The customer app, the staff app's password logins and the dashboard share
+one Supabase login per browser on this domain (the staff app keeps its own
+session, but the login rows are the same). A signed-in login with no
+dashboard profile gets the dashboard's sign-in page with a note
+(`AuthGate`, status `no_profile`), never an empty dashboard.
 
 `#overview?as=vendor` previews the vendor role. It can only ever *remove*
 access, so any account above vendor may use it.

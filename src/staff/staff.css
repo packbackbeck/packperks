@@ -251,7 +251,7 @@
 .st-login__head { display: flex; flex-direction: column; gap: 6px; animation: st-rise 0.35s var(--st-ease) both; }
 .st-login__title { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
 .st-login__sub { margin: 0; color: var(--st-muted); font-size: 15px; line-height: 1.5; }
-.st-login__sub b { color: var(--st-ink); font-weight: 600; word-break: break-all; }
+.st-login__sub b { color: var(--st-ink); font-weight: 600; overflow-wrap: anywhere; }
 .st-login__foot { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--st-muted); font-size: 14px; }
 .st-login__foot p { margin: 0; }
 .st-login__legal { margin: 0; color: var(--st-faint); font-size: 12px; text-align: center; }
@@ -823,3 +823,21 @@
   background: var(--st-accent-soft);
   color: var(--st-accent);
 }
+
+/* The email being signed in, with a way back to change it. */
+.st-emailchip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--st-line);
+  border-radius: 14px;
+  background: var(--st-field);
+  color: var(--st-ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+.st-emailchip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-emailchip .st-link { flex: none; }

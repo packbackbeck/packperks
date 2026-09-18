@@ -22,7 +22,7 @@ const packperksMark = '/favicon.svg';
  * onboarding wizard flips the heuristic. The user can always re-edit
  * later from the top-bar profile menu. */
 export default function AuthGate({ children }) {
-  const { status, profile, recovering, endRecovery, signOut } = useAuth();
+  const { status, session, profile, recovering, endRecovery, signOut } = useAuth();
   const [setupDone, setSetupDone]   = useState(false);
   const [welcomeDone, setWelcomeDone] = useState(false);
 
@@ -55,6 +55,20 @@ export default function AuthGate({ children }) {
 
   if (status === 'unauthenticated') {
     return <LoginPage />;
+  }
+
+  // Signed in, but not as a dashboard account: the customer app and the
+  // staff app's sign-up share this browser's login, so a customer email can
+  // end up here. Ask for a dashboard account rather than showing an empty
+  // dashboard that says no tab is allowed.
+  if (status === 'no_profile' || (profile && profile.status && profile.status !== 'active')) {
+    const who = session?.user?.email;
+    return (
+      <LoginPage
+        key={who || 'none'}
+        notice={`${who ? `${who} is` : 'This login is'} not a dashboard account. Sign in with your dashboard account to continue.`}
+      />
+    );
   }
 
   // Authenticated + has profile. Decide if we owe them onboarding.

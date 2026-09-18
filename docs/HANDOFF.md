@@ -43,6 +43,20 @@ The dashboard now follows PackPulse's layout and access model.
   Settings page therefore never showed the group switches and never locked
   the programme for grouped venues.
 
+### 0. Staff sign-in starts with the email (18 Sep, afternoon)
+
+- `/staff` asks for the email, then: @packback.network gets a one-time code
+  (never a password), an account with a password is asked for it, someone
+  added or approved sets a password with a code, anyone else picks a venue
+  and asks. A request no longer needs a code or password up front; the
+  approval email says to come back and choose a password. staff-app v5,
+  migration 056 (the `login` code purpose).
+- The dashboard showed "Your role doesn't include Dashboard" to a browser
+  signed in as a customer (a Gmail login from the customer app). It now
+  shows the sign-in page with a note saying that login is not a dashboard
+  account. Adding an outside address from the dashboard works (tested).
+- Staff codes are at most 5 cups; the wheel starts at 5 and returns to 5.
+
 ### 0. Staff app per venue, access requests (18 Sep)
 
 - **Programme → Staff app** (new tab `staffapp`, every mode) replaces Master

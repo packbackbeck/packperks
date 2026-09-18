@@ -46,13 +46,13 @@ const RESEND_WAIT = 60;
  * showcase panel) lives in ./login/AuthLayout. The email, password and code
  * inputs keep the same ids in every mode: login-email, login-password,
  * login-code. */
-export default function LoginPage() {
+export default function LoginPage({ notice = null }) {
   const [mode, setMode]         = useState('signin');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp]           = useState('');
   const [busy, setBusy]         = useState(false);
-  const [err, setErr]           = useState(null);
+  const [err, setErr]           = useState(notice);
   const [info, setInfo]         = useState(null);
   const [resendIn, setResendIn] = useState(0);
 

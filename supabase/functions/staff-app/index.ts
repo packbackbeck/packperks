@@ -1,12 +1,21 @@
 // ──────────────────────────────────────────────────────────────────────────
-// PackPerks: staff-app Edge Function (v3)
+// PackPerks: staff-app Edge Function (v5)
 //
 // Everything the PackPerks Staff web app (/staff) does, plus the dashboard's
 // Staff app page. Migrations 050 and 053 have the tables.
 //
 // Body: { action, ...fields }
 //
-// Without a login:
+// Without a login. The app asks for the email first (lookup) and takes the
+// path it answers:
+//   lookup          { email }                          next: code | password |
+//                                                      setup | request | pending |
+//                                                      blocked | app_off
+//   code_request    { email, org_id? }                 @packback.network: emails a
+//   code_verify     { email, code }                    sign-in code; verify returns a
+//                                                      one-time token for verifyOtp
+//   request_access  { email, org_id, name? }           asks to join a venue; no login
+//                                                      until someone approves it
 //   signup_request  { email, org_id?, name? }          emails a 6-digit code
 //                   An email on no staff list gets `not_on_list` with the
 //                   venues that run the app; asked again with org_id, it is
@@ -40,7 +49,9 @@
 //   admin_resend    { org_id, id }       edit access
 //
 // Requests wait for approval, except PackBack's own addresses
-// (TRUSTED_DOMAIN), which are active at once.
+// (TRUSTED_DOMAIN), which are active at once and always sign in with a code.
+// An approved request has no login yet: the person sets a password with an
+// emailed code (signup_request / signup_verify), like someone who was added.
 //
 // A staff QR code is a normal cup batch (`cups` rows sharing a batch_id,
 // source admin_batch), so the customer app claims it through claim-cups
@@ -176,6 +187,7 @@ const CODE_COPY: Record<string, { lead: string; subject: string }> = {
   signup: { lead: "Here is your code to finish creating your staff account", subject: "is your PackPerks Staff sign-up code" },
   reset: { lead: "Here is your code to set a new password", subject: "is your PackPerks Staff password code" },
   email_change: { lead: "Here is your code to use this email address for PackPerks Staff", subject: "is your PackPerks Staff email code" },
+  login: { lead: "Here is your code to sign in to PackPerks Staff", subject: "is your PackPerks Staff sign-in code" },
 };
 
 /* Who a code belongs to: an existing staff row, or (a request to join)
@@ -312,7 +324,7 @@ async function authStaff(req: Request): Promise<Ctx | Response> {
   // customer or dashboard account) is linked on its first sign-in.
   if (!staff && user.email && user.email_confirmed_at) {
     const invited = await staffByEmail(normEmail(user.email));
-    if (invited && !invited.auth_user_id && invited.status === "invited") {
+    if (invited && !invited.auth_user_id && (invited.status === "invited" || invited.status === "active")) {
       const now = new Date().toISOString();
       const { data } = await supabase.from("staff_members")
         .update({ auth_user_id: user.id, status: "active", activated_at: invited.activated_at || now, updated_at: now })
@@ -532,6 +544,118 @@ async function join(req: Request, body: Json) {
   const added = await addMember(org!, email, user.id, name);
   if ("error" in added) return added.error;
   return json({ ok: true, pending: added.staff.status === "requested" });
+}
+
+/* The first step of signing in: what this email needs next. */
+async function lookup(req: Request, body: Json) {
+  const email = normEmail(body.email);
+  if (!EMAIL_RE.test(email)) return fail("invalid_email", 400);
+  if (!await rateLimit(`staff-lookup:ip:${clientIp(req)}`, 3600, 60)) return fail("rate_limited", 429);
+  const staff = await staffByEmail(email);
+  if (staff) {
+    const org = await orgById(staff.org_id);
+    const venue = org ? { id: org.id, name: org.name, logo_url: org.logo_url } : null;
+    if (staff.status === "blocked") return json({ next: "blocked", venue });
+    if (!appOn(org)) return json({ next: "app_off", venue });
+    if (staff.status === "requested") return json({ next: "pending", venue });
+    if (trusted(email)) return json({ next: "code", venue });
+    if (staff.auth_user_id && staff.status === "active") return json({ next: "password", venue });
+    return json({ next: "setup", venue });
+  }
+  const venues = await openVenues();
+  if (!venues.length) return json({ next: "app_off" });
+  return json({ next: trusted(email) ? "code" : "request", venues });
+}
+
+/* Someone on no list asks to join a venue. Nothing to sign in with yet:
+ * once approved they set a password (signup_request / signup_verify). */
+async function requestAccess(req: Request, body: Json) {
+  const email = normEmail(body.email);
+  if (!EMAIL_RE.test(email)) return fail("invalid_email", 400);
+  if (trusted(email)) return fail("use_code", 400);
+  if (!await rateLimit(`staff-ask:ip:${clientIp(req)}`, 3600, 10)) return fail("rate_limited", 429);
+  if (!await rateLimit(`staff-ask:${email}`, 86400, 3)) return fail("rate_limited", 429);
+  if (await staffByEmail(email)) return fail("already_listed", 409);
+  const org = await orgById(String(body.org_id || ""));
+  if (!appOn(org)) return fail("app_off", 403);
+  const name = String(body.name ?? "").trim().slice(0, 60) || null;
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from("staff_members").insert({
+    org_id: org!.id, email, name, status: "requested", requested_at: now,
+  }).select(STAFF_COLS).single();
+  if (error) return fail(error.code === "23505" ? "already_listed" : "db_error", error.code === "23505" ? 409 : 500, error.message);
+  await supabase.from("admin_action_log").insert({
+    actor_id: null, actor_email: email, org_id: org!.id, action: "staff.request",
+    target_type: "staff_member", target_id: (data as Staff).id, after_state: { email, name, status: "requested" },
+  });
+  return json({ ok: true, venue: { id: org!.id, name: org!.name, logo_url: org!.logo_url } });
+}
+
+/* PackBack addresses sign in with an emailed code, never a password. */
+async function codeRequest(req: Request, body: Json) {
+  const email = normEmail(body.email);
+  if (!EMAIL_RE.test(email)) return fail("invalid_email", 400);
+  if (!trusted(email)) return fail("use_password", 400);
+  if (!await rateLimit(`staff-code:ip:${clientIp(req)}`, 3600, 20)) return fail("rate_limited", 429);
+  if (!await rateLimit(`staff-code:login:${email}`, 900, 5)) return fail("rate_limited", 429);
+  const staff = await staffByEmail(email);
+  if (staff) {
+    if (staff.status === "blocked") return fail("blocked", 403);
+    const org = await orgById(staff.org_id);
+    if (!appOn(org)) return fail("app_off", 403);
+    if (!await sendCode("login", email, { staffId: staff.id }, org!.name)) return fail("email_failed", 502);
+    return json({ ok: true, venue: org!.name });
+  }
+  const venues = await openVenues();
+  const orgId = String(body.org_id || "") || (venues.length === 1 ? venues[0].id : "");
+  const venue = venues.find((v) => v.id === orgId);
+  if (!venue) return fail(venues.length ? "pick_venue" : "app_off", venues.length ? 400 : 403, undefined, { venues });
+  if (!await sendCode("login", email, { staffId: null, orgId: venue.id }, venue.name)) return fail("email_failed", 502);
+  return json({ ok: true, venue: venue.name });
+}
+
+async function codeVerify(req: Request, body: Json) {
+  const email = normEmail(body.email);
+  const code = String(body.code ?? "").trim();
+  if (!EMAIL_RE.test(email)) return fail("invalid_email", 400);
+  if (!trusted(email)) return fail("use_password", 400);
+  if (!await rateLimit(`staff-verify:ip:${clientIp(req)}`, 3600, 40)) return fail("rate_limited", 429);
+  let staff = await staffByEmail(email);
+  if (staff?.status === "blocked") return fail("blocked", 403);
+  const used = await useCode("login", staff?.id ?? null, email, code);
+  if ("error" in used) return fail(used.error, 400);
+  const org = await orgById(staff ? staff.org_id : String(used.row.org_id || ""));
+  if (!appOn(org)) return fail("app_off", 403);
+
+  // The login behind the address: an existing one (a dashboard account keeps
+  // its password), or a new one without a password.
+  const { data: existingId } = await supabase.rpc("staff_auth_user_id", { p_email: email });
+  let authId = existingId as string | null;
+  if (!authId) {
+    const { data, error } = await supabase.auth.admin.createUser({ email, email_confirm: true });
+    if (error || !data?.user) return fail("auth_failed", 500, error?.message);
+    authId = data.user.id;
+  }
+  const { data: taken } = await supabase.from("staff_members").select("id").eq("auth_user_id", authId).maybeSingle();
+  if (taken && taken.id !== staff?.id) return fail("email_taken", 409);
+
+  const now = new Date().toISOString();
+  if (staff) {
+    await supabase.from("staff_members").update({
+      auth_user_id: authId, status: "active", activated_at: staff.activated_at || now,
+      approved_at: staff.approved_at || now, updated_at: now,
+    }).eq("id", staff.id);
+  } else {
+    const added = await addMember(org!, email, authId, null);
+    if ("error" in added) return added.error;
+    staff = added.staff;
+  }
+
+  // A one-time token the app exchanges for a session (auth.verifyOtp).
+  const { data: link, error: linkErr } = await supabase.auth.admin.generateLink({ type: "magiclink", email });
+  const tokenHash = link?.properties?.hashed_token;
+  if (linkErr || !tokenHash) return fail("auth_failed", 500, linkErr?.message);
+  return json({ ok: true, token_hash: tokenHash });
 }
 
 async function resetRequest(req: Request, body: Json) {
@@ -832,22 +956,27 @@ function inviteEmail(org: Org, email: string) {
   const link = `${APP_BASE}/staff`;
   const html = emailShell(
     `<p style="margin:0 0 12px;font-size:20px;font-weight:800">You can now make cup QR codes for ${esc(org.name)}</p>` +
-    `<p style="margin:0 0 20px;color:#3F3A34">PackPerks Staff turns returned cups into a QR code your customers scan to collect them. Create your account with this email address: <b>${esc(email)}</b></p>` +
+    `<p style="margin:0 0 20px;color:#3F3A34">PackPerks Staff turns returned cups into a QR code your customers scan to collect them. Open the app and enter this email address: <b>${esc(email)}</b></p>` +
     `<p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#5333A5;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:14px">Open PackPerks Staff</a></p>` +
-    `<p style="margin:0;color:#6C6259;font-size:13px">Choose Create account, enter your email and we send you a code. Tip: add the page to your home screen.</p>`,
+    `<p style="margin:0;color:#6C6259;font-size:13px">${trusted(email) ? "We email you a code to sign in." : "We email you a code, then you choose a password."} Tip: add the page to your home screen.</p>`,
   );
-  const text = `You can now make cup QR codes for ${org.name} with PackPerks Staff.\n\nOpen ${link}, choose Create account and use this email address: ${email}`;
+  const text = `You can now make cup QR codes for ${org.name} with PackPerks Staff.\n\nOpen ${link} and enter this email address: ${email}. ${trusted(email) ? "We email you a code to sign in." : "We email you a code, then you choose a password."}`;
   return sendEmail(email, `Your PackPerks Staff access for ${org.name}`, html, text);
 }
 
-function approvedEmail(org: Org, email: string) {
+function approvedEmail(org: Org, email: string, hasLogin = false) {
   const link = `${APP_BASE}/staff`;
+  const how = trusted(email)
+    ? `Open the app and enter <b>${esc(email)}</b>. We email you a code to sign in.`
+    : hasLogin
+      ? `Sign in with <b>${esc(email)}</b> and the password you chose to start making cup QR codes.`
+      : `Open the app, enter <b>${esc(email)}</b> and choose a password. We email you a code to confirm it is you.`;
   const html = emailShell(
     `<p style="margin:0 0 12px;font-size:20px;font-weight:800">You're in at ${esc(org.name)}</p>` +
-    `<p style="margin:0 0 20px;color:#3F3A34">Your staff account was approved. Sign in with <b>${esc(email)}</b> and the password you chose to start making cup QR codes.</p>` +
+    `<p style="margin:0 0 20px;color:#3F3A34">Your staff account was approved. ${how}</p>` +
     `<p style="margin:0"><a href="${link}" style="display:inline-block;background:#5333A5;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:14px">Open PackPerks Staff</a></p>`,
   );
-  const text = `Your PackPerks Staff account for ${org.name} was approved. Sign in at ${link} with ${email} and the password you chose.`;
+  const text = `Your PackPerks Staff account for ${org.name} was approved. ${how.replace(/<[^>]+>/g, "")} ${link}`;
   return sendEmail(email, `You're approved for PackPerks Staff at ${org.name}`, html, text);
 }
 
@@ -860,7 +989,7 @@ async function adminApprove(ctx: AdminCtx, body: Json) {
     .update({ status: "active", approved_by: ctx.userId, approved_at: now, activated_at: s.activated_at || now, updated_at: now })
     .eq("id", s.id).eq("status", "requested").select(STAFF_COLS).single();
   if (error) return fail("db_error", 500, error.message);
-  const emailed = await approvedEmail(ctx.org, s.email);
+  const emailed = await approvedEmail(ctx.org, s.email, !!s.auth_user_id);
   await adminLog(ctx, "staff.approve", s.id, { status: s.status }, { email: s.email, status: "active", emailed });
   return json({ member: staffOut(data as Staff), emailed });
 }
@@ -908,7 +1037,7 @@ async function adminInvite(ctx: AdminCtx, body: Json) {
       await supabase.from("staff_members")
         .update({ status: "active", approved_by: ctx.userId, approved_at: now, activated_at: now, updated_at: now })
         .eq("id", existing.id);
-      const sent = await approvedEmail(org, email);
+      const sent = await approvedEmail(org, email, !!existing.auth_user_id);
       results.push({ email, result: sent ? "approved" : "approved_email_failed" });
       continue;
     }
@@ -991,6 +1120,10 @@ Deno.serve(async (req) => {
       case "reset_request": return await resetRequest(req, body);
       case "reset_verify": return await resetVerify(req, body);
       case "preview": return await preview(body);
+      case "lookup": return await lookup(req, body);
+      case "request_access": return await requestAccess(req, body);
+      case "code_request": return await codeRequest(req, body);
+      case "code_verify": return await codeVerify(req, body);
       case "join": return await join(req, body);
     }
 

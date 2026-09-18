@@ -134,6 +134,87 @@ html[data-theme="dark"] .admin-app .vendor-preview-bar {
   border-bottom-color: #27272E;
 }
 
+/* ── Surfaces that are dark on purpose ─────────────────────────────────
+ * A few elements are dark in light mode: a toast, a tooltip, a save bar,
+ * the letterbox behind a photo. Two of them paint themselves with
+ * `--ui-fg`, which inverts here and would strand their white text on
+ * white. Hold them dark, and lift them off the near-black page so they
+ * still read as raised. */
+html[data-theme="dark"] .admin-app .afv__savebar,
+html[data-theme="dark"] .admin-app .pg-wrap::before,
+html[data-theme="dark"] .admin-app .st-toast,
+html[data-theme="dark"] .admin-app .cs-detail__photo {
+  background: #2A2A32;
+  color: #F3F3F5;
+}
+html[data-theme="dark"] .admin-app .pg-wrap::after { border-top-color: #2A2A32; }
+
+/* ── The tints and lines that had no exact token ───────────────────────
+ * Each of these was a one-off literal in a page's own stylesheet. Rather
+ * than shift the light palette to fit a token, they are re-pointed here,
+ * where only dark mode sees them. */
+html[data-theme="dark"] .admin-app .bulkbar__delete,
+html[data-theme="dark"] .admin-app .mrm__reject,
+html[data-theme="dark"] .admin-app .mergereq__reject,
+html[data-theme="dark"] .admin-app .cs-act--reject,
+html[data-theme="dark"] .admin-app .cs-detail__btn--reject { border-color: var(--ui-danger-line); }
+html[data-theme="dark"] .admin-app .ac-bulk-btn--reject:not(:disabled):hover,
+html[data-theme="dark"] .admin-app .ad-add__file-clear:hover { border-color: var(--ui-danger-line); }
+html[data-theme="dark"] .admin-app .ac-verdict-check--fail .ac-verdict-check__dot { background: var(--ui-danger-line); }
+html[data-theme="dark"] .admin-app .ac-tk-step.is-done:not(:last-child)::before { background: var(--ui-success-line); }
+
+html[data-theme="dark"] .admin-app .mrm-acct--keep { border-color: var(--ui-success-line); background: var(--ui-success-tint); }
+html[data-theme="dark"] .admin-app .cs-held-btn:hover { border-color: var(--ui-warning-line); background: var(--ui-warning-tint); }
+html[data-theme="dark"] .admin-app .ad-transfers__pdf:hover { background: var(--ui-primary-line); }
+html[data-theme="dark"] .admin-app .rep-econ--ok { background: var(--ui-success-tint); }
+html[data-theme="dark"] .admin-app .rep-econ--under { background: var(--ui-warning-tint); }
+html[data-theme="dark"] .admin-app .rep-econ__cell--gap-under { border-color: var(--ui-warning-line); }
+html[data-theme="dark"] .admin-app .rep-econ__cell--gap-ok { border-color: var(--ui-success-line); }
+html[data-theme="dark"] .admin-app .md-kind--on { background: var(--ui-danger-tint); }
+html[data-theme="dark"] .admin-app .hl-row--bad td { background: var(--ui-danger-tint); }
+html[data-theme="dark"] .admin-app .rbm--blocked { border-color: var(--ui-danger-line); background: var(--ui-danger-tint); }
+html[data-theme="dark"] .admin-app .dz-callout--danger { border-color: var(--ui-danger-line); }
+html[data-theme="dark"] .admin-app .dz-field--long .ui-input,
+html[data-theme="dark"] .admin-app .dz-field--long .ui-textarea { border-color: var(--ui-warning-line); }
+html[data-theme="dark"] .admin-app .dz-field--over .ui-input,
+html[data-theme="dark"] .admin-app .dz-field--over .ui-textarea { border-color: var(--ui-danger-line); }
+
+/* Flagged table rows: an amber wash that has to stay readable on black. */
+html[data-theme="dark"] .admin-app .ui-table tbody tr.ot-row--flag td { background: var(--ui-warning-tint); }
+html[data-theme="dark"] .admin-app .ui-table tbody tr.ot-row--flag.ot-row--selected td { background: #2F2716; }
+html[data-theme="dark"] .admin-app .ui-table tbody tr.ot-row--flag.ot-row--active td { background: #372D18; }
+
+html[data-theme="dark"] .admin-app .ot-notice--info,
+html[data-theme="dark"] .admin-app .ot-callout--info,
+html[data-theme="dark"] .admin-app .ms-callout--info { border-color: var(--ui-primary-line); }
+
+/* Master Settings: the level and programme colours. */
+html[data-theme="dark"] .admin-app .ms-level-dot--manager { background: #4FAEE2; }
+html[data-theme="dark"] .admin-app .ms-level-dot--vendor { background: #3FC2B4; }
+html[data-theme="dark"] .admin-app .ms-role-chip--vendor { background: #102725; border-color: #1E413D; color: #3FC2B4; }
+html[data-theme="dark"] .admin-app .ms-legend__item--view { color: #5FB9E8; }
+html[data-theme="dark"] .admin-app .ms-cell__btn--view[aria-checked="true"] { background: #2C7FA8; }
+html[data-theme="dark"] .admin-app .ms-cell__btn:not(:disabled):hover { background: rgba(255, 255, 255, 0.08); }
+html[data-theme="dark"] .admin-app .ms-mode-chip--byo { background: #122620; color: #45D19B; }
+html[data-theme="dark"] .admin-app .ms-mode-chip--tikkie_only { background: #2E1C14; color: #FF8F66; }
+html[data-theme="dark"] .admin-app .ms-sec.ms-sec--danger { background: var(--ui-danger-tint); }
+html[data-theme="dark"] .admin-app .ms-savebar { background: rgba(23, 23, 27, 0.94); }
+html[data-theme="dark"] .admin-app .ms-savebar--dirty { background: rgba(36, 31, 53, 0.96); }
+html[data-theme="dark"] .admin-app .ms-matrix__role--master { background: #1E1A2B !important; }
+html[data-theme="dark"] .admin-app .ms-matrix__cell--master { background: #1B1825; }
+
+/* The Dashboard's top-three medals. */
+html[data-theme="dark"] .admin-app .ov-leaders__rank--1 { background: #272014; color: #E8B055; }
+html[data-theme="dark"] .admin-app .ov-leaders__rank--2 { background: #22222A; color: #A0A0AC; }
+html[data-theme="dark"] .admin-app .ov-leaders__rank--3 { background: #2E1C14; color: #FF8F66; }
+
+/* The typed-confirm dialog portals to <body> and paints itself white. */
+html[data-theme="dark"] .tcm,
+html[data-theme="dark"] .tcm__input,
+html[data-theme="dark"] .tcm__btn--ghost { background: var(--ui-card); }
+html[data-theme="dark"] .tcm__foot { background: var(--ui-tint); }
+html[data-theme="dark"] .tcm-backdrop { background: rgba(0, 0, 0, 0.6); }
+
 /* ── Previews stay light ───────────────────────────────────────────────
  * Each of these shows something that lives outside the dashboard — the
  * customer app, an email, a printed receipt — so it keeps the light

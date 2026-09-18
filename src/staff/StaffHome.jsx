@@ -15,6 +15,8 @@ import {
  * as something happening. */
 const MIN_MAKING_MS = 1100;
 const POLL_MS = 3000;
+/* How long the green "collected" square stays before going back to idle. */
+const SCANNED_MS = 7000;
 
 const localMidnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 
@@ -89,6 +91,15 @@ export default function StaffHome({ me, userId, onMe, onSignOut, demo = false })
   const remaining = shown ? Math.min(expiresAt(shown) - now, life) : 0;
 
   const locked = !touched && shown?.status === 'waiting' && remaining > 0;
+
+  /* A scanned code lights the square green, then after a few seconds the
+   * square goes back to idle, ready for the next customer. */
+  const scannedId = shown && (shown.status === 'claimed' || shown.status === 'partly_claimed') ? shown.id : null;
+  useEffect(() => {
+    if (!scannedId) return undefined;
+    const t = setTimeout(() => setCurrent(c => (c && c.id === scannedId ? null : c)), SCANNED_MS);
+    return () => clearTimeout(t);
+  }, [scannedId]);
   const touch = () => setTouched(true);
   const pickCups = (n) => { setCups(n); setTouched(true); };
 
@@ -226,8 +237,11 @@ export default function StaffHome({ me, userId, onMe, onSignOut, demo = false })
           {venue.logo_url
             ? <img className="st-venue-logo" src={venue.logo_url} alt={venue.name} />
             : <p className="st-venue">{venue.name}</p>}
-          <QrStage code={shown} making={making} />
-          <StatusLine code={shown} making={making} remaining={remaining} />
+          <QrStage
+            code={shown}
+            making={making}
+            status={<StatusLine code={shown} making={making} remaining={remaining} />}
+          />
 
           <div className="st-panel">
             <div className="st-panel__cell st-panel__cell--cups" onPointerDown={touch}>
@@ -261,8 +275,6 @@ export default function StaffHome({ me, userId, onMe, onSignOut, demo = false })
           </button>
           {locked && <span id="st-cta-hint" className="st-sr">Change the cups or package to make a new code</span>}
         </div>
-
-        <span className="st-peek" aria-hidden="true">History</span>
       </section>
 
       <section className="st-log" aria-labelledby="st-log-title">

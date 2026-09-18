@@ -259,9 +259,9 @@
 
 /* ── Home: the first screen fits the viewport ─────────────────────── */
 .st-screen {
-  /* Room left for the square once the header, venue, status line,
-   * controls, button and gaps are placed. */
-  --st-avail: calc(100svh - 398px - env(safe-area-inset-top, 0px));
+  /* Room left for the code once the header, logo, the status line in the
+   * square, controls, button and gaps are placed. */
+  --st-avail: calc(100svh - 352px - env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -302,18 +302,24 @@
 /* The square */
 .st-stage {
   position: relative;
+  display: flex;
+  flex-direction: column;
   align-self: center;
   width: min(100%, 420px, max(230px, var(--st-avail)));
-  aspect-ratio: 1;
   min-height: 0;
-  padding: 8px;
+  padding: 8px 8px 0;
   border: 1px solid var(--st-line);
   border-radius: 30px;
   background: var(--st-card);
   box-shadow: var(--st-shadow);
   isolation: isolate;
+  transition: background-color 0.45s var(--st-ease), border-color 0.45s var(--st-ease), box-shadow 0.45s var(--st-ease);
 }
-.st-stage__art { position: relative; display: grid; width: 100%; height: 100%; min-height: 0; place-items: center; }
+.st-stage__art { position: relative; display: grid; width: 100%; aspect-ratio: 1; min-height: 0; place-items: center; }
+/* The status line, inside the square under the code. It reaches a little
+ * into the code's own quiet zone, which is four modules wide. */
+.st-stage__status { display: grid; flex: none; place-items: center; height: 34px; margin-top: -8px; padding: 0 12px 8px; }
+.st-stage__status .st-status { margin: 0; font-size: 14px; }
 .st-stage__code {
   width: 100%;
   height: 100%;
@@ -353,6 +359,25 @@
   .st-stage--making { animation: st-edge 1.2s var(--st-ease) infinite alternate; }
   @keyframes st-edge { to { border-color: var(--st-edge, #CFC4EF); } }
 }
+
+/* Scanned: the whole square lights up green, then goes back to idle. */
+.st-stage--lit {
+  border-color: var(--st-green);
+  background: var(--st-green);
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--st-green) 16%, transparent),
+    0 26px 50px -24px color-mix(in srgb, var(--st-green) 75%, transparent);
+  animation: st-lit 0.7s var(--st-ease);
+}
+.st-stage--lit .st-stage__code--faded { opacity: 0; }
+.st-stage--lit .st-done .st-done__badge { background: #fff; color: var(--st-green); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.16); }
+.st-stage--lit .st-done .st-done__title,
+.st-stage--lit .st-done .st-done__sub,
+.st-stage--lit .st-stage__status .st-status,
+.st-stage--lit .st-stage__status .st-status b,
+.st-stage--lit .st-stage__status .st-status__sep { color: #fff; }
+.st-stage--lit .st-done .st-done__sub { opacity: 0.85; }
+@keyframes st-lit { 35% { transform: scale(1.025); } }
 
 /* Done: collected, expired, cancelled */
 .st-done {
@@ -540,25 +565,6 @@
   color: var(--st-muted);
   box-shadow: none;
   transition: background-color 0.25s, color 0.25s;
-}
-
-.st-peek {
-  flex: none;
-  padding-top: 8px;
-  color: var(--st-faint);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-align: center;
-}
-.st-peek::after {
-  content: '';
-  display: block;
-  width: 7px;
-  height: 7px;
-  margin: 3px auto 0;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg);
 }
 
 /* ── History ───────────────────────────────────────────────────────── */

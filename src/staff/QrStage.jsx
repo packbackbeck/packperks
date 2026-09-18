@@ -13,7 +13,12 @@ import { ToneContext } from './staffTheme';
  *   making:  the placeholder ripples and a light runs round the edge
  *            (the Border Beam from Magic UI, MIT, in plain CSS)
  *   showing: the real code grows in from the centre
- *   done:    collected, expired or cancelled, over a faded code
+ *   done:    collected (the whole square lights up green), expired or
+ *            cancelled, over a faded code
+ *
+ * The status line ("2 cups · works for 14:32") sits inside the square,
+ * under the code. The component draws round dots; they are reshaped into
+ * rounded squares as soon as it draws (roundModules).
  * ───────────────────────────────────────────────────────────────────── */
 
 if (typeof window !== 'undefined' && !window.customElements.get('qr-code')) {
@@ -21,6 +26,32 @@ if (typeof window !== 'undefined' && !window.customElements.get('qr-code')) {
 }
 
 const PLACEHOLDER = 'https://perks.packback.network/staff';
+
+/* Each module is one unit wide. A rounded square a little smaller than
+ * that keeps a hairline between neighbours and scans like a plain one. */
+const MODULE_SIZE = 0.88;
+const MODULE_RADIUS = 0.26;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function roundModules(el) {
+  const dots = el?.shadowRoot?.querySelectorAll('circle.module');
+  if (!dots?.length) return;
+  const half = MODULE_SIZE / 2;
+  for (const dot of dots) {
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('class', 'module');
+    rect.setAttribute('fill', dot.getAttribute('fill'));
+    rect.setAttribute('x', String(Number(dot.getAttribute('cx')) - half));
+    rect.setAttribute('y', String(Number(dot.getAttribute('cy')) - half));
+    rect.setAttribute('width', String(MODULE_SIZE));
+    rect.setAttribute('height', String(MODULE_SIZE));
+    rect.setAttribute('rx', String(MODULE_RADIUS));
+    // The animations find a module's place from these.
+    rect.dataset.column = dot.dataset.column;
+    rect.dataset.row = dot.dataset.row;
+    dot.replaceWith(rect);
+  }
+}
 
 /* Dots appear from the centre outwards, then the three corner markers
  * settle in. */
@@ -48,18 +79,21 @@ function reveal(targets, x, y, count, entity) {
 function QrCode({ contents, tone = 'ink', play }) {
   const ref = useRef(null);
 
-  // The first draw of a real code plays the reveal once.
+  // Every draw is reshaped first; the first draw of a real code then plays
+  // the reveal once.
   useEffect(() => {
     const el = ref.current;
-    if (!el || play !== 'reveal') return undefined;
-    let done = false;
-    const run = () => {
-      if (done) return;
-      done = true;
+    if (!el) return undefined;
+    let revealed = play !== 'reveal';
+    const onDraw = () => {
+      roundModules(el);
+      if (revealed) return;
+      revealed = true;
       el.animateQRCode?.(reveal);
     };
-    el.addEventListener('codeRendered', run);
-    return () => el.removeEventListener('codeRendered', run);
+    roundModules(el);
+    el.addEventListener('codeRendered', onDraw);
+    return () => el.removeEventListener('codeRendered', onDraw);
   }, [play]);
 
   // While a code is being made, the placeholder ripples.
@@ -95,13 +129,14 @@ const DONE = {
   cancelled: { icon: Ban, tone: 'grey', title: 'Cancelled', sub: () => 'Make a new code' },
 };
 
-export default function QrStage({ code, making }) {
+export default function QrStage({ code, making, status }) {
   const phase = making ? 'making' : code ? 'showing' : 'idle';
   const done = code && code.status !== 'waiting' ? DONE[code.status] : null;
   const DoneIcon = done?.icon;
+  const lit = code?.status === 'claimed' || code?.status === 'partly_claimed';
 
   return (
-    <div className={`st-stage st-stage--${phase}${done ? ' st-stage--done' : ''}`}>
+    <div className={`st-stage st-stage--${phase}${done ? ' st-stage--done' : ''}${lit ? ' st-stage--lit' : ''}`}>
       {phase === 'making' && <span className="st-beam" aria-hidden="true"><i /></span>}
 
       <div className="st-stage__art">
@@ -125,6 +160,7 @@ export default function QrStage({ code, making }) {
           </div>
         )}
       </div>
+      <div className="st-stage__status">{status}</div>
     </div>
   );
 }

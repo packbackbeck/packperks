@@ -55,7 +55,13 @@ export function demoCalls(venue) {
       codes = [code, ...codes];
       return { code };
     }
-    if (action === 'status') return { code: codes.find(c => c.id === body.id) };
+    if (action === 'status') {
+      // In the preview a code is "scanned" a few seconds after it appears.
+      codes = codes.map(c => (c.id === body.id && c.status === 'waiting' && Date.now() - Date.parse(c.created_at) > 6000
+        ? { ...c, status: 'claimed', claimed_cups: c.cups, claimed_at: new Date().toISOString() }
+        : c));
+      return { code: codes.find(c => c.id === body.id) };
+    }
     if (action === 'cancel') {
       codes = codes.map(c => (c.id === body.id
         ? { ...c, status: 'cancelled', cancelled_at: new Date().toISOString(), url: null }

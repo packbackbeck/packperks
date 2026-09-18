@@ -120,7 +120,7 @@ const MESSAGES = {
   email_failed: 'We could not send the email. Try again in a minute.',
   email_taken: 'That email address is already in use.',
   same_email: 'That is already your email address.',
-  invalid_cups: 'Pick between 1 and 20 cups.',
+  invalid_cups: 'Pick between 1 and 5 cups.',
   invalid_package: 'Pick a package type.',
   mint_failed: 'The code could not be made. Try again.',
   upload_failed: 'The photo could not be uploaded. Try another one.',

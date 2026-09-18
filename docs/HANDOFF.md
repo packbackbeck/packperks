@@ -82,7 +82,7 @@ itself needs a push to reach perks.packback.network.
   change. An address that already has a PackPerks login (customer or
   dashboard) keeps that login; the new password is set on it.
 - **The screen:** a square that shows the code (with a making animation and
-  the code drawing itself in), a picker wheel for 1 to 20 cups that can also
+  the code drawing itself in), a picker wheel for 1 to 20 cups (5 since 18 Sep, starting at 5) that can also
   be typed into, a package type (cups only for now) and the button. Below
   it: today's totals and the history; tapping a code shows when it was made
   and collected, cups and package, and lets a waiting code be shown again or

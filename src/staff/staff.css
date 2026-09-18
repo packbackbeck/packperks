@@ -261,7 +261,7 @@
 .st-screen {
   /* Room left for the code once the header, logo, the status line in the
    * square, controls, button and gaps are placed. */
-  --st-avail: calc(100svh - 352px - env(safe-area-inset-top, 0px));
+  --st-avail: calc(100svh - 390px - env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -285,7 +285,7 @@
 .st-main {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 22px;
   margin-block: auto;
 }
 .st-venue { margin: 0 0 -4px; color: var(--st-muted); font-size: 13px; font-weight: 500; text-align: center; }
@@ -295,7 +295,7 @@
   width: auto;
   max-width: 62%;
   height: 30px;
-  margin-bottom: -2px;
+  margin-bottom: 4px;
   object-fit: contain;
 }
 
@@ -311,7 +311,6 @@
   border: 1px solid var(--st-line);
   border-radius: 30px;
   background: var(--st-card);
-  box-shadow: var(--st-shadow);
   isolation: isolate;
   transition: background-color 0.45s var(--st-ease), border-color 0.45s var(--st-ease), box-shadow 0.45s var(--st-ease);
 }
@@ -364,9 +363,7 @@
 .st-stage--lit {
   border-color: var(--st-green);
   background: var(--st-green);
-  box-shadow:
-    0 0 0 6px color-mix(in srgb, var(--st-green) 16%, transparent),
-    0 26px 50px -24px color-mix(in srgb, var(--st-green) 75%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--st-green) 16%, transparent);
   animation: st-lit 0.7s var(--st-ease);
 }
 .st-stage--lit .st-stage__code--faded { opacity: 0; }
@@ -552,7 +549,6 @@
   font-size: 16.5px;
   font-weight: 600;
   letter-spacing: 0.005em;
-  box-shadow: 0 12px 26px -16px var(--st-accent-glow, rgba(83, 51, 165, 0.9));
   cursor: pointer;
   transition: background-color 0.15s, transform 0.14s var(--st-ease);
 }

@@ -66,7 +66,7 @@ const CORS_HEADERS = {
 };
 
 // ── Limits ──────────────────────────────────────────────────────────────
-const MAX_CUPS = 20;                 // cups in one code
+const MAX_CUPS = 5;                  // cups in one code
 const PACKAGES = ["cup"];            // package types staff can pick
 const CODE_TTL_MIN = 15;             // a code on screen works this long
 const MINTS_PER_HOUR = 60;           // per staff member

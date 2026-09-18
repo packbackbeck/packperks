@@ -17,6 +17,8 @@ const MIN_MAKING_MS = 1100;
 const POLL_MS = 3000;
 /* How long the green "collected" square stays before going back to idle. */
 const SCANNED_MS = 7000;
+/* The wheel starts at this many cups, and goes back to it after each code. */
+const CUPS_DEFAULT = 5;
 
 const localMidnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 
@@ -66,7 +68,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut, demo = false })
   const { venue, limits } = me;
   // The dashboard's preview answers locally (demoCalls.js).
   const call = useMemo(() => (demo ? demoCalls(venue) : staffCall), [demo, venue]);
-  const [cups, setCups] = useState(1);
+  const [cups, setCups] = useState(() => Math.min(CUPS_DEFAULT, limits.max_cups));
   const [pkg, setPkg] = useState(limits.packages[0] || 'cup');
   const [making, setMaking] = useState(false);
   // Set when the cups or package are touched. A code still on screen keeps
@@ -171,6 +173,7 @@ export default function StaffHome({ me, userId, onMe, onSignOut, demo = false })
       const life = new Date(res.code.expires_at).getTime() - new Date(res.code.created_at).getTime();
       setCurrent({ ...res.code, localExpires: Date.now() + life });
       setTouched(false);
+      setCups(Math.min(CUPS_DEFAULT, limits.max_cups));
       setCodes(list => [res.code, ...(list || [])]);
       setToday(t => ({ codes: t.codes + 1, cups: t.cups + res.code.cups }));
       navigator.vibrate?.(10);

@@ -35,9 +35,7 @@ function TopbarCard() {
     setMessage(null);
     const { error } = await saveTopbar(next);
     setSaving(null);
-    setMessage(error
-      ? { ok: false, text: /row-level security/i.test(error) ? 'Only a master can change the top bar.' : error }
-      : { ok: true, text: `${item.label} is ${on ? 'shown' : 'hidden'} in the top bar for everyone.` });
+    setMessage(error ? (/row-level security/i.test(error) ? 'Only a master can change the top bar.' : error) : null);
   }
 
   const hidden = TOPBAR_ITEMS.filter(i => !i.fixed && !topbarShows(topbar, i.id)).length;
@@ -52,7 +50,7 @@ function TopbarCard() {
         actions={hidden > 0 && <Badge tone="warning">{hidden} hidden</Badge>}
       />
       <CardBody>
-        {message && <p className={message.ok ? 'ms-ok' : 'ms-error'} role="status">{message.text}</p>}
+        {message && <p className="ms-error" role="alert">{message}</p>}
         <ul className="ms-ws__list ms-ws__list--grid">
           {TOPBAR_ITEMS.map(item => {
             const Icon = item.icon;
@@ -93,14 +91,12 @@ function DarkModeCard() {
   const shown = display?.darkModeSwitch !== false;
   const auto = display?.darkModeAuto === true;
 
-  async function save(patch, text) {
+  async function save(patch) {
     setSaving(Object.keys(patch)[0]);
     setMessage(null);
     const { error } = await saveDisplay({ ...display, ...patch });
     setSaving(null);
-    setMessage(error
-      ? { ok: false, text: /row-level security/i.test(error) ? 'Only a master can change this.' : error }
-      : { ok: true, text });
+    setMessage(error ? (/row-level security/i.test(error) ? 'Only a master can change this.' : error) : null);
   }
 
   return (
@@ -113,7 +109,7 @@ function DarkModeCard() {
         actions={!shown && <Badge tone="warning">Switch hidden</Badge>}
       />
       <CardBody>
-        {message && <p className={message.ok ? 'ms-ok' : 'ms-error'} role="status">{message.text}</p>}
+        {message && <p className="ms-error" role="alert">{message}</p>}
         <ul className="ms-ws__list ms-ws__list--grid">
           <li className={`ms-ws__row${shown ? '' : ' ms-ws__row--off'}`}>
             <span className="ms-ws__icon" aria-hidden="true"><MoonStar size={16} /></span>
@@ -125,7 +121,7 @@ function DarkModeCard() {
               checked={shown}
               disabled={saving === 'darkModeSwitch'}
               label="Show the dark mode switch"
-              onChange={v => save({ darkModeSwitch: v }, `The dark mode switch is ${v ? 'shown' : 'hidden'} for everyone.`)}
+              onChange={v => save({ darkModeSwitch: v })}
             />
           </li>
           <li className={`ms-ws__row${auto ? '' : ' ms-ws__row--off'}`}>
@@ -141,9 +137,7 @@ function DarkModeCard() {
               checked={auto}
               disabled={saving === 'darkModeAuto'}
               label="Follow sunrise and sunset"
-              onChange={v => save({ darkModeAuto: v }, v
-                ? 'The dashboard now follows sunrise and sunset.'
-                : 'The dashboard stays light until someone switches it.')}
+              onChange={v => save({ darkModeAuto: v })}
             />
           </li>
         </ul>
@@ -164,9 +158,7 @@ function DisplayCard() {
     setMessage(null);
     const { error } = await saveDisplay({ ...display, sparklines: on });
     setSaving(false);
-    setMessage(error
-      ? { ok: false, text: /row-level security/i.test(error) ? 'Only a master can change this.' : error }
-      : { ok: true, text: `Mini graphs are ${on ? 'on' : 'off'} for everyone.` });
+    setMessage(error ? (/row-level security/i.test(error) ? 'Only a master can change this.' : error) : null);
   }
 
   return (
@@ -178,7 +170,7 @@ function DisplayCard() {
         subtitle="How the tiles at the top of Dashboard, System health and User behaviour look. It saves straight away and applies to everyone."
       />
       <CardBody>
-        {message && <p className={message.ok ? 'ms-ok' : 'ms-error'} role="status">{message.text}</p>}
+        {message && <p className="ms-error" role="alert">{message}</p>}
         <ul className="ms-ws__list ms-ws__list--grid">
           <li className={`ms-ws__row${sparklines ? '' : ' ms-ws__row--off'}`}>
             <span className="ms-ws__icon" aria-hidden="true"><ChartSpline size={16} /></span>
@@ -212,9 +204,7 @@ function TabsCard() {
     setMessage(null);
     const { error } = await saveWorkspace(next);
     setSaving(null);
-    setMessage(error
-      ? { ok: false, text: /row-level security/i.test(error) ? 'Only a master can change workspace tabs.' : error }
-      : { ok: true, text: `${tab.label} is ${on ? 'back on' : 'off'} for everyone.` });
+    setMessage(error ? (/row-level security/i.test(error) ? 'Only a master can change workspace tabs.' : error) : null);
   }
 
   const offCount = TABS.filter(t => !t.fixed && !t.masterOnly && workspace?.[t.id] === false).length;
@@ -229,7 +219,7 @@ function TabsCard() {
         actions={offCount > 0 && <Badge tone="warning">{offCount} off</Badge>}
       />
       <CardBody>
-        {message && <p className={message.ok ? 'ms-ok' : 'ms-error'} role="status">{message.text}</p>}
+        {message && <p className="ms-error" role="alert">{message}</p>}
         <div className="ms-ws">
           {TAB_GROUPS.map(group => {
             const tabs = TABS.filter(t => t.group === group.id);

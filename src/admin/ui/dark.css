@@ -134,6 +134,34 @@ html[data-theme="dark"] .admin-app .vendor-preview-bar {
   border-bottom-color: #27272E;
 }
 
+/* ── Light gradients ───────────────────────────────────────────────────
+ * A gradient can't be re-pointed with a token, so these are restated:
+ * the maintenance stripe across the top bar, the stage the phone preview
+ * stands on, the cashback pill and the drawer's header. */
+html[data-theme="dark"] .admin-app .admin-topbar--maintenance {
+  background: linear-gradient(90deg, rgba(70, 38, 24, 0.95), rgba(13, 13, 15, 0.9) 55%);
+  border-bottom-color: #5A3524;
+}
+html[data-theme="dark"] .admin-app .dz-preview__stage {
+  background:
+    radial-gradient(90% 60% at 50% 38%, rgba(139, 109, 255, 0.16), transparent 70%),
+    linear-gradient(180deg, #17171B 0%, #101014 100%);
+}
+html[data-theme="dark"] .admin-app .tb-rates {
+  border-color: var(--ui-success-line);
+  background: linear-gradient(180deg, #14291F, #102219);
+  color: #45D19B;
+}
+html[data-theme="dark"] .admin-app .tb-rates__item + .tb-rates__item { border-left-color: var(--ui-success-line); }
+html[data-theme="dark"] .admin-app .tb-rates__label { color: #6FBD97; }
+html[data-theme="dark"] .admin-app .tb-rates__value { color: #8FE3BA; }
+html[data-theme="dark"] .admin-app .tb-rates:hover { border-color: #2C6A4C; }
+html[data-theme="dark"] .admin-app .ms-drawer__head {
+  background: linear-gradient(180deg, #1C1C22 0%, #17171B 100%);
+}
+html[data-theme="dark"] .admin-publish-error-bar { border-bottom-color: var(--ui-danger-line); }
+html[data-theme="dark"] .admin-publish-error-bar strong { color: #FF8AA5; }
+
 /* ── Surfaces that are dark on purpose ─────────────────────────────────
  * A few elements are dark in light mode: a toast, a tooltip, a save bar,
  * the letterbox behind a photo. Two of them paint themselves with

@@ -25,16 +25,22 @@ export default function ThemeToggle() {
     const rect = btnRef.current?.getBoundingClientRect();
     const x = rect ? rect.left + rect.width / 2 : window.innerWidth;
     const y = rect ? rect.top + rect.height / 2 : window.innerHeight;
-    // The far corner decides how big the circle has to grow.
-    const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    // Distance to the farthest corner, plus 8%. A decelerating curve on an
+    // exact radius spends its last stretch crawling the final sliver of
+    // screen, which reads as a snap; the margin means the corner is
+    // covered at about 80% of the run and the rest is imperceptible.
+    const corner = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    const radius = corner * 1.08;
 
     const transition = document.startViewTransition(() => flushSync(toggle));
     transition.ready.then(() => {
       document.documentElement.animate(
         { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
         {
-          duration: 560,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          duration: 650,
+          // Close to linear, so the circle's edge travels at a steady
+          // speed and the sweep reads as one continuous movement.
+          easing: 'cubic-bezier(0.25, 0.25, 0.5, 0.9)',
           pseudoElement: '::view-transition-new(root)',
         },
       );

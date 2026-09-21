@@ -557,7 +557,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   const canCollect = balance > 0 || !!outstanding;
 
   return (
-    <div className="app tikkie-home">
+    <div className={`app tikkie-home${ownColors ? ' tikkie-home--branded' : ''}`}>
       <Header
         cupCount={0}
         onBadgeClick={() => setShowAccount(true)}

@@ -6,7 +6,6 @@ import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCa
 import { useOrg } from '../context/OrgContext';
 import { resolveEffectiveMode } from '../lib/orgModes';
 import packbackLogo from '../../assets/images/packback-logo.png';
-import RewardsReceiptGenerator from '../cupqr/RewardsReceiptGenerator';
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Field, PageHeader, Segmented } from '../ui';
 import './AdminByoRequests.css';
 
@@ -494,16 +493,6 @@ export default function AdminByoRequests() {
       </Card>
       )}
 
-      {/* ── Rewards receipt generator (Bring Your Own has no Receipt generator tab) ── */}
-      {mode === 'byo' && (
-      <section className="byoreq__generator" aria-labelledby="byoreq-generator-title">
-        <div className="byoreq__generator-head">
-          <h2 className="byoreq__generator-title" id="byoreq-generator-title">Test reward receipts</h2>
-          <p className="byoreq__generator-sub">Make a test purchase receipt for this store. Same tool as Receipt generator.</p>
-        </div>
-        <RewardsReceiptGenerator />
-      </section>
-      )}
     </div>
   );
 }

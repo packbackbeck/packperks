@@ -6,8 +6,12 @@ import { SECTION_GROUPS, featureOn } from './designModel';
 /* Sections: switch parts of the app on or off without touching the
  * feature behind them. A part whose feature is off in Settings can't be
  * shown, and says where to change that. */
-export default function SectionsPanel({ sections, settings, readOnly, onPatch, onReveal }) {
-  const rows = SECTION_GROUPS.flatMap(g => g.rows);
+export default function SectionsPanel({ sections, settings, readOnly, onPatch, onReveal, only = null }) {
+  // `only`: the row keys that apply (Deferred Tikkie shows just the logos).
+  const groups = only
+    ? SECTION_GROUPS.map(g => ({ ...g, rows: g.rows.filter(r => only.includes(r.key)) })).filter(g => g.rows.length)
+    : SECTION_GROUPS;
+  const rows = groups.flatMap(g => g.rows);
   const isOn = (r) => (!r.feature || featureOn(settings, r.feature)) && sections[r.key] !== false;
   const shown = rows.filter(isOn).length;
 
@@ -22,7 +26,7 @@ export default function SectionsPanel({ sections, settings, readOnly, onPatch, o
           ruled
         />
         <CardBody>
-          {SECTION_GROUPS.map(g => (
+          {groups.map(g => (
             <section key={g.id} className="dz-sec-group" aria-labelledby={`dz-sg-${g.id}`}>
               <div className="dz-rule-head">
                 <h3 id={`dz-sg-${g.id}`} className="dz-group-label">{g.title}</h3>

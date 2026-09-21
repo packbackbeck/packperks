@@ -80,6 +80,10 @@ for review. Deferred Tikkie credits one cup's refund to the wallet through
 `bin-tikkie` action `static_qr` (a claim with a synthetic batch id, like a
 backup receipt, so it shows as a return); over the limit nothing is added.
 
+Every mode has **Design & copy** (tab `appdesign`) and **Receipt generator**
+(tab `cupqr`, its own page). In Deferred Tikkie, Design & copy shows only
+Colours and the two header logos (`showPackbackLogo`, `showBrandLogo`).
+
 Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund only”,
 “Titaan Direct Refund”, “Rewards only” — are stale. The code keys stay.
 

@@ -288,6 +288,9 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
 .tikkie-home__action:active:not(:disabled) { transform: scale(0.97); }
 .tikkie-home__action:disabled { cursor: default; opacity: 0.45; }
 .tikkie-home__action--tikkie  { background: #47478A; box-shadow: 0 10px 24px rgba(71, 71, 138, 0.3); }
+/* A venue in its own colours keeps Tikkie's purple for the collect button,
+   flat: no glow competing with the venue's tile. */
+.tikkie-home--branded .tikkie-home__action--tikkie { box-shadow: none; }
 .tikkie-home__action--collect { background: var(--pb-red, #E24400); box-shadow: 0 10px 24px rgba(226, 68, 0, 0.26); }
 .tikkie-home__action--scan    { background: #1F1B16; box-shadow: 0 10px 24px rgba(31, 27, 22, 0.24); }
 .tikkie-home__action--donate  { background: #1A8737; box-shadow: 0 10px 24px rgba(26, 135, 55, 0.28); }

@@ -117,9 +117,9 @@ export const TABS = [
 
   { id: 'rewards', label: 'Rewards & offers', group: 'programme', icon: Gift, modes: APP_MODES, editable: true,
     description: 'What customers can unlock with their cups.' },
-  { id: 'appdesign', label: 'Design & copy', group: 'programme', icon: Palette, modes: APP_MODES, editable: true, beta: true,
+  { id: 'appdesign', label: 'Design & copy', group: 'programme', icon: Palette, modes: ALL_MODES, editable: true, beta: true,
     description: 'Colours, texts and sections of the customer app.' },
-  { id: 'cupqr', label: 'Receipt generator', group: 'programme', icon: QrCode, modes: ['standard', 'tikkie_only'], editable: true,
+  { id: 'cupqr', label: 'Receipt generator', group: 'programme', icon: QrCode, modes: ALL_MODES, editable: true,
     description: 'Print cup batches and receipts.' },
   { id: 'byorequests', label: 'Static QR code', group: 'programme', icon: QrCode, modes: ALL_MODES, editable: true,
     feature: 'featureStaticQr', featureDefault: { byo: true },

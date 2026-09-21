@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Check, ChevronLeft, ChevronRight, Ellipsis, ExternalLink, Eye, LockOpen, RotateCcw, Send, TriangleAlert,
+  Check, ChevronLeft, ChevronRight, Ellipsis, ExternalLink, Eye, LockOpen, Palette, RotateCcw, Send, TriangleAlert,
 } from 'lucide-react';
 import {
-  Badge, Button, Card, Menu, MenuItem, Modal, PageHeader, Segmented, Tabs, ToggleChip,
+  Badge, Button, Card, CardBody, Menu, MenuItem, Modal, PageHeader, Segmented, Tabs, ToggleChip,
 } from '../ui';
 import { supabase } from '../../lib/supabase';
 import { composeGroupCopy } from '../../lib/groups';
@@ -44,6 +44,8 @@ import './AdminAppDesign.css';
  * ───────────────────────────────────────────────────────────────────── */
 
 const TAB_STORAGE_KEY = 'pp_admin_appdesign_tab';
+/* The tabs that apply to a Deferred Tikkie venue. */
+const TIKKIE_TABS = ['colors', 'sections'];
 const COPY_KEYS = ['heroHeadline', 'heroSubtext', 'donationRecipient', 'donationDescription'];
 const NO_SETTINGS = {};
 const SAMPLE_REWARD = { id: 'sample', name: 'Your featured reward', cupsNeeded: 5, tags: [], image: '' };
@@ -86,7 +88,10 @@ function useLogoWidth(orgId) {
 }
 
 export default function AdminAppDesign({ draftState }) {
-  const { activeOrg, activeGroupId, activeGroup, activeGroupMode } = useOrg();
+  const { activeOrg, activeGroupId, activeGroup, activeGroupMode, activeOrgMode } = useOrg();
+  // Deferred Tikkie has no rewards, copy blocks or guide: only its colours
+  // and the two logos in the header apply there.
+  const tikkieMode = activeOrgMode === 'tikkie_only';
   const { access } = useViewRole();
   const readOnly = !!access && !access.canEdit('appdesign');
   const isMaster = !!access?.isMaster;
@@ -212,7 +217,10 @@ export default function AdminAppDesign({ draftState }) {
     : changes.total > 0
       ? { tone: 'warning', label: `${changes.total} unpublished change${changes.total !== 1 ? 's' : ''}` }
       : { tone: 'success', label: justPublished ? 'Published just now' : 'Published', icon: Check };
-  const tabs = TABS.map(t => (t.id === 'guide' && customSteps.length ? { ...t, count: customSteps.length } : t));
+  const tabs = TABS
+    .filter(t => !tikkieMode || TIKKIE_TABS.includes(t.id))
+    .map(t => (t.id === 'guide' && customSteps.length ? { ...t, count: customSteps.length } : t));
+  const shownTab = tikkieMode && !TIKKIE_TABS.includes(tab) ? 'colors' : tab;
 
   return (
     <div className="ui-page dz-page">
@@ -257,12 +265,18 @@ export default function AdminAppDesign({ draftState }) {
           )}
 
           <div className="dz-tabs">
-            <Tabs tabs={tabs} value={tab} onChange={setTab} ariaLabel="Design sections" />
+            <Tabs tabs={tabs} value={shownTab} onChange={setTab} ariaLabel="Design sections" />
           </div>
 
-          <fieldset className="dz-pane" disabled={readOnly} key={tab}>
-            <legend className="dz-sr">{TABS.find(t => t.id === tab)?.label}</legend>
-            {tab === 'colors' && (
+          <fieldset className="dz-pane" disabled={readOnly} key={shownTab}>
+            <legend className="dz-sr">{TABS.find(t => t.id === shownTab)?.label}</legend>
+            {shownTab === 'colors' && tikkieMode && (
+              <Callout tone="info" icon={Palette} title="In the Deferred Tikkie app">
+                Progress and add button colours the wallet tile; Reward card colours the Collect button; Buttons and
+                header colours the add and account buttons. Page, text and success colours work as described below.
+              </Callout>
+            )}
+            {shownTab === 'colors' && (
               <ColoursPanel
                 colors={design.colors}
                 org={activeOrg}
@@ -271,7 +285,7 @@ export default function AdminAppDesign({ draftState }) {
                 onReplace={replaceColors}
               />
             )}
-            {tab === 'copy' && (
+            {shownTab === 'copy' && (
               <CopyPanel
                 design={design}
                 settings={settings}
@@ -284,8 +298,9 @@ export default function AdminAppDesign({ draftState }) {
                 onReveal={reveal}
               />
             )}
-            {tab === 'sections' && (
+            {shownTab === 'sections' && (
               <SectionsPanel
+                only={tikkieMode ? ['showPackbackLogo', 'showBrandLogo'] : null}
                 sections={design.sections}
                 settings={settings}
                 readOnly={readOnly}
@@ -293,7 +308,7 @@ export default function AdminAppDesign({ draftState }) {
                 onReveal={reveal}
               />
             )}
-            {tab === 'guide' && (
+            {shownTab === 'guide' && (
               <GuidePanel
                 steps={customSteps}
                 builtIn={view.builtInGuide}
@@ -308,6 +323,31 @@ export default function AdminAppDesign({ draftState }) {
           </fieldset>
         </div>
 
+        {tikkieMode ? (
+        <aside className="dz-preview" aria-label="Preview">
+          <Card className="dz-preview__card">
+            <CardBody>
+              <div className="dz-tk-preview">
+                <h3 className="dz-tk-preview__title">Deferred Tikkie app</h3>
+                <p className="dz-tk-preview__text">
+                  The preview here shows the rewards app, which this venue doesn’t run. Publish your colours and
+                  logos, then open the app to see them on the wallet screen.
+                </p>
+                <div className="dz-tk-preview__swatches" aria-hidden="true">
+                  {['accent', 'accentDeep', 'primary', 'background'].map(k => (
+                    <span key={k} style={{ background: design.colors[k] }} />
+                  ))}
+                </div>
+                {activeOrg?.slug && (
+                  <a className="ui-btn ui-btn--outline" href={`/${activeOrg.slug}/`} target="_blank" rel="noreferrer">
+                    <ExternalLink size={15} aria-hidden="true" /> Open the app
+                  </a>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        </aside>
+        ) : (
         <aside className="dz-preview" aria-label="Preview">
           <Card className="dz-preview__card">
             <div className="dz-preview__bar">
@@ -354,6 +394,7 @@ export default function AdminAppDesign({ draftState }) {
             </div>
           </Card>
         </aside>
+        )}
       </div>
 
       <Modal

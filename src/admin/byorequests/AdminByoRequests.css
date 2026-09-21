@@ -109,7 +109,3 @@
 .byoreq__actions { display: flex; justify-content: flex-end; gap: 6px; }
 .byoreq__none { display: block; text-align: right; }
 
-/* ── Embedded test receipts ─────────────────────────────────────────── */
-.byoreq__generator { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
-.byoreq__generator-title { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.015em; color: var(--ui-fg); }
-.byoreq__generator-sub { margin: 3px 0 0; font-size: 13px; line-height: 1.5; color: var(--ui-muted); }

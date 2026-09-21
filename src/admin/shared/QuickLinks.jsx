@@ -92,7 +92,7 @@ const PAGE_META = {
     ),
   },
   cupqr: {
-    label: 'QR Receipt Batches',
+    label: 'Dynamic QR code',
     desc: 'Mint, print, and audit the QR receipts the smart bin prints.',
     tone: 'teal',
     icon: (

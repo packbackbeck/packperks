@@ -1,4 +1,4 @@
-/* Reward receipts (Receipt generator tab, also embedded on BYO QR codes).
+/* Receipt generator page.
  * Shared pieces live in ui/ui.css. Everything under .rrg-receipt is the
  * exported image and keeps its own colours. */
 

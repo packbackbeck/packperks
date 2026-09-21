@@ -676,7 +676,7 @@ export default function AdminCupScans({ onNavigate }) {
                           type="button"
                           className="ot-link ot-mono cs-batch-link"
                           onClick={e => { e.stopPropagation(); onNavigate?.('cupqr'); }}
-                          title="Open the Receipt generator"
+                          title="Open Dynamic QR code"
                         >
                           {scan.batch_id.slice(0, 8)}…
                         </button>

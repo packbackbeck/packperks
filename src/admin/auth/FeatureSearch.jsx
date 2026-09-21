@@ -193,7 +193,7 @@ const FEATURES = [
   { id: 'f-byo-qr',       name: 'Counter QR poster',       desc: 'Download the counter QR to print',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'counter qr poster download print png location bring your own byo scan' },
   { id: 'f-byo-cap',      name: 'Daily auto-credit limit', desc: 'Scans per customer before review',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'daily limit cap auto credit per customer per day hold review byo scans over limit' },
   { id: 'f-byo-held',     name: 'Review held BYO requests',desc: 'Approve or reject over-limit scans',group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'held pending review approve reject over limit byo cup request credit awaiting' },
-  { id: 'f-byo-receipt',  name: 'Rewards receipt generator',desc: 'Mint a test reward receipt',       group: 'Operations', page: 'cupqr', icon: Icon.receipt, keywords: 'receipt generator test reward mint image byo' },
+  { id: 'f-byo-receipt',  name: 'Rewards receipt generator',desc: 'Mint a test reward receipt',       group: 'Operations', page: 'receipts', icon: Icon.receipt, keywords: 'receipt generator test reward mint image byo' },
 
   // ── Cup Scans (held review + review mode) ──────────────────────────
   { id: 'f-cupscans-held',  name: 'Held cup scans',        desc: 'Over-limit scans awaiting review',  group: 'Operations', page: 'cupscans', icon: Icon.qr,      keywords: 'held pending review awaiting approve reject over limit byo cup scan credit' },

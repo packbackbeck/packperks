@@ -80,9 +80,12 @@ for review. Deferred Tikkie credits one cup's refund to the wallet through
 `bin-tikkie` action `static_qr` (a claim with a synthetic batch id, like a
 backup receipt, so it shows as a return); over the limit nothing is added.
 
-Every mode has **Design & copy** (tab `appdesign`) and **Receipt generator**
-(tab `cupqr`, its own page). In Deferred Tikkie, Design & copy shows only
-Colours and the two header logos (`showPackbackLogo`, `showBrandLogo`).
+Three code pages, one tab each: **Dynamic QR code** (tab `cupqr`, single-use
+cup batches, every mode), **Static QR code** (`byorequests`) and **Receipt
+generator** (`receipts`, test purchase receipts for rewards, so not in
+Deferred Tikkie). Every mode has **Design & copy** (`appdesign`); in Deferred
+Tikkie it shows only Colours and the two header logos (`showPackbackLogo`,
+`showBrandLogo`).
 
 Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund only”,
 “Titaan Direct Refund”, “Rewards only” — are stale. The code keys stay.
@@ -353,7 +356,7 @@ be unreachable. `RESERVED_SLUGS` (`src/admin/master/orgShared.js`) and
 `isOrgSlugAvailable` refuse them; add a new app path to both.
 
 **Printed batches change through one master-only function.** Revoke,
-restore and expiry in the Receipt generator call `admin_set_cup_batch`
+restore and expiry on the Dynamic QR code page call `admin_set_cup_batch`
 (migration 052); `cups` has no update policy, so a browser `update` on it
 silently changes nothing. Batches generated before 18 Sep never got the
 expiry they were given.

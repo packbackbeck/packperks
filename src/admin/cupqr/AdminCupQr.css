@@ -1,4 +1,4 @@
-/* Receipt generator → Cup QR receipts. Shared pieces live in ui/ui.css.
+/* Dynamic QR code page. Shared pieces live in ui/ui.css.
  *
  * Everything under .acq-receipt is the printed / exported artwork (JPG, PDF,
  * browser print) and keeps its own colours; the rest is dashboard chrome. */

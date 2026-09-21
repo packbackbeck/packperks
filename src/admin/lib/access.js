@@ -1,6 +1,6 @@
 import {
   Activity, Blocks, CircleDollarSign, CircleHelp, ClipboardList, Clock, Eye, Gauge, Gift, HandCoins,
-  HeartHandshake, HeartPulse, History, LayoutDashboard, Mail, MapPin, Palette, QrCode, Receipt, Repeat, ScanLine,
+  HeartHandshake, HeartPulse, History, LayoutDashboard, Mail, MapPin, Palette, QrCode, Receipt, ReceiptText, Repeat, ScanLine, ScanQrCode,
   Search, Send, Settings, ShieldCheck, Smartphone, Store, TabletSmartphone, Users,
 } from 'lucide-react';
 
@@ -119,9 +119,11 @@ export const TABS = [
     description: 'What customers can unlock with their cups.' },
   { id: 'appdesign', label: 'Design & copy', group: 'programme', icon: Palette, modes: ALL_MODES, editable: true, beta: true,
     description: 'Colours, texts and sections of the customer app.' },
-  { id: 'cupqr', label: 'Receipt generator', group: 'programme', icon: QrCode, modes: ALL_MODES, editable: true,
-    description: 'Print cup batches and receipts.' },
-  { id: 'byorequests', label: 'Static QR code', group: 'programme', icon: QrCode, modes: ALL_MODES, editable: true,
+  { id: 'receipts', label: 'Receipt generator', group: 'programme', icon: ReceiptText, modes: APP_MODES, editable: true,
+    description: 'Test purchase receipts that receipt verification always accepts, for claiming a reward without buying anything.' },
+  { id: 'cupqr', label: 'Dynamic QR code', group: 'programme', icon: QrCode, modes: ALL_MODES, editable: true,
+    description: 'Single-use QR codes for a set number of cups: mint, print and revoke batches.' },
+  { id: 'byorequests', label: 'Static QR code', group: 'programme', icon: ScanQrCode, modes: ALL_MODES, editable: true,
     feature: 'featureStaticQr', featureDefault: { byo: true },
     description: 'A counter QR code that gives each customer a cup, up to a daily limit. On by default for Bring Your Own.' },
   { id: 'staffapp', label: 'Staff app', group: 'programme', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff', beta: true,

@@ -26,7 +26,7 @@ import AdminHistory from './history/AdminHistory';
 import AdminReports from './reports/AdminReports';
 import AdminStats from './stats/AdminStats';
 import AdminUserBehaviour from './behaviour/AdminUserBehaviour';
-import AdminReceiptGenerator from './cupqr/AdminReceiptGenerator';
+import AdminReceiptGenerator, { AdminDynamicQr } from './cupqr/AdminReceiptGenerator';
 import AdminTransactions from './transactions/AdminTransactions';
 import AdminSupport from './support/AdminSupport';
 import AdminDonations from './donations/AdminDonations';
@@ -305,7 +305,10 @@ function AdminShell() {
                     <AdminStaffApp />
                   </KeepAlive>
                   <KeepAlive id="cupqr" activeId={page} visited={visited}>
-                    <AdminReceiptGenerator onNavigate={setPage} />
+                    <AdminDynamicQr onNavigate={setPage} />
+                  </KeepAlive>
+                  <KeepAlive id="receipts" activeId={page} visited={visited}>
+                    <AdminReceiptGenerator />
                   </KeepAlive>
                   <KeepAlive id="transactions" activeId={page} visited={visited}>
                     <AdminTransactions onNavigate={setPage} />

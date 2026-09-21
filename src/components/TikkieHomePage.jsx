@@ -4,11 +4,11 @@ import 'leaflet/dist/leaflet.css';
 import { getSmartbinLocations } from '../lib/api';
 import {
   readStoredProfile, storeProfile, fetchWallet, scanBatch,
-  scanBackupCups, redeemWallet, donateWallet, setEmail, savePendingEmail, checkBatch,
+  scanBackupCups, scanStaticQr, redeemWallet, donateWallet, setEmail, savePendingEmail, checkBatch,
 } from '../lib/tikkieWallet';
 import { animalForProfile } from '../lib/animals';
 import { useRegion } from '../lib/RegionContext';
-import { mergeDesign } from '../admin/appdesign/designDefaults';
+import { applyDesignColors, mergeDesign } from '../admin/appdesign/designDefaults';
 import { TikkieExplainer, Sheet, LoginSheet } from './tikkie/TikkieBits';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import CupScanPage from './CupScanPage';
@@ -49,6 +49,8 @@ const SCAN_ERRORS = {
   backup_cooldown:  'This receipt was just used. Please wait a moment and scan again.',
   backup_daily_cap: 'We can’t process this receipt right now. Please ask a member of staff.',
   missing_device:  'Your browser is blocking storage, which we need to keep your balance. Please turn off private mode and scan again.',
+  static_qr_off:   'This counter code isn’t active right now. Please ask a member of staff.',
+  maintenance:     'We’re doing some maintenance. Please scan the code again a little later.',
 };
 
 /* Dev-only sample states for design review (?demo=…). */
@@ -248,7 +250,7 @@ function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy }) {
   );
 }
 
-export default function TikkieHomePage({ org, settings = {}, batchId = '', cupIds = [], consentReady = true }) {
+export default function TikkieHomePage({ org, settings = {}, batchId = '', cupIds = [], staticQr = null, consentReady = true }) {
   // Currency AND payout copy follow the active region: a UAE venue shows
   // AED and never names Tikkie, which is a Dutch product with no UAE
   // equivalent wired up yet (payments.js). `isLinkPayout` gates every
@@ -287,9 +289,22 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   const [showAccount, setShowAccount] = useState(false);
   const [impactOpen, setImpactOpen] = useState(false);
   const [openItem, setOpenItem] = useState(null);   // an activity row, opened
+
+  /* A venue with its own colours (Design & copy) wears them here too: the
+   * tile takes the accent, buttons and text the rest of the palette. A
+   * venue without any keeps the PackPerks orange. */
+  const ownColors = settings?.design?.colors && Object.keys(settings.design.colors).length
+    ? settings.design.colors : null;
+  useEffect(() => {
+    if (!ownColors) return undefined;
+    applyDesignColors(mergeDesign(settings.design).colors);
+    return () => applyDesignColors(null);
+  }, [ownColors, settings?.design]);
   const [redeeming, setRedeeming] = useState(false);
   const [donating, setDonating] = useState(false);
   const scanStartedRef = useRef(false);
+  const staticStartedRef = useRef(false);
+  const staticOn = settings?.featureStaticQr === true;
   // The batch the "held for review" popup is waiting on — the URL's, or one
   // the camera just read.
   const [pendingBatch, setPendingBatch] = useState(batchId || '');
@@ -360,6 +375,35 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     }
     setPopup({ type: 'error', message: SCAN_ERRORS[data?.error] || 'We couldn’t process this receipt right now. Please scan it again in a moment.' });
   }, [org?.id, refreshWallet]);
+
+  /* The counter's Static QR code: one cup's refund, up to the daily limit.
+   * Shared by the QR's own URL (?byo=1) and the in-app camera. */
+  const runStaticQr = useCallback(async (loc) => {
+    const data = await scanStaticQr(org?.id, loc);
+    if (data?.profile) {
+      setProfile(data.profile);
+      storeProfile(org?.id, { userId: data.profile.user_id, email: data.profile.email, name: data.profile.name });
+    }
+    if (data?.status === 'credited') {
+      setPopup({ type: 'credited', amount: Number(data.amount || 0), cups: data.cups || 1 });
+      await refreshWallet();
+      return;
+    }
+    if (data?.status === 'limit_reached') {
+      setPopup({ type: 'limit', limit: Number(data.limit || 0) });
+      await refreshWallet();
+      return;
+    }
+    setPopup({ type: 'error', message: SCAN_ERRORS[data?.error] || 'We couldn’t add the cup right now. Please scan the code again in a moment.' });
+  }, [org?.id, refreshWallet]);
+
+  useEffect(() => {
+    if (DEMO || !staticQr || !consentReady || staticStartedRef.current) return;
+    staticStartedRef.current = true;
+    // Off the address first, so a reload never scans it a second time.
+    try { window.history.replaceState({}, '', window.location.pathname); } catch { /* fine */ }
+    runStaticQr(staticQr.loc);
+  }, [consentReady, staticQr, runStaticQr]);
 
   /* The scan from the URL — only after the cookie choice, and only once.
    * Rejecting the banner (CookieBlocked) means this never runs: no profile,
@@ -450,14 +494,22 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     return (
       <CupScanPage
         copy={{
-          title: 'Scan your receipt',
-          subtitle: 'Point your camera at the QR on the receipt the smart bin printed. We’ll add its value to your balance.',
+          title: staticOn ? 'Scan a QR code' : 'Scan your receipt',
+          subtitle: staticOn
+            ? 'Point your camera at the QR on your receipt, or at the code on the counter. We’ll add its value to your balance.'
+            : 'Point your camera at the QR on the receipt the smart bin printed. We’ll add its value to your balance.',
           caption: 'Hold steady in good light — the QR is at the bottom of the receipt.',
         }}
         onBack={() => setScanner(false)}
         onScan={(parsed) => {
           setScanner(false);
-          // A BYO counter QR isn't a refund receipt — say so rather than
+          // This venue's own counter code, when Static QR code is on.
+          const slug = String(parsed?.byoPath || '').split('/').filter(Boolean)[0] || null;
+          if (parsed?.byo && staticOn && (!slug || slug === org?.slug)) {
+            runStaticQr(parsed.loc || null);
+            return;
+          }
+          // Any other counter QR isn't a refund receipt — say so rather than
           // failing silently on a code this mode can't pay out.
           if (!parsed?.batchId && !parsed?.cupIds?.length) {
             setPopup({ type: 'error', message: SCAN_ERRORS.wrong_mode });
@@ -521,6 +573,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       <button
         type="button"
         className="tikkie-home__hero"
+        style={ownColors?.accent ? { '--tk-hero': ownColors.accent } : undefined}
         onClick={() => (canCollect ? setPopup({ type: 'redeem' }) : setScanner(true))}
       >
         <div className="tikkie-home__hero-copy">
@@ -696,9 +749,25 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           <h2 className="tk-sheet__title">{money(Number(popup.amount))} added</h2>
           <p className="tk-sheet__sub">
             {popup.cups} cup{popup.cups === 1 ? '' : 's'} returned. Your balance is {money(balance)} —
-            collect it whenever you like{actionButtons ? '.' : ' from the orange tile.'}
+            collect it whenever you like{actionButtons ? '.' : ownColors ? ' from the tile above.' : ' from the orange tile.'}
           </p>
           <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Nice</button>
+        </Sheet>
+      )}
+
+      {popup?.type === 'limit' && (
+        <Sheet onClose={() => setPopup(null)} label="Today’s limit reached">
+          <div className="tk-icon tk-icon--warn" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
+          </div>
+          <h2 className="tk-sheet__title">Today’s limit reached</h2>
+          <p className="tk-sheet__sub">
+            {popup.limit > 0
+              ? `The counter code gives ${popup.limit} ${popup.limit === 1 ? 'cup' : 'cups'} per person a day, and you’ve had them today. Scan it again tomorrow.`
+              : 'You’ve had today’s cups from the counter code. Scan it again tomorrow.'}
+            {balance > 0 ? ` Your balance is ${money(balance)}.` : ''}
+          </p>
+          <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Understood</button>
         </Sheet>
       )}
 

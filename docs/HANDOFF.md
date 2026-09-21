@@ -43,6 +43,23 @@ The dashboard now follows PackPulse's layout and access model.
   Settings page therefore never showed the group switches and never locked
   the programme for grouped venues.
 
+### 0. Static QR code for every programme; Cartouche (21 Sep)
+
+- **Static QR code** is now a feature any venue can switch on (Settings →
+  Features), not just Bring Your Own, where it stays on by default. The
+  sidebar tab (was "BYO QR codes") follows the switch. byo-mint v18 accepts
+  Deposit Rewards venues that switched it on; bin-tikkie v15 adds
+  `static_qr` for Deferred Tikkie wallets (one cup's refund per scan, up to
+  the daily limit, 2 by default). The Tikkie app runs the scan from the QR's
+  address after the cookie choice, and its camera accepts the venue's own
+  counter code.
+- **Cartouche** (V.M.H.C. Cartouche, hockey club, NL) was created as a
+  Deferred Tikkie venue with Titaan 3's settings, its green palette
+  (#006633) and logo (`public/brand/cartouche.png`), and Static QR code on.
+  Slug `cartouche`. No smart bins or locations yet.
+- The Deferred Tikkie home now wears a venue's own colours (Design & copy)
+  when it has any; venues without them keep the PackPerks orange.
+
 ### 0. Staff sign-in starts with the email (18 Sep, afternoon)
 
 - `/staff` asks for the email, then: @packback.network gets a one-time code

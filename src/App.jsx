@@ -811,10 +811,19 @@ export default function App({ consentReady = true } = {}) {
             // is never shown any difference.
             const cupIds = (sp.get('cups') || '')
               .split(',').map(c => c.trim()).filter(Boolean);
+            // `?byo=1[&loc=]` is the counter's Static QR code (a venue
+            // that switched it on): one cup's refund per scan, up to its
+            // daily limit. TikkieHomePage clears it from the address once
+            // the scan has run (not here: the cookie choice restarts the
+            // app, and the scan waits for it).
+            const staticQr = sp.get('byo') !== null
+              ? { loc: (sp.get('loc') || '').trim() || null }
+              : null;
             setTikkieOnly({
               org,
               batchId: (sp.get('batch') || '').trim(),
               cupIds,
+              staticQr,
               settings: earlyCfg.settings || {},
             });
             return; // finally{} clears isLoading
@@ -1757,7 +1766,7 @@ export default function App({ consentReady = true } = {}) {
       const path = (parsed.byoPath && parsed.byoPath !== '/')
         ? parsed.byoPath
         : (activeOrg?.slug ? `/${activeOrg.slug}/` : '/');
-      window.location.href = `${path}?byo=1`;
+      window.location.href = `${path}?byo=1${parsed.loc ? `&loc=${encodeURIComponent(parsed.loc)}` : ''}`;
       return;
     }
     track(EVENTS.CUP_ADDED);
@@ -1886,6 +1895,7 @@ export default function App({ consentReady = true } = {}) {
         settings={tikkieOnly.settings}
         batchId={tikkieOnly.batchId || ''}
         cupIds={tikkieOnly.cupIds || []}
+        staticQr={tikkieOnly.staticQr || null}
         consentReady={consentReady}
       />
     );

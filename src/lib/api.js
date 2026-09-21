@@ -762,12 +762,14 @@ export function parseCupQr(payload) {
   let cupsParam = null
   let byo = null
   let byoPath = null
+  let loc = null
   try {
     const url = new URL(payload)
     batch = url.searchParams.get('batch')
     cupsParam = url.searchParams.get('cups')
     byo = url.searchParams.get('byo')
     byoPath = url.pathname
+    loc = url.searchParams.get('loc')
   } catch {
     cupsParam = payload
   }
@@ -781,7 +783,8 @@ export function parseCupQr(payload) {
   // daily cap). Return the store-slug path so the caller can re-enter the
   // stationary-QR flow on the CURRENT origin — the QR's own domain (vercel or
   // perks.packback.app) is intentionally ignored so it works everywhere.
-  if (byo !== null) return { byo: true, byoPath: byoPath || '/' }
+  // The location it was printed for (?loc=) rides along.
+  if (byo !== null) return { byo: true, byoPath: byoPath || '/', loc: loc || null }
   return null
 }
 

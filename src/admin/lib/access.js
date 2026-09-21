@@ -121,8 +121,9 @@ export const TABS = [
     description: 'Colours, texts and sections of the customer app.' },
   { id: 'cupqr', label: 'Receipt generator', group: 'programme', icon: QrCode, modes: ['standard', 'tikkie_only'], editable: true,
     description: 'Print cup batches and receipts.' },
-  { id: 'byorequests', label: 'BYO QR codes', group: 'programme', icon: QrCode, modes: ['byo'], editable: true,
-    description: 'Counter QR codes and the auto-credit queue.' },
+  { id: 'byorequests', label: 'Static QR code', group: 'programme', icon: QrCode, modes: ALL_MODES, editable: true,
+    feature: 'featureStaticQr', featureDefault: { byo: true },
+    description: 'A counter QR code that gives each customer a cup, up to a daily limit. On by default for Bring Your Own.' },
   { id: 'staffapp', label: 'Staff app', group: 'programme', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff', beta: true,
     description: 'The phone app staff use to make cup QR codes: on or off, accounts, requests and every code made. Viewing is enough to approve requests.' },
   { id: 'futurevendors', label: 'Future vendors', group: 'programme', icon: Store, modes: APP_MODES, needsGroup: true, editable: true,
@@ -263,7 +264,15 @@ export function tabAvailability(tab, { access, mode, settings, hasGroup, workspa
   if (!access || access.tabAccess(tab.id) === 'hidden') return { visible: false, reason: 'role' };
   if (tab.modes && !tab.modes.includes(mode || 'standard')) return { visible: false, reason: 'mode' };
   if (tab.needsGroup && !hasGroup) return { visible: false, reason: 'group' };
-  if (tab.feature && settings && settings[tab.feature] === false) return { visible: false, reason: 'feature', feature: tab.feature };
+  if (tab.feature) {
+    // Unset means on, unless the tab names a default per programme
+    // (Static QR code: on for Bring Your Own, off elsewhere).
+    const v = settings ? settings[tab.feature] : undefined;
+    const on = v === undefined || v === null
+      ? (tab.featureDefault ? !!tab.featureDefault[mode || 'standard'] : true)
+      : v !== false;
+    if (!on) return { visible: false, reason: 'feature', feature: tab.feature };
+  }
   return { visible: true };
 }
 

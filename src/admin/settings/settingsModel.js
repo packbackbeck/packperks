@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Banknote, Construction, EyeOff, HeartHandshake, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
-  ScrollText, Share2, SlidersHorizontal, Sparkles, ToggleRight, Wallet,
+  QrCode, ScrollText, Share2, SlidersHorizontal, Sparkles, ToggleRight, Wallet,
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -64,6 +64,13 @@ export const FEATURES = [
     detail: 'With nothing to collect, the first button becomes Scan a QR code. Donate shows only while Donations is on. Switched off, the wallet tile carries a single collect button instead, as before. Tapping the wallet always opens the collect instructions.',
   },
   {
+    key: 'featureStaticQr', group: 'app', icon: QrCode, tone: 'teal', modes: ALL, fallback: false, fallbackByMode: { byo: true },
+    label: 'Static QR code',
+    summary: 'A QR code at the counter that gives each customer a cup, up to a daily limit.',
+    detail: 'Print it once and leave it out: every scan adds one cup (in Deferred Tikkie, one cup’s refund to the wallet) until the person reaches the limit you set on the Static QR code page. On by default for Bring Your Own. Switching it off stops the code working and removes the Static QR code tab from this dashboard.',
+    tab: 'byorequests',
+  },
+  {
     key: 'featureDirectRefunds', group: 'app', icon: Banknote, tone: 'emerald', modes: APP, fallback: true,
     label: 'Direct refunds',
     summary: 'Customers cash out their cups instead of choosing a reward.',
@@ -111,9 +118,12 @@ export function featuresFor(mode, hasGroup) {
   return FEATURES.filter(f => f.modes.includes(mode) && (!f.needsGroup || hasGroup));
 }
 
-export function featureValue(feature, settings) {
+/* A feature's value, or its default when unset. Some defaults depend on the
+ * programme (Static QR code is on for Bring Your Own only). */
+export function featureValue(feature, settings, mode) {
   const v = settings?.[feature.key];
-  return v === undefined || v === null ? feature.fallback : !!v;
+  if (v !== undefined && v !== null) return !!v;
+  return feature.fallbackByMode?.[mode] ?? feature.fallback;
 }
 
 /* The draft, the published copy, and a toast after every change. */

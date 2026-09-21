@@ -14,8 +14,10 @@
 //   { status: "credited", cups, preBalance, newBalance, autoRemaining }
 //   { status: "pending_review", preBalance, newBalance }
 //
-// BYO-only: refuses any org that isn't in a group whose mode is 'byo', so the
-// deposit orgs (which use claim-cups / batches) can never be minted here.
+// Static QR code: a Bring Your Own venue (group mode 'byo') has it unless it
+// was switched off; any other venue only once Settings → Static QR code is
+// on (published settings `featureStaticQr`). Deferred Tikkie venues credit
+// their money wallet through bin-tikkie (action static_qr), never here.
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -82,15 +84,23 @@ Deno.serve(async (req) => {
   if (!owns && deviceId && userRow.device_id === deviceId) owns = true;
   if (!owns) return json({ error: "forbidden" }, 403);
 
-  // ── BYO-only guard: org must be in a group whose mode is 'byo' ───────
+  // ── Static QR guard ──────────────────────────────────────────────────
   const { data: org } = await supabase
     .from("organizations").select("id, group_id").eq("id", orgId).maybeSingle();
-  if (!org?.group_id) return json({ error: "not_grouped" }, 400);
-  const { data: cfg } = await supabase
-    .from("app_config").select("value").eq("key", `published:group:${org.group_id}`).maybeSingle();
-  if ((cfg?.value as { settings?: { mode?: string } } | null)?.settings?.mode !== "byo") {
-    return json({ error: "not_byo" }, 400);
+  if (!org) return json({ error: "org_not_found" }, 404);
+  const { data: orgCfg } = await supabase
+    .from("app_config").select("value").eq("key", `published:${orgId}`).maybeSingle();
+  const orgSettings = (orgCfg?.value as { settings?: Record<string, unknown> } | null)?.settings || {};
+  if (orgSettings.mode === "tikkie_only") return json({ error: "wrong_mode" }, 400);
+  let isByo = false;
+  if (org.group_id) {
+    const { data: cfg } = await supabase
+      .from("app_config").select("value").eq("key", `published:group:${org.group_id}`).maybeSingle();
+    isByo = (cfg?.value as { settings?: { mode?: string } } | null)?.settings?.mode === "byo";
   }
+  const flag = orgSettings.featureStaticQr;
+  const enabled = flag === undefined || flag === null ? isByo : flag === true;
+  if (!enabled) return json({ error: isByo ? "static_qr_off" : "not_byo" }, 400);
 
   // ── Optional per-location tag ────────────────────────────────────────
   // The counter QR may carry ?loc=<location_id>. Accept it only if that
@@ -161,7 +171,7 @@ Deno.serve(async (req) => {
     status: "success", cups_awarded: 1, scanned_at: new Date().toISOString(),
   });
   await supabase.from("activity_history").insert({
-    user_id: userId, type: "cup_added", label: "Cup added (bring your own)",
+    user_id: userId, type: "cup_added", label: isByo ? "Cup added (bring your own)" : "Cup added (counter QR)",
   });
 
   return json({

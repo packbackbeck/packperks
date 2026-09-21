@@ -518,6 +518,103 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
   return credited;
 }
 
+/* ── Static QR code ──────────────────────────────────────────────────────────
+ * action:"static_qr" {org_id, device_id, location_id?} — the counter QR of a
+ * Deferred Tikkie venue that switched Static QR code on (published settings
+ * featureStaticQr). Each scan credits one cup's refund to the scanner's
+ * wallet, up to the venue's per-person limit per rolling 24 hours (app_config
+ * `byo:cap:<orgId>`, set on the Static QR code page; the same key byo-mint
+ * reads). Over the limit nothing is added and the reply says so. The credit
+ * is an ordinary wallet credit with a synthetic batch id, like a backup
+ * receipt, so the balance, collecting and donating need nothing new;
+ * cup_scans keeps one row per scan (scan_type 'byo', source 'static_qr') for
+ * the limit and the dashboard's scan counts. */
+const STATIC_DAILY_DEFAULT = 2;
+
+async function staticQrAction(body: Record<string, unknown>): Promise<Response> {
+  const orgId = String(body.org_id || "").trim();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  const rawLocation = String(body.location_id || "").trim();
+  if (!UUID_RE.test(orgId)) return json({ error: "batch_not_found" }, 404);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+
+  const { data: cfgRow } = await supabase.from("app_config")
+    .select("value").eq("key", `published:${orgId}`).maybeSingle();
+  const settings = (cfgRow?.value as { settings?: Record<string, unknown> } | null)?.settings || {};
+  if (settings.mode !== "tikkie_only") return json({ error: "wrong_mode" }, 409);
+  if (settings.featureStaticQr !== true) return json({ error: "static_qr_off" }, 409);
+  if (settings.maintenanceMode === true) return json({ error: "maintenance" }, 503);
+
+  const profile = await findOrCreateProfile(orgId, deviceId);
+  if (!profile) return json({ error: "account_failed" }, 500);
+  const profileOut = {
+    user_id: profile.id,
+    name: profile.display_name,
+    animal_index: profile.animal_index,
+    email: profile.email,
+  };
+
+  // Where it was scanned, when the QR names one of this venue's locations.
+  let locationId: string | null = null;
+  if (UUID_RE.test(rawLocation)) {
+    const { data: loc } = await supabase
+      .from("locations").select("id").eq("id", rawLocation).eq("org_id", orgId).maybeSingle();
+    if (loc) locationId = loc.id;
+  }
+
+  const { data: capCfg } = await supabase
+    .from("app_config").select("value").eq("key", `byo:cap:${orgId}`).maybeSingle();
+  const capVal = Number((capCfg?.value as { dailyCap?: number } | null)?.dailyCap);
+  const dailyCap = Number.isFinite(capVal) && capVal > 0 ? Math.floor(capVal) : STATIC_DAILY_DEFAULT;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from("cup_scans")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", profile.id).eq("scan_type", "byo").eq("source", "static_qr").eq("status", "success")
+    .gte("scanned_at", since);
+  const used = count ?? 0;
+  if (used >= dailyCap) {
+    const { balance } = await walletBalance(profile.id);
+    return json({ status: "limit_reached", limit: dailyCap, balance, profile: profileOut });
+  }
+
+  const rawRate = Number(settings.refundRatePerCup ?? settings.cashbackRatePerCup);
+  const rate = Math.min(MAX_RATE_EUR, Number.isFinite(rawRate) && rawRate > 0 ? rawRate : DEFAULT_RATE_EUR);
+  const cfgMax = Number(settings.tikkieMaxPerReceipt);
+  const maxTotal = Math.min(MAX_TOTAL_EUR, Number.isFinite(cfgMax) && cfgMax > 0 ? cfgMax : MAX_TOTAL_EUR);
+  const amount = Math.min(maxTotal, Math.round(rate * 100) / 100);
+
+  const { error: insErr } = await supabase.from("claims").insert({
+    user_id: profile.id,
+    org_id: orgId,
+    type: "cashback",
+    status: "completed",
+    payout_status: "queued",
+    cups_redeemed: 1,
+    payout_amount: amount,
+    batch_id: crypto.randomUUID(),
+    notify_email: false,
+    notify_push: false,
+  });
+  if (insErr) return json({ error: "claim_insert_failed", detail: insErr.message }, 500);
+
+  await supabase.from("cup_scans").insert({
+    user_id: profile.id, org_id: orgId, location_id: locationId,
+    scan_type: "byo", source: "static_qr",
+    status: "success", cups_awarded: 1, scanned_at: new Date().toISOString(),
+  });
+
+  const { balance } = await walletBalance(profile.id);
+  return json({
+    status: "credited",
+    amount,
+    cups: 1,
+    balance,
+    remaining: Math.max(0, dailyCap - used - 1),
+    profile: profileOut,
+  });
+}
+
 /* ── Accounts ────────────────────────────────────────────────────────────
  * Redirect Refund's user base: one profile per device per org — the same
  * users_device_org uniqueness the rest of PackPerks relies on. */
@@ -1161,6 +1258,9 @@ Deno.serve(async (req) => {
 
   // The home page's "save your balance" email section.
   if (body.action === "set_email") return setEmailAction(body);
+
+  // The counter's Static QR code (a venue that switched it on).
+  if (body.action === "static_qr") return staticQrAction(body);
 
   // Pending-receipt notification signup (the held-for-review popup).
   if (body.action === "save_email") return saveEmail(body);

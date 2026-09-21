@@ -60,6 +60,11 @@ export const scanBatch = (batchId) =>
 export const scanBackupCups = (cupIds) =>
   invokeBinTikkie({ cup_ids: cupIds, device_id: deviceId() });
 
+/* The counter's Static QR code: one cup's refund, up to the venue's daily
+ * limit per person. */
+export const scanStaticQr = (orgId, locationId) =>
+  invokeBinTikkie({ action: 'static_qr', org_id: orgId, device_id: deviceId(), location_id: locationId || null });
+
 export const redeemWallet = (orgId) =>
   invokeBinTikkie({ action: 'redeem', org_id: orgId, device_id: deviceId() }, 25000);
 

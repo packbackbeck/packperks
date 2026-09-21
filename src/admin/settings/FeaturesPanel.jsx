@@ -31,7 +31,7 @@ export default function FeaturesPanel({ draft, canEdit, mode, org, isMaster, onN
 
   function valueOf(f) {
     if (f.source === 'group') return !!groupFlags[f.key];
-    return featureValue(f, draft.settings);
+    return featureValue(f, draft.settings, mode);
   }
 
   async function toggle(f, next) {

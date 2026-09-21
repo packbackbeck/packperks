@@ -188,8 +188,8 @@ const FEATURES = [
   { id: 'f-design-sections',name: 'App sections',            desc: 'Show or hide app sections',         group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'sections layout blocks show hide toggle app guide stories smart import' },
   { id: 'f-design-preview', name: 'Live app preview',        desc: 'Preview the customer app',          group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'preview phone live customer app mockup design' },
 
-  // ── BYO QR Codes + held-scan review ────────────────────────────────
-  { id: 'f-byo',          name: 'BYO QR Codes',            desc: 'Counter QR + held-scan review',     group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'byo bring your own counter qr poster reusable cup review pending held requests' },
+  // ── Static QR code (BYO counter QR) + held-scan review ─────────────
+  { id: 'f-byo',          name: 'Static QR code',          desc: 'Counter QR + held-scan review',     group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'static qr code byo bring your own counter qr poster reusable cup review pending held requests' },
   { id: 'f-byo-qr',       name: 'Counter QR poster',       desc: 'Download the counter QR to print',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'counter qr poster download print png location bring your own byo scan' },
   { id: 'f-byo-cap',      name: 'Daily auto-credit limit', desc: 'Scans per customer before review',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'daily limit cap auto credit per customer per day hold review byo scans over limit' },
   { id: 'f-byo-held',     name: 'Review held BYO requests',desc: 'Approve or reject over-limit scans',group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'held pending review approve reject over limit byo cup request credit awaiting' },

@@ -68,6 +68,18 @@ exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
   `donation` claim and hands the rest back as a `wallet_change` claim,
   which the wallet counts like a receipt. Count wallet credits with both.
 
+**Static QR code** (feature `featureStaticQr` in the org's published
+settings; Settings → Features; tab `byorequests`, labelled Static QR code). A
+QR code that stays on the counter, `/<slug>/?byo=1[&loc=<location>]`: each
+scan gives one cup, up to a per-person limit per rolling 24 hours
+(`app_config` `byo:cap:<orgId>`, set on that page). On by default for Bring
+Your Own (unset means on there, off everywhere else; `featureDefault` on the
+tab, `fallbackByMode` on the feature). Bring Your Own and Deposit Rewards
+mint through `byo-mint` into the cup balance, and scans over the limit wait
+for review. Deferred Tikkie credits one cup's refund to the wallet through
+`bin-tikkie` action `static_qr` (a claim with a synthetic batch id, like a
+backup receipt, so it shows as a return); over the limit nothing is added.
+
 Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund only”,
 “Titaan Direct Refund”, “Rewards only” — are stale. The code keys stay.
 

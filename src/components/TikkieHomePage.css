@@ -13,12 +13,13 @@
   position: relative;
   width: 100%;
   display: flex; align-items: center; gap: 8px;
-  background: var(--pb-orange-warm, #FD6F46);
+  /* --tk-hero: the venue's accent, when it has its own colours. */
+  background: var(--tk-hero, var(--pb-orange-warm, #FD6F46));
   border-radius: var(--radius-lg, 16px);
   padding: 22px 0 22px 22px;   /* no right padding: the bin bleeds to the edge */
   text-align: left;
   overflow: hidden;
-  box-shadow: 0 12px 30px rgba(253, 111, 70, 0.28);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--tk-hero, #FD6F46) 28%, transparent);
   color: #fff;
 }
 .tikkie-home__hero-copy { flex: 1 1 auto; min-width: 0; }

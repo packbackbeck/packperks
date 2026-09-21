@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { toPng } from 'html-to-image';
 import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT, getLocations } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
+import { resolveEffectiveMode } from '../lib/orgModes';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import RewardsReceiptGenerator from '../cupqr/RewardsReceiptGenerator';
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Field, PageHeader, Segmented } from '../ui';
@@ -47,7 +48,12 @@ function addressLine(loc) {
 }
 
 export default function AdminByoRequests() {
-  const { activeOrg, activeOrgId, activeOrgSlug } = useOrg();
+  const { activeOrg, activeOrgId, activeOrgSlug, activeOrgMode, activeGroupMode } = useOrg();
+  // Static QR code runs in every programme. Bring Your Own and Deposit
+  // Rewards add cups (extra scans wait for review); Deferred Tikkie adds one
+  // cup's refund to the wallet and simply stops at the limit.
+  const mode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
+  const tikkie = mode === 'tikkie_only';
   const [status, setStatus]   = useState('pending');
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
@@ -248,8 +254,10 @@ export default function AdminByoRequests() {
   return (
     <div className="ui-page byoreq">
       <PageHeader
-        title="BYO QR codes"
-        subtitle={`The counter QR code customers scan with their own cup. Each customer collects up to ${cap} ${cap === 1 ? 'cup' : 'cups'} per 24 hours automatically; extra scans wait below for you to approve or deny.`}
+        title="Static QR code"
+        subtitle={tikkie
+          ? `A QR code that stays on the counter. Each scan adds one cup’s refund to the customer’s wallet, up to ${cap} ${cap === 1 ? 'cup' : 'cups'} per person per 24 hours.`
+          : `A QR code that stays on the counter. Each customer collects up to ${cap} ${cap === 1 ? 'cup' : 'cups'} per 24 hours automatically; extra scans wait below for you to approve or deny.`}
       />
 
       {/* Stationary counter QR — branded + per location */}
@@ -257,7 +265,9 @@ export default function AdminByoRequests() {
         <CardHeader
           title="Counter QR code"
           icon={QrCode}
-          subtitle="Print it and stand it on the counter. Each scan adds one cup to the customer’s balance, and a cup earned at any location can be spent across your whole organisation."
+          subtitle={tikkie
+            ? 'Print it and stand it on the counter. Each scan adds one cup’s refund to the customer’s wallet, which they collect via Tikkie like any other refund.'
+            : 'Print it and stand it on the counter. Each scan adds one cup to the customer’s balance, and a cup earned at any location can be spent across your whole organisation.'}
           ruled
         />
         <CardBody>
@@ -337,16 +347,18 @@ export default function AdminByoRequests() {
                 <span className="ui-field__label">Link in the QR code</span>
                 {byoUrl
                   ? <code className="byoreq__qr-url">{byoUrl}</code>
-                  : <span className="byoreq__muted">This store isn’t in a bring-your-own group yet.</span>}
+                  : <span className="byoreq__muted">This organisation has no web address yet.</span>}
               </div>
 
               <div className="byoreq__divider" />
 
               {/* Per-store daily scan limit */}
               <Field
-                label="Automatic cups per day"
+                label={tikkie ? 'Cups per person per day' : 'Automatic cups per day'}
                 htmlFor="byo-cap"
-                hint="How many scans each customer gets credited per 24 hours before extra scans need your review."
+                hint={tikkie
+                  ? 'How many scans each customer gets credited per 24 hours. Scans over the limit add nothing.'
+                  : 'How many scans each customer gets credited per 24 hours before extra scans need your review.'}
               >
                 <div className="byoreq__cap-row">
                   <input
@@ -377,7 +389,9 @@ export default function AdminByoRequests() {
         </CardBody>
       </Card>
 
-      {/* Review queue */}
+      {/* Review queue: cups over the limit. A Deferred Tikkie wallet simply
+          stops at the limit, so there is nothing to review there. */}
+      {!tikkie && (
       <Card>
         <CardHeader
           title="Cup requests"
@@ -478,8 +492,10 @@ export default function AdminByoRequests() {
           )}
         </CardBody>
       </Card>
+      )}
 
-      {/* ── Rewards receipt generator ── */}
+      {/* ── Rewards receipt generator (Bring Your Own has no Receipt generator tab) ── */}
+      {mode === 'byo' && (
       <section className="byoreq__generator" aria-labelledby="byoreq-generator-title">
         <div className="byoreq__generator-head">
           <h2 className="byoreq__generator-title" id="byoreq-generator-title">Test reward receipts</h2>
@@ -487,6 +503,7 @@ export default function AdminByoRequests() {
         </div>
         <RewardsReceiptGenerator />
       </section>
+      )}
     </div>
   );
 }

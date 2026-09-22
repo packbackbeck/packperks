@@ -119,7 +119,7 @@ export const TABS = [
     description: 'What customers can unlock with their cups.' },
   { id: 'appdesign', label: 'Design & copy', group: 'programme', icon: Palette, modes: ALL_MODES, editable: true, beta: true,
     description: 'Colours, texts and sections of the customer app.' },
-  { id: 'receipts', label: 'Receipt generator', group: 'programme', icon: ReceiptText, modes: APP_MODES, editable: true,
+  { id: 'receiptgen', label: 'Receipt generator', group: 'programme', icon: ReceiptText, modes: APP_MODES, editable: true,
     description: 'Test purchase receipts that receipt verification always accepts, for claiming a reward without buying anything.' },
   { id: 'cupqr', label: 'Dynamic QR code', group: 'programme', icon: QrCode, modes: ALL_MODES, editable: true,
     description: 'Single-use QR codes for a set number of cups: mint, print and revoke batches.' },

@@ -307,7 +307,7 @@ function AdminShell() {
                   <KeepAlive id="cupqr" activeId={page} visited={visited}>
                     <AdminDynamicQr onNavigate={setPage} />
                   </KeepAlive>
-                  <KeepAlive id="receipts" activeId={page} visited={visited}>
+                  <KeepAlive id="receiptgen" activeId={page} visited={visited}>
                     <AdminReceiptGenerator />
                   </KeepAlive>
                   <KeepAlive id="transactions" activeId={page} visited={visited}>

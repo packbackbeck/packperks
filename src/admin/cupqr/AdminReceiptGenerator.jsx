@@ -6,7 +6,7 @@ import RewardsReceiptGenerator from './RewardsReceiptGenerator';
  * Two pages, one tab each (the third, Static QR code, is byorequests):
  *   • Dynamic QR code (cupqr)  — single-use cup QR batches, the same ones
  *                                the smart bin prints.
- *   • Receipt generator (receipts) — test purchase receipts that receipt
+ *   • Receipt generator (receiptgen) — test purchase receipts that receipt
  *                                verification always accepts.
  * ───────────────────────────────────────────────────────────────────── */
 

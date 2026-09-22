@@ -82,7 +82,7 @@ backup receipt, so it shows as a return); over the limit nothing is added.
 
 Three code pages, one tab each: **Dynamic QR code** (tab `cupqr`, single-use
 cup batches, every mode), **Static QR code** (`byorequests`) and **Receipt
-generator** (`receipts`, test purchase receipts for rewards, so not in
+generator** (`receiptgen`, test purchase receipts for rewards, so not in
 Deferred Tikkie). Every mode has **Design & copy** (`appdesign`); in Deferred
 Tikkie it shows only Colours and the two header logos (`showPackbackLogo`,
 `showBrandLogo`).

@@ -183,3 +183,32 @@ export function daysUntil(iso) {
   if (!Number.isFinite(t)) return null;
   return Math.max(0, Math.ceil((t - Date.now()) / 86400000));
 }
+
+/* ── PackPulse connections (migration 057, docs/packpulse/INTEGRATION.md) ──
+ * Masters only; the database checks it. Codes are shown once and never
+ * stored in a form that can be read back. */
+
+export async function listPackPulseLinks() {
+  const { data, error } = await supabase.rpc('packpulse_admin_links');
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createPackPulseCode(orgId) {
+  const { data, error } = await supabase.rpc('packpulse_admin_create_code', { p_org: orgId });
+  if (error) throw error;
+  logAction({ action: 'packpulse.code_created', targetType: 'organization', targetId: orgId, metadata: { link_id: data?.id } });
+  return data; // { id, code, expires_at }
+}
+
+/* action: cancel | approve | decline | pause | resume | pages | disconnect */
+export async function updatePackPulseLink(link, action, pages = null) {
+  const { error } = await supabase.rpc('packpulse_admin_update', { p_link: link.id, p_action: action, p_pages: pages });
+  if (error) throw error;
+  logAction({
+    action: `packpulse.${action}`,
+    targetType: 'organization',
+    targetId: link.org_id,
+    metadata: { link_id: link.id, packpulse_org: link.packpulse_org_name || null, ...(pages ? { pages } : {}) },
+  });
+}

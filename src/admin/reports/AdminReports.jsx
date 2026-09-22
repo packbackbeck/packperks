@@ -280,7 +280,7 @@ async function loadDataset(dataset, fromIso, toIso) {
 }
 
 /* ── Component ── */
-export default function AdminReports() {
+export default function AdminReports({ embedded = false }) {
   // Role-gated PII export: Owners + Admins can export the full Users
   // and Claims reports including email columns. Everyone else
   // sees the safe datasets (cup_scans, activity) only. We resolve the
@@ -537,7 +537,9 @@ export default function AdminReports() {
     <div className="ui-page rep-page">
       <PageHeader
         title="Reports & alerts"
-        subtitle="Build a report, check it in the preview, then export it. Further down: the digest emails and instant alerts."
+        subtitle={embedded
+          ? 'Build a report, check it in the preview, then export it.'
+          : 'Build a report, check it in the preview, then export it. Further down: the digest emails and instant alerts.'}
       >
         <Button icon={Copy} onClick={handleCopy} disabled={!filtered.length}>Copy</Button>
         <Button icon={Printer} onClick={handlePrint} disabled={!filtered.length}>Print</Button>
@@ -772,11 +774,29 @@ export default function AdminReports() {
         </Card>
       </div>
 
-      <h2 className="ui-section-label">Digest emails</h2>
-      <WeeklyDigest canManage={canManageAlerts} />
+      {/* The digest and alert settings are PackBack's own (recipients across
+          every venue), so the PackPulse embed leaves them out. */}
+      {embedded ? (
+        <>
+          <h2 className="ui-section-label">Digest emails and alerts</h2>
+          <Card>
+            <CardBody>
+              <p className="rep-embed-note">
+                PackBack sends this venue's weekly digest and instant alerts from PackPerks.
+                To receive them by email, ask your PackBack contact.
+              </p>
+            </CardBody>
+          </Card>
+        </>
+      ) : (
+        <>
+          <h2 className="ui-section-label">Digest emails</h2>
+          <WeeklyDigest canManage={canManageAlerts} />
 
-      <h2 className="ui-section-label">Instant alerts</h2>
-      <NotificationCenter canManage={canManageAlerts} />
+          <h2 className="ui-section-label">Instant alerts</h2>
+          <NotificationCenter canManage={canManageAlerts} />
+        </>
+      )}
     </div>
   );
 }

@@ -95,7 +95,7 @@ const APP_MODES = ['standard', 'byo'];
  *   fixed        — cannot be switched off for the workspace
  *   editable     — false when the page has nothing to change */
 export const TABS = [
-  { id: 'overview', label: 'Dashboard', group: 'analytics', icon: LayoutDashboard, modes: APP_MODES, fixed: true, editable: true,
+  { id: 'overview', label: 'Dashboard', group: 'analytics', icon: LayoutDashboard, modes: ALL_MODES, fixed: true, editable: true,
     description: 'Headline numbers, the trend and what stands out.' },
   { id: 'stats', label: 'System health', group: 'analytics', icon: Gauge, modes: ALL_MODES, editable: true,
     description: 'Whether scanning, payouts and receipt checks work as they should.' },

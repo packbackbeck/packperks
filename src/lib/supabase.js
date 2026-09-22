@@ -16,8 +16,43 @@ function fetchWithDeviceId(input, init = {}) {
   return fetch(input, { ...init, headers })
 }
 
+// The PackPulse embed (/packpulse-embed, docs/packpulse/INTEGRATION.md)
+// signs in as its connection's own login. That session lives in memory
+// only, so it never replaces a customer or dashboard login saved for this
+// domain.
+export const IS_PACKPULSE_EMBED = typeof window !== 'undefined'
+  && window.location.pathname.startsWith('/packpulse-embed')
+
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY,
-  { global: { fetch: fetchWithDeviceId } }
+  IS_PACKPULSE_EMBED
+    ? {
+      global: { fetch: fetchWithDeviceId },
+      auth: { persistSession: false, detectSessionInUrl: false, storageKey: 'pp-packpulse-embed' },
+    }
+    : { global: { fetch: fetchWithDeviceId } }
 )
+
+// In the embed, the dashboard's readers run unchanged, but every table
+// they read resolves to its packpulse_* view (migration 057): the
+// connected venue's rows only, without customer emails, payout links or
+// cup codes. Anything else reads what any signed-in login may read.
+const PACKPULSE_VIEWS = {
+  users: 'packpulse_users',
+  cup_balances: 'packpulse_cup_balances',
+  claims: 'packpulse_claims',
+  cup_scans: 'packpulse_cup_scans',
+  activity_history: 'packpulse_activity_history',
+  cups: 'packpulse_cups',
+  system_events: 'packpulse_system_events',
+  client_events: 'packpulse_client_events',
+  pending_batches: 'packpulse_pending_batches',
+  backup_cup_uses: 'packpulse_backup_cup_uses',
+  bin_sessions: 'packpulse_bin_sessions',
+}
+
+if (IS_PACKPULSE_EMBED) {
+  const from = supabase.from.bind(supabase)
+  supabase.from = (relation) => from(PACKPULSE_VIEWS[relation] || relation)
+}

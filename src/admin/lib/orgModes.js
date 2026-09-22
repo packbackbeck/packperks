@@ -59,7 +59,8 @@ export function resolveEffectiveMode(orgMode, groupMode) {
  * (rewards, claims review, users, analytics…) is hidden from the sidebar,
  * blocked in the router AND filtered from the command palette. */
 export const TIKKIE_ONLY_PAGES = new Set([
-  'cupqr',        // Receipt Generator — mints the same batches the bin does
+  'overview',     // Dashboard — wallet credits, Tikkie payouts, donations
+  'cupqr',        // Dynamic QR code — mints the same batches the bin does
   'tikkielog',    // the payout log
   'donations',    // wallet balances given to the charity partner
   'backupcups',   // the bin's offline fallback codes + outage alarm

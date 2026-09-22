@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, DatabaseZap, History, KeyRound, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
+import { Building2, DatabaseZap, HeartPulse, History, KeyRound, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
 import { useAccess } from '../context/accessCtx';
 import { useOrg } from '../context/OrgContext';
 import { useViewRole } from '../context/ViewRole';
@@ -11,6 +11,7 @@ import RolesPanel from './RolesPanel';
 import OrganisationsPanel from './OrganisationsPanel';
 import WorkspacePanel from './WorkspacePanel';
 import DataPanel from './DataPanel';
+import PackPulsePanel from './PackPulsePanel';
 import './MasterSettings.css';
 
 const TABS = [
@@ -19,6 +20,7 @@ const TABS = [
   { id: 'organisations', label: 'Organisations', icon: Building2 },
   { id: 'workspace', label: 'Workspace', icon: LayoutGrid },
   { id: 'data', label: 'Data', icon: DatabaseZap },
+  { id: 'packpulse', label: 'PackPulse', icon: HeartPulse },
   { id: 'activity', label: 'Activity log', icon: History },
 ];
 
@@ -27,7 +29,7 @@ const SECTION_TO = {
   people: ['people'], team: ['people'], roles: ['roles'], permissions: ['roles'],
   organisations: ['organisations', 'organisations'], organisation: ['organisations', 'organisations'],
   groups: ['organisations', 'groups'], regions: ['organisations', 'regions'],
-  workspace: ['workspace'], data: ['data'], activity: ['activity'],
+  workspace: ['workspace'], data: ['data'], activity: ['activity'], packpulse: ['packpulse'],
 };
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -77,7 +79,7 @@ export default function AdminMasterSettings({ onNavigate, onAddOrg, section, dra
     <div className="ui-page ms-page">
       <PageHeader
         title="Master settings"
-        subtitle="Who can use the dashboard, what each role allows, every organisation, the workspace and its data."
+        subtitle="Who can use the dashboard, what each role allows, every organisation, the workspace, its data and PackPulse."
       >
         <Badge tone="primary" icon={ShieldCheck}>Master</Badge>
         <Badge tone="neutral">{rolesList.length} roles</Badge>
@@ -101,6 +103,7 @@ export default function AdminMasterSettings({ onNavigate, onAddOrg, section, dra
         )}
         {tab === 'workspace' && <WorkspacePanel />}
         {tab === 'data' && <DataPanel orgs={orgs} />}
+        {tab === 'packpulse' && <PackPulsePanel orgs={orgs} />}
         {tab === 'activity' && (
           <Card>
             <CardBody flush>

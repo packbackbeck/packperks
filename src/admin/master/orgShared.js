@@ -41,11 +41,11 @@ export function payoutPromise(style, noun) {
 }
 
 /* Paths the site already uses (src/main.jsx); a venue can't take them. */
-export const RESERVED_SLUGS = new Set(['admin', 'mockup', 'staff', 'support', 'vendor-support']);
+export const RESERVED_SLUGS = new Set(['admin', 'mockup', 'staff', 'support', 'vendor-support', 'packpulse-embed']);
 
 export function slugOk(slug) {
   const s = String(slug || '').trim();
-  return /^[a-z0-9][a-z0-9-]*$/.test(s) && !RESERVED_SLUGS.has(s) && !s.startsWith('support');
+  return /^[a-z0-9][a-z0-9-]*$/.test(s) && !RESERVED_SLUGS.has(s) && !s.startsWith('support') && !s.startsWith('packpulse-embed');
 }
 
 export function plural(n, one, many = `${one}s`) {

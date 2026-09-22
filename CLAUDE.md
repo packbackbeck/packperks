@@ -67,6 +67,9 @@ exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
   `wallet_donate()`, migration 054): it sweeps every credit into one
   `donation` claim and hands the rest back as a `wallet_change` claim,
   which the wallet counts like a receipt. Count wallet credits with both.
+  Its Dashboard rebuilds per-cup activity from those claims
+  (`getAdminStats(orgIds, { mode })`, `buildTikkieMetrics`): there are no
+  cup balances or `activity_history` rows for this mode.
 
 **Static QR code** (feature `featureStaticQr` in the org's published
 settings; Settings → Features; tab `byorequests`, labelled Static QR code). A
@@ -191,6 +194,19 @@ session, but the login rows are the same). A signed-in login with no
 dashboard profile gets the dashboard's sign-in page with a note
 (`AuthGate`, status `no_profile`), never an empty dashboard.
 
+**PackPulse connection** (`docs/packpulse/INTEGRATION.md`, migrations
+057–059, edge function `packpulse-link`, Master Settings → PackPulse). A
+master creates a one-time code for a venue; PackPulse's server claims it and
+gets a link secret; a master approves after comparing a 4-character
+confirmation code. PackPulse then frames `/packpulse-embed` (Dashboard,
+System health, Reports & alerts, as a vendor sees them) with a one-time
+ticket that signs in the connection's own login
+(`link-<id>@packpulse.packperks.invalid`). That login has no dashboard
+profile and reads only the `packpulse_*` views: its venue, active links,
+shared pages, no emails, payout links or cup codes. In embed mode
+`src/lib/supabase.js` keeps the session in memory and maps each table to its
+view. The prompt for PackPulse's own Claude is `docs/packpulse/PACKPULSE_PROMPT.md`.
+
 `#overview?as=vendor` previews the vendor role. It can only ever *remove*
 access, so any account above vendor may use it.
 
@@ -209,7 +225,8 @@ access, so any account above vendor may use it.
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
 | `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |
-| `src/admin/master/` | Master Settings: people, roles, organisations, groups, regions, workspace, data |
+| `src/admin/master/` | Master Settings: people, roles, organisations, groups, regions, workspace, data, PackPulse |
+| `src/admin/embed/` | `/packpulse-embed`: one venue's pages inside PackPulse |
 | `src/admin/lib/adminMoney.js` | `useAdminMoney()` / `adminMoney()` — dashboard currency |
 | `src/admin/lib/demoData.js` | the “Demo numbers” dataset |
 | `src/admin/context/orgState.js` | module-level active org for non-React callers |
@@ -350,7 +367,7 @@ printed cups are never deleted there. Add a kind in the function's list and
 in `ORG_DATA_TIME_COLUMN` (adminApi.js) together.
 
 **App paths are not venue addresses.** `src/main.jsx` sends `/admin…`,
-`/mockup…`, `/staff`, `/support…` and `/vendor-support…` to their own apps
+`/mockup…`, `/staff`, `/support…`, `/vendor-support…` and `/packpulse-embed` to their own apps
 before any venue lookup, so an organisation or group with such a slug would
 be unreachable. `RESERVED_SLUGS` (`src/admin/master/orgShared.js`) and
 `isOrgSlugAvailable` refuse them; add a new app path to both.
@@ -365,6 +382,14 @@ expiry they were given.
 be readable with the public key, which let anyone list unclaimed cup ids and
 claim them. Never add a broader read policy; the customer app claims through
 claim-cups.
+
+**The PackPulse embed reads views, not tables.** A Dashboard, System health
+or Reports reader that starts reading a new table shows zeros in PackPulse
+until that table gets a `packpulse_*` view (only the columns needed, filtered
+by `packpulse_org_ids()`, select-only) and an entry in `PACKPULSE_VIEWS`
+(`src/lib/supabase.js`). Never give a connection login an `admin_profiles`
+row: dashboard accounts read every venue. A new PackPulse address must be
+added to `frame-ancestors` in `vercel.json`.
 
 **Customer emails are email only.** Push notifications were removed; the
 `notify_push` column stays and is always false.

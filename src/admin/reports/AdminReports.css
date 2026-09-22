@@ -631,3 +631,6 @@
   .rep-loading .ui-empty__icon svg { animation: none; }
   .rep-logs__chev { transition: none; }
 }
+
+/* PackPulse embed: where the email settings would be. */
+.rep-embed-note { margin: 0; color: var(--ui-fg-2); font-size: 13.5px; line-height: 1.55; }

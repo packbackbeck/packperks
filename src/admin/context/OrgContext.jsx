@@ -296,6 +296,13 @@ export function OrgProvider({ children }) {
   return <OrgCtx.Provider value={value}>{children}</OrgCtx.Provider>;
 }
 
+/* One fixed organisation, for a surface outside the dashboard shell: the
+ * PackPulse embed shows one venue and never switches. `value` has the same
+ * shape as OrgProvider's. */
+export function StaticOrgProvider({ value, children }) {
+  return <OrgCtx.Provider value={value}>{children}</OrgCtx.Provider>;
+}
+
 export function useOrg() {
   const ctx = useContext(OrgCtx);
   if (!ctx) {

@@ -1,0 +1,33 @@
+/* PackPulse embed: the dashboard's pages without its sidebar and top bar.
+ * PackPulse draws its own around the frame. */
+.admin-app.pp-embed {
+  --topbar-h: 0px;
+  --sidebar-w: 0px;
+  min-height: 100vh;
+  background: var(--ui-bg);
+}
+.pp-embed__main { min-height: 100vh; }
+
+.pp-embed--center { display: grid; place-items: center; }
+.pp-embed__ended { width: 100%; max-width: 560px; }
+
+.pp-embed__spinner {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--ui-border);
+  border-top-color: var(--ui-primary);
+  animation: pp-embed-spin 0.8s linear infinite;
+}
+@keyframes pp-embed-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .pp-embed__spinner { animation-duration: 2.4s; }
+}
+
+/* Same bar as the dashboard's vendor preview. */
+.pp-embed__demo {
+  position: sticky; top: 0; z-index: 120;
+  padding: 9px 22px;
+  background: #1E1840; color: #EEEAFD;
+  font-family: var(--ui-font);
+  font-size: 13px; line-height: 1.4;
+  border-bottom: 1px solid #140F2E;
+}

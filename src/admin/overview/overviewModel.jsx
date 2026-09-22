@@ -1,5 +1,5 @@
 import {
-  Gift, Leaf, Receipt, Recycle, Repeat, UserPlus, Users, Wallet,
+  Gift, HandCoins, HeartHandshake, Leaf, Receipt, Recycle, Repeat, UserPlus, Users, Wallet,
 } from 'lucide-react';
 import {
   bucketStart, bucketStarts, countIn, fmtInt, fmtKg, fmtPct, pctChange, previousSeriesFor, seriesFor, sumIn,
@@ -45,7 +45,88 @@ function distinctUsersSeries(events, range) {
   return starts.map((t, i) => ({ t, value: sets[i].size }));
 }
 
-export function buildOverviewMetrics(stats, range, { money, voucherVenue = false } = {}) {
+/* Deferred Tikkie: a return is a wallet credit (a claim with a batch id);
+ * the wallet is paid out as one Tikkie link, or given to charity. */
+const isCredit = (c) => !!c.batch_id;
+const isCollected = (c) => !!c.tikkie_url && c.tikkie_status === 'redeemed';
+const isDonation = (c) => c.type === 'donation';
+const collectedAt = (c) => c.tikkie_redeemed_at || c.created_at;
+/* Still in a wallet: a credit (or a donation's change) no payout or
+ * donation has swept up yet. */
+const inWallet = (c) => (isCredit(c) || c.type === 'wallet_change') && !c.payout_claim_id && !c.tikkie_url;
+
+export function buildOverviewMetrics(stats, range, { money, voucherVenue = false, mode = null } = {}) {
+  const base = buildBaseMetrics(stats, range, { money, voucherVenue });
+  if (mode !== 'tikkie_only') return base;
+  return buildTikkieMetrics(stats, range, money, base);
+}
+
+/* The same page for a Deferred Tikkie venue: no rewards or claims to
+ * review, so the money tiles follow the wallet instead. */
+function buildTikkieMetrics(stats, range, money, base) {
+  const claims = stats?.rawClaims || [];
+  const { fromMs: from, toMs: to, prevFromMs: pFrom, prevToMs: pTo } = range;
+  const hasPrev = pFrom != null;
+  const prevLabel = range.prev || '';
+  const fmtMoney = (v) => (money ? money(v) : `€${(v || 0).toFixed(2)}`);
+  const axisFormat = (v) => (money ? money(v) : String(v));
+  const byId = Object.fromEntries(base.map(m => [m.id, m]));
+
+  const moneyTile = (id, label, icon, tone, rows, at, description, info, formula) => {
+    const now = sumIn(rows, at, from, to, c => c.payout_amount);
+    const prev = hasPrev ? sumIn(rows, at, pFrom, pTo - 1, c => c.payout_amount) : null;
+    return {
+      id, label, icon, tone, unit: 'money',
+      value: now, format: fmtMoney, delta: pctChange(now, prev), deltaLabel: prevLabel,
+      description, info, formula,
+      series: seriesFor(rows, at, range, c => c.payout_amount),
+      previousSeries: previousSeriesFor(rows, at, range, c => c.payout_amount),
+      axisFormat,
+    };
+  };
+
+  return [
+    {
+      ...byId.cups,
+      description: 'Confirmed and added to a wallet',
+      info: 'Every cup the smart bin (or a counter QR code) confirmed in this period. Each one adds its refund to the customer’s wallet.',
+      formula: 'sum(cups) of wallet credits in period',
+    },
+    {
+      ...byId.new,
+      label: 'New customers',
+      description: 'Wallets opened in this period',
+      info: 'Customer wallets created in this period, with or without an email.',
+    },
+    {
+      ...byId.active,
+      description: 'Returned at least one cup',
+      info: 'Distinct customers with a confirmed return in this period. In the chart each point counts the customers active that day.',
+    },
+    byId.retention,
+    moneyTile(
+      'refunds', 'Refunds earned', Wallet, 'teal', claims.filter(isCredit), c => c.created_at,
+      'Added to customer wallets',
+      'The refunds customers earned by returning cups in this period. It stays in their wallet until they collect it through Tikkie or donate it.',
+      'sum(payout_amount) of wallet credits',
+    ),
+    moneyTile(
+      'collected', 'Collected via Tikkie', HandCoins, 'sky', claims.filter(isCollected), collectedAt,
+      'Paid out through Tikkie links',
+      'Money customers collected through their Tikkie link in this period, dated by when they collected it.',
+      'sum(payout_amount) of redeemed Tikkie links',
+    ),
+    moneyTile(
+      'donated', 'Donated', HeartHandshake, 'rose', claims.filter(isDonation), c => c.created_at,
+      'Given to charity from wallets',
+      'Wallet balances customers gave to charity in this period instead of collecting them.',
+      'sum(payout_amount) of donations',
+    ),
+    byId.co2,
+  ];
+}
+
+function buildBaseMetrics(stats, range, { money, voucherVenue = false } = {}) {
   const cups = (stats?.rawCupActivity || []).filter(isCup);
   const users = stats?.rawUsers || [];
   const claims = stats?.rawClaims || [];
@@ -192,11 +273,34 @@ export function findReward(id, rewards) {
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /* What stands out in the period, most important first. */
-export function buildOverviewInsights({ stats, metrics, range, rewards, budget, money, onNavigate, isVendorView }) {
+export function buildOverviewInsights({ stats, metrics, range, rewards, budget, money, onNavigate, isVendorView, mode = null }) {
   const out = [];
   const byId = Object.fromEntries(metrics.map(m => [m.id, m]));
   const cups = byId.cups;
-  const claims = stats?.rawClaims || [];
+  const tikkie = mode === 'tikkie_only';
+  // Deferred Tikkie has no claims to review: every wallet row is 'completed'.
+  const claims = tikkie ? [] : stats?.rawClaims || [];
+
+  if (tikkie) {
+    const all = stats?.rawClaims || [];
+    const waiting = all.filter(inWallet);
+    const owed = waiting.reduce((t, c) => t + (Number(c.payout_amount) || 0), 0);
+    const people = new Set(waiting.map(c => c.user_id).filter(Boolean)).size;
+    if (owed > 0) {
+      out.push({
+        id: 'wallets', weight: 80, tone: 'info',
+        text: <><b>{money ? money(owed) : owed.toFixed(2)}</b> is waiting in {people === 1 ? 'one customer’s wallet' : <><b>{fmtInt(people)}</b> customers’ wallets</>}, not yet collected or donated.</>,
+      });
+    }
+    const links = all.filter(c => c.tikkie_url && ms(c.created_at) >= range.fromMs && ms(c.created_at) <= range.toMs);
+    if (links.length >= 3) {
+      const share = Math.round((links.filter(c => c.tikkie_status === 'redeemed').length / links.length) * 100);
+      out.push({
+        id: 'collect-rate', weight: share < 60 ? 75 : 50, tone: share < 60 ? 'warn' : 'up',
+        text: <><b>{share}%</b> of the {fmtInt(links.length)} Tikkie links made in this period were collected.</>,
+      });
+    }
+  }
 
   if (cups?.delta != null && Math.abs(cups.delta) >= 5 && range.prev) {
     out.push({
@@ -260,7 +364,7 @@ export function buildOverviewInsights({ stats, metrics, range, rewards, budget, 
   }
 
   // Reward that carries the claims.
-  const popular = buildRewardPopularity(stats, rewards, range, Infinity);
+  const popular = tikkie ? [] : buildRewardPopularity(stats, rewards, range, Infinity);
   const totalRewardClaims = popular.reduce((a, r) => a + r.value, 0);
   if (totalRewardClaims >= 3) {
     const top = popular[0];
@@ -297,8 +401,24 @@ export function buildOverviewInsights({ stats, metrics, range, rewards, budget, 
 }
 
 /* Where every cup ever collected is now. */
-export function buildCupFlow(stats) {
+export function buildCupFlow(stats, mode = null) {
   const claims = stats?.rawClaims || [];
+  if (mode === 'tikkie_only') {
+    // Follow the money a return earned: still in a wallet, paid out through
+    // a Tikkie link (collected or not yet), or donated. A payout or donation
+    // row carries the cups it swept up; a donation's change is back in the
+    // wallet as its own row.
+    const payout = (c) => !c.batch_id && c.type === 'cashback' && !!c.tikkie_url;
+    const legacy = (c) => isCredit(c) && !!c.tikkie_url;
+    const cupsOf = (rows) => rows.reduce((t, c) => t + (Number(c.cups_redeemed) || 0), 0);
+    const links = claims.filter(c => payout(c) || legacy(c));
+    return [
+      { id: 'wallet', name: 'In wallets', value: cupsOf(claims.filter(inWallet)), color: '#5B3FD6', hint: 'not collected yet' },
+      { id: 'collected', name: 'Collected via Tikkie', value: cupsOf(links.filter(c => c.tikkie_status === 'redeemed')), color: '#1F8FCE', hint: 'paid out' },
+      { id: 'link', name: 'Link sent', value: cupsOf(links.filter(c => c.tikkie_status !== 'redeemed')), color: '#E8930C', hint: 'waiting to be collected' },
+      { id: 'donated', name: 'Donated', value: cupsOf(claims.filter(isDonation)), color: '#0E9E74', hint: 'given to charity' },
+    ];
+  }
   const balances = stats?.rawBalances || [];
   const redeemed = claims.filter(isRedeem).reduce((s, c) => s + (c.cups_redeemed || 0), 0);
   const refunded = claims.filter(c => c.type === 'direct_refund').reduce((s, c) => s + (c.cups_redeemed || 0), 0);

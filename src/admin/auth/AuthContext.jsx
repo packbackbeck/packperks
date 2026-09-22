@@ -132,6 +132,12 @@ export function AuthProvider({ children }) {
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
+/* A fixed, read-only account for a surface outside the dashboard shell:
+ * the PackPulse embed renders pages as a vendor would see them. */
+export function StaticAuthProvider({ value, children }) {
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
 export function useAuth() {
   const ctx = useContext(AuthCtx);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');

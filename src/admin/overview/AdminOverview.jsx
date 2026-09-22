@@ -25,6 +25,9 @@ import './AdminOverview.css';
 const PAIRS = [
   { id: 'flow', label: 'Returned vs redeemed', hint: 'Cups coming in against cups spent on rewards', ids: ['cups', 'redeemed'] },
 ];
+const TIKKIE_PAIRS = [
+  { id: 'money', label: 'Earned vs collected', hint: 'Refunds added to wallets against money collected through Tikkie', ids: ['refunds', 'collected'] },
+];
 
 /* Detail sections under the chart. Their visibility is stored with the
  * dashboard draft (dashboardBlocks), like the old Overview's cards.
@@ -48,6 +51,10 @@ const ACTIVITY = {
   cups_withdrawn: { label: 'Refund issued', tone: 'sky' },
   cups_shared: { label: 'Cups shared', tone: 'violet' },
   cups_donated: { label: 'Cups donated', tone: 'teal' },
+  // Deferred Tikkie (rebuilt from wallet rows in getAdminStats).
+  tikkie_link: { label: 'Tikkie link made', tone: 'amber' },
+  tikkie_collected: { label: 'Collected via Tikkie', tone: 'sky' },
+  balance_donated: { label: 'Balance donated', tone: 'teal' },
 };
 
 function timeAgo(ts) {
@@ -111,11 +118,13 @@ function Legend({ data, total }) {
   );
 }
 
-export default function AdminOverview({ draftState, onNavigate }) {
+export default function AdminOverview({ draftState, onNavigate, embedded = false }) {
   const { money } = useAdminMoney();
   const { isVendorView } = useViewRole();
   const { activeOrg, scopeOrgIds, statsScope, activeOrgMode, activeGroupMode } = useOrg();
   const mode = resolveEffectiveMode(activeOrgMode, activeGroupMode);
+  const tikkie = mode === 'tikkie_only';
+  const pairs = tikkie ? TIKKIE_PAIRS : PAIRS;
   const { draft, updateDraft } = draftState;
   const [period, setPeriod] = usePersistentState('pp-overview:period', '30d');
   const [stats, setStats] = useState(null);
@@ -126,13 +135,13 @@ export default function AdminOverview({ draftState, onNavigate }) {
 
   useEffect(() => {
     let alive = true;
-    getAdminStats(scopeOrgIds)
+    getAdminStats(scopeOrgIds, { mode })
       .then(s => { if (alive) { setStats(s); setLoadedAt(Date.now()); } })
       .catch(() => { if (alive) setStats(null); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsScope, activeOrg?.id, reloadKey]);
+  }, [statsScope, activeOrg?.id, reloadKey, mode]);
 
   useEffect(() => {
     let alive = true;
@@ -150,13 +159,13 @@ export default function AdminOverview({ draftState, onNavigate }) {
 
   const voucherVenue = draft?.settings?.paymentMethod === 'voucher';
   const metrics = useMemo(
-    () => buildOverviewMetrics(stats, range, { money, voucherVenue }),
-    [stats, range, money, voucherVenue],
+    () => buildOverviewMetrics(stats, range, { money, voucherVenue, mode }),
+    [stats, range, money, voucherVenue, mode],
   );
-  const selection = useChartSelection({ metrics, defaultId: 'cups', pairs: PAIRS, storageKey: 'pp-overview:chart' });
+  const selection = useChartSelection({ metrics, defaultId: 'cups', pairs, storageKey: tikkie ? 'pp-overview:chart:tikkie' : 'pp-overview:chart' });
   const insights = useMemo(() => buildOverviewInsights({
-    stats, metrics, range, rewards: draft?.rewards, budget, money, onNavigate, isVendorView,
-  }), [stats, metrics, range, draft?.rewards, budget, money, onNavigate, isVendorView]);
+    stats, metrics, range, rewards: draft?.rewards, budget, money, onNavigate, isVendorView, mode,
+  }), [stats, metrics, range, draft?.rewards, budget, money, onNavigate, isVendorView, mode]);
 
   const blocks = draft?.dashboardBlocks || [];
   const sections = SECTIONS.filter(s => !(s.staffOnly && isVendorView) && (!s.modes || s.modes.includes(mode)));
@@ -172,7 +181,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
     };
   });
 
-  const flow = useMemo(() => buildCupFlow(stats), [stats]);
+  const flow = useMemo(() => buildCupFlow(stats, mode), [stats, mode]);
   const flowTotal = flow.reduce((a, b) => a + b.value, 0);
   const rewards = useMemo(() => buildRewardPopularity(stats, draft?.rewards, range), [stats, draft?.rewards, range]);
   const hourly = useMemo(() => buildHourly(stats, range), [stats, range]);
@@ -188,7 +197,9 @@ export default function AdminOverview({ draftState, onNavigate }) {
     <div className="ui-page">
       <PageHeader
         title="Dashboard"
-        subtitle={`How ${orgName} is doing: cups coming back, customers, rewards and payouts.`}
+        subtitle={tikkie
+          ? `How ${orgName} is doing: cups coming back, customers and Tikkie payouts.`
+          : `How ${orgName} is doing: cups coming back, customers, rewards and payouts.`}
       >
         <ScopeToggle />
         <PeriodPicker value={period} onChange={setPeriod} />
@@ -199,7 +210,7 @@ export default function AdminOverview({ draftState, onNavigate }) {
           title="Refresh"
           onClick={() => { setLoading(true); setReloadKey(k => k + 1); }}
         />
-        {!isVendorView && (
+        {!isVendorView && !embedded && (
           <Menu
             align="right"
             trigger={({ open, toggle }) => (
@@ -236,10 +247,10 @@ export default function AdminOverview({ draftState, onNavigate }) {
         <TrendCard
           metrics={metrics}
           selection={selection}
-          pairs={PAIRS}
+          pairs={pairs}
           range={range}
           loading={loading}
-          storageKey="pp-overview:chart"
+          storageKey={tikkie ? 'pp-overview:chart:tikkie' : 'pp-overview:chart'}
           csvName="packperks-dashboard"
         />
         <InsightsCard insights={insights} loading={loading} />
@@ -248,11 +259,15 @@ export default function AdminOverview({ draftState, onNavigate }) {
       <div className="ov-sections">
         {shown('chart-cup-dist') && (
           <Card>
-            <CardHeader title="Where cups go" icon={PieIcon} subtitle="Every cup ever collected, and where it is now." />
+            <CardHeader
+              title="Where cups go"
+              icon={PieIcon}
+              subtitle={tikkie ? 'Every cup returned, and where its refund is now.' : 'Every cup ever collected, and where it is now.'}
+            />
             <CardBody>
               {flowTotal ? (
                 <div className="ov-split">
-                  <Donut data={flow.filter(d => d.value > 0)} total={flowTotal} centerLabel="cups collected" />
+                  <Donut data={flow.filter(d => d.value > 0)} total={flowTotal} centerLabel={tikkie ? 'cups returned' : 'cups collected'} />
                   <Legend data={flow} total={flowTotal} />
                 </div>
               ) : <EmptyState icon={PieIcon} title="No cups yet">Cups show up here once customers start returning them.</EmptyState>}

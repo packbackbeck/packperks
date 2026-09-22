@@ -10,10 +10,13 @@ import SupportForm from './components/SupportForm.jsx'
 import { RegionProvider } from './lib/RegionContext.jsx'
 import CollectPreview from './components/CollectPreview.jsx'
 import StaffApp from './staff/LazyStaffApp.jsx'
+import PackPulseEmbed from './admin/embed/PackPulseEmbed.jsx'
 
 const path = window.location.pathname
 const isStaff = path === '/staff' || path.startsWith('/staff/')
 const isAdmin = path.startsWith('/admin')
+// One venue's dashboard pages inside PackPulse (docs/packpulse/INTEGRATION.md).
+const isPackPulseEmbed = path.startsWith('/packpulse-embed')
 const isMockup = path.startsWith('/mockup')
 // Standalone contact-support pages. /vendor-support is intentionally unlinked —
 // share the URL directly with vendors. (Check vendor first: distinct prefixes.)
@@ -25,7 +28,9 @@ const isRoot = path === '/' || path === ''
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    {isStaff
+    {isPackPulseEmbed
+      ? <PackPulseEmbed />
+      : isStaff
       ? <StaffApp />
       : isMockup
         ? <MockupMaster />
@@ -50,7 +55,7 @@ createRoot(document.getElementById('root')).render(
 // Register the service worker for the customer app only (not admin/mockup/staff) so
 // "Add to Home Screen" install works. The SW has no fetch/cache handler, so
 // it's HMR-safe, and no push handler — notifications are email only.
-if ('serviceWorker' in navigator && !isAdmin && !isMockup && !isStaff) {
+if ('serviceWorker' in navigator && !isAdmin && !isMockup && !isStaff && !isPackPulseEmbed) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => { /* non-fatal */ })
   })

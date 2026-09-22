@@ -63,9 +63,41 @@ async function payoutProviderForOrg(orgId) {
  * in the payload so new rows are tagged correctly.
  * ───────────────────────────────────────────────────────────────────── */
 
-export async function getAdminStats(orgIds) {
+/* Deferred Tikkie keeps no cup balances or cup history: every return is a
+ * wallet credit (a claim with a batch id), and payouts and donations are
+ * claims too. The Overview's per-cup activity is rebuilt from the credits,
+ * one cup_added per cup, and the recent activity from all of them. */
+function tikkieActivity(claims) {
+  const cupActivity = [];
+  for (const c of claims) {
+    if (!c.batch_id) continue;
+    const n = Math.min(Math.max(Number(c.cups_redeemed) || 0, 0), 500);
+    for (let i = 0; i < n; i++) {
+      cupActivity.push({ id: `${c.id}:${i}`, type: 'cup_added', created_at: c.created_at, user_id: c.user_id });
+    }
+  }
+  const recentActivity = claims
+    .filter(c => c.type !== 'wallet_change')
+    .map(c => ({
+      id: c.id,
+      created_at: c.created_at,
+      type: c.batch_id ? 'cup_added'
+        : c.type === 'donation' ? 'balance_donated'
+          : c.tikkie_status === 'redeemed' ? 'tikkie_collected'
+            : 'tikkie_link',
+    }))
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, 20);
+  return { cupActivity, recentActivity };
+}
+
+export async function getAdminStats(orgIds, { mode = null } = {}) {
   // orgIds (optional): explicit scope for the group-analytics toggle. When
   // omitted, applyOrgFilter falls back to the global active org (unchanged).
+  const tikkie = mode === 'tikkie_only';
+  const claimCols = tikkie
+    ? 'id, type, reward_id, cups_redeemed, payout_amount, status, created_at, user_id, batch_id, payout_claim_id, tikkie_url, tikkie_status, tikkie_redeemed_at'
+    : 'id, type, reward_id, cups_redeemed, payout_amount, status, created_at';
   const [usersRes, balancesRes, claimsRes, scansRes, historyRes, cupActivityRes] = await Promise.all([
     // `display_name, email, device` are needed by the Overview insights
     // panels (device breakdown pie + top-returners leaderboard) — without
@@ -75,7 +107,7 @@ export async function getAdminStats(orgIds) {
     applyOrgFilter(supabase.from('cup_balances').select('user_id, balance, lifetime_cups'), orgIds),
     // reward_id is needed by the Overview "Reward Popularity" chart —
     // without it the chart filtered everything out and rendered blank.
-    applyOrgFilter(supabase.from('claims').select('id, type, reward_id, cups_redeemed, payout_amount, status, created_at'), orgIds),
+    applyOrgFilter(supabase.from('claims').select(claimCols), orgIds),
     applyOrgFilter(supabase.from('cup_scans').select('id, status, cups_awarded, scanned_at'), orgIds),
     applyOrgFilter(supabase.from('activity_history').select('id, type, created_at').order('created_at', { ascending: false }).limit(20), orgIds),
     // Fetch all cup_added events for reliable daily chart (no limit, guaranteed
@@ -97,8 +129,9 @@ export async function getAdminStats(orgIds) {
   const balances = src.balances;
   const claims   = src.claims;
   const scans    = src.scans;
-  const recentActivity = src.recentActivity;
-  const cupActivity    = src.cupActivity;
+  const rebuilt = tikkie && !DEMO_MODE ? tikkieActivity(claims) : null;
+  const recentActivity = rebuilt ? rebuilt.recentActivity : src.recentActivity;
+  const cupActivity    = rebuilt ? rebuilt.cupActivity : src.cupActivity;
 
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
@@ -3453,7 +3486,7 @@ export async function isOrgSlugAvailable(slug) {
   const clean = (slug || '').trim().toLowerCase();
   if (!clean) return false;
   // Paths the site already uses (src/main.jsx).
-  if (['admin', 'mockup', 'staff', 'vendor-support'].includes(clean) || clean.startsWith('support')) return false;
+  if (['admin', 'mockup', 'staff', 'vendor-support'].includes(clean) || clean.startsWith('support') || clean.startsWith('packpulse-embed')) return false;
   const { data, error } = await supabase
     .from('organizations').select('id').eq('slug', clean).maybeSingle();
   if (error) return true; // don't block creation on a check that failed

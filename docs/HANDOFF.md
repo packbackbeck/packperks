@@ -72,7 +72,7 @@ The dashboard now follows PackPulse's layout and access model.
   signed in as a customer (a Gmail login from the customer app). It now
   shows the sign-in page with a note saying that login is not a dashboard
   account. Adding an outside address from the dashboard works (tested).
-- Staff codes are at most 5 cups; the wheel starts at 5 and returns to 5.
+- Staff codes are at most 5 cups; the wheel starts at 1 and returns to 1 after each code.
 
 ### 0. Staff app per venue, access requests (18 Sep)
 

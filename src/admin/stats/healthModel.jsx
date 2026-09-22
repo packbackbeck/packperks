@@ -291,11 +291,13 @@ function countSeries(spec, P, Q, range) {
 
 const SCANS = ['scan', 'scans'];
 const RECEIPTS = ['receipt', 'receipts'];
+const PAYOUTS = ['payout', 'payouts'];
 const HOURS = ['busy hour', 'busy hours'];
 const NO_LINE = ' It is worked out for the period as a whole, so it has no line on the chart.';
 
 const noScans = () => 'No scans in this period';
 const noReceipts = () => 'No receipts scanned in this period';
+const noPayouts = () => 'No payouts asked for in this period';
 
 const CHECKS = {
   qr_scan: {
@@ -395,21 +397,21 @@ const CHECKS = {
 
   /* Deferred Tikkie */
   tk_mint: {
-    label: 'Payout links created', icon: Link2, tab: 'tikkielog', per: RECEIPTS,
-    description: 'Receipts that got a Tikkie link',
-    info: 'Of the receipts customers scanned, the share that got a working Tikkie payment link.',
-    how: 'Receipts with a Tikkie link ÷ receipts scanned',
+    label: 'Payout links created', icon: Link2, tab: 'tikkielog', per: PAYOUTS,
+    description: 'Payouts that got a Tikkie link',
+    info: 'Customers collect their wallet as one Tikkie link. Of the payouts they asked for, the share that got a working link. Receipts from before the wallet each had their own link and count as a payout here.',
+    how: 'Payouts with a Tikkie link ÷ payouts asked for',
     why: 'Without a link the customer can’t collect their refund.',
-    empty: noReceipts,
+    empty: noPayouts,
     daily: (d) => d.success,
   },
   tk_mint_fail: {
-    label: 'Link failure rate', icon: TriangleAlert, tab: 'tikkielog', per: RECEIPTS,
-    description: 'Share of receipts whose link failed',
-    info: 'Of the receipts scanned, the share where creating the Tikkie link failed. A failed link is tried again when the same receipt is scanned.',
-    how: 'Receipts whose link failed ÷ receipts scanned',
-    why: 'A failed link holds up the refund until the receipt is scanned again.',
-    empty: noReceipts,
+    label: 'Link failure rate', icon: TriangleAlert, tab: 'tikkielog', per: PAYOUTS,
+    description: 'Share of payouts whose link failed',
+    info: 'Of the payouts customers asked for, the share where creating the Tikkie link failed. The money goes back to the wallet, so they can try again.',
+    how: 'Payouts whose link failed ÷ payouts asked for',
+    why: 'A failed link holds up the refund until the customer tries again.',
+    empty: noPayouts,
     daily: (d) => d.failed,
   },
   tk_pending: {
@@ -435,8 +437,8 @@ const CHECKS = {
   tk_uptime: {
     label: 'Payout uptime', icon: Activity, tab: 'tikkielog', per: HOURS,
     description: 'Busy hours without a failed link',
-    info: 'Of the hours with at least one receipt, the share without a failed Tikkie link. An estimate: true uptime needs regular health pings.',
-    how: 'Hours with receipts and no failed link ÷ hours with receipts',
+    info: 'Of the hours with at least one receipt or payout, the share without a failed Tikkie link. An estimate: true uptime needs regular health pings.',
+    how: 'Hours with activity and no failed link ÷ hours with activity',
     why: 'An hour with failed links is an hour customers waited for their money.',
     empty: noReceipts,
     daily: null,
@@ -464,12 +466,12 @@ const COUNTS = {
     description: 'Bin receipts added to a wallet',
     info: 'Every smart-bin receipt a customer scanned in this period.',
     value: (T) => T.totalScans,
-    series: { ts: (d) => d.total },
+    series: { ts: (d) => d.receipts ?? d.total },
   },
   failed_links: {
     label: 'Failed payout links', icon: Link2Off, tone: 'orange', invertGood: true,
-    description: 'Receipts whose Tikkie link failed',
-    info: 'Receipts where creating the Tikkie payment link returned an error. The link is tried again the next time the same receipt is scanned.',
+    description: 'Payouts whose Tikkie link failed',
+    info: 'Payouts where creating the Tikkie payment link returned an error. The money goes back to the customer’s wallet, so they can try again.',
     value: (T) => T.failed,
     series: { ts: (d) => d.failed },
   },
@@ -530,7 +532,7 @@ function checkNote(id, m, P) {
     case 'tk_uptime':
       return 'An estimate: true uptime needs regular health pings.';
     case 'tk_mint_fail':
-      return m.numerator > 0 ? 'A failed link is tried again when the same receipt is scanned.' : null;
+      return m.numerator > 0 ? 'The money went back to the wallet, so the customer can try again.' : null;
     case 'tk_pending':
       return m.denominator > 0 ? 'Low means the bin is losing sessions: receipts print but never get confirmed.' : null;
     case 'tk_backup':

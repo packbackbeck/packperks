@@ -32,7 +32,7 @@ const PAIRS = {
     { id: 'scans-failed', label: 'Scans vs failed', hint: 'Every scan against the ones that added no cups', ids: ['scans', 'failed'] },
   ],
   tikkie: [
-    { id: 'receipts-failed', label: 'Receipts vs failed links', hint: 'Receipts scanned against the ones whose Tikkie link failed', ids: ['receipts', 'failed_links'] },
+    { id: 'receipts-failed', label: 'Receipts vs failed links', hint: 'Receipts scanned against payouts whose Tikkie link failed', ids: ['receipts', 'failed_links'] },
   ],
 };
 

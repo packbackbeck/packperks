@@ -201,7 +201,7 @@ export default function AdminSmartBins() {
   return (
     <div className="ui-page asb">
       <PageHeader
-        title="Smart bins"
+        title="Smart bin locations"
         subtitle="The bins customers see on the “Smart bins near you” map, with the address they navigate to. Add one per machine; a bin without coordinates stays off the map."
       >
         <Button variant="primary" icon={Plus} onClick={() => setEditing({ ...BLANK })} disabled={busy || loading}>

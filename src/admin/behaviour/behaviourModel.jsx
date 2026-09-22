@@ -591,7 +591,7 @@ function tikkieInsights(byId, action) {
     out.push({
       id: 'pending', weight: 80, tone: 'warn',
       text: <><b>{fmtInt(open)}</b> receipt{open === 1 ? ' was' : 's were'} scanned before the bin confirmed {open === 1 ? 'it' : 'them'} and {open === 1 ? 'is' : 'are'} still unconfirmed.</>,
-      action: action('smartbins', 'Smart bins'),
+      action: action('smartbins', 'Smart bin locations'),
     });
   }
   const backup = rate('tk_backup_share');

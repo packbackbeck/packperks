@@ -18,7 +18,7 @@ const POLL_MS = 3000;
 /* How long the green "collected" square stays before going back to idle. */
 const SCANNED_MS = 7000;
 /* The wheel starts at this many cups, and goes back to it after each code. */
-const CUPS_DEFAULT = 5;
+const CUPS_DEFAULT = 1;
 
 const localMidnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 

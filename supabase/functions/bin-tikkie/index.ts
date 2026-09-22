@@ -1127,6 +1127,16 @@ async function redeemAction(body: Record<string, unknown>): Promise<Response> {
 
   const minted = await mintForClaim({ ...(payout as ClaimRow), payout_amount: amount, cups_redeemed: cups });
   if (minted.status >= 400) {
+    // The failure outlives the payout row below, so System health can count
+    // it (getTikkieStatsMetrics reads event_type tikkie_payout_link).
+    const { data: failedRow } = await supabase.from("claims").select("tikkie_last_error").eq("id", payout.id).maybeSingle();
+    await supabase.from("system_events").insert({
+      org_id: orgId,
+      event_type: "tikkie_payout_link",
+      status: "failure",
+      count: 1,
+      detail: { error: String(failedRow?.tikkie_last_error || `status ${minted.status}`).slice(0, 300), amount, cups },
+    });
     // Put the money back: release the credits and drop the empty payout.
     await supabase.from("claims").update({ payout_claim_id: null }).eq("payout_claim_id", payout.id);
     await supabase.from("claims").delete().eq("id", payout.id);

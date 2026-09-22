@@ -97,7 +97,7 @@ export default function AdminTransactions({ onNavigate }) {
   return (
     <div className="ui-page tx-page">
       <PageHeader
-        title="Cup transfers"
+        title="Cup shares"
         subtitle={loading
           ? 'Cups customers shared with each other.'
           : `Cups customers shared with each other. ${counts.total} share${counts.total === 1 ? '' : 's'} · ${counts.totalCups} cup${counts.totalCups === 1 ? '' : 's'} moved.`}

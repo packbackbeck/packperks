@@ -47,7 +47,7 @@ export const FEATURES = [
     key: 'featureCupSharing', group: 'app', icon: Share2, tone: 'violet', modes: APP, fallback: true,
     label: 'Cup sharing',
     summary: 'Customers send cups to a friend with a QR code.',
-    detail: 'Switching it off removes the share buttons from the app and the Cup transfers tab from this dashboard.',
+    detail: 'Switching it off removes the share buttons from the app and the Cup shares tab from this dashboard.',
     tab: 'transactions',
   },
   {

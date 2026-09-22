@@ -221,7 +221,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
   return (
     <div className="ui-page ub-page">
       <PageHeader
-        title="User behaviour"
+        title="User analytics"
         subtitle={tikkie
           ? `How customers use ${orgName}: scanning receipts, collecting payouts and saving an email.`
           : `How customers use ${orgName}: scanning, coming back, claiming, and where they drop off.`}

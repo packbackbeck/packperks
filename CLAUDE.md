@@ -71,6 +71,15 @@ exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
   (`getAdminStats(orgIds, { mode })`, `buildTikkieMetrics`): there are no
   cup balances or `activity_history` rows for this mode.
 
+**Dashboard sidebar** (`TABS` and `TAB_GROUPS` in `src/admin/lib/access.js`,
+in sidebar order): Analytics (Dashboard, User analytics, System health,
+Reports & alerts), Customers (Users, Rewards & offers, Design & copy, Email
+templates, Future vendors, Smart bin locations), Generate (Static QR code,
+Dynamic QR code, Receipt generator, Staff app), Circulation (Cup scans,
+Claims, Tikkie payouts, Cup shares, Donations, Backup cups), Workspace
+(Settings, Master settings, Help & support, Version history, MockupMaster,
+PackPulse). Each tab's `modes` hides it where the programme has no use for it.
+
 **Static QR code** (feature `featureStaticQr` in the org's published
 settings; Settings → Features; tab `byorequests`, labelled Static QR code). A
 QR code that stays on the counter, `/<slug>/?byo=1[&loc=<location>]`: each
@@ -82,6 +91,12 @@ mint through `byo-mint` into the cup balance, and scans over the limit wait
 for review. Deferred Tikkie credits one cup's refund to the wallet through
 `bin-tikkie` action `static_qr` (a claim with a synthetic batch id, like a
 backup receipt, so it shows as a return); over the limit nothing is added.
+
+A Deferred Tikkie **Tikkie link is made per payout**, not per receipt, so
+System health's *Payout links created* divides links made by payouts asked
+for (`getTikkieStatsMetrics`). A wallet payout whose link fails is deleted,
+so `bin-tikkie` first writes a `system_events` row (`tikkie_payout_link`,
+`failure`); that row is the only record of it.
 
 Three code pages, one tab each: **Dynamic QR code** (tab `cupqr`, single-use
 cup batches, every mode), **Static QR code** (`byorequests`) and **Receipt
@@ -158,7 +173,7 @@ is enforced by the dashboard (see *Org isolation* under Landmines).
 **PackPerks Staff** (`src/staff/`, `supabase/functions/staff-app`,
 migrations 050, 053, 055). A phone app at `/staff`, on for an organisation
 only when `organizations.staff_app_enabled` is set (NYU Abu Dhabi first).
-Each venue runs it from Programme → Staff app (`src/admin/staffapp/`, tab
+Each venue runs it from Generate → Staff app (`src/admin/staffapp/`, tab
 `staffapp`): the on/off switch, accounts, a log of every code tagged with who
 made it, and a preview (`/staff?preview=<orgId>`: sample data, nothing
 minted). Staff are added by email there (`staff_members`, one venue per
@@ -221,7 +236,7 @@ access, so any account above vendor may use it.
 | `src/lib/RegionContext.jsx` | `useRegion()`, `useMoney()` for the customer app |
 | `src/admin/lib/adminApi.js` | every admin query; ~5k lines |
 | `src/staff/` | PackPerks Staff: login, the QR screen, history, profile |
-| `src/admin/staffapp/` | Programme → Staff app: switch, accounts and requests, logs, preview |
+| `src/admin/staffapp/` | Generate → Staff app: switch, accounts and requests, logs, preview |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
 | `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |

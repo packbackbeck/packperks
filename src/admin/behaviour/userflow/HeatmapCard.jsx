@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Flame, Layers, MoveVertical, SquareDashedMousePointer } from 'lucide-react';
 import { Card, CardBody, CardHeader, EmptyState, InfoTip, Segmented } from '../../ui';
 import { fmtInt } from '../../ui/timeSeries';
 import { fmtDuration } from '../../lib/behaviourFormat';
 import { screenName } from '../behaviourCopy';
 import { fmtRate } from '../behaviourModel';
-import ScreenPaint, { ScreenPaintEmpty } from './ScreenPaint';
+import ScreenFrame from './ScreenFrame';
 import { rampColor } from './heatRamp';
 
 /* ─────────────────────────────────────────────────────────────────────
  * The heatmap.
  *
- * Three ways of looking at one screen, over the venue's own screen:
+ * Three ways of looking at one screen, over the venue's actual app:
  *
- *   Taps      — every tap, blurred into heat. Where thumbs actually land,
+ *   Taps      — every tap, blurred into heat. Where thumbs land,
  *               including where they land on nothing.
  *   Scroll    — how far down the page visits got, as bands. Where the
  *               colour drops off is the line below which you are
@@ -21,10 +21,9 @@ import { rampColor } from './heatRamp';
  *   Controls  — the screen's own buttons, shaded by how much they are
  *               used, with the ones nobody touches left cold.
  *
- * The screen under the heat is painted by ScreenPaint from what capture
- * measured — real colours, real words, real images, real positions — so
- * the heat sits exactly where the thumbs did. It is a measurement, never
- * a screenshot; see ScreenPaint for what that costs and protects.
+ * The screen underneath is the real customer app in a phone (ScreenFrame),
+ * put on this screen and scrolling as a phone scrolls. The overlays are
+ * drawn at fractions of the page, so they ride the same scroll.
  * ───────────────────────────────────────────────────────────────────── */
 
 const VIEWS = [
@@ -44,9 +43,8 @@ function paintHeat(canvas, cells, grid, intensity) {
   if (!cells?.length || !w || !h) return;
 
   const max = Math.max(...cells.map(c => Number(c.n) || 0)) || 1;
-  const radius = Math.max(14, Math.min(w, h) / 14) * intensity;
+  const radius = Math.max(16, w / 9) * intensity;
 
-  ctx.globalCompositeOperation = 'source-over';
   for (const c of cells) {
     const x = ((Number(c.cx) + 0.5) / grid.cols) * w;
     const y = ((Number(c.cy) + 0.5) / grid.rows) * h;
@@ -69,33 +67,24 @@ function paintHeat(canvas, cells, grid, intensity) {
     if (!a) continue;
     const [r, g, b] = rampColor(a);
     d[i] = r; d[i + 1] = g; d[i + 2] = b;
-    // Ease the alpha so the cool edge fades out instead of ringing.
-    d[i + 3] = Math.round(Math.min(1, a * 1.3) * 232);
+    d[i + 3] = Math.round(Math.min(1, a * 1.3) * 225);
   }
   ctx.putImageData(img, 0, 0);
 }
 
-function HeatCanvas({ cells, grid, intensity }) {
+function HeatCanvas({ cells, grid, intensity, width, height }) {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current;
-    if (!canvas) return undefined;
-    const draw = () => {
-      const box = canvas.parentElement?.getBoundingClientRect();
-      if (!box?.width) return;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = Math.round(box.width * dpr);
-      canvas.height = Math.round(box.height * dpr);
-      canvas.style.width = `${box.width}px`;
-      canvas.style.height = `${box.height}px`;
-      paintHeat(canvas, cells, grid, intensity);
-    };
-    draw();
-    const ro = new ResizeObserver(draw);
-    if (canvas.parentElement) ro.observe(canvas.parentElement);
-    return () => ro.disconnect();
-  }, [cells, grid, intensity]);
-  return <canvas ref={ref} className="sp-overlay sp-overlay--heat" aria-hidden="true" />;
+    if (!canvas || !width || !height) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    paintHeat(canvas, cells, grid, intensity);
+  }, [cells, grid, intensity, width, height]);
+  return <canvas ref={ref} className="sf-heat" aria-hidden="true" />;
 }
 
 /* The bands: each twentieth of the page, shaded by the share of visits
@@ -104,14 +93,14 @@ function ScrollBands({ curve }) {
   const total = Number(curve?.[0]?.total) || 0;
   if (!total) return null;
   return (
-    <div className="sp-overlay sp-bands" aria-hidden="true">
+    <div className="sf-bands" aria-hidden="true">
       {curve.map((s) => {
         const share = Number(s.total) > 0 ? Number(s.reached) / Number(s.total) : 0;
         const [r, g, b] = rampColor(share);
         return (
-          <div key={s.step} className="sp-band" style={{ background: `rgba(${r},${g},${b},${0.2 + share * 0.5})` }}>
+          <div key={s.step} className="sf-band" style={{ background: `rgba(${r},${g},${b},${0.22 + share * 0.5})` }}>
             {(s.step === 5 || s.step === 10 || s.step === 15 || s.step === 20) && (
-              <span className="sp-band__tag">
+              <span className="sf-band__tag">
                 {Math.round((s.step / curve.length) * 100)}% down · seen by {fmtRate(share * 100)}
               </span>
             )}
@@ -122,30 +111,31 @@ function ScrollBands({ curve }) {
   );
 }
 
-/* Controls, shaded by use, over the real screen. */
-function ControlHeat({ layout, byTarget, max, onHover }) {
+/* Controls, shaded by use. Their rectangles come from what capture
+ * measured on the real visits, so they sit where the customer's controls
+ * sat, at the same fractions of the page. */
+function ControlHeat({ elements, byTarget, max, onHover }) {
   return (
-    <div className="sp-overlay sp-controls">
-      {(layout?.elements || []).filter(e => e.t === 'btn').map((el, i) => {
+    <div className="sf-controls">
+      {elements.map((el, i) => {
         const t = byTarget[el.k];
         const heat = t ? (Number(t.taps) || 0) / max : 0;
         const [r, g, b] = rampColor(heat);
         return (
           <div
             key={`${el.k}-${i}`}
-            className={`sp-control${t ? '' : ' sp-control--cold'}`}
+            className={`sf-control${t ? '' : ' sf-control--cold'}`}
             style={{
               left: `${(Number(el.x) || 0) * 100}%`,
               top: `${(Number(el.y) || 0) * 100}%`,
               width: `${(Number(el.w) || 0) * 100}%`,
               height: `${(Number(el.h) || 0) * 100}%`,
-              borderRadius: el.br ? `${Math.min(50, (Number(el.br) || 0) * 100)}cqw` : undefined,
-              ...(t ? { background: `rgba(${r},${g},${b},${0.2 + heat * 0.5})`, borderColor: `rgb(${r},${g},${b})` } : null),
+              ...(t ? { background: `rgba(${r},${g},${b},${0.22 + heat * 0.5})`, borderColor: `rgb(${r},${g},${b})` } : null),
             }}
             onMouseEnter={() => onHover({ el, t })}
             onMouseLeave={() => onHover(null)}
           >
-            {t && <span className="sp-control__n">{fmtInt(t.taps)}</span>}
+            {t && <span className="sf-control__n">{fmtInt(t.taps)}</span>}
           </div>
         );
       })}
@@ -154,11 +144,13 @@ function ControlHeat({ layout, byTarget, max, onHover }) {
 }
 
 export default function HeatmapCard({
-  screens = [], screen, onScreen, data, loading, phrase, captureOff,
+  screens = [], screen, onScreen, data, loading, phrase, captureOff, slug, device,
 }) {
   const [view, setView] = useState('taps');
   const [intensity, setIntensity] = useState(1);
   const [hover, setHover] = useState(null);
+  const [geo, setGeo] = useState(null);
+  const onGeometry = useCallback(g => setGeo(g), []);
 
   const cells = useMemo(() => data?.cells || [], [data]);
   const layout = data?.layout || null;
@@ -170,9 +162,12 @@ export default function HeatmapCard({
   const busiest = cells.reduce((s, c) => Math.max(s, Number(c.sessions) || 0), 0);
   const byTarget = useMemo(() => Object.fromEntries(targets.map(t => [t.target, t])), [targets]);
   const maxTargetTaps = Math.max(1, ...targets.map(t => Number(t.taps) || 0));
-  const controls = (layout?.elements || []).filter(e => e.t === 'btn');
+  const controls = useMemo(
+    () => (layout?.elements || []).filter(e => e.t === 'btn' || e.t === undefined),
+    [layout],
+  );
 
-  const nothing = !loading && !cells.length && !targets.length && !layout;
+  const nothing = !loading && !cells.length && !targets.length;
 
   return (
     <Card className="uf-heatcard">
@@ -220,17 +215,44 @@ export default function HeatmapCard({
                   ? 'Switch capture on in Capture settings and taps start landing here within a few visits.'
                   : `No taps were recorded on this screen ${phrase}. Try a longer period, or a different device.`}
               </EmptyState>
-            ) : !layout ? (
-              <ScreenPaintEmpty note={`This screen's taps were recorded, but nobody has been through it since screen snapshots were switched on — so there is no picture to lay them over yet.`} />
             ) : (
               <>
-                <ScreenPaint layout={layout} fold={view !== 'controls'} dim={view !== 'controls'}>
-                  {view === 'taps' && <HeatCanvas cells={cells} grid={grid} intensity={intensity} />}
-                  {view === 'scroll' && <ScrollBands curve={data?.curve || []} />}
-                  {view === 'controls' && (
-                    <ControlHeat layout={layout} byTarget={byTarget} max={maxTargetTaps} onHover={setHover} />
-                  )}
-                </ScreenPaint>
+                <div className="uf-heat__phone">
+                  <ScreenFrame
+                    slug={slug}
+                    screen={screen}
+                    device={device || 'mobile'}
+                    onGeometry={onGeometry}
+                    note="This venue has no address to preview yet."
+                  >
+                    {view === 'taps' && (
+                      <>
+                        <span className="sf-veil" aria-hidden="true" />
+                        <HeatCanvas
+                          cells={cells}
+                          grid={grid}
+                          intensity={intensity}
+                          width={geo?.width}
+                          height={geo?.pageHeight}
+                        />
+                      </>
+                    )}
+                    {view === 'scroll' && (
+                      <>
+                        <span className="sf-veil" aria-hidden="true" />
+                        <ScrollBands curve={data?.curve || []} />
+                      </>
+                    )}
+                    {view === 'controls' && controls.length > 0 && (
+                      <ControlHeat
+                        elements={controls}
+                        byTarget={byTarget}
+                        max={maxTargetTaps}
+                        onHover={setHover}
+                      />
+                    )}
+                  </ScreenFrame>
+                </div>
 
                 <div className="uf-heat__foot">
                   {view === 'taps' && (
@@ -269,19 +291,21 @@ export default function HeatmapCard({
                         </>
                       ) : hover ? (
                         <><strong>{hover.el.l || hover.el.k}</strong> — nobody tapped this {phrase}.</>
-                      ) : (
+                      ) : controls.length ? (
                         <>
-                          {fmtInt(controls.length)} controls on this screen,
+                          {fmtInt(controls.length)} controls measured on this screen,
                           {' '}{fmtInt(controls.filter(e => byTarget[e.k]).length)} of them used.
                           {' '}Hover one for its numbers.
                         </>
+                      ) : (
+                        <>No control rectangles for this screen yet — they are measured on the next visit.</>
                       )}
                     </span>
                   )}
-                  <InfoTip label="How this screen is drawn">
-                    Rebuilt from what capture measured — each piece’s position, colour, corner, type size and
-                    words. It is not a screenshot: no picture of a customer’s screen is ever taken, and
-                    anything that looks like a personal detail is masked in the app before it is sent.
+                  <InfoTip label="What you are looking at">
+                    The screen is this venue’s real app, opened read-only on the screen the taps belong to —
+                    no account, no writes, nothing tracked. The heat is drawn over it at the same fractions
+                    of the page the taps were measured at.
                   </InfoTip>
                 </div>
               </>

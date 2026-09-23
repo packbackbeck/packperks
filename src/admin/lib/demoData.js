@@ -577,68 +577,6 @@ const UX_SCREENS = {
   ],
 };
 
-/* How the demo's screens are painted.
- *
- * The real thing measures each piece's colour, corner and type size off
- * the live DOM (src/lib/uxCapture.js). The demo has no DOM, so it derives
- * a plausible look from what the control IS — a primary action, a card, a
- * quiet link — in the PackPerks palette. Same element shape as capture
- * produces, so ScreenPaint cannot tell the two apart.
- */
-const UX_PALETTE = {
-  page: '#FFF6F0',
-  card: '#FFFFFF',
-  ink: '#241A16',
-  muted: '#7A6B63',
-  accent: '#E2552B',
-  accentInk: '#FFFFFF',
-  deep: '#8C3A1E',
-  line: '#EDDFD6',
-};
-
-const PRIMARY_RE = /collect|redeem|claim|confirm|donate|submit|send|add-cups|done|ok|choose|get-my/;
-const CARD_RE    = /card|row|tile|reward|store|activity|balance|wallet|hero|step|howpaid|bins|history|frame|image|map/;
-const QUIET_RE   = /close|back|cancel|terms|policy|delete|torch|slider|filter/;
-
-function uxPaint(el) {
-  const k = `${el.k} ${el.l || ''}`.toLowerCase();
-  const wide = (el.w || 0) > 0.5;
-  if (PRIMARY_RE.test(k) && wide) {
-    return { t: 'btn', bg: UX_PALETTE.accent, fg: UX_PALETTE.accentInk, br: 0.075, fs: 0.042, fw: '700', ta: 'center' };
-  }
-  if (CARD_RE.test(k)) {
-    return { t: 'btn', bg: UX_PALETTE.card, fg: UX_PALETTE.ink, br: 0.05, fs: 0.036, fw: '600', bw: 0.003, bc: UX_PALETTE.line };
-  }
-  if (QUIET_RE.test(k)) {
-    return { t: 'btn', bg: null, fg: UX_PALETTE.muted, br: 0.02, fs: 0.033, fw: '500', ta: 'center' };
-  }
-  return { t: 'btn', bg: UX_PALETTE.card, fg: UX_PALETTE.deep, br: 0.06, fs: 0.038, fw: '600', bw: 0.003, bc: UX_PALETTE.line, ta: 'center' };
-}
-
-/* A heading and a line of copy above the controls, so a demo screen reads
- * as a screen rather than a column of buttons. The two modes are two
- * different apps, so their home screens do not say the same thing. */
-const UX_HEADINGS = {
-  standard: { home: ['Return your cup.', 'Collect cups, unlock a reward.'] },
-  tikkie: { home: ['Your refunds.', 'Collect them whenever you like.'] },
-};
-
-function uxChrome(screen, modeKey) {
-  const [title, sub] = UX_HEADINGS[modeKey]?.[screen]
-    || [screenTitle(screen), modeKey === 'tikkie' ? 'Your refunds, in one place.' : 'Collect cups, unlock a reward.'];
-  return [
-    { k: `${screen}:title`, l: title, t: 'text', x: 0.06, y: 0.035, w: 0.72, h: 0.028,
-      bg: null, fg: UX_PALETTE.ink, br: 0, fs: 0.068, fw: '800' },
-    { k: `${screen}:sub`, l: sub, t: 'text', x: 0.06, y: 0.068, w: 0.8, h: 0.022,
-      bg: null, fg: UX_PALETTE.muted, br: 0, fs: 0.036, fw: '500' },
-  ];
-}
-
-function screenTitle(id) {
-  const words = String(id).replace(/^popup-/, '').replace(/[-_]+/g, ' ').trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 const UX_DEVICES = ['mobile', 'tablet', 'desktop'];
 const UX_DEVICE_WEIGHT = [0.83, 0.06, 0.11];
 const UX_ENTRIES = ['receipt_qr', 'direct', 'shared', 'social', 'website', 'in_app'];
@@ -667,14 +605,10 @@ function generateUx(orgId, modeKey) {
   // One layout row per screen and device: the screen the heat lies on.
   for (const s of screens) {
     if (!s.els.length) continue;
-    const painted = [
-      ...uxChrome(s.id, modeKey),
-      ...s.els.map(e => ({ k: e.k, l: e.l, x: e.x, y: e.y, w: e.w, h: e.h, ...uxPaint(e) })),
-    ];
+    const els = s.els.map(e => ({ k: e.k, l: e.l, x: e.x, y: e.y, w: e.w, h: e.h }));
     for (const device of UX_DEVICES) {
       layouts.push({
-        org_id: orgId, screen: s.id, device, elements: painted,
-        page: UX_PALETTE.page,
+        org_id: orgId, screen: s.id, device, elements: els,
         vw: device === 'mobile' ? 390 : device === 'tablet' ? 834 : 1440,
         vh: device === 'mobile' ? 780 : device === 'tablet' ? 1024 : 900,
         dh: device === 'mobile' ? 1560 : device === 'tablet' ? 1500 : 1300,

@@ -53,7 +53,7 @@ const RAGE_COUNT     = 3;
  * every tap on a reward would be filed as a tap that did nothing. */
 const INTERACTIVE = 'button, a[href], [role="button"], [role="tab"], [role="switch"], input, select, textarea, label, summary, [data-ppk]';
 const MAX_SCAN = 3000;      // elements a snapshot will look at
-const MAX_ELEMENTS = 220;   // …and how many of them it keeps
+const MAX_ELEMENTS = 140;   // controls kept per screen
 
 const cursorOf = (el) => {
   try { return getComputedStyle(el).cursor; } catch { return ''; }
@@ -73,35 +73,6 @@ function pressableAncestor(node) {
     else if (el.parentElement === document.body) break;
   }
   return best;
-}
-
-/* Leaves that carry words: a text node's element, with nothing text-bearing
- * inside it. */
-function textLeaves(root) {
-  return [...root.querySelectorAll(TEXTUAL)].filter(n => (
-    (n.textContent || '').trim() && ![...n.children].some(c => (c.textContent || '').trim())
-  ));
-}
-
-/* A control with one phrase in it draws that phrase itself — a button
- * labelled "Get cashback". A card with several (a reward's name, its tags
- * and its price) draws none, and its pieces are painted separately, or the
- * whole card would collapse to one line of text. */
-function labelOnlyControls(pressable) {
-  const out = new WeakSet();
-  for (const el of pressable) {
-    if (textLeaves(el).length <= 1) out.add(el);
-  }
-  return out;
-}
-
-/* The nearest control above this element, if it is one that draws its own
- * label — in which case this element's words are already on screen. */
-function underLabelControl(el, pressable, labelOnly) {
-  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
-    if (pressable.has(p)) return labelOnly.has(p);
-  }
-  return false;
 }
 
 /* Every control on the screen right now, for the repainted screen. */
@@ -407,16 +378,16 @@ function removeListeners() {
 
 /* ── Screen snapshot ───────────────────────────────────────────────── */
 
-/* Text a screen is allowed to keep. Venue content (a reward name, a
- * price, a heading) describes the screen; a customer's own details
- * describe the customer, and a layout row is shared across every visit
- * to that screen — so anything that looks personal is masked before it
- * can get there. Belt and braces with `[data-ppk-private]`, which the
- * app puts on the blocks that show a name, an email or a device. */
+/* Labels a screen is allowed to keep. A control's own name describes the
+ * screen; a customer's details describe the customer, and a layout row is
+ * shared across every visit to that screen — so anything that looks
+ * personal is masked before it can get there. Belt and braces with
+ * `[data-ppk-private]`, which the app puts on the blocks that show a name,
+ * an email or a device. */
 const EMAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
 const IBAN_RE  = /\b[A-Z]{2}\d{2}[A-Z0-9]{8,26}\b/g;
 const LONGNUM  = /\d{4,}/g;
-function safeText(v, max = 90) {
+function safeText(v, max = 60) {
   const t = String(v || '').replace(/\s+/g, ' ').trim();
   if (!t) return null;
   return t
@@ -426,128 +397,46 @@ function safeText(v, max = 90) {
     .slice(0, max);
 }
 
-const TRANSPARENT = /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)$/;
-const solid = (c) => (!c || c === 'transparent' || TRANSPARENT.test(c) ? null : c);
-
-const urlIn = (v) => {
-  const m = /url\(["']?(https?:[^"')]+)["']?\)/.exec(v || '');
-  return m ? m[1].slice(0, 300) : null;
-};
-
-/* Text blocks worth painting: the ones that carry the screen's words. */
-const TEXTUAL = 'h1, h2, h3, h4, p, li, span, strong, b, em, label, small, figcaption, td, th';
-
-/* How an element is drawn, as fractions of the viewport width so the
- * picture scales to whatever box the dashboard gives it. */
-function paintOf(el, cs, vw) {
-  const px = (v) => {
-    const n = parseFloat(v);
-    return Number.isFinite(n) && n > 0 ? Math.round((n / vw) * 10000) / 10000 : 0;
-  };
-  const bw = px(cs.borderTopWidth);
-  // Line height matters as much as type size: a heading that wrapped over
-  // two tight lines in the app has to wrap over two tight lines here, or
-  // it overflows its measured box and collides with what sits under it.
-  const rawLh = parseFloat(cs.lineHeight);
-  const fsPx = parseFloat(cs.fontSize) || 16;
-  return {
-    bg: solid(cs.backgroundColor),
-    fg: cs.color || null,
-    br: px(cs.borderTopLeftRadius),
-    fs: px(cs.fontSize),
-    lh: Number.isFinite(rawLh) ? Math.round((rawLh / fsPx) * 100) / 100 : null,
-    ff: String(cs.fontFamily || '').slice(0, 90) || null,
-    fw: String(cs.fontWeight || '').slice(0, 4) || null,
-    ta: cs.textAlign === 'center' || cs.textAlign === 'right' ? cs.textAlign : null,
-    bw: bw || 0,
-    bc: bw ? solid(cs.borderTopColor) : null,
-    bgi: urlIn(cs.backgroundImage),
-  };
-}
-
-/* What the screen looked like, as fractions of the page: every control,
- * and the words and pictures around them.
+/* Where the controls were, as fractions of the page.
  *
- * This is rebuilt from the live DOM's own geometry and computed styles —
- * positions, colours, radii, type sizes, the public image URLs — so the
- * heatmap can show the venue's real screen with the heat sitting exactly
- * where the thumbs landed. It is a MEASUREMENT, not a picture: no
- * screenshot is taken, nothing a customer typed is read, and anything
- * that looks like a personal detail is masked on the way out. One
- * snapshot per screen per visit; the fullest one wins. */
+ * This is the ONLY thing a snapshot stores. The heatmap draws its heat
+ * over the venue's actual app, embedded read-only (userflow/ScreenFrame),
+ * so there is nothing to rebuild the screen's appearance from and nothing
+ * to store about how it looked. What is still needed is the geometry of
+ * the controls, for the "Controls" view: which button is where, so taps
+ * can be attributed to it and the ones nobody uses can be shown cold.
+ *
+ * One snapshot per screen per visit; the fullest one wins. */
 function snapshotLayout() {
   if (!state.on || !state.config?.layouts || !state.screen) return;
   const screen = state.screen;
   const vw = window.innerWidth || 1;
   const dh = docHeight() || 1;
   const scrollY = window.scrollY || 0;
-
-  const pressable = new Set(pressableNodes());
-  const labelOnly = labelOnlyControls(pressable);
-  // DOM order, so the picture paints back to front the way the page did.
-  const all = document.body ? [...document.body.querySelectorAll('*')].slice(0, MAX_SCAN) : [];
   const elements = [];
-  const seenKeys = new Map();
 
-  for (const el of all) {
+  for (const el of pressableNodes()) {
     if (elements.length >= MAX_ELEMENTS) break;
     if (isPrivate(el)) continue;
     const r = el.getBoundingClientRect();
-    if (r.width < 6 || r.height < 4) continue;
-    if (r.top + scrollY > dh || r.left > vw * 1.5) continue;
-
-    const tag = el.tagName.toLowerCase();
-    if (tag === 'script' || tag === 'style' || tag === 'svg' || tag === 'path') continue;
-
-    let cs;
-    try { cs = getComputedStyle(el); } catch { continue; }
-    if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) continue;
-
-    const isControl = pressable.has(el);
-    const src = tag === 'img' ? String(el.currentSrc || el.src || '') : '';
-    const isImg = /^https?:/.test(src);
-    const paint = paintOf(el, cs, vw);
-    // A leaf that carries words, rather than a box that contains them —
-    // and not a word already drawn by the control around it, which paints
-    // its own label.
-    const covered = !isControl && underLabelControl(el, pressable, labelOnly);
-    const ownText = !covered
-      && el.matches(TEXTUAL)
-      && ![...el.children].some(c => (c.textContent || '').trim())
-      ? safeText(el.textContent)
-      : null;
-    // Skip anything that draws nothing: no control, no words, no picture,
-    // no fill and no border. Those are the layout wrappers.
-    if (!isControl && !ownText && !isImg && !paint.bg && !paint.bgi && !paint.bw) continue;
-
-    const key = isControl ? keyFor(el) : `${tag}:${Math.round(r.top + scrollY)}:${Math.round(r.left)}`;
-    // One row per control; a repeated wrapper key is not worth two.
-    if (seenKeys.has(key)) continue;
-    seenKeys.set(key, true);
-
+    if (r.width < 8 || r.height < 8) continue;
+    if (r.top + scrollY > dh) continue;
     elements.push({
-      k: key,
-      l: isControl ? (labelOnly.has(el) ? safeText(labelFor(el), 60) : null) : ownText,
-      t: isControl ? 'btn' : isImg ? 'img' : ownText ? 'text' : 'box',
+      k: keyFor(el),
+      l: safeText(labelFor(el)),
       x: clamp01(r.left / vw),
       y: clamp01((r.top + scrollY) / dh),
       w: clamp01(r.width / vw),
       h: clamp01(r.height / dh),
-      src: isImg ? src.slice(0, 300) : null,
-      ...paint,
     });
   }
+
   // A screen that is still loading (rewards, activity, a map) has more
   // controls a moment later. The fullest measurement of the visit wins, so
   // a half-built screen never replaces a complete one on the server.
   if (elements.length <= (state.layoutBest[screen] || 0)) return;
   state.layoutBest[screen] = elements.length;
-  let page = null;
-  try {
-    const body = getComputedStyle(document.body);
-    page = solid(body.backgroundColor) || solid(getComputedStyle(document.documentElement).backgroundColor);
-  } catch { /* leave the dashboard's own default */ }
-  const row = { screen, device: deviceClass(), elements, page, vw, vh: window.innerHeight, dh };
+  const row = { screen, device: deviceClass(), elements, vw, vh: window.innerHeight, dh };
   const at = state.layouts.findIndex(l => l.screen === screen);
   if (at >= 0) state.layouts[at] = row;
   else state.layouts.push(row);

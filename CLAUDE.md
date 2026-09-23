@@ -88,9 +88,12 @@ refetches nothing:
   in the export; the rest is built from what capture recorded, which is
   why *Visits captured* is the first tile — it says how much of the
   programme the others speak for.
-- *Heatmap* — taps, scroll bands or control use, over the venue's own
-  screen, plus the table of every control and how long it takes to reach.
-- *Session replay* — one visit, played back step by step.
+- *Heatmap* — taps, scroll bands or control use, over the venue's own app
+  running in a phone, plus the table of every control and how long it
+  takes to reach. It takes the window's height, because the screen is the
+  subject.
+- *Session replay* — one visit, played back step by step over the same
+  phone, which scrolls to follow it.
 
 In Deferred Tikkie the four moved tiles are absent (that mode's reader
 has no such metrics) and the tabs show the capture-built ones alone, over
@@ -99,59 +102,58 @@ top as the screen, so the wallet gets a real heatmap rather than one page
 called "home".
 
 **UX capture** (`src/lib/uxCapture.js`, `supabase/functions/ux-ingest`,
-migration 061) is what fills it. Taps (position plus the name of the
-control under the finger), scroll depth, screen views and the visit's
-end, written to `ux_events` / `ux_sessions`, plus `ux_layouts`: what each
-screen LOOKED like, measured off the live DOM — every piece's position
-and size as a fraction of the page, and how it was drawn (background and
-text colour, corner radius, type size, weight, line height, border, its
-words, and the public image URL where it had one).
+migrations 061–063) is what fills it. Taps (position plus the name of the
+control under the finger), scroll depth, screen views and the visit's end,
+written to `ux_events` / `ux_sessions`, plus `ux_layouts`: where the
+CONTROLS were on each screen, as fractions of the page. That last one is
+only for the Controls view — which button is where, so taps can be
+attributed to one and the unused ones shown cold.
 
-`ScreenPaint` repaints that, and it is what the heatmap and the replay
-are drawn over, so a venue sees its own app with the heat exactly where
-the thumbs landed. **There is never a screenshot of a customer's screen
-anywhere in this system**: it is a measurement, the page is never
-recorded, and replay is the event stream played over the repaint. The
-phone is a scroll window over the whole page at its true proportions —
-capping the aspect squashes every piece and pushes its words out of the
-box measured for them. A visit on a desktop gets a window frame instead
-of a phone.
+**The screen under the heat is the real app.** `userflow/ScreenFrame`
+embeds the customer app at `/<slug>/?uxpreview=<screen>` in a 375 × 812
+phone that scrolls its page the way a phone does, and the heat is drawn
+over it. `?uxpreview=` is the same read-only boot Design & copy's iframe
+has always used (`isPreviewMode` in `src/App.jsx`) — no auth, no account,
+no writes, no cookie banner, no maintenance screen, and `uxScreen`/`track`
+are skipped so a preview can never record itself into the numbers it is
+showing — plus the screen to open. A Deferred Tikkie venue goes to the
+wallet instead, where `UX_PREVIEW` in `TikkieHomePage` opens the matching
+sheet on the same sample data the DEV `?demo=` harness uses.
 
-Personal-looking text never reaches `ux_layouts`, which is shared across
-every visit to a screen: emails, IBANs and long numbers are masked in the
-browser, and `[data-ppk-private]` (on UserPage's profile block) excludes
-a subtree outright — no tap on it is named and it is never painted.
+Two earlier attempts are worth not repeating: a wireframe of grey boxes
+(unrecognisable) and a repaint rebuilt from measured colours and type
+(text wrapped differently in the dashboard's font, so headings collided).
+Embedding the app is the only version that is actually the app — same
+layout, type, icons, illustrations and scale, because it IS it.
 
 Only customers who turned the **Analytical** cookie category on are
-captured, the same switch that gates `client_events`. Nothing typed,
-no field contents, no pointer trail. A control is found by walking up
-from the tap to a native control or to the outermost element with
-`cursor: pointer` — half this app's buttons are card-shaped divs, and
-without that every tap on a reward would be filed as a dead tap. A
-control holding one phrase paints that phrase itself; one holding several
-(a reward card) paints none, and its own pieces are painted instead, or
-the card would collapse to a single line of text.
+captured, the same switch that gates `client_events`. Nothing typed, no
+field contents, no pointer trail. Control labels are masked for anything
+that looks personal (an email, an IBAN, a long number) and
+`[data-ppk-private]` (on UserPage's profile block) excludes a subtree
+outright. A control is found by walking up from the tap to a native
+control or to the outermost element with `cursor: pointer` — half this
+app's buttons are card-shaped divs, and without that every tap on a
+reward would be filed as a dead tap.
 
 Per venue, `app_config` `ux:capture:<orgId>` holds `{ enabled, sample,
-clicks, scroll, replay, layouts, retentionDays }` (User flow → Capture
-settings; its own row, like `byo:cap:<orgId>`, so publishing can't wipe
-it). `ux-ingest` reads the same row before it stores anything, so a
-switch off stops the data at the server. The function is the only writer:
-a batch is capped at 300 rows, a visit at 3,000 however long it stays
-open, and a new visit counts against 300 per IP per hour — inventing
-session ids is the only way to flood the table, and a visit already
-under way is never turned away mid-flow.
+clicks, scroll, replay, layouts, retentionDays }` (Capture settings; its
+own row, like `byo:cap:<orgId>`, so publishing can't wipe it). `ux-ingest`
+reads the same row before it stores anything, so a switch off stops the
+data at the server. The function is the only writer: a batch is capped at
+300 rows, a visit at 3,000 however long it stays open, and a new visit
+counts against 300 per IP per hour — inventing session ids is the only way
+to flood the table, and a visit already under way is never turned away
+mid-flow.
 
-Everything is **on by default**, replay included: the customer has
-already agreed to behavioural analytics, replay is reconstructed rather
-than recorded, and none of it outlives `retentionDays`. A visit is listed
-for replay only when `ux_sessions.replay` was true at the moment it was
-captured, so turning replay off leaves a permanent gap rather than one
-that fills in later. Taps are the shortest-lived thing we hold:
-`ux_run_retention()` (inside the nightly `run_data_retention()`) deletes
-past `retentionDays`, 60 by default.
-Deleting a customer takes their visits (`ux_erase_user`, called by
-`erase_customer_rows`), and Master Settings → Data can clear them per
+Everything is **on by default**, replay included, and every live venue has
+an explicit row saying so. A visit is listed for replay only when
+`ux_sessions.replay` was true at the moment it was captured, so turning
+replay off leaves a permanent gap rather than one that fills in later.
+Taps are the shortest-lived thing we hold: `ux_run_retention()` (inside
+the nightly `run_data_retention()`) deletes past `retentionDays`, 60 by
+default. Deleting a customer takes their visits (`ux_erase_user`, called
+by `erase_customer_rows`), and Master Settings → Data can clear them per
 venue. The dashboard reads sums, not taps: `ux_screen_summary`,
 `ux_heatmap`, `ux_scroll_curve`, `ux_targets`, `ux_target_series`,
 `ux_flow` (SECURITY DEFINER, dashboard accounts only). `uxAggregate.js`
@@ -407,7 +409,7 @@ access, so any account above vendor may use it.
 | `src/staff/` | PackPerks Staff: login, the QR screen, history, profile |
 | `src/admin/staffapp/` | Generate → Staff app: switch, accounts and requests, logs, preview |
 | `src/lib/uxCapture.js` | taps, scrolls and screen flow from the customer app |
-| `src/admin/behaviour/userflow/` | User flow, Heatmap and Session replay: tiles, the repainted screen, controls, flow, replay, capture settings |
+| `src/admin/behaviour/userflow/` | User flow, Heatmap and Session replay: tiles, the embedded app (ScreenFrame), controls, flow, replay, capture settings |
 | `src/admin/lib/uxAggregate.js` | the User flow sums in JS — the demo's half of migration 061 |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |

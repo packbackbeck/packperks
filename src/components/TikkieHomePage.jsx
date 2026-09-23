@@ -56,7 +56,35 @@ const SCAN_ERRORS = {
 };
 
 /* Dev-only sample states for design review (?demo=…). */
-const DEMO = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('demo') : null;
+/* The wallet, with sample data and no network, in two situations.
+ *
+ *   ?demo=<state>     DEV only — the screen-audit harness.
+ *   ?uxpreview=<screen>  ships — the dashboard's Heatmap and Session
+ *                     replay embed this page so a venue looks at its real
+ *                     wallet with the heat over it, rather than a drawing
+ *                     of it. Read-only either way: nothing is fetched,
+ *                     written, scanned or tracked.
+ *
+ * The ux screen ids are the ones capture files taps under, so they map
+ * onto the same sample states the DEV harness already had. */
+const UX_PREVIEW_DEMO = {
+  home: 'home',
+  'popup-redeem': 'redeem',
+  'popup-credited': 'credited',
+  'popup-donate': 'donate',
+  'popup-donated': 'donated',
+  'popup-pending': 'pending',
+  'popup-claimed': 'claimed',
+  'popup-limit': 'home',
+  'popup-error': 'home',
+};
+const UX_PARAMS = typeof window !== 'undefined'
+  ? new URLSearchParams(window.location.search)
+  : new URLSearchParams();
+const UX_PREVIEW = UX_PARAMS.get('uxpreview');
+const DEMO = UX_PREVIEW
+  ? (UX_PREVIEW_DEMO[UX_PREVIEW] || 'home')
+  : (import.meta.env.DEV ? UX_PARAMS.get('demo') : null);
 const DEMO_WALLET = {
   profile: { user_id: 'demo', name: 'Perky Otter', animal_index: 5, email: null },
   balance: 0.9,
@@ -305,11 +333,13 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     if (DEMO === 'donated') return { type: 'donated', amount: 0.5, left: 0.4 };
     return null;
   });
-  const [login, setLogin] = useState(null);
-  const [showPolicy, setShowPolicy] = useState(false);
-  const [showAccount, setShowAccount] = useState(false);
-  const [impactOpen, setImpactOpen] = useState(false);
-  const [openItem, setOpenItem] = useState(null);   // an activity row, opened
+  const [login, setLogin] = useState(() => (UX_PREVIEW === 'login' ? { email: '' } : null));
+  const [showPolicy, setShowPolicy] = useState(UX_PREVIEW === 'privacy-policy');
+  const [showAccount, setShowAccount] = useState(UX_PREVIEW === 'account');
+  const [impactOpen, setImpactOpen] = useState(UX_PREVIEW === 'impact');
+  const [openItem, setOpenItem] = useState(() => (
+    UX_PREVIEW === 'activity-detail' ? DEMO_WALLET.history.find(h => h.kind === 'payout') || DEMO_WALLET.history[1] : null
+  ));   // an activity row, opened
 
   /* A venue with its own colours (Design & copy) wears them here too: the
    * tile takes the accent, buttons and text the rest of the palette. A
@@ -329,7 +359,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   // The batch the "held for review" popup is waiting on — the URL's, or one
   // the camera just read.
   const [pendingBatch, setPendingBatch] = useState(batchId || '');
-  const [scanner, setScanner] = useState(false);
+  const [scanner, setScanner] = useState(UX_PREVIEW === 'scan-camera');
 
   /* The wallet is one page with sheets over it, and a sheet is a screen to
    * the person looking at it — so User flow is told which one is on top.

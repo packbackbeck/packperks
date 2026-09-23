@@ -60,7 +60,7 @@ const KEY_METRIC = 'flow_captured';
 
 export default function UserFlowTab({
   section = 'flow',
-  orgId, orgIds, mode, win, phrase, behaviourMetrics = [], behaviourLoading, canEdit, device, onDevice,
+  orgId, orgSlug, orgIds, mode, win, phrase, behaviourMetrics = [], behaviourLoading, canEdit, device, onDevice,
 }) {
   const [config, setConfig] = useState(UX_CAPTURE_DEFAULTS);
   const [result, setResult] = useState(null);
@@ -346,6 +346,8 @@ export default function UserFlowTab({
             loading={busy || screenBusy}
             phrase={phrase}
             captureOff={!config.enabled}
+            slug={orgSlug}
+            device={device}
           />
           <ButtonsCard
             targets={targets}
@@ -369,6 +371,7 @@ export default function UserFlowTab({
           replay={replayReady}
           replayLoading={replayBusy}
           onOpenSettings={canEdit ? () => setDialog(true) : undefined}
+          slug={orgSlug}
         />
       ) : (
         <>

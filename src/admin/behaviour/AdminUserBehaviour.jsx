@@ -297,6 +297,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
         <UserFlowTab
           section={tab}
           orgId={activeOrg?.id}
+          orgSlug={activeOrg?.slug}
           orgIds={scopeOrgIds}
           mode={activeOrgMode}
           win={win}

@@ -197,6 +197,16 @@ const EMPTY_REWARD = {
   displayLines: [],
 };
 
+/* The screens `?uxpreview=` can open directly in the rewards app. The
+ * dashboard's Heatmap and Session replay ask for one by the same id the
+ * capture filed the taps under (src/lib/uxCapture.js). Anything not here
+ * falls back to the home screen. */
+const UX_PREVIEW_PAGES = new Set([
+  'home', 'stores', 'rewards', 'cup-scan', 'cup-scan-success', 'cup-scan-error',
+  'receipt', 'verifying', 'success', 'rejected', 'refund-success', 'donate-success',
+  'user', 'voucher',
+]);
+
 export default function App({ consentReady = true } = {}) {
   /* ── Supabase-backed state ── */
   const [userId, setUserId] = useState(null);
@@ -424,6 +434,33 @@ export default function App({ consentReady = true } = {}) {
   const [inAppClaim, setInAppClaim] = useState(null);
   const [inAppRedirecting, setInAppRedirecting] = useState(false);
 
+  /* Detect "preview mode" — when the App Design tab's iframe embeds
+   * us with ?preview=1, we skip every Supabase round-trip (auth,
+   * user creation, balance, history, claims) and just render the
+   * layout. Why: those round-trips fire onAuthStateChange events
+   * that cascade through the parent's draftState, which used to
+   * trigger an iframe reload loop. In preview mode we want a static,
+   * stable render that ONLY reflects the design tokens we receive
+   * over postMessage. */
+  /* `?uxpreview=<screen>` is the same idea, used by the dashboard's
+   * Heatmap and Session replay: they embed THIS app so a venue looks at
+   * its real screen with the heat over it, rather than at a drawing of
+   * it. Same read-only boot — no auth, no account, no writes, nothing
+   * tracked, no cookie banner — plus the screen to open. */
+  const uxPreview = (() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const v = new URLSearchParams(window.location.search).get('uxpreview');
+      return v ? String(v).slice(0, 64) : null;
+    } catch { return null; }
+  })();
+  const isPreviewMode = (() => {
+    if (typeof window === 'undefined') return false;
+    if (uxPreview) return true;
+    try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
+    catch { return false; }
+  })();
+
   /* ── Navigation ── */
   const [page, setPage] = useState('home');
   // A claim id from an email deep-link (?claim=<id>) — the account page opens
@@ -435,9 +472,13 @@ export default function App({ consentReady = true } = {}) {
   // changes. Powers the "Last screen / drop-off" metric, and tells UX
   // capture which screen the taps that follow belong to. Fire-and-forget.
   useEffect(() => {
+    // A preview is the dashboard looking at the app, not a customer using
+    // it. It shares this origin, so a stored cookie choice would otherwise
+    // let it record itself into the very numbers it is showing.
+    if (isPreviewMode) return;
     track(EVENTS.SCREEN_VIEW, { screen: page });
     uxScreen(page);
-  }, [page]);
+  }, [page, isPreviewMode]);
 
   // First-time market visitors get the onboarding flow. Skipped while the
   // screenshot harness runs (so captures aren't blocked) and once completed
@@ -562,19 +603,6 @@ export default function App({ consentReady = true } = {}) {
   // A counter venue never asks for a receipt, so the last step is retold.
   const guideSteps = isVoucher ? voucherGuideSteps(rawGuideSteps) : rawGuideSteps;
 
-  /* Detect "preview mode" — when the App Design tab's iframe embeds
-   * us with ?preview=1, we skip every Supabase round-trip (auth,
-   * user creation, balance, history, claims) and just render the
-   * layout. Why: those round-trips fire onAuthStateChange events
-   * that cascade through the parent's draftState, which used to
-   * trigger an iframe reload loop. In preview mode we want a static,
-   * stable render that ONLY reflects the design tokens we receive
-   * over postMessage. */
-  const isPreviewMode = (() => {
-    if (typeof window === 'undefined') return false;
-    try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
-    catch { return false; }
-  })();
 
   /* ── Init: load user + state from Supabase ── */
   useEffect(() => {
@@ -676,6 +704,12 @@ export default function App({ consentReady = true } = {}) {
         // (rewards + settings + design), but we skip the user-data
         // path entirely.
         if (isPreviewMode) {
+          // No cookies are set and nothing is tracked on this boot, so the
+          // banner would be friction over a screenshot of the venue's own app.
+          try {
+            window.__ppkSuppressConsent = true;
+            window.dispatchEvent(new Event('packperks:suppress-consent'));
+          } catch { /* noop */ }
           const pathSlug = (window.location.pathname || '/').split('/').filter(Boolean)[0] || null;
           const previewOrg = (pathSlug ? await getOrgBySlug(pathSlug) : null) || (await getDefaultOrg());
           if (previewOrg) setActiveOrg(previewOrg);
@@ -714,6 +748,27 @@ export default function App({ consentReady = true } = {}) {
               }
               if (config?.settings) setLiveSettings(s => ({ ...s, ...config.settings }));
             } catch { /* preview tolerates missing config */ }
+          }
+          // A Deferred Tikkie venue IS the wallet, so the preview has to go
+          // there rather than to the rewards app.
+          if (uxPreview) {
+            const cfg = await getAppConfig(previewOrg?.id).catch(() => null);
+            if (cfg?.settings?.mode === 'tikkie_only') {
+              setTikkieOnly({
+                org: previewOrg,
+                batchId: '',
+                cupIds: [],
+                staticQr: null,
+                settings: cfg.settings || {},
+              });
+              setIsLoading(false);
+              return;
+            }
+            // The screen the heat belongs to. An id this app doesn't render
+            // (a sheet of another mode) simply leaves it on the home screen.
+            if (UX_PREVIEW_PAGES.has(uxPreview)) setPage(uxPreview);
+            if (uxPreview === 'account') setPage('user');
+            if (uxPreview === 'howto') setHowItWorksOpen(true);
           }
           setIsLoading(false);
           return;
@@ -1892,7 +1947,9 @@ export default function App({ consentReady = true } = {}) {
   const maintenanceOn = tikkieOnly
     ? !!tikkieOnly.settings?.maintenanceMode
     : !!liveSettings.maintenanceMode;
-  if (maintenanceOn) {
+  // A preview is looking at the screens themselves — a heatmap of taps
+  // from last week is not improved by today's maintenance notice.
+  if (maintenanceOn && !isPreviewMode) {
     return <MaintenancePage />;
   }
 

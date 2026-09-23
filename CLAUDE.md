@@ -144,7 +144,24 @@ so `bin-tikkie` first writes a `system_events` row (`tikkie_payout_link`,
 Three code pages, one tab each: **Dynamic QR code** (tab `cupqr`, single-use
 cup batches, every mode), **Static QR code** (`byorequests`) and **Receipt
 generator** (`receiptgen`, test purchase receipts for rewards, so not in
-Deferred Tikkie). Every mode has **Design & copy** (`appdesign`); in Deferred
+Deferred Tikkie).
+
+**Receipt designs** (`src/admin/cupqr/receiptDesigns.js`, Dynamic QR code →
+Design). Five choices: the tall thermal receipt the page has always printed,
+plus four landscape artworks — Banknote Simple, Banknote Full, Willy Wonka,
+Ticket. An artwork is the designer's Figma export with only the changing
+parts cut out (`scripts/receipt-designs/build.py` → `public/receipt-designs/`);
+its wording is outlined vector and **cannot** be changed from the app, so it
+reads as a deposit refund whatever mode the venue runs. `renderDesign()`
+builds one self-contained SVG — fonts embedded as base64, because an SVG in
+an `<img>` cannot reach the page's stylesheets — and the preview, the JPG,
+the PDF, the browser print and the thermal printer all rasterise that same
+string, so none of them can drift. Measure the value **after** the font
+loads or it is sized against Helvetica and overflows the artwork. On the
+Epson the sheet goes out turned a quarter turn (`rasteriseForThermal`):
+printed upright on an 80 mm roll its QR lands at about 10 mm and will not
+scan. Fonts are self-hosted in `public/fonts/` (Figtree, Playfair Display,
+Bevan — all OFL), same rule as DM Sans. Every mode has **Design & copy** (`appdesign`); in Deferred
 Tikkie it shows only Colours and the two header logos (`showPackbackLogo`,
 `showBrandLogo`).
 

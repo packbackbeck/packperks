@@ -327,20 +327,9 @@ export function buildCupReceiptXml({ url, restaurant, generatedAt, totalAmount, 
   ].join('');
 }
 
-/* POST the receipt to the printer. Resolves on success, throws with a
- * human-readable message on failure. */
-export async function printCupReceipt(data, ip = getPrinterIp()) {
-  // Default: render the boxed header image (matches the dashboard preview).
-  // If an NV logo key is set, skip the image and use the text layout with
-  // the NV logo. If image render fails, fall back to text + rasterised logo.
-  let headerImageXml = '';
-  let logoImageXml = '';
-  if (!getLogoKeys()) {
-    headerImageXml = await renderHeaderImage(data?.variant || 'standard');
-    if (!headerImageXml) logoImageXml = await getLogoImageXml();
-  }
-  const xml = buildCupReceiptXml({ ...data, headerImageXml, logoImageXml });
-
+/* POST an ePOS-Print document to the printer. Resolves on success, throws
+ * with a human-readable message on failure. */
+async function postEpos(xml, ip) {
   let res;
   try {
     res = await fetch(endpoint(ip), {
@@ -355,8 +344,7 @@ export async function printCupReceipt(data, ip = getPrinterIp()) {
     );
   }
   const body = await res.text();
-  const success = /success\s*=\s*"true"/i.test(body);
-  if (!success) {
+  if (!/success\s*=\s*"true"/i.test(body)) {
     const code = (body.match(/code\s*=\s*"([^"]*)"/i) || [])[1];
     const status = (body.match(/status\s*=\s*"([^"]*)"/i) || [])[1];
     throw new Error(
@@ -365,4 +353,48 @@ export async function printCupReceipt(data, ip = getPrinterIp()) {
     );
   }
   return { success: true };
+}
+
+/* The printable width in dots, so a caller rasterising artwork for this
+ * printer sizes it to the paper rather than guessing. */
+export const THERMAL_WIDTH_DOTS = PRINT_WIDTH;
+
+/**
+ * Print one already-rendered sheet: a canvas, exactly as wide as the paper,
+ * sent as a single mono image. The four artwork designs go out this way —
+ * they are drawings, not lines of text, so there is nothing for ESC/POS
+ * text commands to do and nothing that could differ from the preview.
+ */
+export async function printDesignSheet(canvas, ip = getPrinterIp()) {
+  if (canvas.width % 8 !== 0) throw new Error('Sheet width must be a multiple of 8 dots.');
+  const xml = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">',
+    '<s:Body>',
+    '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">',
+    '<text align="center"/>',
+    canvasToEposImage(canvas),
+    '<feed line="3"/>',
+    '<cut type="feed"/>',
+    '</epos-print>',
+    '</s:Body>',
+    '</s:Envelope>',
+  ].join('');
+  return postEpos(xml, ip);
+}
+
+/* POST the receipt to the printer. Resolves on success, throws with a
+ * human-readable message on failure. */
+export async function printCupReceipt(data, ip = getPrinterIp()) {
+  // Default: render the boxed header image (matches the dashboard preview).
+  // If an NV logo key is set, skip the image and use the text layout with
+  // the NV logo. If image render fails, fall back to text + rasterised logo.
+  let headerImageXml = '';
+  let logoImageXml = '';
+  if (!getLogoKeys()) {
+    headerImageXml = await renderHeaderImage(data?.variant || 'standard');
+    if (!headerImageXml) logoImageXml = await getLogoImageXml();
+  }
+  const xml = buildCupReceiptXml({ ...data, headerImageXml, logoImageXml });
+  return postEpos(xml, ip);
 }

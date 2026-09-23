@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle, Ban, CheckCircle2, ChevronLeft, ChevronRight, Copy, FileDown, History, ImageDown,
-  Minus, Plus, Printer, QrCode, RotateCcw, Settings2,
+  Minus, Palette, Plus, Printer, QrCode, RotateCcw, Settings2,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { toJpeg, toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { generateCups, setBatchExpiry, revokeBatch, unrevokeBatch, listCupBatches, deleteCupBatches } from '../lib/adminApi';
-import { printCupReceipt, getPrinterIp, setPrinterIp, getLogoKeys, setLogoKeys } from '../lib/eposPrint';
+import {
+  printCupReceipt, printDesignSheet, getPrinterIp, setPrinterIp, getLogoKeys, setLogoKeys,
+  THERMAL_WIDTH_DOTS,
+} from '../lib/eposPrint';
 import { useOrg } from '../context/OrgContext';
 import { useViewRole } from '../context/ViewRole';
 import { getReceiptCopy } from './receiptCopy';
+import {
+  RECEIPT_DESIGNS, DEFAULT_DESIGN_ID, isArtworkDesign, getDesign,
+  renderDesign, designValues, svgToDataUrl, rasterise, rasteriseForThermal,
+} from './receiptDesigns';
 import { logAction } from '../auth/actionLog';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import { APP_URL } from '../../lib/appUrl';
@@ -35,6 +42,23 @@ const EXPIRY_PRESETS = [
 
 // Shown on the Revoke and Restore buttons for anyone who isn't a master.
 const MASTER_ONLY_HINT = 'Only a master can revoke or restore printed batches.';
+
+/* Which artwork the receipt is printed on. The first entry is the tall
+ * thermal receipt this page has always printed; the rest are the designer's
+ * landscape artworks (see receiptDesigns.js). The choice is per-browser, not
+ * per-org: it is a printing preference, not published config. */
+const DESIGN_STORAGE_KEY = 'packperks_cupqr_design';
+const DESIGN_OPTIONS = [
+  { id: DEFAULT_DESIGN_ID, label: 'Receipt', hint: 'The tall thermal receipt.' },
+  ...RECEIPT_DESIGNS,
+];
+
+function readStoredDesign() {
+  try {
+    const id = localStorage.getItem(DESIGN_STORAGE_KEY);
+    return DESIGN_OPTIONS.some(d => d.id === id) ? id : DEFAULT_DESIGN_ID;
+  } catch { return DEFAULT_DESIGN_ID; }
+}
 
 // Public app URL the QR code points to. The QR ALWAYS targets the
 // production Vercel domain — a printed receipt is scanned by a real
@@ -64,7 +88,7 @@ const PROD_URL = APP_URL;
  * the QR on screen is scannable directly.
  * ───────────────────────────────────────────────────────────────────── */
 export default function AdminCupQr() {
-  const { money } = useAdminMoney();
+  const { money, symbol } = useAdminMoney();
   const { activeOrg, activeOrgMode, activeOrgSettings } = useOrg();
   // Revoking, restoring and dating a printed batch is master-only in the
   // database (admin_set_cup_batch), like minting the cups.
@@ -85,6 +109,16 @@ export default function AdminCupQr() {
   const qrCanvasRef = useRef(null);
   const receiptRef = useRef(null);
   const [exporting, setExporting] = useState(null); // 'jpg' | 'pdf' | null
+
+  /* Artwork designs. `design` is the picked id; `sheet` is the filled SVG
+   * every output is drawn from — preview, JPG, PDF, browser print and the
+   * thermal printer all rasterise this one string, so none of them can
+   * disagree with the others. */
+  const [designId, setDesignId] = useState(readStoredDesign);
+  const [builtSheet, setBuiltSheet] = useState(null); // { id, svg, width, height } | null
+  const [sheetError, setSheetError] = useState(null);
+  const isArtwork = isArtworkDesign(designId);
+  const design = getDesign(designId);
 
   /* Epson TM-m30III (ePOS-Print over Ethernet). printerIp is editable +
    * persisted; printStatus drives the inline success/error message. */
@@ -286,6 +320,15 @@ export default function AdminCupQr() {
     setPrinting(true);
     setPrintStatus(null);
     try {
+      if (isArtwork) {
+        if (!sheet) throw new Error('The design is still being drawn. Try again in a moment.');
+        const canvas = await rasteriseForThermal(
+          sheet.svg, sheet.width, sheet.height, THERMAL_WIDTH_DOTS,
+        );
+        await printDesignSheet(canvas, printerIp);
+        setPrintStatus({ ok: true, text: `Sent to the printer at ${printerIp}. It prints sideways — turn the slip to read it.` });
+        return;
+      }
       await printCupReceipt({
         url: batch.url,
         restaurant,
@@ -325,15 +368,30 @@ export default function AdminCupQr() {
     return format === 'jpg' ? toJpeg(node, { ...opts, quality: 0.92 }) : toPng(node, opts);
   }
 
+  /* Both exports draw the artwork from the same SVG the preview shows, at
+   * twice the design's own pixel size — about 540 dpi at the PDF's 180 mm,
+   * so the QR stays crisp, while the canvas stays well inside Safari's
+   * 16.7-megapixel ceiling. */
+  const SHEET_EXPORT_SCALE = 2;
+
   async function handleDownloadJpg() {
     if (!batch) return;
     setExporting('jpg');
     try {
-      const dataUrl = await captureReceipt('jpg');
+      let dataUrl;
+      if (isArtwork) {
+        if (!sheet) throw new Error('The design is still being drawn.');
+        const canvas = await rasterise(
+          sheet.svg, sheet.width, sheet.height, sheet.width * SHEET_EXPORT_SCALE,
+        );
+        dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      } else {
+        dataUrl = await captureReceipt('jpg');
+      }
       if (!dataUrl) return;
       const a = document.createElement('a');
       a.href = dataUrl;
-      a.download = `packperks-cup-qr-${batch.batch_id.slice(0, 8)}.jpg`;
+      a.download = `packperks-${isArtwork ? designId : 'cup-qr'}-${batch.batch_id.slice(0, 8)}.jpg`;
       a.click();
     } catch (err) {
       console.error('JPG export failed:', err);
@@ -347,6 +405,24 @@ export default function AdminCupQr() {
     if (!batch) return;
     setExporting('pdf');
     try {
+      if (isArtwork) {
+        if (!sheet) throw new Error('The design is still being drawn.');
+        const canvas = await rasterise(
+          sheet.svg, sheet.width, sheet.height, sheet.width * SHEET_EXPORT_SCALE,
+        );
+        // 180 mm wide: big enough that every design's QR lands over 20 mm,
+        // which is the point below which phone cameras start to struggle.
+        const widthMm = 180;
+        const heightMm = widthMm * (sheet.height / sheet.width);
+        const pdf = new jsPDF({
+          unit: 'mm',
+          format: [widthMm, heightMm],
+          orientation: heightMm > widthMm ? 'portrait' : 'landscape',
+        });
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, widthMm, heightMm);
+        pdf.save(`packperks-${designId}-${batch.batch_id.slice(0, 8)}.pdf`);
+        return;
+      }
       const dataUrl = await captureReceipt('png');
       if (!dataUrl) return;
       // Build a narrow PDF page that matches the receipt's aspect ratio —
@@ -384,6 +460,53 @@ export default function AdminCupQr() {
   const refundAmount = (count * ratePerCup).toFixed(2);
   const sessionId = batch?.batch_id?.slice(0, 8).toUpperCase() ?? '———';
   const generatedAt = batch?.generatedAt ?? new Date();
+  const shownCups = batch?.cup_ids?.length ?? count;
+
+  /* Fill the picked artwork. Runs on every change an admin can make to what
+   * the sheet says, so the preview is never a stale render of an older
+   * batch. `sheet` stays null for the tall receipt, which is plain DOM. */
+  useEffect(() => {
+    if (!isArtwork) return undefined;
+    let live = true;
+    (async () => {
+      try {
+        const qrDataUrl = batch?.url
+          ? await QRCode.toDataURL(batch.url, {
+              width: 600, margin: 0, errorCorrectionLevel: 'M',
+              color: { dark: '#000000', light: '#FFFFFF' },
+            })
+          : '';
+        const values = designValues({
+          symbol,
+          total: refundAmount,
+          cups: shownCups,
+          when: batch?.generatedAt ?? new Date(),
+          session: sessionId,
+        })[designId];
+        const built = await renderDesign(designId, values, qrDataUrl);
+        if (!live) return;
+        setBuiltSheet({ id: designId, ...built });
+        setSheetError(null);
+      } catch (e) {
+        console.error('renderDesign failed:', e);
+        if (!live) return;
+        setBuiltSheet(null);
+        setSheetError(e.message || 'The design could not be drawn.');
+      }
+    })();
+    return () => { live = false; };
+  }, [isArtwork, designId, batch, symbol, refundAmount, shownCups, sessionId]);
+
+  // Only ever the sheet for the design that is currently picked — switching
+  // designs must not flash the previous one while the new one is drawn.
+  const sheet = builtSheet && builtSheet.id === designId ? builtSheet : null;
+  const sheetUrl = sheet ? svgToDataUrl(sheet.svg) : null;
+
+  function pickDesign(id) {
+    setDesignId(id);
+    setSheetError(null);
+    try { localStorage.setItem(DESIGN_STORAGE_KEY, id); } catch { /* ignore */ }
+  }
 
   // Multi-select + bulk delete for the Recent batches table. Selection is
   // keyed on the FULL list, so the header checkbox selects every batch across
@@ -409,8 +532,6 @@ export default function AdminCupQr() {
     await refreshRecent();
   }
 
-  const shownCups = batch?.cup_ids?.length ?? count;
-
   return (
     <div className="admin-cup-qr acq">
       {printStatus && (
@@ -423,7 +544,7 @@ export default function AdminCupQr() {
         </div>
       )}
 
-      <div className="acq-layout">
+      <div className={`acq-layout${isArtwork ? ' acq-layout--sheet' : ''}`}>
         {/* ── Left: generation controls ─────────────────────────────── */}
         <div className="acq-controls">
           <Card>
@@ -578,6 +699,38 @@ export default function AdminCupQr() {
             </CardBody>
           </Card>
 
+          <Card>
+            <CardHeader
+              title="Design"
+              icon={Palette}
+              subtitle="What the QR code is printed on. The wording on each artwork is fixed; only the amount, cups, time and session change."
+            />
+            <CardBody>
+              <div className="acq-designs" role="radiogroup" aria-label="Receipt design">
+                {DESIGN_OPTIONS.map(d => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={designId === d.id}
+                    className={`acq-design${designId === d.id ? ' acq-design--on' : ''}`}
+                    onClick={() => pickDesign(d.id)}
+                  >
+                    <span className="acq-design__name">{d.label}</span>
+                    <span className="acq-design__hint">{d.hint}</span>
+                  </button>
+                ))}
+              </div>
+              {isArtwork && (
+                <p className="acq-design__note">
+                  These are landscape notes, so the thermal printer prints them
+                  sideways down the roll — that is the only way the QR code comes
+                  out big enough to scan.
+                </p>
+              )}
+            </CardBody>
+          </Card>
+
           {batch && (
             <Card>
               <CardHeader title="Latest batch" icon={History} />
@@ -638,9 +791,23 @@ export default function AdminCupQr() {
               </>
             )}
           />
-          <div className="acq-preview-wrap">
-          {/* The receipt itself: its look is the printed/exported artwork, so it
-              keeps its own colours. */}
+          <div className={`acq-preview-wrap${isArtwork ? ' acq-preview-wrap--sheet' : ''}`}>
+          {isArtwork ? (
+            /* One <img> of the filled SVG — the same string the JPG, the PDF
+               and the printer are drawn from, so the preview is not a
+               lookalike of the print, it IS the print. */
+            <div className="acq-sheet" id="cupqr-receipt-print-target" ref={receiptRef}>
+              {sheetError ? (
+                <p className="acq-sheet__msg acq-sheet__msg--err" role="alert">{sheetError}</p>
+              ) : sheetUrl ? (
+                <img src={sheetUrl} alt={`${design?.label} design, ${batch ? 'with this batch’s QR code' : 'without a QR code yet'}`} />
+              ) : (
+                <p className="acq-sheet__msg">Drawing the design…</p>
+              )}
+            </div>
+          ) : (
+          /* The receipt itself: its look is the printed/exported artwork, so it
+              keeps its own colours. */
           <div className="acq-receipt" id="cupqr-receipt-print-target" ref={receiptRef}>
             <header className="acq-receipt__brand">
               <img src={packbackLogo} alt="PackBack" />
@@ -713,6 +880,7 @@ export default function AdminCupQr() {
               </div>
             </div>
           </div>
+          )}
           </div>
         </Card>
       </div>

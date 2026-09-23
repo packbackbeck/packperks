@@ -422,3 +422,71 @@
     margin: 0 auto !important;
   }
 }
+
+/* ── Design picker ───────────────────────────────────────────────────
+ * Which artwork the batch is printed on. Radio semantics, card looks. */
+.acq-designs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 10px;
+}
+.acq-design {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  text-align: left;
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+  background: var(--ui-bg);
+  cursor: pointer;
+  transition: border-color .12s, background .12s, box-shadow .12s;
+}
+.acq-design:hover { border-color: var(--ui-line-strong, var(--ui-line)); background: var(--ui-soft); }
+.acq-design--on {
+  border-color: var(--ui-accent, #1D1D1D);
+  background: var(--ui-soft);
+  box-shadow: inset 0 0 0 1px var(--ui-accent, #1D1D1D);
+}
+.acq-design__name { font-size: 13.5px; font-weight: 600; color: var(--ui-fg); }
+.acq-design__hint { font-size: 12px; color: var(--ui-fg-2); line-height: 1.35; }
+.acq-design__note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+/* ── Artwork preview ─────────────────────────────────────────────────
+ * The landscape designs need the full column, so .acq-layout drops to one
+ * column while one is picked. */
+.acq-layout--sheet { grid-template-columns: minmax(0, 1fr); }
+.acq-preview-wrap--sheet { padding: 22px; }
+.acq-sheet {
+  width: 100%;
+  max-width: 980px;
+  background: white;
+  border: 1px solid #E8E6E1;
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.acq-sheet img { display: block; width: 100%; height: auto; }
+.acq-sheet__msg {
+  margin: 0;
+  padding: 48px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ui-fg-2);
+}
+.acq-sheet__msg--err { color: var(--ui-danger, #B42318); }
+
+/* Browser print: the artwork fills the sheet, nothing else on the page. */
+@media print {
+  body.cupqr-printing .acq-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+}

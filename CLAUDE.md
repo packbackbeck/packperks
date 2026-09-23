@@ -407,8 +407,8 @@ dashboard profile gets the dashboard's sign-in page with a note
 master creates a one-time code for a venue; PackPulse's server claims it and
 gets a link secret; a master approves after comparing a 4-character
 confirmation code. PackPulse then frames `/packpulse-embed` (Dashboard,
-System health, Reports & alerts, as a vendor sees them) with a one-time
-ticket that signs in the connection's own login
+User analytics, System health, Reports & alerts, as a vendor sees them)
+with a one-time ticket that signs in the connection's own login
 (`link-<id>@packpulse.packperks.invalid`). That login has no dashboard
 profile and reads only the `packpulse_*` views: its venue, active links,
 shared pages, no emails, payout links or cup codes. The panel is two cards:
@@ -605,13 +605,35 @@ business replaying a venue's visits. If User flow is ever added to the
 shared pages, each table needs its own view and a `PACKPULSE_VIEWS`
 entry, like everything else below.
 
-**The PackPulse embed reads views, not tables.** A Dashboard, System health
-or Reports reader that starts reading a new table shows zeros in PackPulse
-until that table gets a `packpulse_*` view (only the columns needed, filtered
-by `packpulse_org_ids()`, select-only) and an entry in `PACKPULSE_VIEWS`
+**The PackPulse embed reads views, not tables.** A shared page's reader
+that starts reading a new table shows zeros in PackPulse until that table
+gets a `packpulse_*` view (only the columns needed, filtered by
+`packpulse_org_ids()`, select-only) and an entry in `PACKPULSE_VIEWS`
 (`src/lib/supabase.js`). Never give a connection login an `admin_profiles`
 row: dashboard accounts read every venue. A new PackPulse address must be
-added to `frame-ancestors` in `vercel.json`.
+added to `frame-ancestors` in `vercel.json`. Sharing a page also means
+`EMBED_PAGES` in both `packpulse-link` and the embed, a switch in the
+panel, and `packpulse_admin_update`'s own page list — miss that last one
+and the switch springs back off.
+
+**`.rpc()` is not remapped, so a shared RPC must scope itself.** The view
+trick only covers `.from(table)`. User analytics reads six SECURITY DEFINER
+functions (`ux_screen_summary`, `ux_targets`, `ux_flow`, `ux_heatmap`,
+`ux_scroll_curve`, `ux_target_series`) that take the organisation list from
+the caller, so they now go through `ux_guard(p_orgs)` (migration 064): a
+dashboard account passes as before, a PackPulse connection only for the
+venues its link shares with User analytics on, and anything else raises
+`not_authorized`. A definer function that trusts a caller's org list is a
+cross-customer leak.
+
+**A guard in a CTE may never run.** Those same readers opened with
+`with guard as (select ux_guard())` and joined it in — but nothing read the
+CTE's column, so Postgres pruned it and the guard never executed. As plain
+`anon` (the key in the customer bundle) every venue's screens, taps and
+control names came back. Fixed 23 Sep 2026 by migration 065: the guard is
+`volatile` and each CTE is `materialized`. Test a guard as `anon` against a
+venue that actually has rows before believing it — with no rows the join
+short-circuits and an unguarded call looks like an empty one.
 
 **Customer emails are email only.** Push notifications were removed; the
 `notify_push` column stays and is always false.

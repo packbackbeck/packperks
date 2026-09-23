@@ -74,8 +74,8 @@ const OVERRIDES_KEY = 'ppk_behaviour_group_overrides';
 const PAGE_TABS = [
   { id: 'programme', label: 'Programme', icon: TrendingUp },
   { id: 'flow', label: 'User flow', icon: MousePointerClick },
-  { id: 'heatmap', label: 'Heatmap', icon: Flame },
-  { id: 'replay', label: 'Session replay', icon: Video },
+  { id: 'heatmap', label: 'Heatmap', icon: Flame, beta: true },
+  { id: 'replay', label: 'Session replay', icon: Video, beta: true },
 ];
 const FLOW_SECTIONS = new Set(['flow', 'heatmap', 'replay']);
 const MOVED = new Set(MOVED_METRIC_IDS);

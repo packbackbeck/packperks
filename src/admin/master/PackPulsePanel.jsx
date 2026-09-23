@@ -22,6 +22,7 @@ import './PackPulsePanel.css';
 
 const PAGES = [
   { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'behaviour', label: 'User analytics', icon: Activity, hint: 'includes the heatmap and replays' },
   { id: 'stats', label: 'System health', icon: Gauge },
   { id: 'reports', label: 'Reports & alerts', icon: ClipboardList },
   { id: 'preview', label: 'Preview', icon: Smartphone, hint: 'the customer app' },

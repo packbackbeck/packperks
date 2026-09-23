@@ -50,6 +50,13 @@ const PACKPULSE_VIEWS = {
   pending_batches: 'packpulse_pending_batches',
   backup_cup_uses: 'packpulse_backup_cup_uses',
   bin_sessions: 'packpulse_bin_sessions',
+  consent_rejections: 'packpulse_consent_rejections',
+  // User analytics → User flow, Heatmap, Session replay (migration 064).
+  // The ux_* RPCs behind them are reached directly, not through a view:
+  // ux_guard(p_orgs) is what keeps a connection to its own venues.
+  ux_sessions: 'packpulse_ux_sessions',
+  ux_events: 'packpulse_ux_events',
+  ux_layouts: 'packpulse_ux_layouts',
 }
 
 if (IS_PACKPULSE_EMBED) {

@@ -283,7 +283,10 @@ export default function UserFlowTab({
         <div className="uf__controls">
           <Segmented options={DEVICES} value={device || ''} onChange={v => onDevice(v || null)} ariaLabel="Device" />
           <Button variant="outline" icon={RefreshCw} aria-label="Refresh" title="Refresh" onClick={() => setReloadKey(k => k + 1)} />
-          <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog(true)}>Capture settings</Button>
+          {/* A setting, so not for a read-only viewer — a vendor, or PackPulse. */}
+          {canEdit && (
+            <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog(true)}>Capture settings</Button>
+          )}
         </div>
       </div>
 

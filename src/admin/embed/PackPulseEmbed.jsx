@@ -12,6 +12,7 @@ import { Card, EmptyState, TileDisplayContext } from '../ui';
 import AdminOverview from '../overview/AdminOverview';
 import AdminStats from '../stats/AdminStats';
 import AdminReports from '../reports/AdminReports';
+import AdminUserBehaviour from '../behaviour/AdminUserBehaviour';
 import '../ui/ui.css';
 import '../ui/dark.css';
 import '../AdminApp.css';
@@ -37,7 +38,7 @@ import './PackPulseEmbed.css';
  * The whole contract is in docs/packpulse/INTEGRATION.md.
  * ───────────────────────────────────────────────────────────────────── */
 
-const EMBED_PAGES = ['overview', 'stats', 'reports'];
+const EMBED_PAGES = ['overview', 'behaviour', 'stats', 'reports'];
 const SESSION_CHECK_MS = 5 * 60 * 1000;
 
 function readFragment() {
@@ -305,6 +306,9 @@ function EmbedShell({ state, setState, post, parentOrigin }) {
                   </KeepAlive>
                   <KeepAlive id="stats" activeId={page} visited={visited}>
                     <AdminStats onNavigate={go} />
+                  </KeepAlive>
+                  <KeepAlive id="behaviour" activeId={page} visited={visited}>
+                    <AdminUserBehaviour onNavigate={go} />
                   </KeepAlive>
                   <KeepAlive id="reports" activeId={page} visited={visited}>
                     <AdminReports embedded />

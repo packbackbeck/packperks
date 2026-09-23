@@ -1,8 +1,8 @@
 # PackPerks × PackPulse connection
 
 A PackPulse organisation can show one PackPerks venue's **Dashboard**,
-**System health** and **Reports & alerts** inside PackPulse, plus a
-**Preview** button that opens the venue's customer app. PackPulse sees
+**User analytics**, **System health** and **Reports & alerts** inside
+PackPulse, plus a **Preview** button that opens the venue's customer app. PackPulse sees
 these pages read-only, the way the venue's own vendors see them in the
 PackPerks dashboard. The pages are PackPerks' own, rendered by PackPerks in
 an iframe, so they look and behave exactly the same.
@@ -12,7 +12,8 @@ organisation, and which pages. They can pause or end any connection at any
 time, and access stops at once.
 
 The PackPulse side is built by PackPulse's own Claude from
-[`PACKPULSE_PROMPT.md`](PACKPULSE_PROMPT.md). Nothing in PackPulse's code or
+[`PACKPULSE_PROMPT.md`](PACKPULSE_PROMPT.md), with
+[`PROMPT_USER_ANALYTICS.md`](PROMPT_USER_ANALYTICS.md) for the fourth page. Nothing in PackPulse's code or
 database is touched from this repository.
 
 ---
@@ -101,17 +102,21 @@ views (migration 057). Each view:
 
 | View | Needed by | Left out |
 |---|---|---|
-| `packpulse_users` | Dashboard, Reports | email (always empty), IBAN, device id, login id, consent fields |
+| `packpulse_users` | Dashboard, User analytics, Reports | email (always empty), IBAN, device id, login id, consent fields |
 | `packpulse_cup_balances` | Dashboard, Reports | — |
-| `packpulse_claims` | Dashboard, System health, Reports | IBAN, receipt photos and AI texts, approval notes; the Tikkie link reads `hidden`; batch id hashed |
-| `packpulse_cup_scans` | Dashboard, System health, Reports | photos; cup and batch ids hashed |
+| `packpulse_claims` | Dashboard, User analytics, System health, Reports | IBAN, receipt photos and AI texts, approval notes; the Tikkie link reads `hidden`; batch id hashed |
+| `packpulse_cup_scans` | Dashboard, User analytics, System health, Reports | photos; cup and batch ids hashed |
 | `packpulse_activity_history` | Dashboard, Reports | — |
-| `packpulse_cups` | System health | cup and batch ids hashed (an unclaimed cup id is a code that claims cups) |
+| `packpulse_cups` | User analytics, System health | cup and batch ids hashed (an unclaimed cup id is a code that claims cups) |
 | `packpulse_system_events` | System health | event details, who did it |
-| `packpulse_client_events` | System health | every app event property except the scan id |
+| `packpulse_client_events` | User analytics, System health | every app event property except the scan id |
 | `packpulse_pending_batches` | System health | email (always empty), marketing consent; batch id hashed |
 | `packpulse_backup_cup_uses` | System health | amounts, device id |
 | `packpulse_bin_sessions` | System health | machine and session ids, amounts |
+| `packpulse_consent_rejections` | User analytics | nothing to leave out: an id, the venue and a date |
+| `packpulse_ux_sessions` | User analytics | nothing beyond the visit record itself |
+| `packpulse_ux_events` | User analytics | nothing beyond the tap, scroll or screen view |
+| `packpulse_ux_layouts` | User analytics | — |
 
 Hashes are sha256, so the same id always gives the same hash: counts and joins
 between views still work, but no code that claims cups can be read back.
@@ -178,14 +183,14 @@ with `verify_jwt` off because it checks the secret or ticket itself.
 |---|---|---|---|
 | `claim` | none (the code) | `{ code, packpulse: { org_id, org_name, app_origin?, requested_by?: { email?, name? } } }` | `{ link_id, secret, status: "pending", confirm_code, packperks: Venue }` |
 | `status` | secret | `{}` | `{ link_id, status, confirm_code?, pages, packperks: Venue, packpulse, preview_url, approved_at, ended_at, ended_by }` |
-| `embed` | secret | `{ page: "overview"\|"stats"\|"reports", theme?: "light"\|"dark", parent_origin?, viewer?: { email?, name? } }` | `{ url, expires_at }` |
+| `embed` | secret | `{ page: "overview"\|"behaviour"\|"stats"\|"reports", theme?: "light"\|"dark", parent_origin?, viewer?: { email?, name? } }` | `{ url, expires_at }` |
 | `disconnect` | secret | `{}` | `{ ok: true, status: "revoked" }` |
 | `redeem` | the ticket | `{ ticket }` (called by the embed page itself) | `{ token_hash, page, pages, link_id, org_id, … }` |
 
 `Venue` is `{ org_id, name, brand_name, slug, country, brand_color, logo_url,
 mode, mode_label, app_url, archived }`. `pages` is
-`{ overview, stats, reports, preview }`, all `false` unless the status is
-`active`. `status` is one of `pending`, `active`, `paused`, `declined`,
+`{ overview, behaviour, stats, reports, preview }`, all `false` unless the
+status is `active`. `status` is one of `pending`, `active`, `paused`, `declined`,
 `revoked`.
 
 Errors are `{ error: code }` with an HTTP status: `invalid_code` (400/404),
@@ -242,9 +247,23 @@ there, or browsers refuse to show the frame.
   it would read every venue. Its email domain, `packpulse.packperks.invalid`,
   is neither invitable in practice nor on the trusted `@packback.network`
   list, so `bootstrap-admin` refuses it (tested).
+- **A page calls an RPC.** `src/lib/supabase.js` rewrites `.from(table)` to
+  the view, but it cannot rewrite `.rpc(name)` — a shared page reaches the
+  function directly. So the function itself has to scope the caller: see
+  `ux_guard(p_orgs)` (migration 064), which lets a dashboard account through
+  unchanged and a connection through only for the venues its own link
+  shares. A SECURITY DEFINER function that takes an org list and trusts it
+  is a cross-customer leak waiting to happen.
+- **A guard must be somewhere the planner cannot drop.** The ux readers put
+  `ux_guard()` in a CTE whose column nothing read, and Postgres pruned it:
+  the guard never ran, and the public key could read every venue's
+  behaviour data (found and fixed 23 Sep 2026, migration 065). Keep such a
+  guard `volatile` and its CTE `materialized`, and test it as `anon` before
+  believing it.
 - **Sharing another page.** Add it to `EMBED_PAGES` in the edge function and
   the embed, a switch in the panel, and to `packpulse_admin_update`'s page
-  list.
+  list. Miss the last one and the switch moves in the dashboard but comes
+  back off, because that writer rebuilds `pages` from its own fixed list.
 
 ## 8. Troubleshooting
 

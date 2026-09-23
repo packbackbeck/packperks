@@ -162,6 +162,7 @@ export function Tabs({ tabs, value, onChange, ariaLabel }) {
             {Icon && <Icon size={14} aria-hidden="true" />}
             {t.label}
             {t.count != null && <span className="ui-tabs__count">{t.count}</span>}
+            {t.beta && <BetaChip />}
           </button>
         );
       })}

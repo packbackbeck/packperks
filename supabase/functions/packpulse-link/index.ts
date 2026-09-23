@@ -1,9 +1,10 @@
 // packpulse-link — the PackPerks side of a PackPulse connection.
 //
-// A PackPulse organisation shows one PackPerks venue's Dashboard, System
-// health and Reports & alerts, read-only, in an iframe. The whole design is
-// in docs/packpulse/INTEGRATION.md; the tables and the master-only SQL
-// functions are migration 057.
+// A PackPulse organisation shows one PackPerks venue's Dashboard, User
+// analytics, System health and Reports & alerts, read-only, in an iframe.
+// The whole design is in docs/packpulse/INTEGRATION.md; the tables and the
+// master-only SQL functions are migration 057, and User analytics needs
+// migration 064 as well.
 //
 // Who calls what
 //   PackPulse's SERVER (never a browser: the secret must stay server-side)
@@ -32,7 +33,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const APP_ORIGIN = "https://perks.packback.network";
-const EMBED_PAGES = ["overview", "stats", "reports"];
+const EMBED_PAGES = ["overview", "behaviour", "stats", "reports"];
 const ALL_PAGES = [...EMBED_PAGES, "preview"];
 const TICKET_TTL_MS = 2 * 60 * 1000;
 // The connection's own login. Not a real mailbox, never on

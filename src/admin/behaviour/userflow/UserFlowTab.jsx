@@ -135,15 +135,33 @@ export default function UserFlowTab({
     return screens[0]?.screen || null;
   }, [screen, screens]);
 
+  /* A heatmap is always of ONE device. A phone page and a desktop page are
+   * different shapes, so taps from both, drawn over one of them, land on
+   * the wrong things — which is exactly what "All devices" used to do. So
+   * when no device is chosen the screen picks the one most of its visits
+   * were actually on, and says so. */
+  const screenDevice = useMemo(() => {
+    if (device) return device;
+    if (!activeScreen) return 'mobile';
+    const count = {};
+    for (const v of (cur?.sessions || [])) {
+      if (!(v.screen_list || []).includes(activeScreen)) continue;
+      const d = v.device || 'mobile';
+      count[d] = (count[d] || 0) + 1;
+    }
+    const best = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+    return best ? best[0] : 'mobile';
+  }, [device, activeScreen, cur]);
+
   /* The heat for one screen. The result carries the key it was loaded
    * for, so the previous screen's heat is never painted under the new
    * screen's name — and "still loading" is that mismatch, not a flag. */
-  const screenKey = `${requestKey}|${activeScreen || ''}`;
+  const screenKey = `${requestKey}|${activeScreen || ''}|${screenDevice}`;
   useEffect(() => {
     if (!activeScreen || !orgId) return undefined;
     let alive = true;
     const key = screenKey;
-    getUxScreen(activeScreen, range, orgIds, mode, device || null)
+    getUxScreen(activeScreen, range, orgIds, mode, screenDevice)
       .then(d => { if (alive) setScreenData({ key, ...d }); })
       .catch(() => { if (alive) setScreenData({ key, cells: [], curve: [], targets: [], layout: null }); });
     return () => { alive = false; };
@@ -347,7 +365,8 @@ export default function UserFlowTab({
             phrase={phrase}
             captureOff={!config.enabled}
             slug={orgSlug}
-            device={device}
+            device={screenDevice}
+            devicePicked={!!device}
           />
           <ButtonsCard
             targets={targets}

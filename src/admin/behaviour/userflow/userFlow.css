@@ -69,7 +69,14 @@
   display: flex; flex-direction: column; gap: 10px;
   padding: 14px 16px; min-width: 0; align-items: center;
 }
-.uf-heat__phone { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; }
+/* The room the phone gets. It is `position: relative` and the phone inside
+ * it is absolutely placed, so the phone's size is decided BY this box and
+ * never feeds back into it — that loop is what let the device grow past
+ * its section and stick out over the cards above and below. */
+.uf-heat__phone {
+  position: relative; flex: 1 1 auto; min-height: 0; width: 100%;
+  overflow: hidden;
+}
 
 /* ── The device (ScreenFrame) ───────────────────────────────────────
  *
@@ -81,7 +88,10 @@
  * The phone keeps its own colours in both themes: it stands in for a
  * customer's device, and that device does not have a dark mode because
  * the dashboard does. */
-.sf { position: relative; flex: none; }
+.sf {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+}
 .sf__device { position: absolute; top: 0; left: 0; transform-origin: top left; }
 .sf__bezel {
   position: relative; width: 100%; height: 100%;
@@ -335,18 +345,19 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
   padding: 14px 16px; min-width: 0; align-items: center;
 }
 .uf-replay__phone {
-  position: relative; flex: 1 1 auto; min-height: 0;
-  display: flex; align-items: center; justify-content: center;
+  position: relative; flex: 1 1 auto; min-height: 0; width: 100%;
+  overflow: hidden;
 }
 .uf-replay__loading { padding: 40px; text-align: center; color: var(--ui-muted); font-size: 13px; }
+/* Under the phone, not over it: the phone's box clips, and a caption
+ * half-hidden by a bezel is worse than one on its own line. */
 .uf-replay__caption {
-  position: absolute; z-index: 7; left: 50%; bottom: -6px;
-  transform: translateX(-50%);
-  display: flex; align-items: baseline; gap: 6px; max-width: 94%;
-  padding: 6px 12px; border-radius: 999px;
-  background: var(--ui-card); border: 1px solid var(--ui-border);
-  font-size: 12px; color: var(--ui-muted); white-space: nowrap;
-  box-shadow: var(--ui-shadow-md);
+  display: inline-flex; align-items: baseline; gap: 6px;
+  margin: 0; max-width: 100%;
+  padding: 5px 12px; border-radius: 999px;
+  background: var(--ui-soft); border: 1px solid var(--ui-border);
+  font-size: 12px; color: var(--ui-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .uf-replay__caption strong { font-size: 12.5px; color: var(--ui-fg); }
 

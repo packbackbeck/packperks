@@ -110,9 +110,16 @@ only for the Controls view — which button is where, so taps can be
 attributed to one and the unused ones shown cold.
 
 **The screen under the heat is the real app.** `userflow/ScreenFrame`
-embeds the customer app at `/<slug>/?uxpreview=<screen>` in a 375 × 812
-phone that scrolls its page the way a phone does, and the heat is drawn
-over it. `?uxpreview=` is the same read-only boot Design & copy's iframe
+embeds the customer app at `/<slug>/?uxpreview=<screen>` in a device that
+scrolls its page the way that device does, and the heat is drawn over it.
+
+**A heatmap is always of ONE device.** A phone page and a desktop page are
+different shapes, so taps from both drawn over one of them land on the
+wrong things. With no device chosen, the screen picks the one most of its
+visits were actually on and the subtitle says which; the filter overrides
+it. The phone is placed absolutely inside a box of a definite height, so
+its size is decided BY that box and never feeds back into it — that loop
+is what let it grow past its section. `?uxpreview=` is the same read-only boot Design & copy's iframe
 has always used (`isPreviewMode` in `src/App.jsx`) — no auth, no account,
 no writes, no cookie banner, no maintenance screen, and `uxScreen`/`track`
 are skipped so a preview can never record itself into the numbers it is

@@ -143,8 +143,10 @@ function ControlHeat({ elements, byTarget, max, onHover }) {
   );
 }
 
+const DEVICE_WORD = { mobile: 'on a phone', tablet: 'on a tablet', desktop: 'on a desktop' };
+
 export default function HeatmapCard({
-  screens = [], screen, onScreen, data, loading, phrase, captureOff, slug, device,
+  screens = [], screen, onScreen, data, loading, phrase, captureOff, slug, device, devicePicked,
 }) {
   const [view, setView] = useState('taps');
   const [intensity, setIntensity] = useState(1);
@@ -175,7 +177,7 @@ export default function HeatmapCard({
         title="Where customers tap"
         icon={Flame}
         subtitle={row
-          ? `${screenName(row.screen)} · ${fmtInt(row.views)} views from ${fmtInt(row.sessions)} visits ${phrase}`
+          ? `${screenName(row.screen)} ${DEVICE_WORD[device] || DEVICE_WORD.mobile}${devicePicked ? '' : ', where most of these visits were'} · ${fmtInt(row.views)} views from ${fmtInt(row.sessions)} visits ${phrase}`
           : `Pick a screen to see where taps land ${phrase}`}
         actions={<Segmented options={VIEWS} value={view} onChange={setView} ariaLabel="Heatmap view" />}
       />

@@ -194,18 +194,18 @@ export default function ReplayCard({
                       />
                     )}
                   </ScreenFrame>
-                  <div className="uf-replay__caption">
-                    <strong>{screenName(step?.screen)}</strong>
-                    <span>
-                      {step?.kind === 'view' && 'opened this screen'}
-                      {step?.kind === 'scroll' && `scrolled to ${Math.round((Number(step.depth) || 0) * 100)}%`}
-                      {step?.kind === 'click' && `tapped ${step.label || 'the screen'}`}
-                      {step?.kind === 'rage' && `tapped ${step.label || 'here'} again — nothing happened`}
-                      {step?.kind === 'dead' && 'tapped something that does nothing'}
-                      {step?.kind === 'leave' && 'left'}
-                    </span>
-                  </div>
                 </div>
+                <p className="uf-replay__caption">
+                  <strong>{screenName(step?.screen)}</strong>
+                  <span>
+                    {step?.kind === 'view' && 'opened this screen'}
+                    {step?.kind === 'scroll' && `scrolled to ${Math.round((Number(step.depth) || 0) * 100)}%`}
+                    {step?.kind === 'click' && `tapped ${step.label || 'the screen'}`}
+                    {step?.kind === 'rage' && `tapped ${step.label || 'here'} again — nothing happened`}
+                    {step?.kind === 'dead' && 'tapped something that does nothing'}
+                    {step?.kind === 'leave' && 'left'}
+                  </span>
+                </p>
 
                 <div className="uf-replay__controls">
                   <Button
@@ -241,9 +241,9 @@ export default function ReplayCard({
 
                 <p className="uf-replay__note">
                   <Hand size={13} aria-hidden="true" />
-                  Reconstructed: the taps and scrolls this visit made, played over a screen rebuilt from
-                  what capture measured. The page itself was never recorded, so nothing typed or shown in
-                  a field exists to play back.
+                  Reconstructed: the taps and scrolls this visit made, played over the venue’s own app
+                  opened read-only. The page itself was never recorded, so nothing typed or shown in a
+                  field exists to play back.
                 </p>
               </>
             )}

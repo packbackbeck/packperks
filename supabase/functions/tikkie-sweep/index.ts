@@ -105,26 +105,6 @@ async function lookup(cashbackId: string) {
   return { status, redeemedAt: cb.redeemedDateTime ?? null, expiresAt: cb.expiryDateTime ?? null };
 }
 
-/* TEMPORARY probe (cron-secret only): does the Cashback API accept a
- * DELETE on a cashback? Asked with a random id that cannot exist, so it
- * can never cancel anyone's real link. Removed once answered. */
-async function cancelProbe() {
-  const fake = crypto.randomUUID();
-  const urls = [`${campaignBase()}/cashbacks/${fake}`, `${BASE}/cashbacks/${fake}`];
-  const out: Record<string, unknown>[] = [];
-  for (const url of urls) {
-    for (const method of ["DELETE", "GET"]) {
-      try {
-        const r = await fetch(url, { method, headers: tikkieHeaders(), signal: AbortSignal.timeout(8000) });
-        out.push({ url: url.replace(fake, "<fake>"), method, status: r.status, body: (await r.text()).slice(0, 200) });
-      } catch (e) {
-        out.push({ url: url.replace(fake, "<fake>"), method, error: String(e).slice(0, 120) });
-      }
-    }
-  }
-  return out;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -135,10 +115,6 @@ Deno.serve(async (req) => {
   const who = await authorize(req, body);
   if (!who.ok) return who.resp;
   if (!API_KEY || !APP_TOKEN) return json({ error: "tikkie_not_configured" }, 503);
-
-  if (body.action === "cancel_probe" && who.actor === "cron") {
-    return json({ probe: await cancelProbe() });
-  }
 
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(body.limit) || DEFAULT_LIMIT));
   const orgId = typeof body.org_id === "string" ? body.org_id : null;

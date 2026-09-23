@@ -6,7 +6,9 @@ is no driver to install and nothing to configure in macOS — the Mac only has
 to be able to reach the printer's IP. That is the whole job.
 
 Everything below is for **Generate → Dynamic QR code**, which is the only page
-that prints.
+that prints. For the artwork designs themselves — the file format, and what to
+do to drive a printer that is not this one — see
+[receipt-designs.md](receipt-designs.md).
 
 ---
 

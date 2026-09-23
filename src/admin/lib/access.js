@@ -97,8 +97,10 @@ const APP_MODES = ['standard', 'byo'];
 export const TABS = [
   { id: 'overview', label: 'Dashboard', group: 'analytics', icon: LayoutDashboard, modes: ALL_MODES, fixed: true, editable: true,
     description: 'Headline numbers, the trend and what stands out.' },
-  { id: 'behaviour', label: 'User analytics', group: 'analytics', icon: Activity, modes: ALL_MODES, editable: false,
-    description: 'How customers find the programme, come back and redeem.' },
+  // Editable since User flow: the page now carries a setting (what the
+  // customer app may capture), so a role can be granted edit on it.
+  { id: 'behaviour', label: 'User analytics', group: 'analytics', icon: Activity, modes: ALL_MODES, editable: true,
+    description: 'How customers find the programme, come back and redeem — and what they do inside the app.' },
   { id: 'stats', label: 'System health', group: 'analytics', icon: Gauge, modes: ALL_MODES, editable: true,
     description: 'Whether scanning, payouts and receipt checks work as they should.' },
   { id: 'reports', label: 'Reports & alerts', group: 'analytics', icon: ClipboardList, modes: ALL_MODES, editable: true,

@@ -211,4 +211,13 @@ function getInAppBrowserKind() {
   return null;
 }
 
-export { EVENTS, track, setAnalyticsContext, getEntryContext, isAndroidInAppBrowser, getInAppBrowserKind };
+/** The id this visit is filed under, in client_events and in ux_events
+ *  alike, so a heatmap and a funnel are talking about the same visit. */
+function getSessionId() {
+  return SESSION_ID;
+}
+
+export {
+  EVENTS, track, setAnalyticsContext, getEntryContext, getSessionId,
+  isAndroidInAppBrowser, getInAppBrowserKind,
+};

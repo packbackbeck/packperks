@@ -379,7 +379,7 @@ export function demoWorld(orgId) {
 }
 
 /** Drop the cache — used when the demo toggle flips, so the next read rebuilds. */
-export function resetDemoWorld() { CACHE.clear(); }
+export function resetDemoWorld() { CACHE.clear(); UX_CACHE.clear(); }
 
 /* ── Range helper: the real queries filter server-side, so the demo has
  *    to apply the same window itself. ── */
@@ -427,4 +427,307 @@ export function demoBehaviourRows(orgId) {
     ev: w.clientEvents,
     rej: w.consentRejections,
   };
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * UX capture — the demo's taps, scrolls and screen flow.
+ *
+ * Same rule as everything above: fabricate ROWS (ux_sessions, ux_events,
+ * ux_layouts as migration 061 shapes them) and let the real aggregates in
+ * uxAggregate.js count them. So the demo heatmap is a real heatmap of
+ * invented visits, not a drawing of one, and the tiles beside it add up
+ * to the same visits.
+ *
+ * The screen graph is per mode, because the modes are different apps: a
+ * Deposit Rewards venue has a market, rewards and a scanner; a Deferred
+ * Tikkie wallet is one page with sheets over it.
+ * ───────────────────────────────────────────────────────────────────── */
+
+/* A screen: where its controls sit (fractions of the page, as the tracker
+ * records them) and what customers open next. `weight` is how much traffic
+ * starts there; `exit` is how often a visit ends on it. */
+const UX_SCREENS = {
+  standard: [
+    { id: 'home', weight: 0.62, exit: 0.28, scroll: 0.72, next: [['rewards', 0.34], ['cup-scan', 0.26], ['user', 0.14], ['howto', 0.1], ['impact', 0.08], ['stores', 0.08]],
+      els: [
+        { k: 'ppk:header-account', l: 'Account', x: 0.82, y: 0.03, w: 0.12, h: 0.03 },
+        { k: 'ppk:balance-card', l: 'Cup balance', x: 0.06, y: 0.1, w: 0.88, h: 0.12 },
+        { k: 'ppk:add-cups', l: 'Add more cups', x: 0.06, y: 0.25, w: 0.88, h: 0.06 },
+        { k: 'ppk:reward-card-1', l: 'Flat white', x: 0.06, y: 0.36, w: 0.42, h: 0.14 },
+        { k: 'ppk:reward-card-2', l: 'Latte', x: 0.52, y: 0.36, w: 0.42, h: 0.14 },
+        { k: 'ppk:reward-card-3', l: 'Cold brew', x: 0.06, y: 0.53, w: 0.42, h: 0.14 },
+        { k: 'ppk:reward-card-4', l: 'Filter coffee', x: 0.52, y: 0.53, w: 0.42, h: 0.14 },
+        { k: 'ppk:how-it-works', l: 'How it works', x: 0.06, y: 0.72, w: 0.88, h: 0.05 },
+        { k: 'ppk:share-impact', l: 'Share your impact', x: 0.06, y: 0.8, w: 0.88, h: 0.05 },
+        { k: 'ppk:terms', l: 'Terms', x: 0.34, y: 0.93, w: 0.32, h: 0.03 },
+      ] },
+    { id: 'rewards', weight: 0.06, exit: 0.16, scroll: 0.56, next: [['receipt', 0.36], ['home', 0.4], ['voucher', 0.12], ['user', 0.12]],
+      els: [
+        { k: 'ppk:reward-back', l: 'Back', x: 0.04, y: 0.03, w: 0.12, h: 0.04 },
+        { k: 'ppk:reward-hero', l: 'Reward image', x: 0.06, y: 0.1, w: 0.88, h: 0.24 },
+        { k: 'ppk:reward-claim', l: 'Get cashback', x: 0.06, y: 0.42, w: 0.88, h: 0.07 },
+        { k: 'ppk:reward-switch', l: 'Save for this one', x: 0.06, y: 0.52, w: 0.88, h: 0.06 },
+        { k: 'ppk:reward-terms', l: 'Reward terms', x: 0.3, y: 0.66, w: 0.4, h: 0.04 },
+      ] },
+    { id: 'cup-scan', weight: 0.14, exit: 0.1, scroll: 0.2, next: [['cup-scan-success', 0.68], ['cup-scan-error', 0.14], ['home', 0.18]],
+      els: [
+        { k: 'ppk:scan-close', l: 'Close', x: 0.85, y: 0.04, w: 0.1, h: 0.04 },
+        { k: 'ppk:scan-frame', l: 'Camera', x: 0.12, y: 0.24, w: 0.76, h: 0.42 },
+        { k: 'ppk:scan-torch', l: 'Torch', x: 0.44, y: 0.76, w: 0.12, h: 0.06 },
+      ] },
+    { id: 'cup-scan-success', weight: 0, exit: 0.34, scroll: 0.3, next: [['home', 0.72], ['rewards', 0.28]],
+      els: [
+        { k: 'ppk:scan-done', l: 'Nice', x: 0.06, y: 0.62, w: 0.88, h: 0.07 },
+        { k: 'ppk:scan-again', l: 'Scan another', x: 0.06, y: 0.72, w: 0.88, h: 0.06 },
+      ] },
+    { id: 'cup-scan-error', weight: 0, exit: 0.52, scroll: 0.25, next: [['cup-scan', 0.5], ['home', 0.5]],
+      els: [
+        { k: 'ppk:scan-retry', l: 'Try again', x: 0.06, y: 0.6, w: 0.88, h: 0.07 },
+        { k: 'ppk:scan-close-2', l: 'Close', x: 0.06, y: 0.7, w: 0.88, h: 0.06 },
+      ] },
+    { id: 'receipt', weight: 0.02, exit: 0.3, scroll: 0.68, next: [['verifying', 0.7], ['home', 0.3]],
+      els: [
+        { k: 'ppk:receipt-upload', l: 'Upload receipt', x: 0.06, y: 0.3, w: 0.88, h: 0.16 },
+        { k: 'ppk:receipt-email', l: 'Email', x: 0.06, y: 0.52, w: 0.88, h: 0.06 },
+        { k: 'ppk:receipt-consent', l: 'Privacy consent', x: 0.06, y: 0.62, w: 0.06, h: 0.03 },
+        { k: 'ppk:receipt-submit', l: 'Send claim', x: 0.06, y: 0.72, w: 0.88, h: 0.07 },
+      ] },
+    { id: 'verifying', weight: 0, exit: 0.2, scroll: 0.1, next: [['success', 0.82], ['rejected', 0.18]], els: [] },
+    { id: 'success', weight: 0, exit: 0.58, scroll: 0.3, next: [['home', 1]],
+      els: [{ k: 'ppk:success-done', l: 'Done', x: 0.06, y: 0.66, w: 0.88, h: 0.07 }] },
+    { id: 'rejected', weight: 0, exit: 0.62, scroll: 0.35, next: [['home', 1]],
+      els: [{ k: 'ppk:rejected-back', l: 'Back to home', x: 0.06, y: 0.66, w: 0.88, h: 0.07 }] },
+    { id: 'user', weight: 0.08, exit: 0.42, scroll: 0.8, next: [['home', 0.72], ['impact', 0.28]],
+      els: [
+        { k: 'ppk:account-name', l: 'Edit name', x: 0.06, y: 0.14, w: 0.88, h: 0.06 },
+        { k: 'ppk:account-email', l: 'Save your balance', x: 0.06, y: 0.24, w: 0.88, h: 0.06 },
+        { k: 'ppk:account-history', l: 'Activity', x: 0.06, y: 0.36, w: 0.88, h: 0.2 },
+        { k: 'ppk:account-refund', l: 'Direct refund', x: 0.06, y: 0.62, w: 0.88, h: 0.06 },
+        { k: 'ppk:account-delete', l: 'Delete my account', x: 0.24, y: 0.88, w: 0.52, h: 0.04 },
+      ] },
+    { id: 'howto', weight: 0.04, exit: 0.44, scroll: 0.88, next: [['home', 1]],
+      els: [
+        { k: 'ppk:howto-step-1', l: 'Step 1', x: 0.06, y: 0.16, w: 0.88, h: 0.12 },
+        { k: 'ppk:howto-step-2', l: 'Step 2', x: 0.06, y: 0.32, w: 0.88, h: 0.12 },
+        { k: 'ppk:howto-close', l: 'Got it', x: 0.06, y: 0.74, w: 0.88, h: 0.07 },
+      ] },
+    { id: 'impact', weight: 0.02, exit: 0.5, scroll: 0.64, next: [['home', 1]],
+      els: [
+        { k: 'ppk:impact-share', l: 'Share', x: 0.06, y: 0.5, w: 0.88, h: 0.07 },
+        { k: 'ppk:impact-close', l: 'Close', x: 0.06, y: 0.6, w: 0.88, h: 0.06 },
+      ] },
+    { id: 'stores', weight: 0.02, exit: 0.46, scroll: 0.7, next: [['home', 1]],
+      els: [
+        { k: 'ppk:store-card-1', l: 'Cartouche', x: 0.06, y: 0.2, w: 0.88, h: 0.1 },
+        { k: 'ppk:store-card-2', l: 'La Place', x: 0.06, y: 0.33, w: 0.88, h: 0.1 },
+        { k: 'ppk:store-request', l: 'Request it', x: 0.06, y: 0.6, w: 0.88, h: 0.06 },
+      ] },
+    { id: 'voucher', weight: 0, exit: 0.66, scroll: 0.2, next: [['home', 1]],
+      els: [{ k: 'ppk:voucher-slide', l: 'Slide to redeem', x: 0.06, y: 0.6, w: 0.88, h: 0.08 }] },
+  ],
+  tikkie: [
+    { id: 'home', weight: 0.86, exit: 0.42, scroll: 0.66, next: [['popup-redeem', 0.3], ['activity-detail', 0.2], ['account', 0.14], ['popup-donate', 0.12], ['impact', 0.1], ['scan-camera', 0.08], ['privacy-policy', 0.06]],
+      els: [
+        { k: 'ppk:wallet-tile', l: 'What you are owed', x: 0.06, y: 0.12, w: 0.88, h: 0.16 },
+        { k: 'ppk:wallet-collect', l: 'Collect', x: 0.06, y: 0.31, w: 0.42, h: 0.06 },
+        { k: 'ppk:wallet-donate', l: 'Donate', x: 0.52, y: 0.31, w: 0.42, h: 0.06 },
+        { k: 'ppk:activity-row-1', l: 'Activity row', x: 0.06, y: 0.44, w: 0.88, h: 0.07 },
+        { k: 'ppk:activity-row-2', l: 'Activity row', x: 0.06, y: 0.53, w: 0.88, h: 0.07 },
+        { k: 'ppk:activity-row-3', l: 'Activity row', x: 0.06, y: 0.62, w: 0.88, h: 0.07 },
+        { k: 'ppk:wallet-howpaid', l: 'How you get paid', x: 0.06, y: 0.74, w: 0.88, h: 0.1 },
+        { k: 'ppk:wallet-bins', l: 'Where the bins are', x: 0.06, y: 0.87, w: 0.88, h: 0.06 },
+      ] },
+    { id: 'popup-redeem', weight: 0, exit: 0.3, scroll: 0.2, next: [['home', 1]],
+      els: [
+        { k: 'ppk:redeem-confirm', l: 'Get my money', x: 0.08, y: 0.62, w: 0.84, h: 0.07 },
+        { k: 'ppk:redeem-cancel', l: 'Not now', x: 0.08, y: 0.72, w: 0.84, h: 0.05 },
+      ] },
+    { id: 'popup-credited', weight: 0, exit: 0.36, scroll: 0.15, next: [['home', 1]],
+      els: [{ k: 'ppk:credited-ok', l: 'Nice', x: 0.08, y: 0.66, w: 0.84, h: 0.07 }] },
+    { id: 'popup-donate', weight: 0, exit: 0.26, scroll: 0.2, next: [['home', 0.7], ['popup-donated', 0.3]],
+      els: [
+        { k: 'ppk:donate-slider', l: 'How much', x: 0.08, y: 0.5, w: 0.84, h: 0.05 },
+        { k: 'ppk:donate-confirm', l: 'Donate', x: 0.08, y: 0.62, w: 0.84, h: 0.07 },
+        { k: 'ppk:donate-cancel', l: 'Cancel', x: 0.08, y: 0.72, w: 0.84, h: 0.05 },
+      ] },
+    { id: 'popup-donated', weight: 0, exit: 0.6, scroll: 0.15, next: [['home', 1]],
+      els: [{ k: 'ppk:donated-ok', l: 'Thanks', x: 0.08, y: 0.66, w: 0.84, h: 0.07 }] },
+    { id: 'activity-detail', weight: 0, exit: 0.22, scroll: 0.45, next: [['home', 0.82], ['popup-redeem', 0.18]],
+      els: [
+        { k: 'ppk:activity-open-link', l: 'Open Tikkie link', x: 0.08, y: 0.56, w: 0.84, h: 0.07 },
+        { k: 'ppk:activity-close', l: 'Close', x: 0.08, y: 0.66, w: 0.84, h: 0.05 },
+      ] },
+    { id: 'account', weight: 0.06, exit: 0.44, scroll: 0.74, next: [['home', 0.86], ['login', 0.14]],
+      els: [
+        { k: 'ppk:account-email', l: 'Save your balance', x: 0.06, y: 0.2, w: 0.88, h: 0.06 },
+        { k: 'ppk:account-name', l: 'Edit name', x: 0.06, y: 0.3, w: 0.88, h: 0.06 },
+        { k: 'ppk:account-close', l: 'Close', x: 0.06, y: 0.68, w: 0.88, h: 0.06 },
+      ] },
+    { id: 'login', weight: 0.04, exit: 0.5, scroll: 0.25, next: [['home', 1]],
+      els: [
+        { k: 'ppk:login-email', l: 'Email', x: 0.08, y: 0.4, w: 0.84, h: 0.06 },
+        { k: 'ppk:login-send', l: 'Send code', x: 0.08, y: 0.5, w: 0.84, h: 0.07 },
+      ] },
+    { id: 'impact', weight: 0.02, exit: 0.54, scroll: 0.6, next: [['home', 1]],
+      els: [{ k: 'ppk:impact-close', l: 'Close', x: 0.08, y: 0.62, w: 0.84, h: 0.06 }] },
+    { id: 'scan-camera', weight: 0.02, exit: 0.3, scroll: 0.1, next: [['popup-credited', 0.66], ['home', 0.34]],
+      els: [{ k: 'ppk:scan-close', l: 'Close', x: 0.85, y: 0.05, w: 0.1, h: 0.04 }] },
+    { id: 'privacy-policy', weight: 0, exit: 0.6, scroll: 0.9, next: [['home', 1]],
+      els: [{ k: 'ppk:policy-close', l: 'Close', x: 0.08, y: 0.9, w: 0.84, h: 0.05 }] },
+  ],
+};
+
+const UX_DEVICES = ['mobile', 'tablet', 'desktop'];
+const UX_DEVICE_WEIGHT = [0.83, 0.06, 0.11];
+const UX_ENTRIES = ['receipt_qr', 'direct', 'shared', 'social', 'website', 'in_app'];
+const UX_ENTRY_WEIGHT = [0.46, 0.24, 0.12, 0.09, 0.05, 0.04];
+
+/* A normal-ish draw around a centre, clipped — thumbs land near a button,
+ * not exactly on its middle. */
+function jitter(rand, centre, spread) {
+  const g = (rand() + rand() + rand() - 1.5) / 1.5;   // −1…1, bunched at 0
+  return Math.min(1, Math.max(0, centre + g * spread));
+}
+
+function generateUx(orgId, modeKey) {
+  const rand = mulberry32(hashSeed(`${orgId}:ux:${modeKey}`));
+  const now = Date.now();
+  const end = Math.floor(now / HOUR) * HOUR;
+  const start = end - DAYS * DAY;
+  const screens = UX_SCREENS[modeKey] || UX_SCREENS.standard;
+  const byId = new Map(screens.map(s => [s.id, s]));
+  const entries = screens.filter(s => s.weight > 0);
+
+  const sessions = [];
+  const events = [];
+  const layouts = [];
+
+  // One layout row per screen and device: the wireframe the heat lies on.
+  for (const s of screens) {
+    if (!s.els.length) continue;
+    for (const device of UX_DEVICES) {
+      layouts.push({
+        org_id: orgId, screen: s.id, device,
+        elements: s.els.map(e => ({ k: e.k, l: e.l, x: e.x, y: e.y, w: e.w, h: e.h })),
+        vw: device === 'mobile' ? 390 : device === 'tablet' ? 834 : 1440,
+        vh: device === 'mobile' ? 780 : device === 'tablet' ? 1024 : 900,
+        dh: device === 'mobile' ? 1560 : device === 'tablet' ? 1500 : 1300,
+        seen: 1, updated_at: new Date(end).toISOString(),
+      });
+    }
+  }
+
+  const TOTAL = 520 + Math.floor(rand() * 180);
+  for (let i = 0; i < TOTAL; i++) {
+    // Skewed toward the recent end, then nudged by the weekday rhythm the
+    // rest of the demo uses, so the daily lines have the same shape.
+    let startMs = start + Math.pow(rand(), 0.7) * (end - start);
+    if (rand() > WEEKDAY_WEIGHT[new Date(startMs).getDay()] / 1.18) {
+      startMs = start + Math.pow(rand(), 0.7) * (end - start);
+    }
+    const sessionId = `demo-${modeKey}-${i.toString(36).padStart(4, '0')}`;
+    const device = weightedPick(rand, UX_DEVICES, UX_DEVICE_WEIGHT);
+    const vw = device === 'mobile' ? 390 : device === 'tablet' ? 834 : 1440;
+    const vh = device === 'mobile' ? 780 : device === 'tablet' ? 1024 : 900;
+
+    let t = startMs;
+    let seq = 0;
+    let screen = weightedPick(rand, entries.map(s => s.id), entries.map(s => s.weight));
+    let clicks = 0; let rage = 0; let dead = 0; let views = 0;
+    let firstTapMs = null; let maxScroll = 0;
+    const seen = new Set();
+    const hops = 1 + Math.floor(Math.pow(rand(), 1.6) * 5);
+
+    for (let h = 0; h < hops; h++) {
+      const def = byId.get(screen);
+      if (!def) break;
+      const dh = Math.round(vh * (1 + (def.scroll || 0.3) * 1.4));
+      const screenAt = t;
+      seen.add(screen);
+      views += 1;
+      events.push({
+        org_id: orgId, session_id: sessionId, user_id: null, seq: seq++, kind: 'view',
+        screen, target: null, label: null, x: null, y: null, yv: null,
+        vw, vh, dh, depth: 0, t_ms: 0, at: new Date(t).toISOString(),
+      });
+
+      // Reading the screen: how far down this visit got.
+      const reach = Math.min(1, (def.scroll || 0.3) * (0.4 + rand() * 0.9));
+      if (reach > 0.08) {
+        const stepsDown = 1 + Math.floor(reach * 5);
+        for (let s = 1; s <= stepsDown; s++) {
+          t += 700 + rand() * 2600;
+          const depth = Math.min(1, (reach * s) / stepsDown);
+          if (depth > maxScroll) maxScroll = depth;
+          events.push({
+            org_id: orgId, session_id: sessionId, user_id: null, seq: seq++, kind: 'scroll',
+            screen, target: null, label: null, x: null, y: null, yv: null,
+            vw, vh, dh, depth, t_ms: Math.round(t - screenAt), at: new Date(t).toISOString(),
+          });
+        }
+      }
+
+      // Taps. Most land on a control; a few land on nothing, and now and
+      // then a control does not react and the thumb goes again.
+      const taps = def.els.length ? Math.floor(rand() * 3) + (h === hops - 1 ? 0 : 1) : 0;
+      for (let c = 0; c < taps; c++) {
+        t += 900 + rand() * 5200;
+        const onControl = def.els.length && rand() > 0.14;
+        const el = onControl ? def.els[Math.floor(Math.pow(rand(), 1.7) * def.els.length)] : null;
+        const x = el ? jitter(rand, el.x + el.w / 2, Math.max(0.03, el.w * 0.32)) : jitter(rand, 0.5, 0.3);
+        const y = el ? jitter(rand, el.y + el.h / 2, Math.max(0.015, el.h * 0.4)) : jitter(rand, 0.45, 0.26);
+        const raging = !!el && rand() < 0.035;
+        const kind = raging ? 'rage' : el ? 'click' : 'dead';
+        clicks += 1;
+        if (kind === 'rage') rage += 1;
+        if (kind === 'dead') dead += 1;
+        if (firstTapMs == null) firstTapMs = Math.round(t - startMs);
+        events.push({
+          org_id: orgId, session_id: sessionId, user_id: null, seq: seq++, kind,
+          screen, target: el ? el.k : null, label: el ? el.l : null,
+          x, y, yv: Math.min(1, y * 1.4), vw, vh, dh,
+          depth: null, t_ms: Math.round(t - screenAt), at: new Date(t).toISOString(),
+        });
+      }
+
+      t += 600 + rand() * 4000;
+      if (rand() < (def.exit || 0.3) || h === hops - 1 || !def.next?.length) break;
+      screen = weightedPick(rand, def.next.map(n => n[0]), def.next.map(n => n[1]));
+    }
+
+    events.push({
+      org_id: orgId, session_id: sessionId, user_id: null, seq: seq++, kind: 'leave',
+      screen, target: null, label: null, x: null, y: null, yv: null,
+      vw, vh, dh: Math.round(vh * 1.6), depth: maxScroll || null,
+      t_ms: null, at: new Date(t).toISOString(),
+    });
+
+    sessions.push({
+      session_id: sessionId, org_id: orgId, user_id: null,
+      mode: modeKey === 'tikkie' ? 'tikkie_only' : 'standard',
+      device, entry: weightedPick(rand, UX_ENTRIES, UX_ENTRY_WEIGHT),
+      started_at: new Date(startMs).toISOString(),
+      last_at: new Date(t).toISOString(),
+      duration_ms: Math.max(0, Math.round(t - startMs)),
+      screens: views, screen_list: [...seen],
+      clicks, rage, dead,
+      max_scroll: maxScroll || null,
+      first_tap_ms: firstTapMs,
+      last_screen: screen,
+      replay: true,
+      events: seq,
+      created_at: new Date(startMs).toISOString(),
+    });
+  }
+
+  return { sessions, events, layouts, window: { start, end } };
+}
+
+const UX_CACHE = new Map();
+
+/** Rows for the User flow readers — the demo's own visits. */
+export function demoUxRows(orgId, modeKey = 'standard') {
+  const key = `${orgId || 'default'}:${modeKey}`;
+  if (!UX_CACHE.has(key)) UX_CACHE.set(key, generateUx(String(orgId || 'default'), modeKey));
+  return UX_CACHE.get(key);
 }

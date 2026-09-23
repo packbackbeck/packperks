@@ -15,6 +15,7 @@ import CupScanPage from './CupScanPage';
 import UserPage, { ImpactSummary, ImpactDetailModal } from './UserPage';
 import Header from './Header';
 import TikkieActivitySheet from './TikkieActivitySheet';
+import { setUxUser, uxScreen } from '../lib/uxCapture';
 import { payoutLinkState } from '../lib/payoutLink';
 import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
@@ -329,6 +330,21 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   // the camera just read.
   const [pendingBatch, setPendingBatch] = useState(batchId || '');
   const [scanner, setScanner] = useState(false);
+
+  /* The wallet is one page with sheets over it, and a sheet is a screen to
+   * the person looking at it — so User flow is told which one is on top.
+   * Without this every tap in this mode would land on "home" and the
+   * heatmap would say nothing. Topmost wins. */
+  const uxView = scanner ? 'scan-camera'
+    : popup?.type ? `popup-${popup.type}`
+      : login ? 'login'
+        : openItem ? 'activity-detail'
+          : impactOpen ? 'impact'
+            : showAccount ? 'account'
+              : showPolicy ? 'privacy-policy'
+                : 'home';
+  useEffect(() => { uxScreen(uxView); }, [uxView]);
+  useEffect(() => { setUxUser(profile?.user_id || null); }, [profile?.user_id]);
 
   /* What the customer is owed: the wallet balance plus every Tikkie link
    * they have not collected. Tikkie cannot cancel or merge a link once it

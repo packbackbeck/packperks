@@ -5,7 +5,10 @@ import { fmtDuration } from './behaviourFormat';
 import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
 import { EMAIL_TEMPLATE_KEY } from './emailTemplates';
 import { providerForCountry } from '../../lib/payments';
-import { demoAdminStatsRows, demoHealthRows, demoBehaviourRows, resetDemoWorld } from './demoData';
+import { demoAdminStatsRows, demoHealthRows, demoBehaviourRows, demoUxRows, resetDemoWorld } from './demoData';
+import {
+  uxFlow, uxHeatmap, uxScreenSummary, uxScrollCurve, uxSlice, uxTargetSeries, uxTargets,
+} from './uxAggregate';
 import { adminMoney } from './adminMoney';
 import { RATE_DEFAULTS } from '../../lib/rates';
 
@@ -2062,6 +2065,281 @@ export async function getUserBehaviourDailyHistory(range = null, orgIds, mode = 
   };
 }
 
+
+/* ─────────────────────────────────────────────────────────────────────
+ * User flow — the readers behind User analytics → User flow.
+ *
+ * Two kinds of number live here, and they are read in two different ways
+ * on purpose:
+ *
+ *   • Visits (`ux_sessions`) come back as rows. One row per visit is
+ *     small, and every tile on the tab plus its day-by-day line is
+ *     computed from them in JavaScript, exactly as the rest of the
+ *     dashboard computes from raw rows.
+ *   • Taps (`ux_events`) never do. A busy screen is tens of thousands of
+ *     them, so the heatmap, the scroll curve, the button table and the
+ *     flow all come back already summed, from the SECURITY DEFINER
+ *     functions in migration 061. The one exception is replaying a single
+ *     visit, which is a few hundred rows by definition.
+ *
+ * "Demo numbers" has no database to ask, so demoUxRows fabricates the
+ * same rows and uxAggregate.js does the same sums in JavaScript.
+ * ───────────────────────────────────────────────────────────────────── */
+
+/* What the customer app captures for a venue. Its own app_config row, so
+ * publishing the design draft can never wipe it (CLAUDE.md → Landmines),
+ * and the ux-ingest edge function reads the same key — the switches here
+ * are enforced on the server, not just offered in the UI. */
+export const UX_CAPTURE_DEFAULTS = {
+  enabled: true,
+  sample: 100,
+  clicks: true,
+  scroll: true,
+  replay: false,
+  layouts: true,
+  retentionDays: 60,
+};
+export const UX_RETENTION_MAX_DAYS = 400;
+
+const uxBool = (v, d) => (typeof v === 'boolean' ? v : d);
+const uxInt = (v, min, max, d) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : d;
+};
+
+export async function getUxCaptureConfig(orgId) {
+  const id = orgId || getActiveOrgId();
+  // "Demo numbers" shows the tab at its fullest, replay included, without
+  // reading or writing a real venue's settings.
+  if (DEMO_MODE) return { ...UX_CAPTURE_DEFAULTS, replay: true };
+  if (!id) return { ...UX_CAPTURE_DEFAULTS };
+  const { data } = await supabase
+    .from('app_config').select('value').eq('key', `ux:capture:${id}`).maybeSingle();
+  const v = data?.value && typeof data.value === 'object' ? data.value : {};
+  return {
+    enabled: uxBool(v.enabled, UX_CAPTURE_DEFAULTS.enabled),
+    sample: uxInt(v.sample, 1, 100, UX_CAPTURE_DEFAULTS.sample),
+    clicks: uxBool(v.clicks, UX_CAPTURE_DEFAULTS.clicks),
+    scroll: uxBool(v.scroll, UX_CAPTURE_DEFAULTS.scroll),
+    replay: uxBool(v.replay, UX_CAPTURE_DEFAULTS.replay),
+    layouts: uxBool(v.layouts, UX_CAPTURE_DEFAULTS.layouts),
+    retentionDays: uxInt(v.retentionDays, 1, UX_RETENTION_MAX_DAYS, UX_CAPTURE_DEFAULTS.retentionDays),
+  };
+}
+
+export async function saveUxCaptureConfig(orgId, config) {
+  const id = orgId || getActiveOrgId();
+  if (DEMO_MODE) throw new Error('Demo numbers are on, so capture settings are read-only here.');
+  if (!id) throw new Error('Pick a venue first.');
+  const clean = {
+    enabled: uxBool(config?.enabled, UX_CAPTURE_DEFAULTS.enabled),
+    sample: uxInt(config?.sample, 1, 100, UX_CAPTURE_DEFAULTS.sample),
+    clicks: uxBool(config?.clicks, UX_CAPTURE_DEFAULTS.clicks),
+    scroll: uxBool(config?.scroll, UX_CAPTURE_DEFAULTS.scroll),
+    replay: uxBool(config?.replay, UX_CAPTURE_DEFAULTS.replay),
+    layouts: uxBool(config?.layouts, UX_CAPTURE_DEFAULTS.layouts),
+    retentionDays: uxInt(config?.retentionDays, 1, UX_RETENTION_MAX_DAYS, UX_CAPTURE_DEFAULTS.retentionDays),
+  };
+  const { error } = await supabase.from('app_config').upsert({
+    key: `ux:capture:${id}`,
+    value: clean,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  return clean;
+}
+
+/* The demo's rows, filtered the way the database would filter them. */
+function demoUx(orgIds, mode) {
+  const modeKey = mode === 'tikkie_only' ? 'tikkie' : 'standard';
+  return demoUxRows(demoSeed(orgIds), modeKey);
+}
+
+/* An RPC's rows, or an empty list if this dashboard has no business
+ * reading them. A missing function (an app deployed before the migration
+ * ran) is an empty tab, never a crash. */
+async function uxRpc(fn, args) {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) {
+    console.warn(`${fn} failed`, error.message);
+    return [];
+  }
+  return data || [];
+}
+
+const uxRange = (range) => ({
+  p_from: range?.from || null,
+  p_to: range?.to || null,
+});
+
+/* ── The tab's own numbers ─────────────────────────────────────────── */
+
+/**
+ * getUxFlowStats — everything the User flow tab draws at once.
+ *
+ * @param {{from,to}|null} range   the selected window, ISO strings
+ * @param {string[]} orgIds        the venue or group in scope
+ * @param {string|null} mode       the venue's programme mode
+ * @param {string|null} device     'mobile' | 'tablet' | 'desktop', or all
+ * Returns { sessions, screens, targets, flow, meta }.
+ */
+export async function getUxFlowStats(range = null, orgIds, mode = null, device = null) {
+  if (DEMO_MODE) {
+    const world = demoUx(orgIds, mode);
+    const events = uxSlice(world.events, world.sessions, { ...range, device });
+    const keep = new Set(events.map(e => e.session_id));
+    const sessions = world.sessions.filter(s => keep.has(s.session_id));
+    return {
+      sessions,
+      screens: uxScreenSummary(events),
+      targets: uxTargets(events),
+      flow: uxFlow(events),
+      meta: { demo: true, device, captured: sessions.length },
+    };
+  }
+
+  const p = { p_orgs: orgIds?.length ? orgIds : null, ...uxRange(range), p_device: device || null };
+  let q = applyOrgFilter(
+    supabase.from('ux_sessions').select(
+      'session_id, user_id, device, entry, mode, started_at, last_at, duration_ms, screens, screen_list, clicks, rage, dead, max_scroll, first_tap_ms, last_screen, replay, events',
+    ).order('started_at', { ascending: false }).limit(20000),
+    orgIds,
+  );
+  if (range?.from) q = q.gte('started_at', range.from);
+  if (range?.to) q = q.lte('started_at', range.to);
+  if (device) q = q.eq('device', device);
+
+  const [sessRes, screens, targets, flow] = await Promise.all([
+    q,
+    uxRpc('ux_screen_summary', p),
+    uxRpc('ux_targets', { ...p, p_screen: null }),
+    uxRpc('ux_flow', p),
+  ]);
+  if (sessRes.error) throw sessRes.error;
+  const sessions = sessRes.data || [];
+  return {
+    sessions,
+    screens,
+    targets,
+    flow,
+    meta: { demo: false, device, captured: sessions.length },
+  };
+}
+
+/** The heat on one screen, and how far down that screen people got. */
+export async function getUxScreen(screen, range = null, orgIds, mode = null, device = null, grid = {}) {
+  const cols = uxInt(grid.cols, 4, 80, 36);
+  const rows = uxInt(grid.rows, 4, 160, 64);
+  if (DEMO_MODE) {
+    const world = demoUx(orgIds, mode);
+    const events = uxSlice(world.events, world.sessions, { ...range, device });
+    const layout = world.layouts.find(l => l.screen === screen && l.device === (device || 'mobile'))
+      || world.layouts.find(l => l.screen === screen)
+      || null;
+    return {
+      cells: uxHeatmap(events, screen, cols, rows),
+      curve: uxScrollCurve(events, screen),
+      targets: uxTargets(events, { screen }),
+      layout,
+      grid: { cols, rows },
+    };
+  }
+  const p = { p_orgs: orgIds?.length ? orgIds : null, ...uxRange(range), p_device: device || null };
+  let layoutQ = applyOrgFilter(
+    supabase.from('ux_layouts').select('screen, device, elements, vw, vh, dh, updated_at').eq('screen', screen),
+    orgIds,
+  );
+  if (device) layoutQ = layoutQ.eq('device', device);
+  const [cells, curve, targets, layoutRes] = await Promise.all([
+    uxRpc('ux_heatmap', { ...p, p_screen: screen, p_cols: cols, p_rows: rows }),
+    uxRpc('ux_scroll_curve', { ...p, p_screen: screen, p_steps: 20 }),
+    uxRpc('ux_targets', { ...p, p_screen: screen }),
+    layoutQ.order('updated_at', { ascending: false }).limit(4),
+  ]);
+  const layouts = layoutRes.data || [];
+  const layout = layouts.find(l => l.device === (device || 'mobile')) || layouts[0] || null;
+  return { cells, curve, targets, layout, grid: { cols, rows } };
+}
+
+/** One control, day by day — the graph behind a button's row. */
+export async function getUxTargetSeries(target, range = null, orgIds, mode = null, device = null) {
+  if (!target) return [];
+  if (DEMO_MODE) {
+    const world = demoUx(orgIds, mode);
+    return uxTargetSeries(uxSlice(world.events, world.sessions, { ...range, device }), target);
+  }
+  return uxRpc('ux_target_series', {
+    p_orgs: orgIds?.length ? orgIds : null, p_target: target, ...uxRange(range), p_device: device || null,
+  });
+}
+
+/**
+ * The visits that can be replayed. Only ones captured while the venue had
+ * replay on: `ux_sessions.replay` is written by ux-ingest from the venue's
+ * own setting, so turning it off later hides the visits it was off for.
+ */
+export async function getUxReplaySessions(range = null, orgIds, mode = null, { device = null, screen = null, limit = 60 } = {}) {
+  if (DEMO_MODE) {
+    const world = demoUx(orgIds, mode);
+    const fromMs = range?.from ? Date.parse(range.from) : null;
+    const toMs = range?.to ? Date.parse(range.to) : null;
+    return world.sessions
+      .filter(s => s.replay)
+      .filter(s => !device || s.device === device)
+      .filter(s => !screen || (s.screen_list || []).includes(screen))
+      .filter((s) => {
+        const t = Date.parse(s.started_at);
+        return (fromMs == null || t >= fromMs) && (toMs == null || t <= toMs);
+      })
+      .sort((a, b) => (a.started_at < b.started_at ? 1 : -1))
+      .slice(0, limit);
+  }
+  let q = applyOrgFilter(
+    supabase.from('ux_sessions').select(
+      'session_id, device, entry, mode, started_at, duration_ms, screens, screen_list, clicks, rage, dead, max_scroll, last_screen, events',
+    ).eq('replay', true),
+    orgIds,
+  );
+  if (range?.from) q = q.gte('started_at', range.from);
+  if (range?.to) q = q.lte('started_at', range.to);
+  if (device) q = q.eq('device', device);
+  if (screen) q = q.contains('screen_list', [screen]);
+  const { data, error } = await q.order('started_at', { ascending: false }).limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+/** One visit, tap by tap, in the order it happened. */
+export async function getUxReplay(sessionId, orgIds, mode = null) {
+  if (!sessionId) return { session: null, events: [], layouts: [] };
+  if (DEMO_MODE) {
+    const world = demoUx(orgIds, mode);
+    return {
+      session: world.sessions.find(s => s.session_id === sessionId) || null,
+      events: world.events.filter(e => e.session_id === sessionId).sort((a, b) => a.seq - b.seq),
+      layouts: world.layouts,
+    };
+  }
+  const [sessRes, evRes] = await Promise.all([
+    supabase.from('ux_sessions').select('*').eq('session_id', sessionId).maybeSingle(),
+    supabase.from('ux_events')
+      .select('seq, kind, screen, target, label, x, y, yv, vw, vh, dh, depth, t_ms, at')
+      .eq('session_id', sessionId).order('seq', { ascending: true }).limit(3000),
+  ]);
+  if (evRes.error) throw evRes.error;
+  const session = sessRes.data || null;
+  const screens = [...new Set((evRes.data || []).map(e => e.screen))];
+  let layouts = [];
+  if (screens.length) {
+    const { data } = await applyOrgFilter(
+      supabase.from('ux_layouts').select('screen, device, elements, vw, vh, dh').in('screen', screens),
+      orgIds,
+    );
+    layouts = data || [];
+  }
+  return { session, events: evRes.data || [], layouts };
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * Rewards Receipt Generator (feasibility test).
  *
@@ -2108,6 +2386,8 @@ export const ORG_DATA_TIME_COLUMN = {
   bin_sessions: 'created_at',
   client_events: 'created_at',
   system_events: 'created_at',
+  ux_events: 'at',
+  ux_sessions: 'started_at',
 };
 
 /* How many rows each kind has for this org and window: { kind: n | null }. */

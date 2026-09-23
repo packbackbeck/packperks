@@ -75,6 +75,53 @@ exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
   (`getAdminStats(orgIds, { mode })`, `buildTikkieMetrics`): there are no
   cup balances or `activity_history` rows for this mode.
 
+**User analytics is two tabs** (`AdminUserBehaviour.jsx`). *Programme* is
+the old page: scanning, coming back, claiming. *User flow*
+(`src/admin/behaviour/userflow/`) is how the app itself is used — a tap
+heatmap and a scroll map per screen, a table of every control with the
+median time it takes to reach it, the screen-to-screen flow, and a
+replay of one visit. Four tiles moved there because they were always
+answering that question: *App opens*, *Time per visit*, *Button taps*,
+*Where visits end*. They keep their own reader (`computeMetrics` over
+`client_events`, every consented visit) and stay in the export; the rest
+of the tab is built from what capture recorded, which is why *Visits
+captured* is the first tile — it says how much of the programme the
+others speak for. In Deferred Tikkie the four are absent (that mode's
+reader has no such metrics) and the tab shows the capture-built tiles
+alone, over that mode's own screens.
+
+**UX capture** (`src/lib/uxCapture.js`, `supabase/functions/ux-ingest`,
+migration 061) is what fills it. Taps (position plus the name of the
+control under the finger), scroll depth, screen views and the visit's
+end, written to `ux_events` / `ux_sessions`, plus `ux_layouts`: where the
+controls sat on each screen, as fractions of the page. That last one is
+the heatmap's backdrop — **there is never a screenshot of a customer's
+screen anywhere in this system**, and session replay is the event stream
+played back over that wireframe, not a recording of the page.
+
+Only customers who turned the **Analytical** cookie category on are
+captured, the same switch that gates `client_events`. Nothing typed,
+no field contents, no pointer trail. A control is found by walking up
+from the tap to a native control or to the outermost element with
+`cursor: pointer` — half this app's buttons are card-shaped divs, and
+without that every tap on a reward would be filed as a dead tap.
+
+Per venue, `app_config` `ux:capture:<orgId>` holds `{ enabled, sample,
+clicks, scroll, replay, layouts, retentionDays }` (User flow → Capture
+settings; its own row, like `byo:cap:<orgId>`, so publishing can't wipe
+it). `ux-ingest` reads the same row before it stores anything, so a
+switch off stops the data at the server. Heat is on by default; **replay
+is off by default** — a visit is only listed for replay when
+`ux_sessions.replay` was true when it was captured. Taps are the
+shortest-lived thing we hold: `ux_run_retention()` (inside the nightly
+`run_data_retention()`) deletes past `retentionDays`, 60 by default.
+Deleting a customer takes their visits (`ux_erase_user`, called by
+`erase_customer_rows`), and Master Settings → Data can clear them per
+venue. The dashboard reads sums, not taps: `ux_screen_summary`,
+`ux_heatmap`, `ux_scroll_curve`, `ux_targets`, `ux_target_series`,
+`ux_flow` (SECURITY DEFINER, dashboard accounts only). `uxAggregate.js`
+is the same sums in JavaScript, for "Demo numbers".
+
 **Dashboard sidebar** (`TABS` and `TAB_GROUPS` in `src/admin/lib/access.js`,
 in sidebar order): Analytics (Dashboard, User analytics, System health,
 Reports & alerts), Customers (Users, Rewards & offers, Design & copy, Email
@@ -300,6 +347,9 @@ access, so any account above vendor may use it.
 | `src/admin/lib/adminApi.js` | every admin query; ~5k lines |
 | `src/staff/` | PackPerks Staff: login, the QR screen, history, profile |
 | `src/admin/staffapp/` | Generate → Staff app: switch, accounts and requests, logs, preview |
+| `src/lib/uxCapture.js` | taps, scrolls and screen flow from the customer app |
+| `src/admin/behaviour/userflow/` | User analytics → User flow: heatmap, controls, flow, replay, capture settings |
+| `src/admin/lib/uxAggregate.js` | the User flow sums in JS — the demo's half of migration 061 |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
 | `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |
@@ -460,6 +510,13 @@ expiry they were given.
 be readable with the public key, which let anyone list unclaimed cup ids and
 claim them. Never add a broader read policy; the customer app claims through
 claim-cups.
+
+**UX capture is not shared with PackPulse.** `ux_events`, `ux_sessions`
+and `ux_layouts` have no `packpulse_*` view, on purpose: the shared pages
+are Dashboard, System health and Reports, and a connection has no
+business replaying a venue's visits. If User flow is ever added to the
+shared pages, each table needs its own view and a `PACKPULSE_VIEWS`
+entry, like everything else below.
 
 **The PackPulse embed reads views, not tables.** A Dashboard, System health
 or Reports reader that starts reading a new table shows zeros in PackPulse

@@ -34,6 +34,7 @@ import usePersistedState from './hooks/usePersistedState';
 import { rewards } from './data/rewards';
 import { getShotPreset } from './lib/shotPresets'; // DEV-only screen-audit harness
 import { track, EVENTS, setAnalyticsContext, getEntryContext, getInAppBrowserKind } from './utils/analytics';
+import { initUxCapture, setUxUser, uxScreen } from './lib/uxCapture';
 import { takePendingMarketingChoice } from './lib/consent';
 import {
   getOrCreateUser,
@@ -431,9 +432,11 @@ export default function App({ consentReady = true } = {}) {
   const [shot, setShot] = useState(null); // DEV-only screen-audit preset (?__shot=)
 
   // Behavioural analytics: log which screen the user is on whenever it
-  // changes. Powers the "Last screen / drop-off" metric. Fire-and-forget.
+  // changes. Powers the "Last screen / drop-off" metric, and tells UX
+  // capture which screen the taps that follow belong to. Fire-and-forget.
   useEffect(() => {
     track(EVENTS.SCREEN_VIEW, { screen: page });
+    uxScreen(page);
   }, [page]);
 
   // First-time market visitors get the onboarding flow. Skipped while the
@@ -826,6 +829,11 @@ export default function App({ consentReady = true } = {}) {
               staticQr,
               settings: earlyCfg.settings || {},
             });
+            // Taps and flow for this mode too. The wallet is one page with
+            // sheets over it, so TikkieHomePage names the sheet that is
+            // open as the screen; it starts here because the receipt is
+            // still in the address.
+            initUxCapture({ orgId: org?.id, mode: 'tikkie_only' });
             return; // finally{} clears isLoading
           }
         }
@@ -909,6 +917,12 @@ export default function App({ consentReady = true } = {}) {
         // stripped below, so we can later attribute 0-cup accounts to a
         // shared link / in-app browser / bare URL.
         track(EVENTS.APP_LOADED, { slug: seg0 || null, ...getEntryContext() });
+        // Taps, scrolls and screen flow for User analytics → User flow.
+        // Reads the same entry context, so it has to start here too, while
+        // the deeplink is still in the address. Does nothing without the
+        // Analytical cookie category, or where the venue turned it off.
+        setUxUser(user.id);
+        initUxCapture({ orgId: org?.id, mode: byoGroup ? 'byo' : 'standard' });
         // Detect the device once per session and push it to Supabase so
         // the admin Users tab can show what kind of phone is using the
         // app. We only re-push if it changed (e.g. user switched

@@ -398,6 +398,21 @@ const SCREEN_NAMES = {
   howto: 'How it works',
   impact: 'Impact',
   unknown: 'Unknown screen',
+  // Deferred Tikkie is one page with sheets over it, and TikkieHomePage
+  // reports whichever sheet is on top as the screen — a sheet is a screen
+  // to the person looking at it (src/lib/uxCapture.js).
+  'scan-camera': 'Camera scanner',
+  'activity-detail': 'Activity detail',
+  'privacy-policy': 'Privacy policy',
+  login: 'Sign in',
+  'popup-redeem': 'Collect sheet',
+  'popup-credited': 'Refund added',
+  'popup-donate': 'Donate sheet',
+  'popup-donated': 'Donation done',
+  'popup-pending': 'Held for review',
+  'popup-limit': 'Limit reached',
+  'popup-claimed': 'Already claimed',
+  'popup-error': 'Scan error',
 };
 export const ERROR_SCREENS = new Set(['cup-scan-error', 'rejected']);
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, Download, HandCoins, Inbox, LayoutGrid, RefreshCw, SlidersHorizontal,
+  AlertTriangle, Download, HandCoins, Inbox, LayoutGrid, MousePointerClick, RefreshCw,
+  SlidersHorizontal, TrendingUp,
 } from 'lucide-react';
 import { getUserBehaviourStats } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
@@ -11,7 +12,8 @@ import { TAB_BY_ID } from '../lib/access';
 import { formatMoney } from '../../lib/regions';
 import ScopeToggle from '../shared/ScopeToggle';
 import {
-  Button, Card, EmptyState, InsightsCard, PageHeader, TrendCard, useChartSelection, usePersistentState,
+  Button, Card, EmptyState, InsightsCard, PageHeader, Tabs, TrendCard, useChartSelection,
+  usePersistentState,
 } from '../ui';
 import ArrangeDialog from './ArrangeDialog';
 import BehaviourTiles from './BehaviourTiles';
@@ -21,11 +23,14 @@ import ExportDialog from './ExportDialog';
 import FunnelCard from './FunnelCard';
 import MetricDetailModal from './MetricDetailModal';
 import { BREAKDOWNS, GROUPS } from './behaviourCopy';
+import UserFlowTab from './userflow/UserFlowTab';
+import { MOVED_METRIC_IDS } from './userflow/flowModel';
 import {
   buildFunnels, buildInsights, buildLinkSplit, buildMetrics, chartMetricsFor, chartRangeFor, phraseFor,
   previousRequestFor, requestFor, resolveWindow, skeletonMetrics, windowText,
 } from './behaviourModel';
 import './AdminUserBehaviour.css';
+import './userflow/userFlow.css';
 
 /* ─────────────────────────────────────────────────────────────────────
  * User behaviour — how customers move from a first scan to a claim.
@@ -44,6 +49,25 @@ import './AdminUserBehaviour.css';
 
 const OVERRIDES_KEY = 'ppk_behaviour_group_overrides';
 
+/* The page is two questions, so it is two tabs.
+ *
+ *   Programme — is the reward programme working: scanning, coming back,
+ *               claiming. Everything that was on this page before.
+ *   User flow — is the APP working: where thumbs land, how far people
+ *               read, which button nobody finds, what one visit looked
+ *               like. Four tiles moved here because they were always
+ *               answering this question (see userflow/flowModel).
+ *
+ * The four keep their own reader — they are still built from
+ * client_events by buildMetrics — they simply render on the other tab.
+ * They stay in the export and in Customise so nothing a venue already
+ * relies on disappears. */
+const PAGE_TABS = [
+  { id: 'programme', label: 'Programme', icon: TrendingUp },
+  { id: 'flow', label: 'User flow', icon: MousePointerClick },
+];
+const MOVED = new Set(MOVED_METRIC_IDS);
+
 const PAIRS = {
   standard: [{
     id: 'comeback', label: 'Second vs third scan',
@@ -55,7 +79,7 @@ const PAIRS = {
   }],
 };
 const KEY_METRIC = { standard: 'qr_scan_receipts', tikkie: 'tk_collect' };
-const BREAKDOWN_IDS = ['button_clicks', 'entry_source', 'audience_split', 'inapp_redirect'];
+const BREAKDOWN_IDS = ['audience_split', 'inapp_redirect'];
 const LOWER_GROUPS = GROUPS.filter(g => g.id !== 'primary');
 
 export default function AdminUserBehaviour({ onNavigate }) {
@@ -66,6 +90,8 @@ export default function AdminUserBehaviour({ onNavigate }) {
   const modeKey = activeOrgMode === 'tikkie_only' ? 'tikkie' : 'standard';
   const tikkie = modeKey === 'tikkie';
 
+  const [tab, setTab] = usePersistentState('pp-behaviour:tab', 'programme');
+  const [device, setDevice] = usePersistentState('pp-behaviour:device', null);
   const [period, setPeriod] = usePersistentState('pp-behaviour:period', '30d');
   const [custom, setCustom] = usePersistentState('pp-behaviour:custom', null);
   const [overrides, setOverrides] = usePersistentState(OVERRIDES_KEY, {});
@@ -148,7 +174,12 @@ export default function AdminUserBehaviour({ onNavigate }) {
     : metrics), [loading, metrics]);
   const byGroup = useMemo(() => {
     const out = { primary: [], secondary: [], optional: [] };
-    for (const m of tiles) (out[groupOf(m)] || out.optional).push(m);
+    // The four that moved to User flow keep their numbers and their place
+    // in the export; they just aren't tiles on this tab any more.
+    for (const m of tiles) {
+      if (MOVED.has(m.id)) continue;
+      (out[groupOf(m)] || out.optional).push(m);
+    }
     return out;
   }, [tiles, groupOf]);
 
@@ -240,11 +271,32 @@ export default function AdminUserBehaviour({ onNavigate }) {
           title="Refresh"
           onClick={() => setReloadKey(k => k + 1)}
         />
-        {!isVendorView && (
+        {!isVendorView && tab === 'programme' && (
           <Button variant="outline" icon={SlidersHorizontal} onClick={() => setDialog('arrange')}>Customise</Button>
         )}
-        <Button variant="outline" icon={Download} onClick={() => setDialog('export')} disabled={!fresh}>Export</Button>
+        {tab === 'programme' && (
+          <Button variant="outline" icon={Download} onClick={() => setDialog('export')} disabled={!fresh}>Export</Button>
+        )}
       </PageHeader>
+
+      <Tabs tabs={PAGE_TABS} value={tab} onChange={setTab} ariaLabel="User analytics sections" />
+
+      {tab === 'flow' && (
+        <UserFlowTab
+          orgId={activeOrg?.id}
+          orgIds={scopeOrgIds}
+          mode={activeOrgMode}
+          win={win}
+          phrase={phrase}
+          behaviourMetrics={built || []}
+          behaviourLoading={loading}
+          canEdit={!isVendorView && !!access?.canEdit?.('behaviour')}
+          device={device}
+          onDevice={setDevice}
+        />
+      )}
+
+      {tab === 'programme' && (<>
 
       {error && (
         <Card className="ub-alert" role="alert">
@@ -371,6 +423,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
           )}
         </>
       )}
+      </>)}
 
       {detailMetric && built && (
         <MetricDetailModal
@@ -408,7 +461,7 @@ export default function AdminUserBehaviour({ onNavigate }) {
 
       {dialog === 'arrange' && (
         <ArrangeDialog
-          metrics={metrics}
+          metrics={metrics.filter(m => !MOVED.has(m.id))}
           groupOf={groupOf}
           onChange={changeGroup}
           onReset={() => setOverrides({})}

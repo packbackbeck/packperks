@@ -2095,7 +2095,7 @@ export const UX_CAPTURE_DEFAULTS = {
   sample: 100,
   clicks: true,
   scroll: true,
-  replay: false,
+  replay: true,
   layouts: true,
   retentionDays: 60,
 };
@@ -2111,7 +2111,7 @@ export async function getUxCaptureConfig(orgId) {
   const id = orgId || getActiveOrgId();
   // "Demo numbers" shows the tab at its fullest, replay included, without
   // reading or writing a real venue's settings.
-  if (DEMO_MODE) return { ...UX_CAPTURE_DEFAULTS, replay: true };
+  if (DEMO_MODE) return { ...UX_CAPTURE_DEFAULTS };
   if (!id) return { ...UX_CAPTURE_DEFAULTS };
   const { data } = await supabase
     .from('app_config').select('value').eq('key', `ux:capture:${id}`).maybeSingle();
@@ -2246,7 +2246,7 @@ export async function getUxScreen(screen, range = null, orgIds, mode = null, dev
   }
   const p = { p_orgs: orgIds?.length ? orgIds : null, ...uxRange(range), p_device: device || null };
   let layoutQ = applyOrgFilter(
-    supabase.from('ux_layouts').select('screen, device, elements, vw, vh, dh, updated_at').eq('screen', screen),
+    supabase.from('ux_layouts').select('screen, device, elements, page, vw, vh, dh, updated_at').eq('screen', screen),
     orgIds,
   );
   if (device) layoutQ = layoutQ.eq('device', device);
@@ -2332,7 +2332,7 @@ export async function getUxReplay(sessionId, orgIds, mode = null) {
   let layouts = [];
   if (screens.length) {
     const { data } = await applyOrgFilter(
-      supabase.from('ux_layouts').select('screen, device, elements, vw, vh, dh').in('screen', screens),
+      supabase.from('ux_layouts').select('screen, device, elements, page, vw, vh, dh').in('screen', screens),
       orgIds,
     );
     layouts = data || [];

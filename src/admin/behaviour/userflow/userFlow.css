@@ -62,58 +62,176 @@
 
 .uf-heat__stage { display: flex; flex-direction: column; gap: 12px; padding: 16px; min-width: 0; }
 
-/* The frame stands in for the customer's screen, which is a light surface
- * whatever theme the dashboard is in — the same exception dark.css already
- * makes for the phone and email previews. It carries its own values so the
- * wireframe stays readable and the cool end of the heat ramp doesn't vanish
- * into a dark ground. */
-.uf-heat__frame, .uf-replay__screen {
-  --uf-screen: #F1F0F6;
-  --uf-screen-line: #D6D3E0;
-  --uf-el-bg: #FFFFFF;
-  --uf-el-line: #C7C4D4;
-  --uf-el-fg: #6B6778;
-  --uf-el-strong: #17151F;
+/* ── The repainted screen (ScreenPaint) ─────────────────────────────
+ *
+ * The phone from Design & copy, holding a screen rebuilt from what
+ * capture measured rather than one drawn by hand. Everything inside is
+ * sized in `cqw` against `.sp__screen`, which is the container: the
+ * capture stored each piece's size as a fraction of the viewport it was
+ * measured in, so the picture keeps the real screen's proportions at any
+ * width the card gives it.
+ *
+ * The phone itself keeps its own colours in both themes, like the other
+ * previews in this dashboard — it stands in for a customer's device, and
+ * a customer's device does not have a dark mode because the dashboard
+ * does. */
+.sp { flex: none; width: min(330px, 100%); margin: 0 auto; }
+.sp--tablet { width: min(460px, 100%); }
+.sp--desktop { width: min(640px, 100%); }
+.sp__frame {
+  padding: 8px;
+  border-radius: 40px;
+  background: linear-gradient(150deg, #3A3844 0%, #17161C 45%, #26242E 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 10%),
+    inset 0 0 0 3px #0E0D12,
+    0 24px 50px -24px rgb(38 24 92 / 40%);
 }
-.uf-heat__frame {
-  position: relative; width: min(340px, 100%); margin: 0 auto;
-  background: var(--uf-screen);
-  border: 1px solid var(--uf-screen-line);
-  border-radius: 18px; overflow: hidden;
-}
-.uf-heat__canvas, .uf-heat__bands { position: absolute; inset: 0; }
-.uf-heat__canvas { pointer-events: none; }
+.sp__frame { position: relative; }
+.sp--desktop .sp__frame, .sp--tablet .sp__frame { padding: 6px; border-radius: 14px; }
 
-.uf-heat__wire { position: absolute; inset: 0; }
-.uf-el {
-  position: absolute; display: flex; align-items: center; gap: 4px;
-  padding: 0 5px; min-height: 8px;
-  border: 1px dashed var(--uf-el-line); border-radius: 6px;
-  background: var(--uf-el-bg); opacity: 0.62;
-  font-size: 9.5px; color: var(--uf-el-fg);
-  overflow: hidden; white-space: nowrap;
+/* A window's title bar, for a visit that was not on a phone. */
+.sp__bar {
+  position: absolute; inset: 0 0 auto; z-index: 3;
+  display: flex; align-items: center; gap: 4px;
+  height: 3.2%; min-height: 12px; padding: 0 8px;
+  background: rgb(23 21 31 / 6%); border-bottom: 1px solid rgb(23 21 31 / 8%);
 }
-.uf-el--on { opacity: 1; border-style: solid; cursor: default; }
-.uf-el--on.uf-el--cold { opacity: 0.6; }
-.uf-el__label { overflow: hidden; text-overflow: ellipsis; }
-.uf-el__count { margin-left: auto; font-weight: 700; color: var(--uf-el-strong); }
+.sp__dot { width: 5px; height: 5px; border-radius: 50%; background: rgb(23 21 31 / 22%); }
 
-.uf-heat__bands { display: flex; flex-direction: column; }
-.uf-band { position: relative; flex: 1 1 0; }
-.uf-band__tag {
-  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-  font-size: 9.5px; font-weight: 600; color: var(--uf-el-strong);
-  background: var(--uf-el-bg); border: 1px solid var(--uf-screen-line);
-  border-radius: 999px; padding: 1px 6px; white-space: nowrap;
+/* The window the page scrolls inside. The page is as long as it really
+ * was, so a long screen scrolls here the way it scrolled on the phone —
+ * capping it would squash every piece and push its words out of the box
+ * that was measured for them. */
+.sp__window {
+  position: relative;
+  max-height: 620px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 33px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
 }
-.uf-heat__fold {
-  position: absolute; left: 0; right: 0; height: 0;
-  border-top: 1px dashed var(--uf-el-fg); opacity: 0.65; pointer-events: none;
+.sp--desktop .sp__window, .sp--tablet .sp__window { border-radius: 9px; max-height: 560px; }
+
+.sp__screen {
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  background: #FFFFFF;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.15;
+  color: #17151F;
+  text-align: left;
 }
-.uf-heat__fold span {
+.sp--empty .sp__screen { display: grid; place-items: center; background: #F1F0F6; }
+.sp__note { margin: 0; padding: 0 18px; font-size: 11.5px; line-height: 1.55; color: #6B6778; text-align: center; }
+
+.sp__status {
+  position: absolute; inset: 0 0 auto; z-index: 3;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 5cqw; color: #17151F; pointer-events: none;
+}
+.sp__time { font-size: 3.2cqw; font-weight: 700; }
+.sp__island {
+  width: 22cqw; height: 5.5cqw; border-radius: 999px; background: #0E0D12;
+  position: absolute; left: 50%; transform: translateX(-50%); top: 1.5cqw;
+}
+.sp__icons { display: inline-flex; align-items: center; gap: 3px; }
+.sp__homebar {
+  position: absolute; z-index: 6; left: 50%; bottom: 12px;
+  transform: translateX(-50%);
+  width: 32%; height: 4px; border-radius: 999px; background: rgb(255 255 255 / 55%);
+}
+
+.sp__page { position: absolute; inset: 0; }
+.sp-piece {
+  position: absolute;
+  display: flex; align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.sp-piece--img { object-fit: cover; display: block; }
+.sp-piece--text { align-items: flex-start; }
+.sp-piece__t {
+  display: block; width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Text blocks wrap and are clamped to the number of lines their measured
+ * box actually held, so a heading ends in an ellipsis rather than being
+ * sliced through a word. */
+.sp-piece--text .sp-piece__t {
+  display: -webkit-box; white-space: normal;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+
+.sp__fold {
+  position: absolute; left: 0; right: 0; z-index: 4; height: 0;
+  border-top: 1px dashed rgb(23 21 31 / 45%); pointer-events: none;
+}
+.sp__fold span {
   position: absolute; left: 6px; top: 3px;
-  font-size: 9.5px; font-weight: 600; color: var(--uf-el-fg);
-  background: var(--uf-el-bg); border-radius: 999px; padding: 1px 6px;
+  font-size: 2.6cqw; font-weight: 600; color: #3B3647;
+  background: rgb(255 255 255 / 92%); border-radius: 999px; padding: 0.4cqw 1.6cqw;
+}
+
+/* Overlays sit above the picture and never take the pointer, except the
+ * control shading, which is the thing you hover. */
+.sp-overlay { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+/* The heat is the subject; the screen is the context. A veil under the
+ * overlay lets the app stay recognisable without competing with the
+ * colour scale on top of it — the same trick every heatmap tool uses on
+ * its screenshots. */
+.sp__veil { position: absolute; inset: 0; z-index: 4; background: rgb(255 255 255 / 55%); pointer-events: none; }
+
+.sp-bands { display: flex; flex-direction: column; }
+.sp-band { position: relative; flex: 1 1 0; }
+.sp-band__tag {
+  position: absolute; right: 4cqw; top: 50%; transform: translateY(-50%);
+  font-size: 2.6cqw; font-weight: 600; color: #17151F;
+  background: rgb(255 255 255 / 94%); border: 1px solid rgb(23 21 31 / 12%);
+  border-radius: 999px; padding: 0.4cqw 1.8cqw; white-space: nowrap;
+}
+
+.sp-controls { pointer-events: auto; }
+.sp-control {
+  position: absolute; box-sizing: border-box;
+  border: 1.5px solid rgb(23 21 31 / 22%);
+  background: rgb(23 21 31 / 5%);
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 1.4cqw; cursor: default;
+  transition: filter 0.12s var(--ui-ease);
+}
+.sp-control:hover { filter: brightness(1.08) saturate(1.2); }
+.sp-control--cold { border-style: dashed; background: rgb(23 21 31 / 3%); }
+.sp-control__n {
+  font-size: 2.8cqw; font-weight: 800; color: #17151F;
+  background: rgb(255 255 255 / 88%); border-radius: 999px; padding: 0 1.2cqw;
+}
+
+/* The replay's moving parts. */
+.sp-viewport { display: flex; flex-direction: column; }
+.sp-viewport__shade { flex: none; transition: height 0.4s var(--ui-ease); }
+.sp-viewport__box {
+  flex: none; margin: 0 2px;
+  border: 2px solid var(--ui-primary); border-radius: 10px;
+  box-shadow: 0 0 0 100vmax rgb(13 13 15 / 34%);
+  clip-path: inset(-100vmax);
+}
+.sp-tap {
+  position: absolute; z-index: 6;
+  width: 9cqw; height: 9cqw; margin: -4.5cqw 0 0 -4.5cqw;
+  border-radius: 50%; pointer-events: none;
+  background: rgb(91 63 214 / 55%);
+  animation: sp-tap 0.7s var(--ui-ease);
+}
+.sp-tap--rage { background: rgb(217 45 85 / 60%); }
+.sp-tap--dead { background: rgb(226 85 43 / 55%); }
+@keyframes sp-tap {
+  0% { transform: scale(0.3); opacity: 1; }
+  100% { transform: scale(2.1); opacity: 0; }
 }
 
 .uf-heat__foot {
@@ -268,39 +386,15 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
 
 .uf-replay__stage { display: flex; flex-direction: column; gap: 10px; padding: 16px; min-width: 0; }
 .uf-replay__loading { padding: 40px; text-align: center; color: var(--ui-muted); font-size: 13px; }
-.uf-replay__screen {
-  position: relative; width: min(320px, 100%); margin: 0 auto;
-  background: var(--uf-screen); border: 1px solid var(--uf-screen-line);
-  border-radius: 18px; overflow: hidden;
-}
-.uf-replay__wire { position: absolute; inset: 0; }
-.uf-replay__view {
-  position: absolute; left: 0; right: 0;
-  border: 2px solid var(--ui-primary); border-radius: 10px;
-  background: rgb(91 63 214 / 7%);
-  transition: top 0.4s var(--ui-ease);
-  pointer-events: none;
-}
-.uf-replay__tap {
-  position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px;
-  border-radius: 50%; pointer-events: none;
-  background: rgb(91 63 214 / 55%);
-  animation: uf-tap 0.7s var(--ui-ease);
-}
-.uf-replay__tap--rage { background: rgb(217 45 85 / 60%); }
-.uf-replay__tap--dead { background: rgb(226 85 43 / 55%); }
-@keyframes uf-tap {
-  0% { transform: scale(0.3); opacity: 1; }
-  100% { transform: scale(2.1); opacity: 0; }
-}
+.uf-replay__paint { width: min(300px, 100%); }
 .uf-replay__caption {
-  position: absolute; left: 8px; right: 8px; bottom: 8px;
+  position: absolute; z-index: 7; left: 3cqw; right: 3cqw; bottom: 4cqw;
   display: flex; align-items: baseline; gap: 6px;
-  padding: 6px 9px; border-radius: 9px;
-  background: var(--uf-el-bg); border: 1px solid var(--uf-screen-line);
-  font-size: 11.5px; color: var(--uf-el-fg); box-shadow: var(--ui-shadow-sm);
+  padding: 1.6cqw 2.6cqw; border-radius: 9px;
+  background: rgb(255 255 255 / 95%); border: 1px solid rgb(23 21 31 / 12%);
+  font-size: 3cqw; color: #6B6778; box-shadow: 0 4px 14px -8px rgb(23 21 31 / 50%);
 }
-.uf-replay__caption strong { font-size: 12px; color: var(--uf-el-strong); }
+.uf-replay__caption strong { font-size: 3.2cqw; color: #17151F; }
 
 .uf-replay__controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .uf-replay__scrub { flex: 1 1 140px; accent-color: var(--ui-primary); }

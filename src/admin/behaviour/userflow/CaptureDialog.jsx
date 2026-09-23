@@ -16,7 +16,8 @@ import { fmtInt } from '../../ui/timeSeries';
  *
  * Two changes are consequential enough to confirm in words rather than
  * with a switch that silently flips:
- *   • Turning replay on, which is a new promise to the customer.
+ *   • Turning replay back on after it was off, because the visits from
+ *     the gap stay unlistable and people expect otherwise.
  *   • Shortening retention, which deletes on the next nightly run.
  * Everything else saves on Save, and the dialog says plainly what is
  * already true: nothing is captured without the Analytical cookie.
@@ -67,8 +68,8 @@ export default function CaptureDialog({ config, onSave, onClose, canEdit, stats 
       <Modal
         open
         onClose={() => setConfirm(null)}
-        title="Turn session replay on?"
-        subtitle="This changes what the venue keeps about one customer, not just the totals."
+        title="Turn session replay back on?"
+        subtitle="Only visits captured from now on can be replayed."
         icon={Video}
         iconTone="amber"
         footer={(
@@ -79,13 +80,14 @@ export default function CaptureDialog({ config, onSave, onClose, canEdit, stats 
         )}
       >
         <p className="uf-dlg__p">
-          Heatmaps are sums: thousands of taps with nobody in them. A replay is one visit, watched back
+          A heatmap is a sum: thousands of taps with nobody in them. A replay is one visit, watched back
           step by step. It is still reconstructed — the page is never recorded, so nothing typed or shown
-          on screen exists to play — but it is one person’s path, and that is a different promise.
+          in a field exists to play — but it is one person’s path, and that is a different promise.
         </p>
         <p className="uf-dlg__p">
-          Only visits captured from now on can be replayed. Make sure the venue’s privacy policy covers it
-          before you switch it on.
+          A visit is marked replayable when it is captured, so the visits from the period this was off
+          stay unlistable. Only what is captured from now on will appear. Make sure the venue’s privacy
+          policy covers it.
         </p>
       </Modal>
     );
@@ -191,7 +193,7 @@ export default function CaptureDialog({ config, onSave, onClose, canEdit, stats 
           <span className="uf-dlg__rowicon ui-tone--rose"><Video size={15} aria-hidden="true" /></span>
           <span className="uf-dlg__rowtext">
             <strong>Session replay</strong>
-            <em>Keep visits so one can be watched back step by step. Off by default: a replay is one person’s path, not a total.</em>
+            <em>Keep visits so one can be watched back step by step, over the same repainted screen the heatmap uses.</em>
           </span>
           <Switch checked={!!draft.replay} onChange={v => set({ replay: v })} disabled={!canEdit || !draft.enabled} label="Session replay" />
         </label>

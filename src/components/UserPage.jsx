@@ -503,7 +503,12 @@ export default function UserPage({
               ? <img src={avatarUrl} alt="" className="user-page__profile-avatar-img" />
               : <span className="user-page__profile-avatar-emoji" role="img" aria-label={animal.name}>{animal.emoji}</span>}
           </div>
-          <div className="user-page__profile-details">
+          {/* The one block on this screen that is about the person rather
+              than the programme. `data-ppk-private` keeps their name,
+              email and device out of UX capture entirely: no tap on it is
+              named, and it is never painted into a screen snapshot
+              (src/lib/uxCapture.js). */}
+          <div className="user-page__profile-details" data-ppk-private>
             <span className="user-page__profile-name">{profile.displayName}</span>
             {(email || authEmail) ? (
               <span className="user-page__profile-email">{email || authEmail}</span>

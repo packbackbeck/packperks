@@ -1,0 +1,26 @@
+-- ─────────────────────────────────────────────────────────────────────
+-- 062 — The heatmap shows the real screen, not a wireframe.
+--
+-- `ux_layouts.elements` started as rectangles: where the controls sat, so
+-- a hotspot could be placed without a screenshot. It reads as a wireframe,
+-- which is honest but hard to recognise — a venue looking at its own app
+-- should see its own app.
+--
+-- So the snapshot now measures how each piece was DRAWN as well as where
+-- it was: background and text colour, corner radius, type size and weight,
+-- border, the text itself, and the public image URL where there is one
+-- (a reward photo, a logo). The dashboard repaints the screen from that,
+-- at the same normalised geometry, so the heat still lands exactly where
+-- the thumbs did.
+--
+-- It is still a measurement and not a picture. No screenshot is taken
+-- anywhere in this system, nothing a customer typed is read, and text
+-- that looks personal (an email, an IBAN, a long number) is masked in the
+-- browser before it is sent — on top of `[data-ppk-private]`, which the
+-- customer app puts on the blocks that show a name or an address.
+--
+-- Elements are jsonb, so the extra keys need no migration; `page` is the
+-- screen's own background colour and does.
+-- ─────────────────────────────────────────────────────────────────────
+
+alter table public.ux_layouts add column if not exists page text;

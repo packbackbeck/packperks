@@ -40,6 +40,13 @@ import {
  *
  * The device filter applies to everything below the tiles, because a
  * heatmap that mixes a phone and a desktop is a heatmap of neither.
+ *
+ * It renders three of the page's tabs — the numbers, the heatmap and the
+ * replay — from ONE component, because they read the same window, scope
+ * and device and the heatmap alone is a second's worth of queries.
+ * Switching tabs changes `section`, not the component, so nothing is
+ * refetched and the screen you were looking at is still selected when
+ * you come back to it.
  * ───────────────────────────────────────────────────────────────────── */
 
 const DEVICES = [
@@ -52,6 +59,7 @@ const DEVICES = [
 const KEY_METRIC = 'flow_captured';
 
 export default function UserFlowTab({
+  section = 'flow',
   orgId, orgIds, mode, win, phrase, behaviourMetrics = [], behaviourLoading, canEdit, device, onDevice,
 }) {
   const [config, setConfig] = useState(UX_CAPTURE_DEFAULTS);
@@ -272,7 +280,7 @@ export default function UserFlowTab({
         </Card>
       )}
 
-      {FLOW_GROUPS.map(g => (byGroup[g.id].length > 0 && (
+      {section === 'flow' && FLOW_GROUPS.map(g => (byGroup[g.id].length > 0 && (
         <section key={g.id} className="uf__group" aria-labelledby={`uf-group-${g.id}`}>
           <div className="ub-group__head">
             <h2 className="ub-group__title" id={`uf-group-${g.id}`}>{g.title}</h2>
@@ -292,6 +300,7 @@ export default function UserFlowTab({
         </section>
       )))}
 
+      {section === 'flow' && (
       <div className="ui-grid-main uf__chartrow" ref={chartRef}>
         <TrendCard
           metrics={chartMetrics}
@@ -309,6 +318,7 @@ export default function UserFlowTab({
           emptyText="Once a few dozen visits are captured, the patterns worth acting on show up here."
         />
       </div>
+      )}
 
       {nothing ? (
         <Card>
@@ -326,7 +336,7 @@ export default function UserFlowTab({
               : 'Nothing new is being recorded for this venue. Turning capture on starts the heatmaps, the button table and the flow filling in.'}
           </EmptyState>
         </Card>
-      ) : (
+      ) : section === 'heatmap' ? (
         <>
           <HeatmapCard
             screens={screens}
@@ -337,16 +347,6 @@ export default function UserFlowTab({
             phrase={phrase}
             captureOff={!config.enabled}
           />
-
-          <FlowCard
-            flow={cur?.flow || []}
-            screens={screens}
-            screen={activeScreen}
-            onScreen={setScreen}
-            loading={busy}
-            phrase={phrase}
-          />
-
           <ButtonsCard
             targets={targets}
             screens={screens}
@@ -356,6 +356,29 @@ export default function UserFlowTab({
             seriesByTarget={seriesByTarget}
             screenFilter={buttonScreen}
             onScreenFilter={setButtonScreen}
+          />
+        </>
+      ) : section === 'replay' ? (
+        <ReplayCard
+          sessions={replaySessions}
+          replayOn={!!config.replay}
+          loading={busy}
+          phrase={phrase}
+          selected={replayId}
+          onSelect={setReplayId}
+          replay={replayReady}
+          replayLoading={replayBusy}
+          onOpenSettings={canEdit ? () => setDialog(true) : undefined}
+        />
+      ) : (
+        <>
+          <FlowCard
+            flow={cur?.flow || []}
+            screens={screens}
+            screen={activeScreen}
+            onScreen={setScreen}
+            loading={busy}
+            phrase={phrase}
           />
 
           {MOVED_BREAKDOWN_IDS.filter(id => movedById[id]?.breakdown?.length).length > 0 && (
@@ -371,18 +394,6 @@ export default function UserFlowTab({
               ))}
             </div>
           )}
-
-          <ReplayCard
-            sessions={replaySessions}
-            replayOn={!!config.replay}
-            loading={busy}
-            phrase={phrase}
-            selected={replayId}
-            onSelect={setReplayId}
-            replay={replayReady}
-            replayLoading={replayBusy}
-            onOpenSettings={canEdit ? () => setDialog(true) : undefined}
-          />
         </>
       )}
 

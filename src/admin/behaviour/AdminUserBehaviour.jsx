@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, Download, HandCoins, Inbox, LayoutGrid, MousePointerClick, RefreshCw,
-  SlidersHorizontal, TrendingUp,
+  AlertTriangle, Download, Flame, HandCoins, Inbox, LayoutGrid, MousePointerClick, RefreshCw,
+  SlidersHorizontal, TrendingUp, Video,
 } from 'lucide-react';
 import { getUserBehaviourStats } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
@@ -49,23 +49,35 @@ import './userflow/userFlow.css';
 
 const OVERRIDES_KEY = 'ppk_behaviour_group_overrides';
 
-/* The page is two questions, so it is two tabs.
+/* One page, four questions, so four tabs.
  *
- *   Programme — is the reward programme working: scanning, coming back,
- *               claiming. Everything that was on this page before.
- *   User flow — is the APP working: where thumbs land, how far people
- *               read, which button nobody finds, what one visit looked
- *               like. Four tiles moved here because they were always
- *               answering this question (see userflow/flowModel).
+ *   Programme      — is the reward programme working: scanning, coming
+ *                    back, claiming. Everything that was on this page
+ *                    before.
+ *   User flow      — is the APP working, in numbers: taps per visit, time
+ *                    to first tap, how far people read, where they go
+ *                    next. Four tiles moved here because they were always
+ *                    answering this question (userflow/flowModel).
+ *   Heatmap        — where the thumbs actually land, on the venue's own
+ *                    screen, plus every control and how long it takes to
+ *                    reach. It needs the whole width, which is why it is
+ *                    not a card on the tab above.
+ *   Session replay — one visit, played back.
  *
- * The four keep their own reader — they are still built from
- * client_events by buildMetrics — they simply render on the other tab.
- * They stay in the export and in Customise so nothing a venue already
- * relies on disappears. */
+ * The last three are one component (UserFlowTab) with a `section`: they
+ * read the same window, scope and device, so switching between them
+ * refetches nothing.
+ *
+ * The four moved tiles keep their own reader — still built from
+ * client_events by buildMetrics — and stay in the export and in Customise
+ * so nothing a venue already relies on disappears. */
 const PAGE_TABS = [
   { id: 'programme', label: 'Programme', icon: TrendingUp },
   { id: 'flow', label: 'User flow', icon: MousePointerClick },
+  { id: 'heatmap', label: 'Heatmap', icon: Flame },
+  { id: 'replay', label: 'Session replay', icon: Video },
 ];
+const FLOW_SECTIONS = new Set(['flow', 'heatmap', 'replay']);
 const MOVED = new Set(MOVED_METRIC_IDS);
 
 const PAIRS = {
@@ -281,8 +293,9 @@ export default function AdminUserBehaviour({ onNavigate }) {
 
       <Tabs tabs={PAGE_TABS} value={tab} onChange={setTab} ariaLabel="User analytics sections" />
 
-      {tab === 'flow' && (
+      {FLOW_SECTIONS.has(tab) && (
         <UserFlowTab
+          section={tab}
           orgId={activeOrg?.id}
           orgIds={scopeOrgIds}
           mode={activeOrgMode}

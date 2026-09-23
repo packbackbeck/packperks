@@ -3,7 +3,7 @@
 //
 // The one way taps, scrolls and screen views reach the database. The
 // customer app buffers them (src/lib/uxCapture.js) and posts a batch here;
-// User analytics → User flow reads what lands.
+// User analytics → Heatmap and Session replay read what lands.
 //
 // Why a function and not an anon insert: client_events was given an open
 // "insert anything" policy for the sandbox and that is the mistake this
@@ -46,7 +46,7 @@ const SESSION_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 const MAX_BATCH          = 300;    // rows in one post
 const MAX_SESSION_EVENTS = 3000;   // rows one visit may ever store
-const MAX_LAYOUT_ELEMS   = 120;    // controls remembered per screen
+const MAX_LAYOUT_ELEMS   = 240;    // pieces of a screen remembered
 
 // A visit is capped at MAX_SESSION_EVENTS rows however long it runs, so the
 // only way to flood this table is to invent session ids. That is what this
@@ -57,18 +57,20 @@ const MAX_LAYOUT_ELEMS   = 120;    // controls remembered per screen
 const RL_WINDOW_MS   = 60 * 60 * 1000;
 const RL_NEW_PER_IP  = 300;
 const KINDS   = new Set(["view", "click", "rage", "dead", "scroll", "leave", "move"]);
+const KINDS_PAINT = new Set(["btn", "text", "img", "box"]);
 const DEVICES = new Set(["mobile", "tablet", "desktop"]);
 
-// What a venue gets before anyone opens Capture settings. Heat is on,
-// because it is anonymous and aggregated and the customer already agreed to
-// behavioural analytics. Replay is off, because watching one visit back is
-// a different promise and a venue should have to make it deliberately.
+// What a venue gets before anyone opens Capture settings. All on: the
+// customer has already agreed to behavioural analytics, replay is
+// reconstructed from taps rather than recorded off the screen, and none of
+// it outlives retentionDays. A venue that wants less switches it off here,
+// and ux-ingest stops storing it at the server, not just hiding it.
 const DEFAULTS = {
   enabled: true,
   sample: 100,
   clicks: true,
   scroll: true,
-  replay: false,
+  replay: true,
   layouts: true,
   retentionDays: 60,
 };
@@ -127,6 +129,13 @@ const int = (v: unknown, min: number, max: number): number | null => {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : null;
 };
 const bool = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
+// A ratio that is not a fraction of one — a line height, say — kept to two
+// decimals so 1.15 stays 1.15 rather than rounding to 1.
+const ratio = (v: unknown, min: number, max: number): number | null => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(Math.min(max, Math.max(min, n)) * 100) / 100;
+};
 
 /* The venue's Capture settings (`ux:capture:<orgId>`), merged over the
  * defaults. Its own app_config row, like `byo:cap:<orgId>`, so publishing
@@ -259,8 +268,9 @@ Deno.serve(async (req) => {
     .from("ux_sessions").upsert(session, { onConflict: "session_id" });
   if (sErr) return json(req, { error: sErr.message }, 500);
 
-  // Where the controls sat on the screen. One row per screen and device
-  // class; the newest wins, which is all a wireframe backdrop needs.
+  // What the screen looked like: each piece's place, and how it was drawn.
+  // One row per screen and device class; the newest wins, which is all a
+  // repainted backdrop needs.
   if (config.layouts && Array.isArray(body.layouts) && body.layouts.length) {
     const layouts = body.layouts.slice(0, 20).map((raw) => {
       const l = raw as Record<string, unknown>;
@@ -272,16 +282,36 @@ Deno.serve(async (req) => {
         const el = rawEl as Record<string, unknown>;
         const k = str(el.k, 120);
         if (!k) return null;
+        // Geometry, then how it was drawn: the colours, radii and type
+        // sizes the dashboard repaints the screen from. Colours are short
+        // CSS strings and the only URLs allowed through are http(s) image
+        // sources, which are public venue content (a reward photo, a logo).
+        const src = str(el.src, 300);
+        const bgi = str(el.bgi, 300);
         return {
           k,
-          l: str(el.l, 80),
+          l: str(el.l, 90),
+          t: KINDS_PAINT.has(String(el.t)) ? String(el.t) : "box",
           x: frac(el.x), y: frac(el.y),
           w: frac(el.w), h: frac(el.h),
+          bg: str(el.bg, 40),
+          fg: str(el.fg, 40),
+          br: frac(el.br),
+          fs: frac(el.fs),
+          lh: ratio(el.lh, 0.5, 4),
+          ff: str(el.ff, 90),
+          fw: str(el.fw, 4),
+          ta: el.ta === "center" || el.ta === "right" ? el.ta : null,
+          bw: frac(el.bw),
+          bc: str(el.bc, 40),
+          src: src && /^https?:\/\//.test(src) ? src : null,
+          bgi: bgi && /^https?:\/\//.test(bgi) ? bgi : null,
         };
       }).filter(Boolean);
       if (!elements.length) return null;
       return {
         org_id: orgId, screen, device, elements,
+        page: str(l.page, 40),
         vw: int(l.vw, 0, 32000), vh: int(l.vh, 0, 32000), dh: int(l.dh, 0, 2_000_000),
         seen: 1, updated_at: new Date().toISOString(),
       };

@@ -47,6 +47,15 @@ const SESSION_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_BATCH          = 300;    // rows in one post
 const MAX_SESSION_EVENTS = 3000;   // rows one visit may ever store
 const MAX_LAYOUT_ELEMS   = 120;    // controls remembered per screen
+
+// A visit is capped at MAX_SESSION_EVENTS rows however long it runs, so the
+// only way to flood this table is to invent session ids. That is what this
+// caps: NEW visits from one address in an hour. 300 is one fresh visitor
+// every twelve seconds from a single IP, far above a venue behind one
+// campus router, and it never touches a visit already under way. Fails
+// OPEN on a database hiccup, like every other rate limit here.
+const RL_WINDOW_MS   = 60 * 60 * 1000;
+const RL_NEW_PER_IP  = 300;
 const KINDS   = new Set(["view", "click", "rage", "dead", "scroll", "leave", "move"]);
 const DEVICES = new Set(["mobile", "tablet", "desktop"]);
 
@@ -65,6 +74,26 @@ const DEFAULTS = {
 };
 
 type Config = typeof DEFAULTS;
+
+async function tooManyNewSessions(req: Request): Promise<boolean> {
+  try {
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+    const key = `ux-ingest:${ip}`;
+    const now = Date.now();
+    const { data } = await supabase.from("rate_limits")
+      .select("count, window_start").eq("key", key).maybeSingle();
+    if (!data || now - new Date(data.window_start).getTime() > RL_WINDOW_MS) {
+      await supabase.from("rate_limits")
+        .upsert({ key, count: 1, window_start: new Date().toISOString() });
+      return false;
+    }
+    if ((data.count ?? 0) >= RL_NEW_PER_IP) return true;
+    await supabase.from("rate_limits").update({ count: (data.count ?? 0) + 1 }).eq("key", key);
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
@@ -153,6 +182,12 @@ Deno.serve(async (req) => {
     .from("ux_sessions").select("events, started_at").eq("session_id", sessionId).maybeSingle();
   const already = Number(existing?.events ?? 0);
   const room    = Math.max(0, MAX_SESSION_EVENTS - already);
+
+  // Only a visit we have never seen counts against the address's hourly
+  // allowance; a visit already under way is never turned away mid-flow.
+  if (!existing && await tooManyNewSessions(req)) {
+    return json(req, { error: "rate_limited" }, 429);
+  }
 
   const inEvents = Array.isArray(body.events) ? body.events.slice(0, MAX_BATCH) : [];
   const rows: Record<string, unknown>[] = [];

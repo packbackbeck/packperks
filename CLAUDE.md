@@ -110,7 +110,11 @@ Per venue, `app_config` `ux:capture:<orgId>` holds `{ enabled, sample,
 clicks, scroll, replay, layouts, retentionDays }` (User flow → Capture
 settings; its own row, like `byo:cap:<orgId>`, so publishing can't wipe
 it). `ux-ingest` reads the same row before it stores anything, so a
-switch off stops the data at the server. Heat is on by default; **replay
+switch off stops the data at the server. The function is the only writer:
+a batch is capped at 300 rows, a visit at 3,000 however long it stays
+open, and a new visit counts against 300 per IP per hour — inventing
+session ids is the only way to flood the table, and a visit already
+under way is never turned away mid-flow. Heat is on by default; **replay
 is off by default** — a visit is only listed for replay when
 `ux_sessions.replay` was true when it was captured. Taps are the
 shortest-lived thing we hold: `ux_run_retention()` (inside the nightly

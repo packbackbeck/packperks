@@ -83,6 +83,7 @@ import ActivityDetailModal from './components/ActivityDetailModal';
 import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
 import { effectiveRates } from './lib/rates';
+import { isAppPreview } from './lib/isPreview';
 
 /* Best-effort device fingerprint from the user agent. Falls back to a
  * generic string when no platform-specific token is found. Used in the
@@ -454,12 +455,7 @@ export default function App({ consentReady = true } = {}) {
       return v ? String(v).slice(0, 64) : null;
     } catch { return null; }
   })();
-  const isPreviewMode = (() => {
-    if (typeof window === 'undefined') return false;
-    if (uxPreview) return true;
-    try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
-    catch { return false; }
-  })();
+  const isPreviewMode = isAppPreview();
 
   /* ── Navigation ── */
   const [page, setPage] = useState('home');

@@ -6,6 +6,7 @@ import { fmtDuration } from '../../lib/behaviourFormat';
 import { screenName } from '../behaviourCopy';
 import { fmtRate } from '../behaviourModel';
 import ScreenFrame from './ScreenFrame';
+import useFitHeight from './useFitHeight';
 import { rampColor } from './heatRamp';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ function HeatCanvas({ cells, grid, intensity, width, height }) {
     canvas.style.height = `${height}px`;
     paintHeat(canvas, cells, grid, intensity);
   }, [cells, grid, intensity, width, height]);
-  return <canvas ref={ref} className="sf-heat" aria-hidden="true" />;
+  return <canvas ref={ref} className="ufs-heat" aria-hidden="true" />;
 }
 
 /* The bands: each twentieth of the page, shaded by the share of visits
@@ -93,14 +94,14 @@ function ScrollBands({ curve }) {
   const total = Number(curve?.[0]?.total) || 0;
   if (!total) return null;
   return (
-    <div className="sf-bands" aria-hidden="true">
+    <div className="ufs-bands" aria-hidden="true">
       {curve.map((s) => {
         const share = Number(s.total) > 0 ? Number(s.reached) / Number(s.total) : 0;
         const [r, g, b] = rampColor(share);
         return (
-          <div key={s.step} className="sf-band" style={{ background: `rgba(${r},${g},${b},${0.22 + share * 0.5})` }}>
+          <div key={s.step} className="ufs-band" style={{ background: `rgba(${r},${g},${b},${0.22 + share * 0.5})` }}>
             {(s.step === 5 || s.step === 10 || s.step === 15 || s.step === 20) && (
-              <span className="sf-band__tag">
+              <span className="ufs-band__tag">
                 {Math.round((s.step / curve.length) * 100)}% down · seen by {fmtRate(share * 100)}
               </span>
             )}
@@ -116,7 +117,7 @@ function ScrollBands({ curve }) {
  * sat, at the same fractions of the page. */
 function ControlHeat({ elements, byTarget, max, onHover }) {
   return (
-    <div className="sf-controls">
+    <div className="ufs-controls">
       {elements.map((el, i) => {
         const t = byTarget[el.k];
         const heat = t ? (Number(t.taps) || 0) / max : 0;
@@ -124,7 +125,7 @@ function ControlHeat({ elements, byTarget, max, onHover }) {
         return (
           <div
             key={`${el.k}-${i}`}
-            className={`sf-control${t ? '' : ' sf-control--cold'}`}
+            className={`ufs-control${t ? '' : ' ufs-control--cold'}`}
             style={{
               left: `${(Number(el.x) || 0) * 100}%`,
               top: `${(Number(el.y) || 0) * 100}%`,
@@ -135,7 +136,7 @@ function ControlHeat({ elements, byTarget, max, onHover }) {
             onMouseEnter={() => onHover({ el, t })}
             onMouseLeave={() => onHover(null)}
           >
-            {t && <span className="sf-control__n">{fmtInt(t.taps)}</span>}
+            {t && <span className="ufs-control__n">{fmtInt(t.taps)}</span>}
           </div>
         );
       })}
@@ -153,6 +154,8 @@ export default function HeatmapCard({
   const [hover, setHover] = useState(null);
   const [geo, setGeo] = useState(null);
   const onGeometry = useCallback(g => setGeo(g), []);
+  const fit = useRef(null);
+  useFitHeight(fit);
 
   const cells = useMemo(() => data?.cells || [], [data]);
   const layout = data?.layout || null;
@@ -182,7 +185,7 @@ export default function HeatmapCard({
         actions={<Segmented options={VIEWS} value={view} onChange={setView} ariaLabel="Heatmap view" />}
       />
       <CardBody flush>
-        <div className="uf-heat">
+        <div className="uf-heat" ref={fit}>
           <div className="uf-heat__rail" role="tablist" aria-label="Screens">
             {screens.length === 0 && !loading && (
               <p className="uf-heat__railempty">No screen has been captured yet.</p>
@@ -229,7 +232,7 @@ export default function HeatmapCard({
                   >
                     {view === 'taps' && (
                       <>
-                        <span className="sf-veil" aria-hidden="true" />
+                        <span className="ufs-veil" aria-hidden="true" />
                         <HeatCanvas
                           cells={cells}
                           grid={grid}
@@ -241,7 +244,7 @@ export default function HeatmapCard({
                     )}
                     {view === 'scroll' && (
                       <>
-                        <span className="sf-veil" aria-hidden="true" />
+                        <span className="ufs-veil" aria-hidden="true" />
                         <ScrollBands curve={data?.curve || []} />
                       </>
                     )}

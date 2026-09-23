@@ -35,8 +35,10 @@
 .uf-heat { display: grid; grid-template-columns: 236px minmax(0, 1fr); }
 /* The screen is the subject of this tab, so it gets the height of the
  * window rather than a guessed box: the phone fills it and the screen
- * list scrolls beside it. */
-.uf-heat, .uf-heat__rail, .uf-heat__stage { height: clamp(560px, calc(100vh - 208px), 900px); }
+ * list scrolls beside it. `--uf-fit` is measured (useFitHeight.js) —
+ * everything above this section differs by venue, role and how the
+ * subtitle wraps, so a constant was always wrong somewhere. */
+.uf-heat, .uf-heat__rail, .uf-heat__stage { height: var(--uf-fit, 620px); }
 .uf-heat__rail { max-height: none; }
 .uf-heat__rail {
   display: flex; flex-direction: column; gap: 2px;
@@ -72,9 +74,11 @@
 /* The room the phone gets. It is `position: relative` and the phone inside
  * it is absolutely placed, so the phone's size is decided BY this box and
  * never feeds back into it — that loop is what let the device grow past
- * its section and stick out over the cards above and below. */
+ * its section and stick out over the cards above and below. The min-height
+ * is the other half of that: a box with no height gives the phone nothing
+ * to measure, and it renders at a fallback size and hangs out again. */
 .uf-heat__phone {
-  position: relative; flex: 1 1 auto; min-height: 0; width: 100%;
+  position: relative; flex: 1 1 auto; min-height: 320px; width: 100%;
   overflow: hidden;
 }
 
@@ -88,12 +92,12 @@
  * The phone keeps its own colours in both themes: it stands in for a
  * customer's device, and that device does not have a dark mode because
  * the dashboard does. */
-.sf {
+.ufs {
   position: absolute; left: 50%; top: 50%;
   transform: translate(-50%, -50%);
 }
-.sf__device { position: absolute; top: 0; left: 0; transform-origin: top left; }
-.sf__bezel {
+.ufs__device { position: absolute; top: 0; left: 0; transform-origin: top left; }
+.ufs__bezel {
   position: relative; width: 100%; height: 100%;
   padding: 12px; box-sizing: border-box;
   border-radius: 58px;
@@ -104,43 +108,43 @@
     0 40px 80px -36px rgb(38 24 92 / 45%),
     0 18px 36px -20px rgb(23 21 31 / 40%);
 }
-.sf--desktop .sf__bezel, .sf--tablet .sf__bezel { padding: 10px; border-radius: 20px; }
+.ufs--desktop .ufs__bezel, .ufs--tablet .ufs__bezel { padding: 10px; border-radius: 20px; }
 
 /* The screen scrolls its page exactly as the phone does. */
-.sf__screen {
+.ufs__screen {
   position: relative; width: 100%; height: 100%;
   overflow-y: auto; overflow-x: hidden;
   border-radius: 46px; background: #FFFFFF;
   scroll-behavior: smooth;
   scrollbar-width: none;
 }
-.sf__screen::-webkit-scrollbar { width: 0; height: 0; }
-.sf--desktop .sf__screen, .sf--tablet .sf__screen { border-radius: 10px; }
+.ufs__screen::-webkit-scrollbar { width: 0; height: 0; }
+.ufs--desktop .ufs__screen, .ufs--tablet .ufs__screen { border-radius: 10px; }
 
-.sf__app { display: block; border: 0; pointer-events: none; background: transparent; }
-.sf__note {
+.ufs__app { display: block; border: 0; pointer-events: none; background: transparent; }
+.ufs__note {
   position: absolute; inset: 0; margin: 0;
   display: grid; place-items: center; padding: 0 28px;
   font-size: 13px; line-height: 1.6; color: #6B6778; text-align: center; background: #F1F0F6;
 }
 
 /* Overlays sit over the WHOLE page and scroll with it. */
-.sf__over { position: absolute; top: 0; left: 0; pointer-events: none; }
-.sf__over > * { pointer-events: none; }
-.sf-veil { position: absolute; inset: 0; background: rgb(255 255 255 / 52%); }
-.sf-heat { position: absolute; top: 0; left: 0; }
+.ufs__over { position: absolute; top: 0; left: 0; pointer-events: none; }
+.ufs__over > * { pointer-events: none; }
+.ufs-veil { position: absolute; inset: 0; background: rgb(255 255 255 / 52%); }
+.ufs-heat { position: absolute; top: 0; left: 0; }
 
-.sf-bands { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.sf-band { position: relative; flex: 1 1 0; }
-.sf-band__tag {
+.ufs-bands { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.ufs-band { position: relative; flex: 1 1 0; }
+.ufs-band__tag {
   position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
   font-size: 11px; font-weight: 600; color: #17151F;
   background: rgb(255 255 255 / 94%); border: 1px solid rgb(23 21 31 / 12%);
   border-radius: 999px; padding: 2px 8px; white-space: nowrap;
 }
 
-.sf-controls { position: absolute; inset: 0; pointer-events: auto; }
-.sf-control {
+.ufs-controls { position: absolute; inset: 0; pointer-events: auto; }
+.ufs-control {
   position: absolute; box-sizing: border-box;
   border: 2px solid rgb(23 21 31 / 22%); border-radius: 8px;
   background: rgb(23 21 31 / 5%);
@@ -148,39 +152,39 @@
   padding-right: 5px; cursor: default; pointer-events: auto;
   transition: filter 0.12s var(--ui-ease);
 }
-.sf-control:hover { filter: brightness(1.08) saturate(1.25); }
-.sf-control--cold { border-style: dashed; background: rgb(23 21 31 / 3%); }
-.sf-control__n {
+.ufs-control:hover { filter: brightness(1.08) saturate(1.25); }
+.ufs-control--cold { border-style: dashed; background: rgb(23 21 31 / 3%); }
+.ufs-control__n {
   font-size: 11px; font-weight: 800; color: #17151F;
   background: rgb(255 255 255 / 90%); border-radius: 999px; padding: 0 6px;
 }
 
-.sf-tap {
+.ufs-tap {
   position: absolute; z-index: 2;
   width: 34px; height: 34px; margin: -17px 0 0 -17px;
   border-radius: 50%; background: rgb(91 63 214 / 55%);
-  animation: sf-tap 0.7s var(--ui-ease);
+  animation: ufs-tap 0.7s var(--ui-ease);
 }
-.sf-tap--rage { background: rgb(217 45 85 / 62%); }
-.sf-tap--dead { background: rgb(226 85 43 / 58%); }
-@keyframes sf-tap {
+.ufs-tap--rage { background: rgb(217 45 85 / 62%); }
+.ufs-tap--dead { background: rgb(226 85 43 / 58%); }
+@keyframes ufs-tap {
   0% { transform: scale(0.3); opacity: 1; }
   100% { transform: scale(2.1); opacity: 0; }
 }
 
 /* The phone's own furniture, over the screen. */
-.sf__status {
+.ufs__status {
   position: absolute; top: 12px; left: 12px; right: 12px; height: 46px;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 24px; color: #17151F; pointer-events: none;
   font-size: 14px; font-weight: 700;
 }
-.sf__island {
+.ufs__island {
   position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
   width: 118px; height: 33px; border-radius: 999px; background: #0E0D12;
 }
-.sf__icons { display: inline-flex; align-items: center; gap: 4px; }
-.sf__homebar {
+.ufs__icons { display: inline-flex; align-items: center; gap: 4px; }
+.ufs__homebar {
   position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
   width: 134px; height: 5px; border-radius: 999px;
   background: rgb(23 21 31 / 30%); pointer-events: none;
@@ -307,9 +311,7 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
 /* ── Replay ─────────────────────────────────────────────────────── */
 
 .uf-replay__body { display: grid; grid-template-columns: 250px minmax(0, 1fr); }
-.uf-replay__body, .uf-replay__list, .uf-replay__stage {
-  height: clamp(580px, calc(100vh - 208px), 920px);
-}
+.uf-replay__body, .uf-replay__list, .uf-replay__stage { height: var(--uf-fit, 640px); }
 .uf-replay__list { max-height: none; }
 .uf-replay__list {
   display: flex; flex-direction: column; gap: 2px; padding: 10px;
@@ -345,7 +347,7 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
   padding: 14px 16px; min-width: 0; align-items: center;
 }
 .uf-replay__phone {
-  position: relative; flex: 1 1 auto; min-height: 0; width: 100%;
+  position: relative; flex: 1 1 auto; min-height: 320px; width: 100%;
   overflow: hidden;
 }
 .uf-replay__loading { padding: 40px; text-align: center; color: var(--ui-muted); font-size: 13px; }
@@ -442,8 +444,14 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
 }
 @media (max-width: 860px) {
   .uf-heat, .uf-replay__body { grid-template-columns: minmax(0, 1fr); }
-  .uf-heat, .uf-heat__rail, .uf-heat__stage,
-  .uf-replay__body, .uf-replay__list, .uf-replay__stage { height: auto; }
+  /* Stacked: the rail becomes a strip along the top and the phone keeps a
+   * height of its own. It must never be `auto` — the phone is placed
+   * absolutely inside it, so an auto box collapses to nothing and the
+   * device, having no room to measure, renders at a size of its own and
+   * hangs out of the card. */
+  .uf-heat, .uf-heat__rail, .uf-replay__body, .uf-replay__list { height: auto; }
+  .uf-heat__stage, .uf-replay__stage { height: auto; }
+  .uf-heat__phone, .uf-replay__phone { height: min(70vh, 560px); flex: none; }
   .uf-heat__rail, .uf-replay__list {
     flex-direction: row; overflow-x: auto; max-height: none;
     border-right: 0; border-bottom: 1px solid var(--ui-border);

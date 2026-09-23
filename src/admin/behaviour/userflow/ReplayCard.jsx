@@ -7,6 +7,7 @@ import { fmtInt } from '../../ui/timeSeries';
 import { fmtDuration } from '../../lib/behaviourFormat';
 import { screenName } from '../behaviourCopy';
 import ScreenFrame from './ScreenFrame';
+import useFitHeight from './useFitHeight';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Session replay.
@@ -62,6 +63,8 @@ export default function ReplayCard({
   const [speed, setSpeed] = useState('2');
   const [at, setAt] = useState(0);
   const timer = useRef(null);
+  const fit = useRef(null);
+  useFitHeight(fit);
 
   const steps = useMemo(() => toSteps(replay?.events), [replay]);
   const step = steps[Math.min(at, Math.max(0, steps.length - 1))] || null;
@@ -131,7 +134,7 @@ export default function ReplayCard({
         actions={<Badge tone="violet">{fmtInt(sessions.length)} visits</Badge>}
       />
       <CardBody flush>
-        <div className="uf-replay__body">
+        <div className="uf-replay__body" ref={fit}>
           <div className="uf-replay__list" role="list">
             {loading && <div className="uf-replay__skel" aria-busy="true" />}
             {!loading && !sessions.length && (
@@ -189,7 +192,7 @@ export default function ReplayCard({
                     {step && (step.kind === 'click' || step.kind === 'rage' || step.kind === 'dead') && step.x != null && (
                       <span
                         key={`${step.seq}`}
-                        className={`sf-tap sf-tap--${step.kind}`}
+                        className={`ufs-tap ufs-tap--${step.kind}`}
                         style={{ left: `${Number(step.x) * 100}%`, top: `${Number(step.y) * 100}%` }}
                       />
                     )}

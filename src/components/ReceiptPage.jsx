@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import './ReceiptPage.css';
+import { isAppPreview } from '../lib/isPreview';
 
 /* ── Step icons (inline SVG) ── */
 const CupStepIcon = () => (
@@ -128,6 +129,8 @@ export default function ReceiptPage({ reward, onSubmit, onBack, orgName, isByo =
   /* Start the camera only once the user reaches the camera screen. */
   useEffect(() => {
     if (step !== 'camera') return;
+    // Same as the cup scanner: a preview never opens the camera.
+    if (isAppPreview()) return;
     let mounted = true;
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
       .then(stream => {

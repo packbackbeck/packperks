@@ -3,6 +3,7 @@ import jsQR from 'jsqr';
 import './ReceiptPage.css'; /* reuse same base styles */
 import './CupScanPage.css';
 import { parseCupQr } from '../lib/api';
+import { isAppPreview } from '../lib/isPreview';
 
 /* Compress a (possibly large) canvas down to a manageable JPEG data-URL.
  *
@@ -56,6 +57,9 @@ export default function CupScanPage({ onScan, onBack, onError, copy = {} }) {
 
   // ── Start camera + decode loop ─────────────────────────────────────────
   useEffect(() => {
+    // A preview shows what this screen looks like. Asking the person
+    // reading a heatmap for their webcam is not that.
+    if (isAppPreview()) return undefined;
     let mounted = true;
     navigator.mediaDevices
       ?.getUserMedia({ video: { facingMode: 'environment' }, audio: false })

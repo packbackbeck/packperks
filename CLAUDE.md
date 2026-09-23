@@ -113,13 +113,31 @@ attributed to one and the unused ones shown cold.
 embeds the customer app at `/<slug>/?uxpreview=<screen>` in a device that
 scrolls its page the way that device does, and the heat is drawn over it.
 
+`?uxpreview=` and `?preview=1` both answer `isAppPreview()`
+(`src/lib/isPreview.js`), which is its own module because App.jsx is not
+the only thing that needs it: **a preview never opens the camera**. The
+cup scanner and the receipt camera check it, or previewing those screens
+would ask whoever is reading a heatmap for their webcam.
+
+**The dashboard's device frame is prefixed `ufs-`, not `sf-`.** The
+customer app's support form already owns `.sf`, with `min-height: 100dvh`
+on it, and the dashboard bundle carries that CSS — so the phone inherited
+a 900px minimum, hung out of its card and bled a cream background. Both
+apps' stylesheets are in one bundle; a two-letter prefix is not yours.
+
 **A heatmap is always of ONE device.** A phone page and a desktop page are
 different shapes, so taps from both drawn over one of them land on the
 wrong things. With no device chosen, the screen picks the one most of its
 visits were actually on and the subtitle says which; the filter overrides
 it. The phone is placed absolutely inside a box of a definite height, so
 its size is decided BY that box and never feeds back into it — that loop
-is what let it grow past its section. `?uxpreview=` is the same read-only boot Design & copy's iframe
+is what let it grow past its section. The box must never be `height:
+auto` either (the narrow layout tried it): a collapsed box gives the
+device nothing to measure and it renders at a fallback size and hangs out
+again. How tall the section itself is, is measured rather than guessed
+(`userflow/useFitHeight.js`) — everything above it differs by venue, role
+and how the subtitle wraps, and a constant left the card 180px below the
+fold on a real dashboard. `?uxpreview=` is the same read-only boot Design & copy's iframe
 has always used (`isPreviewMode` in `src/App.jsx`) — no auth, no account,
 no writes, no cookie banner, no maintenance screen, and `uxScreen`/`track`
 are skipped so a preview can never record itself into the numbers it is

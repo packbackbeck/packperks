@@ -40,10 +40,14 @@ export default function ScreenFrame({
   const [room, setRoom] = useState(null);
 
   const dev = DEVICE[device] || DEVICE.mobile;
-  // As big as the room allows, never bigger than life size.
-  const scale = room
-    ? Math.max(0.25, Math.min(1, Math.min(room.h / dev.h, room.w / dev.w)))
-    : 0.75;
+  // As big as the room allows, never bigger than life size. A box that has
+  // not been laid out yet, or has collapsed to nothing, is not a room:
+  // scaling to it produced a device a few hundred pixels tall that hung
+  // out of its card, so it is ignored until it is real.
+  const usable = room && room.h > 120 && room.w > 120 ? room : null;
+  const scale = usable
+    ? Math.max(0.25, Math.min(1, Math.min(usable.h / dev.h, usable.w / dev.w)))
+    : 0.7;
 
   /* The room is whatever the card gives us, so the phone grows with the
    * window instead of being sized by a number someone guessed. */
@@ -111,19 +115,19 @@ export default function ScreenFrame({
   return (
     <div
       ref={box}
-      className={`sf sf--${device}`}
+      className={`ufs ufs--${device}`}
       style={{ width: dev.w * scale, height: dev.h * scale }}
     >
       <div
-        className="sf__device"
+        className="ufs__device"
         style={{ width: dev.w, height: dev.h, transform: `scale(${scale})` }}
       >
-        <div className="sf__bezel">
-          <div className="sf__screen" ref={scroller}>
+        <div className="ufs__bezel">
+          <div className="ufs__screen" ref={scroller}>
             {src && !failed ? (
               <iframe
                 ref={frame}
-                className="sf__app"
+                className="ufs__app"
                 title="The customer app"
                 src={src}
                 style={{ width: dev.w, height: pageHeight || dev.h }}
@@ -132,27 +136,27 @@ export default function ScreenFrame({
                 tabIndex={-1}
               />
             ) : (
-              <p className="sf__note">{note || 'This venue’s app could not be loaded here.'}</p>
+              <p className="ufs__note">{note || 'This venue’s app could not be loaded here.'}</p>
             )}
 
             {/* Overlays are laid over the WHOLE page and scroll with it. */}
-            <div className="sf__over" style={{ width: dev.w, height: pageHeight || dev.h }}>
+            <div className="ufs__over" style={{ width: dev.w, height: pageHeight || dev.h }}>
               {children}
             </div>
           </div>
 
           {phone && (
             <>
-              <div className="sf__status">
-                <span className="sf__time">9:41</span>
-                <span className="sf__island" />
-                <span className="sf__icons">
+              <div className="ufs__status">
+                <span className="ufs__time">9:41</span>
+                <span className="ufs__island" />
+                <span className="ufs__icons">
                   <Signal size={13} strokeWidth={2.6} aria-hidden="true" />
                   <Wifi size={13} strokeWidth={2.6} aria-hidden="true" />
                   <BatteryFull size={17} strokeWidth={2} aria-hidden="true" />
                 </span>
               </div>
-              <span className="sf__homebar" />
+              <span className="ufs__homebar" />
             </>
           )}
         </div>

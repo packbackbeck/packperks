@@ -215,7 +215,7 @@ function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRet
            becomes the full-width Collect action. */
         <a
           className="pc-card__collect"
-          href={payoutLinkState(claim).url || claim.tikkie_url}
+          href={payoutLinkState(claim).url || undefined}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => onCollect?.(claim)}

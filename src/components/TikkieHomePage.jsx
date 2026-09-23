@@ -351,8 +351,13 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
    * exists, so an uncollected one has to be opened on its own rather than
    * folded into a bigger one — the tile shows the honest total, and Collect
    * deals with the open link first. */
+  /* The wallet's history rows come from bin-tikkie, so they carry Tikkie's
+   * own expiry but not the venue's deadline (migration 063). Measuring the
+   * venue's window from each row's date gives the same answer the claims
+   * table holds. */
+  const linkOpts = { expireAfterMonths: settings?.payoutExpiryMonths ?? 3 };
   const openLinkTotal = history.reduce((t, h) => (
-    h.kind === 'payout' && payoutLinkState(h).state === 'open'
+    h.kind === 'payout' && payoutLinkState(h, null, linkOpts).state === 'open'
       ? t + Number(h.amount || 0)
       : t), 0);
   const roundMoney = (n) => Math.round(n * 100) / 100;
@@ -748,7 +753,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           <ul className="tikkie-home__history">
             {history.map(h => {
               const link = h.kind === 'payout'
-                ? payoutLinkState(h, h.id === openPayoutId ? outstanding?.url : null)
+                ? payoutLinkState(h, h.id === openPayoutId ? outstanding?.url : null, linkOpts)
                 : null;
               return (
               <li key={h.id}>
@@ -841,6 +846,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           isLinkPayout={isLinkPayout}
           charity={charity}
           payoutUrl={openItem.id === openPayoutId ? outstanding?.url : null}
+          expireAfterMonths={linkOpts.expireAfterMonths}
           email={profile?.email || null}
           onClose={() => setOpenItem(null)}
         />

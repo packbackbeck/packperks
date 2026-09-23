@@ -166,11 +166,18 @@ also backfills), and the Claims page's per-claim refresh
 asked. Backfilling 48 old links on 23 Sep 2026 found 33 of them collected
 that we had recorded as open, so treat a stale `created` as "not asked".
 
-**A Tikkie link cannot be cancelled.** The Cashback API has no delete,
-cancel or expire call: a `DELETE` on a cashback is refused by the gateway as
-a disallowed method (probed 23 Sep 2026), while `GET` validates the id. So a
-link, once minted, stays collectable until Tikkie expires it, and minting a
-second link that covers money an open link already covers would pay twice.
+**A Tikkie link cannot be cancelled, and its expiry is not ours to set.**
+The Cashback API has no delete, cancel or expire call: a `DELETE` on a
+cashback is refused by the gateway as a disallowed method (probed 23 Sep
+2026), while `GET` validates the id. Nor is there a per-link expiry — a
+cashback's `expiryDateTime` **is the campaign's `endDate`**, the same
+instant for every link the campaign ever mints (all 48 of ours read
+2026-12-31T22:59:59.999Z; `GET /cashback-campaigns/<id>` returns
+`startDate`, `endDate`, `status` and `remainingAmountInCents`, and the
+campaigns collection itself answers 404, so campaigns are managed at ABN
+AMRO, not through this API). Two consequences: **every link dies on the
+campaign's end date**, and minting a second link that covers money an open
+link already covers would pay twice.
 The Deferred Tikkie wallet therefore shows the total owed (balance plus
 every uncollected link) on its tile, and Collect **reopens** an uncollected
 link instead of minting; the rest of the wallet gets its own link once that
@@ -179,9 +186,26 @@ number, and only when the total really is split across the two, two short
 lines say to collect it all with the button below and that the older part
 sits in a link in the activity list.
 
+**Unclaimed money has a deadline of our own** (`claims.expires_at`,
+migration 063). Two settings — Settings → Rules & limits → *When unclaimed
+money expires* — give each venue a window in months
+(`payoutExpiryMonths` for cashback, refunds and wallet payouts,
+`rewardExpiryMonths` for a claim against a reward; three months unless set,
+0 means never), and a BEFORE INSERT trigger stamps the deadline on every
+claim as it is made. It is **our** cutoff, not enforcement at Tikkie: past
+it the app offers nothing and the reporting counts the money as never
+claimed, but someone still holding the URL can collect until the campaign
+ends, because the link cannot be cancelled. Keep the window shorter than
+the campaign's end and the two agree — the Rules & limits footer shows that
+date and warns when the window overshoots it.
+
 **The app never offers a dead payout link.** `src/lib/payoutLink.js`
 (`payoutLinkState`) is the one place that decides: collected, expired (by
-status or by an expiry in the past), open, waiting or failed. The activity
+status, or by the **earliest** of Tikkie's expiry and ours being in the
+past), open, waiting or failed. A row without a deadline of its own can be
+judged with `opts.expireAfterMonths`, measured from `created_at` — the
+Deferred Tikkie wallet passes the venue's window that way, because its
+history rows come from `bin-tikkie` rather than the claims table. The activity
 list, its popups (`ActivityDetailModal`, `TikkieActivitySheet`), the claim
 cards (`PendingClaims`) and the wallet all read it, show the status and its
 time, and hand out a URL only while the link still works.
@@ -356,7 +380,7 @@ access, so any account above vendor may use it.
 | `src/admin/lib/uxAggregate.js` | the User flow sums in JS — the demo's half of migration 061 |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
-| `src/admin/settings/` | Settings: features, payouts, rules, locations, privacy policy |
+| `src/admin/settings/` | Settings: features, payouts, rules and expiry, locations, privacy policy |
 | `src/admin/master/` | Master Settings: people, roles, organisations, groups, regions, workspace, data, PackPulse |
 | `src/admin/embed/` | `/packpulse-embed`: one venue's pages inside PackPulse |
 | `src/admin/lib/adminMoney.js` | `useAdminMoney()` / `adminMoney()` — dashboard currency |
@@ -369,6 +393,7 @@ access, so any account above vendor may use it.
 | `supabase/migrations/` | numbered SQL migrations — every schema change is one |
 | `supabase/rollback/` | emergency scripts that undo a migration |
 | `supabase/baseline/` | full schema snapshot; rebuilds the database from nothing |
+| `docs/roles-and-features.md` | who reaches which tab, and the FigJam chart of it |
 
 The three analytics readers behind the dashboard, all in `adminApi.js`:
 `getAdminStats` (Overview), `getStatsMetrics` (System Health),

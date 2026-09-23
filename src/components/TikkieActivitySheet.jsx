@@ -39,7 +39,7 @@ function fullWhen(iso) {
 const refFor = (id) => `PP-${String(id || '').replace(/^pending:/, '').replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
 export default function TikkieActivitySheet({
-  item, money, isLinkPayout, charity, payoutUrl, email, onClose,
+  item, money, isLinkPayout, charity, payoutUrl, email, expireAfterMonths, onClose,
 }) {
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose?.(); }
@@ -67,7 +67,7 @@ export default function TikkieActivitySheet({
       status: 'Donated', statusColor: GREEN, amountLabel: 'Donated', sign: '−',
     };
   } else if (item.kind === 'payout') {
-    const link = payoutLinkState(item, payoutUrl);
+    const link = payoutLinkState(item, payoutUrl, { expireAfterMonths });
     view = link.state === 'collected'
       ? {
         title: isLinkPayout ? 'Collected via Tikkie' : 'Cashback sent', tone: 'green', icon: 'check',

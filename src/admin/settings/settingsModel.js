@@ -18,7 +18,7 @@ import {
 export const SETTINGS_TABS = [
   { id: 'features', label: 'Features', icon: ToggleRight },
   { id: 'payouts', label: 'Payouts', icon: Wallet },
-  { id: 'rules', label: 'Rules & limits', icon: SlidersHorizontal, notFor: ['tikkie_only'] },
+  { id: 'rules', label: 'Rules & limits', icon: SlidersHorizontal },
   { id: 'locations', label: 'Locations', icon: MapPin },
   { id: 'legal', label: 'Legal', icon: ScrollText },
 ];

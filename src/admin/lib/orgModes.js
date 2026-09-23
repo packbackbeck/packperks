@@ -166,6 +166,7 @@ const TIKKIE_ONLY_STRIP_KEYS = [
   'maxCupsPerDay', 'dailyCapMessage',
   'balanceResetDays', 'resetWarningMessage',
   'budgetPausedTitle', 'budgetPausedBody',
+  'rewardExpiryMonths',            // no rewards to expire in this mode
 ];
 
 export function stripSettingsForMode(settings) {

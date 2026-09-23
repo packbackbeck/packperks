@@ -278,3 +278,8 @@
   .st-tile, .st-panel, .st-toast { animation: none; }
   .st-tile:hover { transform: none; }
 }
+
+/* A footer line that points somewhere else, or explains a rule. */
+.st-pointer { display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+.st-pointer svg { flex: none; margin-top: 2px; color: var(--ui-muted); }
+.st-pointer b { color: var(--ui-fg-2); font-weight: 600; }

@@ -4941,6 +4941,23 @@ export async function saveByoCap(orgId, cap, windowMinutes = BYO_WINDOW_DEFAULT_
   return { cap: n, windowMinutes: m };
 }
 
+/* The horizon on every Tikkie link: the campaign's end date. Tikkie gives
+ * each cashback the campaign's `endDate` as its expiry — the same instant
+ * for every link it ever mints — and there is no per-link expiry to set
+ * (probed 23 Sep 2026). Rather than ask the API, read the latest expiry we
+ * have been told about; it IS that date. Used to warn that a window past
+ * it cannot mean anything. */
+export async function getTikkieCampaignEnd() {
+  const { data } = await supabase
+    .from('claims')
+    .select('tikkie_expires_at')
+    .not('tikkie_expires_at', 'is', null)
+    .order('tikkie_expires_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.tikkie_expires_at || null;
+}
+
 export async function approveByoRequest(reqId) {
   const { data: { user } } = await supabase.auth.getUser();
 

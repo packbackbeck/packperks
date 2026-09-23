@@ -4,14 +4,15 @@
 // The stationary counter QR for a BYO store points at /<slug>/?byo=1. When a
 // customer scans it the client calls this function to add ONE cup.
 //
-// Trust + soft cap (decision 3A/A4): up to 2 cups are auto-credited per user
-// per ROLLING 24h. The 3rd+ scan in that window does NOT credit — it creates
-// a pending `byo_cup_requests` row for an admin to approve (which credits it)
-// or deny, and the client shows a respectful "held for review" message.
+// Trust + soft cap: the venue's Static QR code limit says how many cups one
+// person gets auto-credited per rolling window (2 a day unless set). A scan
+// past it does NOT credit — it creates a pending `byo_cup_requests` row for
+// an admin to approve (which credits it) or deny, and the client shows a
+// respectful "held for review" message with no numbers in it.
 //
 // Body: { user_id, device_id, org_id }   (JWT optional — anonymous allowed)
 // Returns:
-//   { status: "credited", cups, preBalance, newBalance, autoRemaining }
+//   { status: "credited", cups, preBalance, newBalance }
 //   { status: "pending_review", preBalance, newBalance }
 //
 // Static QR code: a Bring Your Own venue (group mode 'byo') has it unless it
@@ -31,8 +32,26 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DEFAULT_DAILY_CAP = 2;               // auto-credited cups per rolling 24h (per store, when unset)
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_CAP = 2;                     // auto-credited cups per window (per store, when unset)
+const DEFAULT_WINDOW_HOURS = 24;
+const MAX_WINDOW_HOURS = 24 * 90;          // a quarter is as long as a limit may run
+
+/* The venue's Static QR code limit: how many cups one person gets from the
+ * counter code, and the rolling window it resets over (Static QR code page →
+ * app_config `byo:cap:<orgId>`). `dailyCap` is the older name for the same
+ * number, from when the window was always 24 hours. */
+async function staticLimit(orgId: string): Promise<{ cap: number; hours: number; windowMs: number }> {
+  const { data } = await supabase
+    .from("app_config").select("value").eq("key", `byo:cap:${orgId}`).maybeSingle();
+  const v = (data?.value ?? {}) as { cap?: number; dailyCap?: number; windowHours?: number };
+  const rawCap = Number(v.cap ?? v.dailyCap);
+  const cap = Number.isFinite(rawCap) && rawCap > 0 ? Math.floor(rawCap) : DEFAULT_CAP;
+  const rawHours = Number(v.windowHours);
+  const hours = Number.isFinite(rawHours) && rawHours >= 1 && rawHours <= MAX_WINDOW_HOURS
+    ? Math.floor(rawHours)
+    : DEFAULT_WINDOW_HOURS;
+  return { cap, hours, windowMs: hours * 60 * 60 * 1000 };
+}
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
@@ -114,17 +133,13 @@ Deno.serve(async (req) => {
     if (loc) locationId = loc.id;
   }
 
-  // ── Per-store daily auto-credit cap (admin-set on the BYO requests page).
-  // Stored in its own app_config row `byo:cap:<orgId>`; falls back to the
-  // default. This is org-scoped, so each store enforces its own limit.
-  const { data: capCfg } = await supabase
-    .from("app_config").select("value").eq("key", `byo:cap:${orgId}`).maybeSingle();
-  const capVal = Number((capCfg?.value as { dailyCap?: number } | null)?.dailyCap);
-  const dailyCap = Number.isFinite(capVal) && capVal > 0 ? Math.floor(capVal) : DEFAULT_DAILY_CAP;
+  // ── Per-store auto-credit limit (Static QR code page). Org-scoped, so
+  // each store enforces its own cap over its own window.
+  const { cap, hours, windowMs } = await staticLimit(orgId);
 
-  const sinceIso = new Date(Date.now() - WINDOW_MS).toISOString();
+  const sinceIso = new Date(Date.now() - windowMs).toISOString();
 
-  // ── Count auto-credited BYO cups in the rolling 24h window ───────────
+  // ── Count auto-credited BYO cups inside the window ───────────────────
   const { count } = await supabase
     .from("cup_scans")
     .select("id", { count: "exact", head: true })
@@ -137,7 +152,7 @@ Deno.serve(async (req) => {
   const preBalance = balRow?.balance || 0;
 
   // ── Over the soft cap → hold for review, do NOT credit ───────────────
-  if (autoCount >= dailyCap) {
+  if (autoCount >= cap) {
     // Collapse rapid re-scans into one pending request per user/org/window.
     const { data: existing } = await supabase
       .from("byo_cup_requests")
@@ -148,7 +163,7 @@ Deno.serve(async (req) => {
         org_id: orgId, user_id: userId, identity_id: userRow.identity_id || null,
         cups: 1, status: "pending", location_id: locationId,
         device_id: userRow.device_id || deviceId || null,
-        note: "Auto-credit cap reached (rolling 24h)",
+        note: `Auto-credit cap reached (${cap} per rolling ${hours}h)`,
       });
     }
     return json({ status: "pending_review", preBalance, newBalance: preBalance });
@@ -158,9 +173,9 @@ Deno.serve(async (req) => {
   // Previously this wrote preBalance+1 (a stale absolute), so two concurrent
   // scans both wrote the same value and a cup was lost. The RPC does
   // `balance = balance + 1` inside one statement, so concurrent scans each
-  // apply. Multi-redeem up to the per-store daily cap is unchanged; the cap is
-  // a soft cap (3rd+ still holds for review), so a rare double-scan crediting
-  // one extra is acceptable.
+  // apply. Multi-redeem up to the per-store limit is unchanged; the cap is
+  // a soft cap (a scan past it still holds for review), so a rare
+  // double-scan crediting one extra is acceptable.
   const { data: newBalance, error: incErr } = await supabase
     .rpc("increment_cup_balance", { p_user_id: userId, p_org_id: orgId, p_delta: 1 });
   if (incErr) return json({ error: "balance_update_failed", detail: incErr.message }, 500);
@@ -174,8 +189,7 @@ Deno.serve(async (req) => {
     user_id: userId, type: "cup_added", label: isByo ? "Cup added (bring your own)" : "Cup added (counter QR)",
   });
 
-  return json({
-    status: "credited", cups: 1, preBalance, newBalance,
-    autoRemaining: Math.max(0, dailyCap - (autoCount + 1)),
-  });
+  // How many are left is deliberately not returned: the app tells a
+  // customer only that they reached the limit, never the numbers behind it.
+  return json({ status: "credited", cups: 1, preBalance, newBalance });
 });

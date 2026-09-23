@@ -109,3 +109,8 @@
 .byoreq__actions { display: flex; justify-content: flex-end; gap: 6px; }
 .byoreq__none { display: block; text-align: right; }
 
+
+/* The limit row: cap, its window, and the sentence that spells the rule out. */
+.byoreq__cap-unit { width: auto; min-width: 92px; }
+.byoreq__cap-rule { margin: 10px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--ui-muted); }
+.byoreq__cap-rule b { color: var(--ui-fg-2); font-weight: 600; }

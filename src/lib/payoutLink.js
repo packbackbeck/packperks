@@ -29,12 +29,15 @@ export function payoutLinkState(claim, url = null) {
   const expiresAt = claim.tikkie_expires_at ?? claim.expires_at ?? null;
   const redeemedAt = claim.tikkie_redeemed_at ?? claim.redeemed_at ?? null;
   const link = url || claim.tikkie_url || null;
+  // A row may know a link exists without carrying its URL (the wallet only
+  // hands out the URL of the one link it wants opened).
+  const hasLink = !!link || claim.has_link === true;
 
   let state;
   if (status === 'redeemed' || redeemedAt) state = 'collected';
   else if (status === 'expired' || (expiresAt && Date.parse(expiresAt) < Date.now())) state = 'expired';
   else if (status === 'failed') state = 'failed';
-  else if (!link) state = 'pending';
+  else if (!hasLink) state = 'pending';
   else state = 'open';
 
   return {

@@ -330,7 +330,18 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   const [pendingBatch, setPendingBatch] = useState(batchId || '');
   const [scanner, setScanner] = useState(false);
 
-  const shownBalance = useCountUp(balance);
+  /* What the customer is owed: the wallet balance plus every Tikkie link
+   * they have not collected. Tikkie cannot cancel or merge a link once it
+   * exists, so an uncollected one has to be opened on its own rather than
+   * folded into a bigger one — the tile shows the honest total, and Collect
+   * deals with the open link first. */
+  const openLinkTotal = history.reduce((t, h) => (
+    h.kind === 'payout' && payoutLinkState(h).state === 'open'
+      ? t + Number(h.amount || 0)
+      : t), 0);
+  const roundMoney = (n) => Math.round(n * 100) / 100;
+  const owed = roundMoney(balance + openLinkTotal);
+  const shownOwed = useCountUp(owed);
   const animal = useMemo(
     () => animalForProfile({ displayName: profile?.name, animalIndex: profile?.animal_index }),
     [profile],
@@ -365,6 +376,20 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
 
   /* The wallet itself. */
   useEffect(() => { refreshWallet(); }, [refreshWallet]);
+
+  /* Back from Tikkie, or the tab in front again: a collection is usually
+   * recorded within seconds (tikkie-webhook), so re-read the wallet and let
+   * the tile and the activity list settle on the truth. */
+  useEffect(() => {
+    if (DEMO) return undefined;
+    const again = () => { if (!document.hidden) refreshWallet(); };
+    window.addEventListener('focus', again);
+    document.addEventListener('visibilitychange', again);
+    return () => {
+      window.removeEventListener('focus', again);
+      document.removeEventListener('visibilitychange', again);
+    };
+  }, [refreshWallet]);
 
   /* One receipt → the wallet. Shared by the two ways a receipt arrives:
    * the QR's own URL (?batch=/?cups=) and the in-app camera scanner. */
@@ -410,7 +435,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       return;
     }
     if (data?.status === 'limit_reached') {
-      setPopup({ type: 'limit', limit: Number(data.limit || 0) });
+      setPopup({ type: 'limit' });
       await refreshWallet();
       return;
     }
@@ -467,6 +492,14 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   /* Open Tikkie: mint ONE link for the whole balance and go there. */
   async function handleOpenTikkie() {
     if (DEMO) { setPopup(null); return; }
+    /* An uncollected link first: Tikkie cannot cancel it, and minting a
+     * second link for money the first one already covers would pay twice.
+     * Once it is collected (the webhook knows within seconds) the rest of
+     * the wallet can have a link of its own. */
+    if (outstanding?.url) {
+      window.location.href = outstanding.url;
+      return;
+    }
     setRedeeming(true);
     const data = await redeemWallet(org?.id);
     setRedeeming(false);
@@ -579,7 +612,8 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       || null)
     : null;
   const lifetimeCups = returns.reduce((t, h) => t + Number(h.cups || 0), 0);
-  const canCollect = balance > 0 || !!outstanding;
+
+  const canCollect = owed > 0;
 
   return (
     <div className={`app tikkie-home${ownColors ? ' tikkie-home--branded' : ''}`}>
@@ -603,7 +637,12 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       >
         <div className="tikkie-home__hero-copy">
           <span className="tikkie-home__hero-label">Available to collect</span>
-          <div className="tikkie-home__hero-amount">{money(shownBalance)}</div>
+          <div className="tikkie-home__hero-amount">{money(shownOwed)}</div>
+          {openLinkTotal > 0 && (
+            <span className="tikkie-home__hero-note">
+              {money(openLinkTotal)} is in a Tikkie link you haven’t opened yet
+            </span>
+          )}
           {!actionButtons && (
             <span className="tikkie-home__hero-cta">
               {canCollect ? collectLabel : 'Scan a receipt'}
@@ -800,16 +839,17 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         </Sheet>
       )}
 
+      {/* The limit is reached. How many cups it allows, and over what
+          window, is the venue's business: the customer is told only that
+          they are done for now. */}
       {popup?.type === 'limit' && (
-        <Sheet onClose={() => setPopup(null)} label="Today’s limit reached">
+        <Sheet onClose={() => setPopup(null)} label="Limit reached">
           <div className="tk-icon tk-icon--warn" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
           </div>
-          <h2 className="tk-sheet__title">Today’s limit reached</h2>
+          <h2 className="tk-sheet__title">Limit reached</h2>
           <p className="tk-sheet__sub">
-            {popup.limit > 0
-              ? `The counter code gives ${popup.limit} ${popup.limit === 1 ? 'cup' : 'cups'} per person a day, and you’ve had them today. Scan it again tomorrow.`
-              : 'You’ve had today’s cups from the counter code. Scan it again tomorrow.'}
+            You’ve collected all the cups this counter code gives for now. Try again later.
             {balance > 0 ? ` Your balance is ${money(balance)}.` : ''}
           </p>
           <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => setPopup(null)}>Understood</button>
@@ -856,14 +896,14 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
       {popup?.type === 'redeem' && (
         <Sheet onClose={() => setPopup(null)} label="Collect your balance">
           <h2 className="tk-sheet__title">Collect your balance</h2>
-          <div className="tk-sheet__amount">
-            {money(outstanding && balance === 0 ? outstanding.amount : balance)}
-          </div>
-          {outstanding && balance === 0 ? (
+          <div className="tk-sheet__amount">{money(owed)}</div>
+          {outstanding ? (
             <p className="tk-sheet__sub">
               {isLinkPayout
-                ? 'Your Tikkie link is ready — open it to finish collecting this amount.'
-                : 'Your cashback is on its way — we’ll let you know as soon as it’s sent.'}
+                ? (balance > 0
+                  ? `${money(outstanding.amount)} is already waiting in a Tikkie link. Open that first; the other ${money(roundMoney(owed - outstanding.amount))} stays in your wallet and gets its own link right after.`
+                  : 'Your Tikkie link is ready. Open it to finish collecting this amount.')
+                : 'Your cashback is on its way. We’ll let you know as soon as it’s sent.'}
             </p>
           ) : (
             <TikkieExplainer />
@@ -876,12 +916,12 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
               type="button"
               className={`tk-btn tk-btn--full ${isLinkPayout ? 'tk-btn--tikkie' : 'tk-btn--collect'}`}
               onClick={handleOpenTikkie}
-              disabled={redeeming || (balance === 0 && !outstanding)}
+              disabled={redeeming || !canCollect}
             >
               {redeeming ? 'Preparing…' : isLinkPayout ? 'Open Tikkie' : collectLabel}
             </button>
           </div>
-          {balance === 0 && !outstanding && (
+          {!canCollect && (
             <p className="tk-note">Nothing to collect yet — return some cups first.</p>
           )}
         </Sheet>

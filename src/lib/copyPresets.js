@@ -103,7 +103,7 @@ export const COPY_PRESETS = {
     },
     dailyCapReview: {
       title: 'This one’s being checked',
-      body:  'You’ve reached today’s automatic limit. This extra cup has been sent for a quick review and will appear once it’s approved.',
+      body:  'You’ve reached the limit for this code for now. This extra cup has been sent for a quick review and will appear once it’s approved.',
     },
     scanSuccess: {
       title: 'Cup added',
@@ -157,8 +157,8 @@ export const COPY_PRESETS = {
       body:  'You’re collecting at a different store in this group. This cup is added here. Each store keeps its own balance, so your cups at other venues stay exactly where they are.',
     },
     dailyCapReview: {
-      title: 'You’ve reached today’s cup limit',
-      body:  'There’s a limit on how many cups you can collect per day at this store, and you’ve hit it for today. We’ll review this scan and, if it’s valid, add the cup to your balance.',
+      title: 'You’ve reached the cup limit',
+      body:  'There’s a limit on how many cups you can collect from this code at this store, and you’ve reached it for now. We’ll review this scan and, if it’s valid, add the cup to your balance.',
     },
     scanSuccess: {
       title: 'Cup added',

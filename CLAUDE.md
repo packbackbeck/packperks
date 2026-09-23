@@ -87,8 +87,12 @@ PackPulse). Each tab's `modes` hides it where the programme has no use for it.
 **Static QR code** (feature `featureStaticQr` in the org's published
 settings; Settings → Features; tab `byorequests`, labelled Static QR code). A
 QR code that stays on the counter, `/<slug>/?byo=1[&loc=<location>]`: each
-scan gives one cup, up to a per-person limit per rolling 24 hours
-(`app_config` `byo:cap:<orgId>`, set on that page). On by default for Bring
+scan gives one cup, up to a per-person limit over a rolling window
+(`app_config` `byo:cap:<orgId>` = `{ cap, windowHours, dailyCap }`, set on
+that page; `dailyCap` is the old name for `cap`, kept in step. A day is the
+usual window; the page also takes any period up to 90 days). The limit's
+numbers never reach the customer: the app says only that the limit is
+reached, and neither edge function returns counts. On by default for Bring
 Your Own (unset means on there, off everywhere else; `featureDefault` on the
 tab, `fallbackByMode` on the feature). Bring Your Own and Deposit Rewards
 mint through `byo-mint` into the cup balance, and scans over the limit wait
@@ -106,6 +110,16 @@ also backfills), and the Claims page's per-claim refresh
 (`tikkie-cashback` action `status`). `tikkie_checked_at` is when we last
 asked. Backfilling 48 old links on 23 Sep 2026 found 33 of them collected
 that we had recorded as open, so treat a stale `created` as "not asked".
+
+**A Tikkie link cannot be cancelled.** The Cashback API has no delete,
+cancel or expire call: a `DELETE` on a cashback is refused by the gateway as
+a disallowed method (probed 23 Sep 2026), while `GET` validates the id. So a
+link, once minted, stays collectable until Tikkie expires it, and minting a
+second link that covers money an open link already covers would pay twice.
+The Deferred Tikkie wallet therefore shows the total owed (balance plus
+every uncollected link) on its tile, and Collect **reopens** an uncollected
+link instead of minting; the rest of the wallet gets its own link once that
+one is collected, which the webhook knows within seconds.
 
 **The app never offers a dead payout link.** `src/lib/payoutLink.js`
 (`payoutLinkState`) is the one place that decides: collected, expired (by

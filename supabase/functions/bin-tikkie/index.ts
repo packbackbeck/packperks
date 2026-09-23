@@ -489,14 +489,34 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
  * action:"static_qr" {org_id, device_id, location_id?} — the counter QR of a
  * Deferred Tikkie venue that switched Static QR code on (published settings
  * featureStaticQr). Each scan credits one cup's refund to the scanner's
- * wallet, up to the venue's per-person limit per rolling 24 hours (app_config
+ * wallet, up to the venue's limit per person per rolling window (app_config
  * `byo:cap:<orgId>`, set on the Static QR code page; the same key byo-mint
- * reads). Over the limit nothing is added and the reply says so. The credit
- * is an ordinary wallet credit with a synthetic batch id, like a backup
- * receipt, so the balance, collecting and donating need nothing new;
- * cup_scans keeps one row per scan (scan_type 'byo', source 'static_qr') for
- * the limit and the dashboard's scan counts. */
-const STATIC_DAILY_DEFAULT = 2;
+ * reads). Over the limit nothing is added and the reply says only that,
+ * never the numbers behind it. The credit is an ordinary wallet credit with
+ * a synthetic batch id, like a backup receipt, so the balance, collecting
+ * and donating need nothing new; cup_scans keeps one row per scan
+ * (scan_type 'byo', source 'static_qr') for the limit and the dashboard's
+ * scan counts. */
+const STATIC_CAP_DEFAULT = 2;
+const STATIC_WINDOW_HOURS_DEFAULT = 24;
+const STATIC_WINDOW_HOURS_MAX = 24 * 90;
+
+/* The venue's Static QR code limit: how many cups one person gets from the
+ * counter code, and the rolling window it resets over (app_config
+ * `byo:cap:<orgId>`, the same row byo-mint reads). `dailyCap` is the older
+ * name for the cap, from when the window was always 24 hours. */
+async function staticLimit(orgId: string): Promise<{ cap: number; hours: number; windowMs: number }> {
+  const { data } = await supabase
+    .from("app_config").select("value").eq("key", `byo:cap:${orgId}`).maybeSingle();
+  const v = (data?.value ?? {}) as { cap?: number; dailyCap?: number; windowHours?: number };
+  const rawCap = Number(v.cap ?? v.dailyCap);
+  const cap = Number.isFinite(rawCap) && rawCap > 0 ? Math.floor(rawCap) : STATIC_CAP_DEFAULT;
+  const rawHours = Number(v.windowHours);
+  const hours = Number.isFinite(rawHours) && rawHours >= 1 && rawHours <= STATIC_WINDOW_HOURS_MAX
+    ? Math.floor(rawHours)
+    : STATIC_WINDOW_HOURS_DEFAULT;
+  return { cap, hours, windowMs: hours * 60 * 60 * 1000 };
+}
 
 async function staticQrAction(body: Record<string, unknown>): Promise<Response> {
   const orgId = String(body.org_id || "").trim();
@@ -529,11 +549,8 @@ async function staticQrAction(body: Record<string, unknown>): Promise<Response> 
     if (loc) locationId = loc.id;
   }
 
-  const { data: capCfg } = await supabase
-    .from("app_config").select("value").eq("key", `byo:cap:${orgId}`).maybeSingle();
-  const capVal = Number((capCfg?.value as { dailyCap?: number } | null)?.dailyCap);
-  const dailyCap = Number.isFinite(capVal) && capVal > 0 ? Math.floor(capVal) : STATIC_DAILY_DEFAULT;
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { cap: dailyCap, windowMs } = await staticLimit(orgId);
+  const since = new Date(Date.now() - windowMs).toISOString();
   const { count } = await supabase
     .from("cup_scans")
     .select("id", { count: "exact", head: true })
@@ -541,8 +558,9 @@ async function staticQrAction(body: Record<string, unknown>): Promise<Response> 
     .gte("scanned_at", since);
   const used = count ?? 0;
   if (used >= dailyCap) {
+    // No counts in the reply: the app says only that the limit is reached.
     const { balance } = await walletBalance(profile.id);
-    return json({ status: "limit_reached", limit: dailyCap, balance, profile: profileOut });
+    return json({ status: "limit_reached", balance, profile: profileOut });
   }
 
   const rawRate = Number(settings.refundRatePerCup ?? settings.cashbackRatePerCup);
@@ -577,7 +595,6 @@ async function staticQrAction(body: Record<string, unknown>): Promise<Response> 
     amount,
     cups: 1,
     balance,
-    remaining: Math.max(0, dailyCap - used - 1),
     profile: profileOut,
   });
 }

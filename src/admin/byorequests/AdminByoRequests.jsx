@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, CheckCircle2, Download, Inbox, LayoutGrid, QrCode, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { toPng } from 'html-to-image';
-import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT, getLocations } from '../lib/adminApi';
+import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT, BYO_WINDOW_DEFAULT_HOURS, getLocations } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { resolveEffectiveMode } from '../lib/orgModes';
 import packbackLogo from '../../assets/images/packback-logo.png';
@@ -60,12 +60,34 @@ export default function AdminByoRequests() {
   const [busyId, setBusyId]   = useState(null);
   const [notice, setNotice]   = useState(null);
 
-  // Per-store daily auto-credit cap (how many times/day a customer can scan
-  // this store's QR before extra scans are held for review).
-  const [cap, setCap]         = useState(BYO_CAP_DEFAULT);
+  /* The per-store limit: how many cups one person gets from this store's
+   * counter code, and how long the window is before it resets. A day is the
+   * usual choice; a venue can set any period up to 90 days instead. */
+  const [limit, setLimit]     = useState({ cap: BYO_CAP_DEFAULT, windowHours: BYO_WINDOW_DEFAULT_HOURS });
   const [capInput, setCapInput] = useState(String(BYO_CAP_DEFAULT));
+  const [windowKind, setWindowKind] = useState('day');   // 'day' | 'period'
+  const [periodInput, setPeriodInput] = useState('3');
+  const [periodUnit, setPeriodUnit] = useState('days');  // 'hours' | 'days'
   const [savingCap, setSavingCap] = useState(false);
   const [capMsg, setCapMsg]   = useState(null);
+
+  /* The window the inputs describe, in hours. */
+  const windowHours = windowKind === 'day'
+    ? 24
+    : Math.max(1, Math.min(24 * 90, (parseInt(periodInput, 10) || 1) * (periodUnit === 'days' ? 24 : 1)));
+  const capNumber = Math.max(1, Math.min(50, parseInt(capInput, 10) || BYO_CAP_DEFAULT));
+  const limitChanged = capNumber !== limit.cap || windowHours !== limit.windowHours;
+  const asWords = (h) => (h === 24
+    ? 'day'
+    : h % 24 === 0
+      ? `${h / 24} day${h / 24 === 1 ? '' : 's'}`
+      : `${h} hour${h === 1 ? '' : 's'}`);
+  const savedWindowWords = asWords(limit.windowHours);
+  const windowWords = windowHours === 24
+    ? 'a day'
+    : windowHours % 24 === 0
+      ? `${windowHours / 24} day${windowHours / 24 === 1 ? '' : 's'}`
+      : `${windowHours} hour${windowHours === 1 ? '' : 's'}`;
 
   // Locations for this org + the one whose counter QR we're showing.
   const [locations, setLocations] = useState([]);
@@ -84,9 +106,18 @@ export default function AdminByoRequests() {
   useEffect(() => {
     let alive = true;
     if (!activeOrgId) return undefined;
-    getByoCap(activeOrgId).then(n => {
+    getByoCap(activeOrgId).then(l => {
       if (!alive) return;
-      setCap(n); setCapInput(String(n));
+      setLimit(l);
+      setCapInput(String(l.cap));
+      if (l.windowHours === 24) {
+        setWindowKind('day');
+      } else {
+        setWindowKind('period');
+        const days = l.windowHours % 24 === 0 ? l.windowHours / 24 : null;
+        setPeriodUnit(days ? 'days' : 'hours');
+        setPeriodInput(String(days || l.windowHours));
+      }
     }).catch(() => {});
     getLocations(activeOrgId).then(locs => {
       if (!alive) return;
@@ -100,8 +131,8 @@ export default function AdminByoRequests() {
   async function handleSaveCap() {
     setSavingCap(true); setCapMsg(null);
     try {
-      const saved = await saveByoCap(activeOrgId, capInput);
-      setCap(saved); setCapInput(String(saved));
+      const saved = await saveByoCap(activeOrgId, capNumber, windowHours);
+      setLimit(saved); setCapInput(String(saved.cap));
       setCapMsg('Saved');
       setTimeout(() => setCapMsg(null), 2500);
     } catch (e) {
@@ -255,8 +286,8 @@ export default function AdminByoRequests() {
       <PageHeader
         title="Static QR code"
         subtitle={tikkie
-          ? `A QR code that stays on the counter. Each scan adds one cup’s refund to the customer’s wallet, up to ${cap} ${cap === 1 ? 'cup' : 'cups'} per person per 24 hours.`
-          : `A QR code that stays on the counter. Each customer collects up to ${cap} ${cap === 1 ? 'cup' : 'cups'} per 24 hours automatically; extra scans wait below for you to approve or deny.`}
+          ? `A QR code that stays on the counter. Each scan adds one cup’s refund to the customer’s wallet, up to ${limit.cap} ${limit.cap === 1 ? 'cup' : 'cups'} per person per ${savedWindowWords}.`
+          : `A QR code that stays on the counter. Each customer collects up to ${limit.cap} ${limit.cap === 1 ? 'cup' : 'cups'} per ${savedWindowWords} automatically; extra scans wait below for you to approve or deny.`}
       />
 
       {/* Stationary counter QR — branded + per location */}
@@ -351,13 +382,13 @@ export default function AdminByoRequests() {
 
               <div className="byoreq__divider" />
 
-              {/* Per-store daily scan limit */}
+              {/* How many cups one person gets, and when that resets */}
               <Field
-                label={tikkie ? 'Cups per person per day' : 'Automatic cups per day'}
+                label={tikkie ? 'Cups per person' : 'Automatic cups per person'}
                 htmlFor="byo-cap"
                 hint={tikkie
-                  ? 'How many scans each customer gets credited per 24 hours. Scans over the limit add nothing.'
-                  : 'How many scans each customer gets credited per 24 hours before extra scans need your review.'}
+                  ? 'Each scan gives one cup. Scans past the limit add nothing until the window resets.'
+                  : 'Each scan gives one cup. Scans past the limit need your review until the window resets.'}
               >
                 <div className="byoreq__cap-row">
                   <input
@@ -368,10 +399,38 @@ export default function AdminByoRequests() {
                     onChange={e => setCapInput(e.target.value)}
                     disabled={!activeOrgId || savingCap}
                   />
+                  <Segmented
+                    ariaLabel="When the limit resets"
+                    value={windowKind}
+                    onChange={setWindowKind}
+                    options={[{ id: 'day', label: 'Per day' }, { id: 'period', label: 'Per period' }]}
+                  />
+                  {windowKind === 'period' && (
+                    <>
+                      <input
+                        className="ui-input byoreq__cap-input"
+                        type="number" min="1" max="90" step="1"
+                        value={periodInput}
+                        onChange={e => setPeriodInput(e.target.value)}
+                        disabled={!activeOrgId || savingCap}
+                        aria-label="Length of the period"
+                      />
+                      <select
+                        className="ui-select byoreq__cap-unit"
+                        value={periodUnit}
+                        onChange={e => setPeriodUnit(e.target.value)}
+                        disabled={!activeOrgId || savingCap}
+                        aria-label="Period unit"
+                      >
+                        <option value="hours">hours</option>
+                        <option value="days">days</option>
+                      </select>
+                    </>
+                  )}
                   <Button
                     variant="primary"
                     onClick={handleSaveCap}
-                    disabled={!activeOrgId || savingCap || capInput === String(cap)}
+                    disabled={!activeOrgId || savingCap || !limitChanged}
                   >
                     {savingCap ? 'Saving…' : 'Save limit'}
                   </Button>
@@ -382,6 +441,10 @@ export default function AdminByoRequests() {
                     </span>
                   )}
                 </div>
+                <p className="byoreq__cap-rule">
+                  Each customer gets <b>{capNumber} cup{capNumber === 1 ? '' : 's'}</b> from this code per {windowWords},
+                  counted over a rolling window. The app tells them the limit is reached without naming any numbers.
+                </p>
               </Field>
             </div>
           </div>

@@ -307,3 +307,11 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
 /* The activity popup (TikkieActivitySheet) borrows ActivityDetailModal's
    card; its values are sentences and email addresses, so keep their case. */
 .tk-activity .adm-row__val { text-transform: none; }
+
+/* The tile's second line: part of the total sits in a Tikkie link the
+   customer has not opened yet. */
+.tikkie-home__hero-note {
+  display: block; margin-top: 4px;
+  font-size: 11.5px; line-height: 1.4; font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+}

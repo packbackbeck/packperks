@@ -1073,8 +1073,8 @@ export default function App({ consentReady = true } = {}) {
               } else if (res?.status === 'pending_review') {
                 setByoResult({
                   status: 'pending',
-                  title: gcopy?.dailyCapReview?.title || 'You’ve reached today’s cup limit',
-                  body:  gcopy?.dailyCapReview?.body  || 'You’ve hit today’s cup limit at this store. We’ll review this scan and, if it’s valid, add the cup to your balance.',
+                  title: gcopy?.dailyCapReview?.title || 'You’ve reached the cup limit',
+                  body:  gcopy?.dailyCapReview?.body  || 'You’ve reached the limit for this code at this store. We’ll review this scan and, if it’s valid, add the cup to your balance.',
                 });
               }
             })

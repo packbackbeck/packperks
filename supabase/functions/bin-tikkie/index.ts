@@ -1,7 +1,7 @@
 // ──────────────────────────────────────────────────────────────────────
 // bin-tikkie — Tikkie-only mode (smart-bin cashback).
 //
-// The customer scans the QR the smart bin printed (/​<slug>/?batch=<uuid>).
+// The customer scans the QR the smart bin printed (/<slug>/?batch=<uuid>).
 // For an org whose published config has settings.mode === 'tikkie_only',
 // the app renders a minimal redirect page that calls THIS function:
 //
@@ -498,24 +498,27 @@ async function redeemBackupCups(cupIds: string[], deviceId: string): Promise<Res
  * (scan_type 'byo', source 'static_qr') for the limit and the dashboard's
  * scan counts. */
 const STATIC_CAP_DEFAULT = 2;
-const STATIC_WINDOW_HOURS_DEFAULT = 24;
-const STATIC_WINDOW_HOURS_MAX = 24 * 90;
+const STATIC_WINDOW_MIN_DEFAULT = 24 * 60;        // two cups a day
+const STATIC_WINDOW_MIN_MAX = 90 * 24 * 60;       // a quarter is as long as a limit may run
 
 /* The venue's Static QR code limit: how many cups one person gets from the
  * counter code, and the rolling window it resets over (app_config
- * `byo:cap:<orgId>`, the same row byo-mint reads). `dailyCap` is the older
- * name for the cap, from when the window was always 24 hours. */
-async function staticLimit(orgId: string): Promise<{ cap: number; hours: number; windowMs: number }> {
+ * `byo:cap:<orgId>`, the same row byo-mint reads). The window is minutes;
+ * `windowHours` and `dailyCap` are the older names for the same two
+ * numbers, and a row written before minutes existed only carries them. */
+async function staticLimit(orgId: string): Promise<{ cap: number; minutes: number; windowMs: number }> {
   const { data } = await supabase
     .from("app_config").select("value").eq("key", `byo:cap:${orgId}`).maybeSingle();
-  const v = (data?.value ?? {}) as { cap?: number; dailyCap?: number; windowHours?: number };
+  const v = (data?.value ?? {}) as { cap?: number; dailyCap?: number; windowHours?: number; windowMinutes?: number };
   const rawCap = Number(v.cap ?? v.dailyCap);
   const cap = Number.isFinite(rawCap) && rawCap > 0 ? Math.floor(rawCap) : STATIC_CAP_DEFAULT;
-  const rawHours = Number(v.windowHours);
-  const hours = Number.isFinite(rawHours) && rawHours >= 1 && rawHours <= STATIC_WINDOW_HOURS_MAX
-    ? Math.floor(rawHours)
-    : STATIC_WINDOW_HOURS_DEFAULT;
-  return { cap, hours, windowMs: hours * 60 * 60 * 1000 };
+  const rawMinutes = Number.isFinite(Number(v.windowMinutes))
+    ? Number(v.windowMinutes)
+    : Number(v.windowHours) * 60;
+  const minutes = Number.isFinite(rawMinutes) && rawMinutes >= 1 && rawMinutes <= STATIC_WINDOW_MIN_MAX
+    ? Math.floor(rawMinutes)
+    : STATIC_WINDOW_MIN_DEFAULT;
+  return { cap, minutes, windowMs: minutes * 60 * 1000 };
 }
 
 async function staticQrAction(body: Record<string, unknown>): Promise<Response> {

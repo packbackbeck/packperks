@@ -4624,38 +4624,41 @@ export async function getByoPendingCount() {
 export const BYO_CAP_DEFAULT = 2;
 
 /* The Static QR code limit: how many cups one person gets from the counter
- * code, and the rolling window it resets over. `dailyCap` is the older name
- * for the cap, from when the window was always 24 hours, and is still
- * written so an older reader keeps working. byo-mint and bin-tikkie read
- * the same row. */
-export const BYO_WINDOW_DEFAULT_HOURS = 24;
-export const BYO_WINDOW_MAX_HOURS = 24 * 90;
+ * code, and the rolling window it resets over. Two cups a day unless a venue
+ * says otherwise; the window is kept in MINUTES, because a venue may set one
+ * as short as a few minutes. `windowHours` and `dailyCap` are the older
+ * names, still written in step so an older reader keeps working. byo-mint
+ * and bin-tikkie read the same row. */
+export const BYO_WINDOW_DEFAULT_MINUTES = 24 * 60;
+export const BYO_WINDOW_MAX_MINUTES = 90 * 24 * 60;
 
 export async function getByoCap(orgId) {
-  if (!orgId) return { cap: BYO_CAP_DEFAULT, windowHours: BYO_WINDOW_DEFAULT_HOURS };
+  if (!orgId) return { cap: BYO_CAP_DEFAULT, windowMinutes: BYO_WINDOW_DEFAULT_MINUTES };
   const { data } = await supabase
     .from('app_config').select('value').eq('key', `byo:cap:${orgId}`).maybeSingle();
   const n = Number(data?.value?.cap ?? data?.value?.dailyCap);
-  const h = Number(data?.value?.windowHours);
+  // A row written before minutes existed only carries the hours.
+  const raw = Number(data?.value?.windowMinutes);
+  const m = Number.isFinite(raw) ? raw : Number(data?.value?.windowHours) * 60;
   return {
     cap: Number.isFinite(n) && n > 0 ? Math.floor(n) : BYO_CAP_DEFAULT,
-    windowHours: Number.isFinite(h) && h >= 1 && h <= BYO_WINDOW_MAX_HOURS
-      ? Math.floor(h)
-      : BYO_WINDOW_DEFAULT_HOURS,
+    windowMinutes: Number.isFinite(m) && m >= 1 && m <= BYO_WINDOW_MAX_MINUTES
+      ? Math.floor(m)
+      : BYO_WINDOW_DEFAULT_MINUTES,
   };
 }
 
-export async function saveByoCap(orgId, cap, windowHours = BYO_WINDOW_DEFAULT_HOURS) {
+export async function saveByoCap(orgId, cap, windowMinutes = BYO_WINDOW_DEFAULT_MINUTES) {
   if (!orgId) throw new Error('No active store selected.');
   const n = Math.max(1, Math.min(50, parseInt(cap, 10) || BYO_CAP_DEFAULT));
-  const h = Math.max(1, Math.min(BYO_WINDOW_MAX_HOURS, parseInt(windowHours, 10) || BYO_WINDOW_DEFAULT_HOURS));
+  const m = Math.max(1, Math.min(BYO_WINDOW_MAX_MINUTES, parseInt(windowMinutes, 10) || BYO_WINDOW_DEFAULT_MINUTES));
   const { error } = await supabase.from('app_config').upsert({
     key: `byo:cap:${orgId}`,
-    value: { cap: n, windowHours: h, dailyCap: n },
+    value: { cap: n, windowMinutes: m, windowHours: Math.max(1, Math.round(m / 60)), dailyCap: n },
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
-  return { cap: n, windowHours: h };
+  return { cap: n, windowMinutes: m };
 }
 
 export async function approveByoRequest(reqId) {

@@ -88,11 +88,15 @@ PackPulse). Each tab's `modes` hides it where the programme has no use for it.
 settings; Settings → Features; tab `byorequests`, labelled Static QR code). A
 QR code that stays on the counter, `/<slug>/?byo=1[&loc=<location>]`: each
 scan gives one cup, up to a per-person limit over a rolling window
-(`app_config` `byo:cap:<orgId>` = `{ cap, windowHours, dailyCap }`, set on
-that page; `dailyCap` is the old name for `cap`, kept in step. A day is the
-usual window; the page also takes any period up to 90 days). The limit's
-numbers never reach the customer: the app says only that the limit is
-reached, and neither edge function returns counts. On by default for Bring
+(`app_config` `byo:cap:<orgId>` = `{ cap, windowMinutes, windowHours,
+dailyCap }`, set on that page). **The window is minutes** — the page offers
+minutes, hours, days and weeks up to 90 days, and two cups a day is the
+default when a venue sets nothing. `windowHours` and `dailyCap` are the old
+names, still written in step so an older reader keeps working; a row from
+before minutes existed carries only those, and every reader falls back
+`windowMinutes` → `windowHours × 60` → a day. The limit's numbers never
+reach the customer: the app says only that the limit is reached, and neither
+edge function returns counts. On by default for Bring
 Your Own (unset means on there, off everywhere else; `featureDefault` on the
 tab, `fallbackByMode` on the feature). Bring Your Own and Deposit Rewards
 mint through `byo-mint` into the cup balance, and scans over the limit wait
@@ -119,7 +123,10 @@ second link that covers money an open link already covers would pay twice.
 The Deferred Tikkie wallet therefore shows the total owed (balance plus
 every uncollected link) on its tile, and Collect **reopens** an uncollected
 link instead of minting; the rest of the wallet gets its own link once that
-one is collected, which the webhook knows within seconds.
+one is collected, which the webhook knows within seconds. Under the big
+number, and only when the total really is split across the two, two short
+lines say to collect it all with the button below and that the older part
+sits in a link in the activity list.
 
 **The app never offers a dead payout link.** `src/lib/payoutLink.js`
 (`payoutLinkState`) is the one place that decides: collected, expired (by
@@ -254,7 +261,10 @@ System health, Reports & alerts, as a vendor sees them) with a one-time
 ticket that signs in the connection's own login
 (`link-<id>@packpulse.packperks.invalid`). That login has no dashboard
 profile and reads only the `packpulse_*` views: its venue, active links,
-shared pages, no emails, payout links or cup codes. In embed mode
+shared pages, no emails, payout links or cup codes. The panel is two cards:
+*Set up a connection* (the three steps, each holding its own control —
+create the code, hand it over, approve what comes back) and *Connections*
+(the diagram and one row per connection). In embed mode
 `src/lib/supabase.js` keeps the session in memory and maps each table to its
 view. The prompt for PackPulse's own Claude is `docs/packpulse/PACKPULSE_PROMPT.md`.
 

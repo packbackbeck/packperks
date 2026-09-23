@@ -32,25 +32,28 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DEFAULT_CAP = 2;                     // auto-credited cups per window (per store, when unset)
-const DEFAULT_WINDOW_HOURS = 24;
-const MAX_WINDOW_HOURS = 24 * 90;          // a quarter is as long as a limit may run
+const DEFAULT_CAP = 2;                      // auto-credited cups per window (per store, when unset)
+const DEFAULT_WINDOW_MINUTES = 24 * 60;     // two cups a day
+const MAX_WINDOW_MINUTES = 90 * 24 * 60;    // a quarter is as long as a limit may run
 
 /* The venue's Static QR code limit: how many cups one person gets from the
  * counter code, and the rolling window it resets over (Static QR code page →
- * app_config `byo:cap:<orgId>`). `dailyCap` is the older name for the same
- * number, from when the window was always 24 hours. */
-async function staticLimit(orgId: string): Promise<{ cap: number; hours: number; windowMs: number }> {
+ * app_config `byo:cap:<orgId>`). The window is minutes; `windowHours` and
+ * `dailyCap` are the older names for the same two numbers, and a row
+ * written before minutes existed only carries them. */
+async function staticLimit(orgId: string): Promise<{ cap: number; minutes: number; windowMs: number }> {
   const { data } = await supabase
     .from("app_config").select("value").eq("key", `byo:cap:${orgId}`).maybeSingle();
-  const v = (data?.value ?? {}) as { cap?: number; dailyCap?: number; windowHours?: number };
+  const v = (data?.value ?? {}) as { cap?: number; dailyCap?: number; windowHours?: number; windowMinutes?: number };
   const rawCap = Number(v.cap ?? v.dailyCap);
   const cap = Number.isFinite(rawCap) && rawCap > 0 ? Math.floor(rawCap) : DEFAULT_CAP;
-  const rawHours = Number(v.windowHours);
-  const hours = Number.isFinite(rawHours) && rawHours >= 1 && rawHours <= MAX_WINDOW_HOURS
-    ? Math.floor(rawHours)
-    : DEFAULT_WINDOW_HOURS;
-  return { cap, hours, windowMs: hours * 60 * 60 * 1000 };
+  const rawMinutes = Number.isFinite(Number(v.windowMinutes))
+    ? Number(v.windowMinutes)
+    : Number(v.windowHours) * 60;
+  const minutes = Number.isFinite(rawMinutes) && rawMinutes >= 1 && rawMinutes <= MAX_WINDOW_MINUTES
+    ? Math.floor(rawMinutes)
+    : DEFAULT_WINDOW_MINUTES;
+  return { cap, minutes, windowMs: minutes * 60 * 1000 };
 }
 
 function corsHeaders(req: Request): Record<string, string> {
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
 
   // ── Per-store auto-credit limit (Static QR code page). Org-scoped, so
   // each store enforces its own cap over its own window.
-  const { cap, hours, windowMs } = await staticLimit(orgId);
+  const { cap, minutes, windowMs } = await staticLimit(orgId);
 
   const sinceIso = new Date(Date.now() - windowMs).toISOString();
 
@@ -163,7 +166,7 @@ Deno.serve(async (req) => {
         org_id: orgId, user_id: userId, identity_id: userRow.identity_id || null,
         cups: 1, status: "pending", location_id: locationId,
         device_id: userRow.device_id || deviceId || null,
-        note: `Auto-credit cap reached (${cap} per rolling ${hours}h)`,
+        note: `Auto-credit cap reached (${cap} per rolling ${minutes}m)`,
       });
     }
     return json({ status: "pending_review", preBalance, newBalance: preBalance });

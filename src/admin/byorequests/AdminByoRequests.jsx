@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, CheckCircle2, Download, Inbox, LayoutGrid, QrCode, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { toPng } from 'html-to-image';
-import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT, BYO_WINDOW_DEFAULT_HOURS, getLocations } from '../lib/adminApi';
+import { getByoRequests, approveByoRequest, denyByoRequest, getByoCap, saveByoCap, BYO_CAP_DEFAULT, BYO_WINDOW_DEFAULT_MINUTES, BYO_WINDOW_MAX_MINUTES, getLocations } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { resolveEffectiveMode } from '../lib/orgModes';
 import packbackLogo from '../../assets/images/packback-logo.png';
@@ -40,6 +40,32 @@ function fmtWhen(iso) {
   } catch { return iso; }
 }
 
+/* The limit's window, in the units a venue may pick. Stored in minutes, so
+ * the largest unit that divides it evenly is the one shown. */
+const WINDOW_UNITS = [
+  { id: 'minutes', label: 'minutes', one: 'minute', m: 1 },
+  { id: 'hours',   label: 'hours',   one: 'hour',   m: 60 },
+  { id: 'days',    label: 'days',    one: 'day',    m: 60 * 24 },
+  { id: 'weeks',   label: 'weeks',   one: 'week',   m: 60 * 24 * 7 },
+];
+const WINDOW_UNIT = Object.fromEntries(WINDOW_UNITS.map(u => [u.id, u.m]));
+
+function splitWindow(minutes) {
+  const total = Math.max(1, Math.floor(Number(minutes) || 0));
+  for (let i = WINDOW_UNITS.length - 1; i >= 0; i -= 1) {
+    const u = WINDOW_UNITS[i];
+    if (total % u.m === 0) return { n: total / u.m, unit: u.id };
+  }
+  return { n: total, unit: 'minutes' };
+}
+
+/* "day", "2 days", "30 minutes" — reads after "per". */
+function windowWords(minutes) {
+  const { n, unit } = splitWindow(minutes);
+  const u = WINDOW_UNITS.find(x => x.id === unit);
+  return n === 1 ? u.one : `${n} ${u.label}`;
+}
+
 /* One-line address for the subtle caption under the QR. */
 function addressLine(loc) {
   if (!loc) return '';
@@ -61,33 +87,25 @@ export default function AdminByoRequests() {
   const [notice, setNotice]   = useState(null);
 
   /* The per-store limit: how many cups one person gets from this store's
-   * counter code, and how long the window is before it resets. A day is the
-   * usual choice; a venue can set any period up to 90 days instead. */
-  const [limit, setLimit]     = useState({ cap: BYO_CAP_DEFAULT, windowHours: BYO_WINDOW_DEFAULT_HOURS });
+   * counter code, and how long the window is before it resets. Two cups a
+   * day unless this venue says otherwise, and any period from a minute to
+   * 90 days. Kept in minutes, the shortest unit on offer. */
+  const [limit, setLimit]     = useState({ cap: BYO_CAP_DEFAULT, windowMinutes: BYO_WINDOW_DEFAULT_MINUTES });
   const [capInput, setCapInput] = useState(String(BYO_CAP_DEFAULT));
-  const [windowKind, setWindowKind] = useState('day');   // 'day' | 'period'
-  const [periodInput, setPeriodInput] = useState('3');
-  const [periodUnit, setPeriodUnit] = useState('days');  // 'hours' | 'days'
+  const [periodInput, setPeriodInput] = useState('1');
+  const [periodUnit, setPeriodUnit] = useState('days');
   const [savingCap, setSavingCap] = useState(false);
   const [capMsg, setCapMsg]   = useState(null);
 
-  /* The window the inputs describe, in hours. */
-  const windowHours = windowKind === 'day'
-    ? 24
-    : Math.max(1, Math.min(24 * 90, (parseInt(periodInput, 10) || 1) * (periodUnit === 'days' ? 24 : 1)));
+  /* The window the two inputs describe, in minutes. */
+  const windowMinutes = Math.max(1, Math.min(
+    BYO_WINDOW_MAX_MINUTES,
+    (parseInt(periodInput, 10) || 1) * (WINDOW_UNIT[periodUnit] || 1),
+  ));
   const capNumber = Math.max(1, Math.min(50, parseInt(capInput, 10) || BYO_CAP_DEFAULT));
-  const limitChanged = capNumber !== limit.cap || windowHours !== limit.windowHours;
-  const asWords = (h) => (h === 24
-    ? 'day'
-    : h % 24 === 0
-      ? `${h / 24} day${h / 24 === 1 ? '' : 's'}`
-      : `${h} hour${h === 1 ? '' : 's'}`);
-  const savedWindowWords = asWords(limit.windowHours);
-  const windowWords = windowHours === 24
-    ? 'a day'
-    : windowHours % 24 === 0
-      ? `${windowHours / 24} day${windowHours / 24 === 1 ? '' : 's'}`
-      : `${windowHours} hour${windowHours === 1 ? '' : 's'}`;
+  const limitChanged = capNumber !== limit.cap || windowMinutes !== limit.windowMinutes;
+  const savedWindowWords = windowWords(limit.windowMinutes);
+  const draftWindowWords = windowWords(windowMinutes);
 
   // Locations for this org + the one whose counter QR we're showing.
   const [locations, setLocations] = useState([]);
@@ -110,14 +128,9 @@ export default function AdminByoRequests() {
       if (!alive) return;
       setLimit(l);
       setCapInput(String(l.cap));
-      if (l.windowHours === 24) {
-        setWindowKind('day');
-      } else {
-        setWindowKind('period');
-        const days = l.windowHours % 24 === 0 ? l.windowHours / 24 : null;
-        setPeriodUnit(days ? 'days' : 'hours');
-        setPeriodInput(String(days || l.windowHours));
-      }
+      const { n, unit } = splitWindow(l.windowMinutes);
+      setPeriodInput(String(n));
+      setPeriodUnit(unit);
     }).catch(() => {});
     getLocations(activeOrgId).then(locs => {
       if (!alive) return;
@@ -131,7 +144,7 @@ export default function AdminByoRequests() {
   async function handleSaveCap() {
     setSavingCap(true); setCapMsg(null);
     try {
-      const saved = await saveByoCap(activeOrgId, capNumber, windowHours);
+      const saved = await saveByoCap(activeOrgId, capNumber, windowMinutes);
       setLimit(saved); setCapInput(String(saved.cap));
       setCapMsg('Saved');
       setTimeout(() => setCapMsg(null), 2500);
@@ -387,8 +400,8 @@ export default function AdminByoRequests() {
                 label={tikkie ? 'Cups per person' : 'Automatic cups per person'}
                 htmlFor="byo-cap"
                 hint={tikkie
-                  ? 'Each scan gives one cup. Scans past the limit add nothing until the window resets.'
-                  : 'Each scan gives one cup. Scans past the limit need your review until the window resets.'}
+                  ? 'Each scan gives one cup. Scans past the limit add nothing until the window resets. Two cups a day unless you change it.'
+                  : 'Each scan gives one cup. Scans past the limit need your review until the window resets. Two cups a day unless you change it.'}
               >
                 <div className="byoreq__cap-row">
                   <input
@@ -399,34 +412,24 @@ export default function AdminByoRequests() {
                     onChange={e => setCapInput(e.target.value)}
                     disabled={!activeOrgId || savingCap}
                   />
-                  <Segmented
-                    ariaLabel="When the limit resets"
-                    value={windowKind}
-                    onChange={setWindowKind}
-                    options={[{ id: 'day', label: 'Per day' }, { id: 'period', label: 'Per period' }]}
+                  <span className="byoreq__cap-per">per</span>
+                  <input
+                    className="ui-input byoreq__cap-input"
+                    type="number" min="1" max="1000" step="1"
+                    value={periodInput}
+                    onChange={e => setPeriodInput(e.target.value)}
+                    disabled={!activeOrgId || savingCap}
+                    aria-label="Length of the window"
                   />
-                  {windowKind === 'period' && (
-                    <>
-                      <input
-                        className="ui-input byoreq__cap-input"
-                        type="number" min="1" max="90" step="1"
-                        value={periodInput}
-                        onChange={e => setPeriodInput(e.target.value)}
-                        disabled={!activeOrgId || savingCap}
-                        aria-label="Length of the period"
-                      />
-                      <select
-                        className="ui-select byoreq__cap-unit"
-                        value={periodUnit}
-                        onChange={e => setPeriodUnit(e.target.value)}
-                        disabled={!activeOrgId || savingCap}
-                        aria-label="Period unit"
-                      >
-                        <option value="hours">hours</option>
-                        <option value="days">days</option>
-                      </select>
-                    </>
-                  )}
+                  <select
+                    className="ui-select byoreq__cap-unit"
+                    value={periodUnit}
+                    onChange={e => setPeriodUnit(e.target.value)}
+                    disabled={!activeOrgId || savingCap}
+                    aria-label="Window unit"
+                  >
+                    {WINDOW_UNITS.map(u => <option key={u.id} value={u.id}>{u.label}</option>)}
+                  </select>
                   <Button
                     variant="primary"
                     onClick={handleSaveCap}
@@ -442,7 +445,7 @@ export default function AdminByoRequests() {
                   )}
                 </div>
                 <p className="byoreq__cap-rule">
-                  Each customer gets <b>{capNumber} cup{capNumber === 1 ? '' : 's'}</b> from this code per {windowWords},
+                  Each customer gets <b>{capNumber} cup{capNumber === 1 ? '' : 's'}</b> from this code per {draftWindowWords},
                   counted over a rolling window. The app tells them the limit is reached without naming any numbers.
                 </p>
               </Field>
@@ -458,7 +461,7 @@ export default function AdminByoRequests() {
         <CardHeader
           title="Cup requests"
           icon={Inbox}
-          subtitle="Scans over the daily limit. Approve to credit the cup, or deny."
+          subtitle="Scans over the limit. Approve to credit the cup, or deny."
           ruled
           actions={(
             <Segmented

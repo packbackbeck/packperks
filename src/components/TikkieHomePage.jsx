@@ -638,9 +638,14 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         <div className="tikkie-home__hero-copy">
           <span className="tikkie-home__hero-label">Available to collect</span>
           <div className="tikkie-home__hero-amount">{money(shownOwed)}</div>
-          {openLinkTotal > 0 && (
+          {/* Only when the total really is split — some in the wallet, some
+              in a link nobody opened. Then say how to get it and where the
+              older part lives, in as few words as possible. One part alone
+              needs no explaining. */}
+          {openLinkTotal > 0 && balance > 0 && (
             <span className="tikkie-home__hero-note">
-              {money(openLinkTotal)} is in a Tikkie link you haven’t opened yet
+              {actionButtons ? 'Collect it all below.' : 'Tap to collect it all.'}
+              <br />{money(openLinkTotal)} sits in a link in your activity.
             </span>
           )}
           {!actionButtons && (

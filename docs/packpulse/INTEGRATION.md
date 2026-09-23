@@ -40,17 +40,18 @@ sequenceDiagram
     S-->>A: PackPerks appears in PackPulse's sidebar
 ```
 
-1. **Code.** A master picks a venue in *Master settings → PackPulse → Connect
-   a venue* and creates a connection code. It is shown once, works once and
-   expires after 48 hours. The code alone decides which venue is shared.
+1. **Code.** A master picks a venue in *Master settings → PackPulse → Set up
+   a connection*, step 1, and creates a connection code. It is shown once,
+   works once and expires after 48 hours. The code alone decides which venue
+   is shared.
 2. **Claim.** Someone at PackPulse pastes the code into *PackPulse → Master
    settings → PackPerks* and picks their PackPulse organisation. PackPulse's
    server sends it to PackPerks. PackPerks burns the code and answers with a
    **link secret** (PackPulse keeps it on its server; PackPerks stores only a
    hash) and a 4-character **confirmation code**.
-3. **Approve.** The request shows up under *Waiting for your approval*, with
-   the PackPulse organisation, who asked, from which PackPulse address, and
-   the confirmation code. A master approves only when PackPulse shows the same
+3. **Approve.** The request shows up in step 3 of the same card, with the
+   PackPulse organisation, who asked, from which PackPulse address, and the
+   confirmation code. A master approves only when PackPulse shows the same
    code. That check catches a code that leaked and was used by someone else.
 4. **Use.** PackPulse's sidebar gets a *PackPerks* category with the pages the
    master shares.
@@ -136,14 +137,24 @@ switch is not shown in the embed, and a group total is never shared.
 
 ## 4. Controls in PackPerks (Master settings → PackPulse)
 
-- **Connections diagram**: PackPerks venues on the left, PackPulse
-  organisations on the right. A solid line is connected, dashed is waiting
-  for approval or paused.
-- **Connect a venue**: pick a venue, create a code, copy it. Unused codes are
-  listed with the last four characters and can be cancelled.
-- **Waiting for your approval**: approve or decline, with the confirmation
-  code to compare.
-- **Connected**: for each connection, switch pages on or off (Dashboard,
+Two cards, in the order the job is done.
+
+**Set up a connection** walks the three steps and holds the control for each:
+
+- **Step 1 — create a code**: pick a venue, create the code, copy it. Unused
+  codes are listed underneath with their last four characters, and can be
+  cancelled.
+- **Step 2 — send it to PackPulse**: where they paste it.
+- **Step 3 — approve the request**: approve or decline, with the confirmation
+  code to compare. It says *Nothing waiting for approval* when it is quiet.
+
+**Connections** is the live state:
+
+- **The diagram**: PackPerks venues on the left, PackPulse organisations on
+  the right. A solid line is connected, dashed is waiting for approval or
+  paused, and the chip riding each line says how many of the four pages that
+  connection shares and how often it was opened in the last 7 days.
+- **One row per connection**: switch pages on or off (Dashboard,
   System health, Reports & alerts, Preview). A page switched off disappears
   from PackPulse's sidebar on its next status check, and its data stops at
   once. **Pause** keeps the connection but shows nothing until *Resume*.

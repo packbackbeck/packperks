@@ -67,6 +67,10 @@ exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
   `wallet_donate()`, migration 054): it sweeps every credit into one
   `donation` claim and hands the rest back as a `wallet_change` claim,
   which the wallet counts like a receipt. Count wallet credits with both.
+  A first-time visitor reads *How you get paid* above the activity list;
+  once there is activity it moves below it (`hasActivity` in
+  `TikkieHomePage`), and that block is a normal card that follows the
+  venue's colours.
   Its Dashboard rebuilds per-cup activity from those claims
   (`getAdminStats(orgIds, { mode })`, `buildTikkieMetrics`): there are no
   cup balances or `activity_history` rows for this mode.
@@ -91,6 +95,24 @@ mint through `byo-mint` into the cup balance, and scans over the limit wait
 for review. Deferred Tikkie credits one cup's refund to the wallet through
 `bin-tikkie` action `static_qr` (a claim with a synthetic batch id, like a
 backup receipt, so it shows as a return); over the limit nothing is added.
+
+**Tikkie link status** (migration 060). A link's real state lives at ABN
+AMRO: `created`, `redeemed` (with `tikkie_redeemed_at`) or `expired`. Three
+things write it onto the claim: `tikkie-webhook` (seconds after a
+collection, but only once the subscription is registered — Tikkie payouts →
+Status updates → Connect, owner-only at Tikkie's end), `tikkie-sweep`
+(pg_cron every 15 minutes and the same page's *Check open links*, which
+also backfills), and the Claims page's per-claim refresh
+(`tikkie-cashback` action `status`). `tikkie_checked_at` is when we last
+asked. Backfilling 48 old links on 23 Sep 2026 found 33 of them collected
+that we had recorded as open, so treat a stale `created` as "not asked".
+
+**The app never offers a dead payout link.** `src/lib/payoutLink.js`
+(`payoutLinkState`) is the one place that decides: collected, expired (by
+status or by an expiry in the past), open, waiting or failed. The activity
+list, its popups (`ActivityDetailModal`, `TikkieActivitySheet`), the claim
+cards (`PendingClaims`) and the wallet all read it, show the status and its
+time, and hand out a URL only while the link still works.
 
 A Deferred Tikkie **Tikkie link is made per payout**, not per receipt, so
 System health's *Payout links created* divides links made by payouts asked

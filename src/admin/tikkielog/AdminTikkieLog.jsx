@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, CupSoda, ExternalLink, HandCoins, Link2, ListFilter, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CupSoda, ExternalLink, HandCoins, Link2, ListFilter, PlugZap, RefreshCw, Satellite } from 'lucide-react';
 import { useOrg } from '../context/OrgContext';
-import { listBinTikkiePayouts } from '../lib/adminApi';
+import { useViewRole } from '../context/ViewRole';
+import { getTikkieStatusState, listBinTikkiePayouts, setTikkieWebhook, sweepTikkieStatuses } from '../lib/adminApi';
+import { relativeTime } from '../master/masterApi';
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, KpiTile, PageHeader, Segmented } from '../ui';
 import './AdminTikkieLog.css';
 import { adminMoney } from '../lib/adminMoney';
@@ -11,9 +13,11 @@ import { adminMoney } from '../lib/adminMoney';
  * Every Tikkie link is one claims row: wallet-era bulk payouts (no batch,
  * they sweep many receipts) and legacy per-receipt links. When a link
  * was generated, how many cups, the amount, and the live Tikkie status
- * (created → redeemed/expired, kept fresh by the tikkie-webhook). This page
- * is deliberately a flat log + a few counters — in tikkie-only mode there is
- * nothing to review or approve. */
+ * (created → redeemed/expired). Status updates come from Tikkie itself:
+ * the redemption webhook the card below registers, and the 15-minute sweep
+ * that also backfills anything the webhook missed (migration 060). This
+ * page is deliberately a flat log + a few counters — in tikkie-only mode
+ * there is nothing to review or approve. */
 
 const STATUS_META = {
   created:  { label: 'Link active',        tone: 'info' },
@@ -47,6 +51,7 @@ const FILTERS = [
 
 export default function AdminTikkieLog() {
   const { activeOrgId } = useOrg();
+  const { access } = useViewRole();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -106,6 +111,8 @@ export default function AdminTikkieLog() {
         {kpis.map((m, i) => <KpiTile key={m.id} metric={m} index={i} interactive={false} />)}
       </div>
 
+      <StatusUpdates orgId={activeOrgId} canManage={!!access?.isMaster} onChecked={load} />
+
       <Card>
         <CardHeader
           title="Payout links"
@@ -146,6 +153,7 @@ export default function AdminTikkieLog() {
                     <th>Status</th>
                     <th>Redeemed</th>
                     <th>Expires</th>
+                    <th>Checked</th>
                     <th>Batch</th>
                     <th aria-label="Link" />
                   </tr>
@@ -166,11 +174,16 @@ export default function AdminTikkieLog() {
                         </td>
                         <td className="atl-muted">{fmtDateTime(r.tikkie_redeemed_at)}</td>
                         <td className="atl-muted">{r.tikkie_expires_at ? new Date(r.tikkie_expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}</td>
+                        <td className="atl-muted" title={r.tikkie_checked_at ? new Date(r.tikkie_checked_at).toLocaleString('en-GB') : 'Tikkie has not been asked about this link yet'}>
+                          {r.tikkie_checked_at ? relativeTime(r.tikkie_checked_at) : 'never'}
+                        </td>
                         <td className="atl-batch" title={r.batch_id || 'Bulk payout: one link for the whole wallet balance'}>
                           {r.batch_id ? r.batch_id.slice(0, 8) : 'Whole wallet'}
                         </td>
                         <td className="atl-link-cell">
-                          {r.tikkie_url && (
+                          {/* A collected or expired link leads nowhere, so it
+                              is not offered. */}
+                          {r.tikkie_url && st === 'created' && (
                             <a className="atl-link" href={r.tikkie_url} target="_blank" rel="noopener noreferrer">
                               Open link <ExternalLink size={12} aria-hidden="true" />
                             </a>
@@ -186,5 +199,94 @@ export default function AdminTikkieLog() {
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/* ── Where the statuses come from ──────────────────────────────────────
+ * Tikkie tells us a link was collected in two ways: the redemption
+ * webhook (seconds, once registered) and the sweep every 15 minutes,
+ * which also catches up on anything older. Registering the webhook is
+ * owner-only at Tikkie's end. */
+function StatusUpdates({ orgId, canManage, onChecked }) {
+  const [state, setState] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [msg, setMsg] = useState(null);
+
+  const read = useCallback(() => {
+    getTikkieStatusState().then(setState).catch(() => setState(null));
+  }, []);
+  useEffect(() => { read(); }, [read]);
+
+  const connected = !!state?.subscription?.subscriptionId;
+  const sweep = state?.lastSweep || null;
+
+  async function connect(on) {
+    setBusy('hook'); setMsg(null);
+    const res = await setTikkieWebhook(on);
+    setBusy(null);
+    if (res?.error) {
+      setMsg(res.error === 'owner_only'
+        ? 'Only the owner account can register the webhook with Tikkie.'
+        : `Tikkie refused: ${res.detail || res.error}`);
+    } else {
+      setMsg(on ? 'Connected. Collections now arrive on their own.' : 'Disconnected.');
+    }
+    read();
+  }
+
+  async function checkNow() {
+    setBusy('sweep'); setMsg(null);
+    const res = await sweepTikkieStatuses(orgId);
+    setBusy(null);
+    if (res?.error) {
+      setMsg(res.error === 'forbidden' ? 'Your account cannot check links.' : `Could not check: ${res.detail || res.error}`);
+    } else {
+      const bits = [`${res.checked} checked`];
+      if (res.redeemed) bits.push(`${res.redeemed} collected`);
+      if (res.expired) bits.push(`${res.expired} expired`);
+      if (res.failed) bits.push(`${res.failed} could not be read`);
+      setMsg(bits.join(', ') + '.');
+      onChecked?.();
+    }
+    read();
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Status updates"
+        icon={Satellite}
+        subtitle="Whether a link was collected, and when, comes from Tikkie. The webhook reports a collection within seconds; the sweep re-checks every open link every 15 minutes."
+        actions={(
+          <Button icon={RefreshCw} onClick={checkNow} disabled={!!busy}>
+            {busy === 'sweep' ? 'Checking…' : 'Check open links'}
+          </Button>
+        )}
+      />
+      <CardBody>
+        <div className="atl-status">
+          <Badge tone={connected ? 'success' : 'warning'} icon={PlugZap}>
+            {connected ? 'Webhook connected' : 'Webhook not connected'}
+          </Badge>
+          <span className="atl-status__text">
+            {connected
+              ? `Tikkie posts collections to us${state.subscription.updated_at ? ` since ${relativeTime(state.subscription.updated_at)}` : ''}.`
+              : 'Without it, statuses only update on the 15-minute sweep or when you press Check open links.'}
+            {sweep?.at && ` Last check ${relativeTime(sweep.at)}: ${sweep.checked} link${sweep.checked === 1 ? '' : 's'}, ${sweep.redeemed} newly collected.`}
+          </span>
+          {canManage && (
+            <Button
+              variant={connected ? 'outline' : 'primary'}
+              icon={PlugZap}
+              onClick={() => connect(!connected)}
+              disabled={!!busy}
+            >
+              {busy === 'hook' ? 'Talking to Tikkie…' : connected ? 'Disconnect' : 'Connect'}
+            </Button>
+          )}
+        </div>
+        {msg && <p className="atl-status__msg">{msg}</p>}
+      </CardBody>
+    </Card>
   );
 }

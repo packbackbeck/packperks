@@ -213,3 +213,7 @@
   background: var(--pb-green, #1A8737); color: #fff;
   font-family: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer;
 }
+
+/* When a payout link has been collected or has expired there is nothing to
+   open, so its fate is stated here instead of a dead button. */
+.adm-collect-note--closed { text-align: center; margin-top: 4px; }

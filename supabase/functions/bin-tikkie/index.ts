@@ -214,43 +214,10 @@ function claimReply(claim: ClaimRow, status: string, liveStatus?: string | null)
   });
 }
 
-/* Ask Tikkie what actually happened to this cashback.
- *
- * Our stored tikkie_status only moves when the redemption webhook fires,
- * and that subscription has never been registered — so every link in the
- * database still reads "created" even after someone has collected it.
- * On a RE-SCAN (and only then, so we don't add a call to the happy path)
- * we ask Tikkie directly, which is the only way to honestly tell a
- * customer "this receipt has already been used". Best-effort: if the
- * lookup fails we fall back to the stored value. */
-async function liveTikkieStatus(cashbackId: string | null): Promise<string | null> {
-  if (!cashbackId) return null;
-  try {
-    const { campaignBase } = resolveCampaign();
-    // Hard 4s cap. ABN AMRO has been observed taking 80+ seconds, and this
-    // lookup sits INSIDE the re-scan response — a customer staring at a
-    // spinner for a minute is worse than a slightly stale status.
-    const resp = await fetch(`${campaignBase}/cashbacks/${cashbackId}`, {
-      headers: tikkieHeaders(),
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!resp.ok) return null;
-    const cb = await resp.json() as { status?: string; redeemedDateTime?: string; expiryDateTime?: string };
-    const st = String(cb.status || "").toLowerCase() || null;
-    if (st) {
-      // Keep our copy in sync while we're here — free backfill for the
-      // dashboard's payout log.
-      await supabase.from("claims").update({
-        tikkie_status: st,
-        tikkie_redeemed_at: cb.redeemedDateTime ?? null,
-        tikkie_expires_at: cb.expiryDateTime ?? null,
-      }).eq("tikkie_cashback_id", cashbackId);
-    }
-    return st;
-  } catch {
-    return null;
-  }
-}
+/* A link's live state (collected, expired, when) is not asked for here:
+ * tikkie-webhook writes it the moment Tikkie reports a collection, and
+ * tikkie-sweep re-checks every open link every 15 minutes (migration
+ * 060). The wallet below serves whatever those last wrote. */
 
 /* Every backup-cup scan means the bin could not reach us — that is an
  * incident, not a routine payout, so it always raises an alert. Subject
@@ -990,7 +957,7 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
   const [{ balance }, { data: rows }, { data: pendingRows }] = await Promise.all([
     walletBalance(profile.id),
     supabase.from("claims")
-      .select("id, type, created_at, cups_redeemed, payout_amount, batch_id, payout_claim_id, tikkie_url, tikkie_status")
+      .select("id, type, created_at, cups_redeemed, payout_amount, batch_id, payout_claim_id, tikkie_url, tikkie_status, tikkie_expires_at, tikkie_redeemed_at")
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(100),
@@ -1013,6 +980,12 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
     amount: Number(r.payout_amount || 0),
     created_at: r.created_at,
     redeemed: r.tikkie_status === "redeemed",
+    // What became of the link, so the app can say so and stop offering a
+    // link that leads nowhere.
+    has_link: !!r.tikkie_url,
+    link_status: r.tikkie_url ? (r.tikkie_status || "created") : null,
+    expires_at: r.tikkie_expires_at,
+    redeemed_at: r.tikkie_redeemed_at,
   }));
 
   /* A pending row stops being pending the moment its batch is credited,
@@ -1033,10 +1006,14 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
   history.sort((a, b) =>
     new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
-  // An outstanding bulk link: money already swept out of the balance but
-  // (as far as we know) not collected yet — "Open Tikkie" reopens it.
+  // An outstanding bulk link: money already swept out of the balance and
+  // still collectable — "Open Tikkie" reopens it. A collected or expired
+  // link is not outstanding, and neither is one whose expiry has passed
+  // even if Tikkie hasn't told us yet.
   const outstanding = (rows || []).find(r =>
-    !r.batch_id && r.tikkie_url && r.tikkie_status !== "redeemed" && r.tikkie_status !== "expired");
+    !r.batch_id && r.tikkie_url
+    && r.tikkie_status !== "redeemed" && r.tikkie_status !== "expired"
+    && !(r.tikkie_expires_at && Date.parse(r.tikkie_expires_at) < Date.now()));
 
   return json({
     profile: {
@@ -1047,7 +1024,14 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
     },
     balance,
     history,
-    outstanding: outstanding ? { url: outstanding.tikkie_url, amount: Number(outstanding.payout_amount || 0) } : null,
+    outstanding: outstanding
+      ? {
+        url: outstanding.tikkie_url,
+        amount: Number(outstanding.payout_amount || 0),
+        claim_id: outstanding.id,
+        expires_at: outstanding.tikkie_expires_at,
+      }
+      : null,
   });
 }
 

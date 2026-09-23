@@ -2755,6 +2755,39 @@ export async function refreshTikkieStatus(claimId) {
   return invokeEdge('tikkie-cashback', { action: 'status', claim_id: claimId });
 }
 
+/* ── Tikkie link statuses ────────────────────────────────────────────────
+ * The truth lives at ABN AMRO. `tikkie-webhook` writes it the moment a
+ * customer collects, but only once the redemption subscription is
+ * registered (Connect below, owner-only at Tikkie's end).
+ * `tikkie-sweep` is the safety net: pg_cron every 15 minutes, and the
+ * dashboard's "Check open links" button. Migration 060. */
+export const TIKKIE_WEBHOOK_URL =
+  `${String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '')}/functions/v1/tikkie-webhook`;
+
+export async function getTikkieStatusState() {
+  const { data } = await supabase.from('app_config').select('key, value')
+    .in('key', ['tikkie:subscription', 'tikkie_sweep_state']);
+  const byKey = Object.fromEntries((data || []).map(r => [r.key, r.value]));
+  return {
+    subscription: byKey['tikkie:subscription'] || null,
+    lastSweep: byKey.tikkie_sweep_state || null,
+    webhookUrl: TIKKIE_WEBHOOK_URL,
+  };
+}
+
+/* Register (or drop) the redemption webhook with Tikkie. Owner-only there. */
+export async function setTikkieWebhook(on) {
+  return on
+    ? invokeEdge('tikkie-cashback', { action: 'subscribe', url: TIKKIE_WEBHOOK_URL })
+    : invokeEdge('tikkie-cashback', { action: 'unsubscribe' });
+}
+
+/* Ask Tikkie about the links we still think are open. One venue when
+ * `orgId` is given, otherwise every venue's. */
+export async function sweepTikkieStatuses(orgId = null, limit = 120) {
+  return invokeEdge('tikkie-sweep', { mode: 'admin', org_id: orgId, limit });
+}
+
 /* Re-mint a payout link for an already-approved claim whose earlier mint failed
  * (e.g. the campaign was momentarily out of funds). Region-routed + idempotent. */
 export async function mintTikkieLink(claimId) {
@@ -4329,7 +4362,7 @@ export async function listBinTikkiePayouts(orgId, { limit = 300 } = {}) {
   if (!orgId) return [];
   const { data, error } = await supabase
     .from('claims')
-    .select('id, created_at, cups_redeemed, payout_amount, batch_id, tikkie_url, tikkie_status, tikkie_expires_at, tikkie_redeemed_at, tikkie_last_error, payout_status')
+    .select('id, created_at, cups_redeemed, payout_amount, batch_id, tikkie_url, tikkie_status, tikkie_expires_at, tikkie_redeemed_at, tikkie_checked_at, tikkie_last_error, payout_status')
     .eq('org_id', orgId)
     .or('tikkie_url.not.is.null,tikkie_last_error.not.is.null')
     .order('created_at', { ascending: false })

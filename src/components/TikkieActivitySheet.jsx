@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { payoutLinkState } from '../lib/payoutLink';
 import './ActivityDetailModal.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -9,7 +10,9 @@ import './ActivityDetailModal.css';
  * its link here, so the customer can still open it.
  *
  * `payoutUrl` is the wallet's outstanding link when this row is the payout
- * it belongs to (TikkieHomePage matches them).
+ * it belongs to (TikkieHomePage matches them). A link that was collected or
+ * has expired is never offered: the row says what became of it instead
+ * (src/lib/payoutLink.js).
  * ───────────────────────────────────────────────────────────────────── */
 
 function ToneIcon({ icon }) {
@@ -64,27 +67,37 @@ export default function TikkieActivitySheet({
       status: 'Donated', statusColor: GREEN, amountLabel: 'Donated', sign: '−',
     };
   } else if (item.kind === 'payout') {
-    const open = !item.redeemed && !!payoutUrl;
-    view = item.redeemed
+    const link = payoutLinkState(item, payoutUrl);
+    view = link.state === 'collected'
       ? {
         title: isLinkPayout ? 'Collected via Tikkie' : 'Cashback sent', tone: 'green', icon: 'check',
-        sub: isLinkPayout ? 'You collected this payout through Tikkie.' : 'This cashback was sent to you.',
+        sub: isLinkPayout
+          ? `You collected this payout through Tikkie${link.at ? ` on ${fullWhen(link.at)}` : ''}.`
+          : 'This cashback was sent to you.',
         status: 'Collected', statusColor: GREEN,
+        linkNote: link.at ? `Collected ${fullWhen(link.at)}` : null,
       }
-      : open
+      : link.state === 'open'
         ? {
           title: isLinkPayout ? 'Your Tikkie is ready' : 'Payout on its way', tone: 'amber', icon: 'link',
           sub: isLinkPayout
             ? 'You have not collected this payout yet. Open the Tikkie link below to get it.'
             : 'This payout has not reached you yet.',
           status: isLinkPayout ? 'Ready to collect' : 'On its way', statusColor: AMBER,
+          linkNote: link.expiresAt ? `Collect before ${fullWhen(link.expiresAt)}` : null,
         }
-        : {
-          title: isLinkPayout ? 'Tikkie payout' : 'Cashback payout', tone: 'gray', icon: 'link',
-          sub: 'This link is no longer active. If you did not collect it, contact us and we will sort it out.',
-          status: 'Link no longer active', statusColor: GREY,
-        };
-    view = { ...view, amountLabel: 'Amount', sign: '−', link: open && isLinkPayout ? payoutUrl : null };
+        : link.state === 'expired'
+          ? {
+            title: isLinkPayout ? 'Tikkie link expired' : 'Cashback payout', tone: 'gray', icon: 'clock',
+            sub: `This link expired${link.at ? ` on ${fullWhen(link.at)}` : ''}. If you never collected it, contact us and we will sort it out.`,
+            status: 'Link expired', statusColor: GREY,
+          }
+          : {
+            title: isLinkPayout ? 'Tikkie payout' : 'Cashback payout', tone: 'amber', icon: 'clock',
+            sub: 'We are making your payout link. It shows up here in a moment.',
+            status: 'On its way', statusColor: AMBER,
+          };
+    view = { ...view, amountLabel: 'Amount', sign: '−', link: isLinkPayout ? link.url : null };
   } else {
     view = {
       title: `${cupsText || 'Cups'} returned`, tone: 'green', icon: 'plus',
@@ -118,6 +131,9 @@ export default function TikkieActivitySheet({
           <div className="adm-dashed" />
 
           <div className="adm-row"><span className="adm-row__label">Status</span><span className="adm-row__val" style={{ color: view.statusColor }}>{view.status}</span></div>
+          {view.linkNote && (
+            <div className="adm-row"><span className="adm-row__label">Tikkie link</span><span className="adm-row__val">{view.linkNote}</span></div>
+          )}
         </div>
 
         {view.link && (
@@ -128,7 +144,9 @@ export default function TikkieActivitySheet({
               </svg>
               Open Tikkie
             </a>
-            <p className="adm-collect-note">If the link no longer opens, it may have expired. Contact us and we will reissue it.</p>
+            {!view.linkNote && (
+              <p className="adm-collect-note">If the link no longer opens, it may have expired. Contact us and we will reissue it.</p>
+            )}
           </div>
         )}
 

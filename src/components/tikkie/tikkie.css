@@ -88,12 +88,18 @@
 .tk-icon--warn { background: #FCF2D6; color: #9A6E12; }
 .tk-icon--err  { background: #FBEAE5; color: #C4472B; }
 
-/* ── The Tikkie explainer ── */
+/* ── The Tikkie explainer ──
+   The same card as everything else on the page (white surface, the app's
+   radius and shadow) so it follows the venue's own colours instead of
+   sitting there in one fixed sand tone. */
 .tk-explain {
   display: flex; align-items: stretch; gap: 12px;
-  padding: 14px;
-  background: #F7F4EC;
-  border-radius: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 16px;
+  background: var(--white, #fff);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-screen, 0 4px 20px rgba(0, 0, 0, 0.06));
   text-align: left;
 }
 .tk-explain__text {
@@ -102,37 +108,28 @@
 }
 .tk-explain__lead {
   margin: 0 0 12px;
-  font-size: 13.5px; line-height: 1.5; font-weight: 600; color: #5F584F;
+  font-size: 13.5px; line-height: 1.5; font-weight: 600; color: var(--text-muted, #5F584F);
 }
-.tk-explain__lead strong { color: #47478A; font-weight: 800; }
-.tk-explain__q { margin: 0 0 8px; font-size: 13.5px; font-weight: 800; color: #1F1B16; }
+.tk-explain__lead strong { color: var(--pb-brown, #502314); font-weight: 800; }
+.tk-explain__q { margin: 0 0 8px; font-size: 13.5px; font-weight: 800; color: var(--black, #1F1B16); }
 .tk-explain__text ul {
   margin: 0; padding: 0 0 0 16px;
   list-style: disc;
   display: flex; flex-direction: column; gap: 7px;
 }
-.tk-explain__text li { font-size: 13px; line-height: 1.4; color: #5F584F; }
-.tk-explain__text li::marker { color: #47478A; }
-.tk-explain__text strong { color: #1F1B16; }
+.tk-explain__text li { font-size: 13px; line-height: 1.4; color: var(--text-muted, #5F584F); }
+.tk-explain__text li::marker { color: var(--pb-brown, #502314); }
+.tk-explain__text strong { color: var(--black, #1F1B16); }
 /* The direct variant carries no provider screenshot, so the text owns the
    whole width instead of sitting in a narrow column beside an image. */
 .tk-explain--direct { display: block; }
-.tk-explain__note { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: #6B655C; }
+.tk-explain__note { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-muted, #6B655C); }
 
 .tk-explain__shot {
   flex-shrink: 0;
   height: 208px; width: auto;
   align-self: center;
   display: block;
-}
-
-/* tikkie.me — the brand name in the explainer doubles as the way to go
-   look Tikkie up before handing over an IBAN. */
-.tk-explain__link {
-  color: #47478A;
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 /* ── Donate sheet ── */

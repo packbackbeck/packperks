@@ -40,3 +40,8 @@
   text-decoration: none;
 }
 .atl-link:hover { text-decoration: underline; }
+
+/* Status updates card: webhook state, last sweep, the two buttons. */
+.atl-status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.atl-status__text { flex: 1; min-width: 220px; font-size: 13px; line-height: 1.55; color: var(--ui-fg-2); }
+.atl-status__msg { margin: 10px 0 0; font-size: 12.5px; color: var(--ui-muted); }

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useRegion } from '../lib/RegionContext';
 import { getFailureCopy } from '../admin/lib/aiVerdictLabels';
 import CollectSheet from './CollectSheet';
+import { payoutLinkState } from '../lib/payoutLink';
 import './ActivityDetailModal.css';
 
 /* Claim "phase" views. A single receipt claim shows up in Activity as up to
@@ -76,8 +77,7 @@ function liveStatusForClaim(item, userClaims) {
   }
   if (!bestMatch) return null;
 
-  const tikkieUrl = bestMatch.tikkie_url || null;
-  const expired = bestMatch.tikkie_status === 'expired';
+  const link = payoutLinkState(bestMatch);
 
   if (bestMatch.type === 'voucher') {
     return { label: 'Redeemed', color: '#1A8737', claim: bestMatch };
@@ -87,10 +87,16 @@ function liveStatusForClaim(item, userClaims) {
     case 'completed':
       // "Ready" only once an admin has minted the Tikkie link. A claim the AI
       // auto-passed (completed, but no link yet) is still under human review.
-      if (tikkieUrl) {
-        return bestMatch.tikkie_status === 'redeemed'
-          ? { label: 'Collected', color: '#1A8737', tikkieUrl, expired, claim: bestMatch }
-          : { label: 'Ready to collect', color: '#1A8737', tikkieUrl, expired, claim: bestMatch };
+      if (bestMatch.tikkie_url) {
+        // A collected or expired link is not offered again: `link.url` is
+        // null unless it still works.
+        return {
+          label: link.label,
+          color: link.state === 'expired' || link.state === 'failed' ? '#7A7166' : '#1A8737',
+          tikkieUrl: link.url,
+          link,
+          claim: bestMatch,
+        };
       }
       /* A 'direct' region has no link to wait for — an approved claim is
        * collectable through our own sheet, so say so. */
@@ -101,6 +107,14 @@ function liveStatusForClaim(item, userClaims) {
     default:
       return { label: 'In review by our team', color: '#B8922A' };
   }
+}
+
+/* "25 Aug 2026, 09:57" — for a link's collect time or its expiry. */
+function fmtWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function makeRefId(type, time) {
@@ -263,10 +277,19 @@ export default function ActivityDetailModal({ item, profile, userClaims, onClose
               </svg>
               {collectLabel || 'Collect your cashback'}
             </a>
-            {liveStatus.expired && (
-              <p className="adm-collect-note">If this link no longer opens, it may have expired. Contact us and we’ll reissue it.</p>
+            {liveStatus.link?.expiresAt && (
+              <p className="adm-collect-note">Collect it before {fmtWhen(liveStatus.link.expiresAt)}.</p>
             )}
           </div>
+        )}
+
+        {/* Nothing left to open: say what became of the link instead. */}
+        {approvedView && liveStatus?.link && (liveStatus.link.state === 'collected' || liveStatus.link.state === 'expired') && (
+          <p className="adm-collect-note adm-collect-note--closed">
+            {liveStatus.link.state === 'collected'
+              ? `You collected this cashback${liveStatus.link.at ? ` on ${fmtWhen(liveStatus.link.at)}` : ''}.`
+              : `This link expired${liveStatus.link.at ? ` on ${fmtWhen(liveStatus.link.at)}` : ''}. Contact us and we’ll reissue it.`}
+          </p>
         )}
 
         {showDirectCollect && (

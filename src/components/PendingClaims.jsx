@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { COLLECT_WINDOW_MS, getDismissedSet, dismissClaim } from '../lib/collectedClaims';
 import { useMoney, useRegion } from '../lib/RegionContext';
+import { payoutLinkState } from '../lib/payoutLink';
 import { getFailureCopy, getFailureLabel } from '../admin/lib/aiVerdictLabels';
 import './PendingClaims.css';
 
@@ -8,7 +9,7 @@ import './PendingClaims.css';
  * link. The AI receipt check is just a pre-screen — the final verdict is a
  * person, so a claim the AI auto-passed (status 'completed' but no tikkie_url
  * yet) is still shown as "in review" until the team sends the link. */
-const isReady = (c) => c.status === 'completed' && !!c.tikkie_url;
+const isReady = (c) => c.status === 'completed' && !!payoutLinkState(c).url;
 const isUnderReview = (c) => c.status === 'pending' || (c.status === 'completed' && !c.tikkie_url);
 const isRejected = (c) => c.status === 'failed';
 
@@ -53,9 +54,11 @@ export default function PendingClaims({ claims = [], collectedMap = {}, onCollec
     onDismiss?.(claim);
   };
   const isDismissed = (id) => dismissed.has(id);
+  /* A link that was collected or has expired leads nowhere, so its card
+   * goes (the activity list keeps the history and its status). */
   const active = (claims || []).filter(c =>
     (c.type === 'cashback' || c.type === 'direct_refund') &&
-    c.tikkie_status !== 'redeemed' &&
+    !['collected', 'expired'].includes(payoutLinkState(c).state) &&
     !collectExpired(c.id) &&
     !isDismissed(c.id) &&
     (isReady(c) || isUnderReview(c) || (isRejected(c) && rejectedRecent(c))),
@@ -212,7 +215,7 @@ function ClaimCard({ claim, onCollect, onDismiss, collected, partnerBrand, onRet
            becomes the full-width Collect action. */
         <a
           className="pc-card__collect"
-          href={claim.tikkie_url}
+          href={payoutLinkState(claim).url || claim.tikkie_url}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => onCollect?.(claim)}

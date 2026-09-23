@@ -15,6 +15,7 @@ import CupScanPage from './CupScanPage';
 import UserPage, { ImpactSummary, ImpactDetailModal } from './UserPage';
 import Header from './Header';
 import TikkieActivitySheet from './TikkieActivitySheet';
+import { payoutLinkState } from '../lib/payoutLink';
 import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
 
@@ -61,11 +62,30 @@ const DEMO_WALLET = {
   history: [
     { id: 'd5', kind: 'pending', cups: null, amount: null, created_at: new Date(Date.now() - 1 * 36e5).toISOString() },
     { id: 'd1', kind: 'return', cups: 4, amount: 0.4, created_at: new Date(Date.now() - 2 * 864e5).toISOString() },
+    // An open link, a collected one and an expired one: the three states the
+    // activity rows and their popup have to tell apart.
+    {
+      id: 'd0', kind: 'payout', cups: 9, amount: 0.9, created_at: new Date(Date.now() - 3 * 36e5).toISOString(),
+      redeemed: false, has_link: true, link_status: 'created', expires_at: new Date(Date.now() + 30 * 864e5).toISOString(),
+    },
     { id: 'd2', kind: 'return', cups: 3, amount: 0.3, created_at: new Date(Date.now() - 6 * 864e5).toISOString() },
-    { id: 'd3', kind: 'payout', cups: 5, amount: 0.5, created_at: new Date(Date.now() - 9 * 864e5).toISOString(), redeemed: true },
+    {
+      id: 'd3', kind: 'payout', cups: 5, amount: 0.5, created_at: new Date(Date.now() - 9 * 864e5).toISOString(),
+      redeemed: true, has_link: true, link_status: 'redeemed',
+      redeemed_at: new Date(Date.now() - 9 * 864e5 + 6e5).toISOString(),
+    },
+    {
+      id: 'd6', kind: 'payout', cups: 2, amount: 0.2, created_at: new Date(Date.now() - 40 * 864e5).toISOString(),
+      redeemed: false, has_link: true, link_status: 'expired', expires_at: new Date(Date.now() - 9 * 864e5).toISOString(),
+    },
     { id: 'd4', kind: 'return', cups: 2, amount: 0.2, created_at: new Date(Date.now() - 12 * 864e5).toISOString() },
   ],
-  outstanding: null,
+  outstanding: {
+    url: 'https://tikkie.me/pay/demo',
+    amount: 0.9,
+    claim_id: 'd0',
+    expires_at: new Date(Date.now() + 30 * 864e5).toISOString(),
+  },
 };
 
 function fmtWhen(iso) {
@@ -273,7 +293,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   });
   const [balance, setBalance] = useState(DEMO && DEMO !== 'empty' ? DEMO_WALLET.balance : 0);
   const [history, setHistory] = useState(DEMO && DEMO !== 'empty' ? DEMO_WALLET.history : []);
-  const [outstanding, setOutstanding] = useState(null);
+  const [outstanding, setOutstanding] = useState(DEMO && DEMO !== 'empty' ? DEMO_WALLET.outstanding : null);
   const [bins, setBins] = useState([]);
   const [popup, setPopup] = useState(() => {
     if (DEMO === 'credited') return { type: 'credited', amount: 0.4, cups: 4 };
@@ -546,12 +566,17 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   }
 
   const returns = history.filter(h => h.kind === 'return');
+  /* Somebody who has never returned a cup reads the instructions first;
+   * once there is activity, it moves below the list. */
+  const hasActivity = history.length > 0;
   /* The wallet names one payout link nobody has collected yet (outstanding).
    * It belongs to the newest uncollected payout of that amount, so that row
    * can offer the link again. */
   const openPayoutId = outstanding?.url
-    ? history.find(h => h.kind === 'payout' && !h.redeemed
-      && Math.abs(Number(h.amount || 0) - Number(outstanding.amount || 0)) < 0.005)?.id || null
+    ? (outstanding.claim_id
+      || history.find(h => h.kind === 'payout' && !h.redeemed
+        && Math.abs(Number(h.amount || 0) - Number(outstanding.amount || 0)) < 0.005)?.id
+      || null)
     : null;
   const lifetimeCups = returns.reduce((t, h) => t + Number(h.cups || 0), 0);
   const canCollect = balance > 0 || !!outstanding;
@@ -641,6 +666,17 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         />
       )}
 
+      {/* ── How you get paid ──
+             A first-time visitor needs the instructions before anything
+             else, so they sit above Activity until there is activity to
+             read; after that they move below it, out of the way. */}
+      {!hasActivity && (
+        <section className="tikkie-home__section">
+          <h2 className="tikkie-home__section-title">How you get paid</h2>
+          <TikkieExplainer />
+        </section>
+      )}
+
       {/* ── Activity ── */}
       <section className="tikkie-home__section">
         <h2 className="tikkie-home__section-title">Activity</h2>
@@ -650,24 +686,31 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
           </div>
         ) : (
           <ul className="tikkie-home__history">
-            {history.map(h => (
+            {history.map(h => {
+              const link = h.kind === 'payout'
+                ? payoutLinkState(h, h.id === openPayoutId ? outstanding?.url : null)
+                : null;
+              return (
               <li key={h.id}>
                 <button type="button" className="tikkie-home__row" onClick={() => setOpenItem(h)}>
                 <span
                   className={`tikkie-home__row-icon${
-                    h.kind === 'payout' && h.redeemed !== false ? ' tikkie-home__row-icon--done' : ''
-                  }${h.kind === 'pending' || (h.kind === 'payout' && h.redeemed === false) ? ' tikkie-home__row-icon--wait' : ''}${
+                    link?.state === 'collected' ? ' tikkie-home__row-icon--done' : ''
+                  }${h.kind === 'pending' || link?.state === 'open' || link?.state === 'pending' ? ' tikkie-home__row-icon--wait' : ''}${
                     h.kind === 'donation' ? ' tikkie-home__row-icon--gift' : ''}`}
                   aria-hidden="true"
                 >
-                  {h.kind === 'payout' ? (h.redeemed === false ? '→' : '✓') : h.kind === 'pending' ? '◷' : h.kind === 'donation' ? '♥' : '♻︎'}
+                  {h.kind === 'payout' ? (link.state === 'collected' ? '✓' : link.state === 'expired' ? '◷' : '→') : h.kind === 'pending' ? '◷' : h.kind === 'donation' ? '♥' : '♻︎'}
                 </span>
                 <div className="tikkie-home__row-main">
                   <span className="tikkie-home__row-title">
                     {h.kind === 'payout'
-                      ? (h.redeemed === false
-                        ? (isLinkPayout ? (h.id === openPayoutId ? 'Tikkie ready to collect' : 'Tikkie payout') : 'Cashback on its way')
-                        : (isLinkPayout ? 'Collected via Tikkie' : 'Cashback sent'))
+                      ? (!isLinkPayout
+                        ? (link.state === 'collected' ? 'Cashback sent' : 'Cashback on its way')
+                        : link.state === 'collected' ? 'Collected via Tikkie'
+                          : link.state === 'expired' ? 'Tikkie link expired'
+                            : link.state === 'open' ? 'Tikkie ready to collect'
+                              : 'Tikkie payout')
                       : h.kind === 'donation'
                         ? `Donated to ${charity}`
                       : h.kind === 'pending'
@@ -691,16 +734,18 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                 )}
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>
 
-      {/* ── How the customer gets paid (region-aware, static) ── */}
-      <section className="tikkie-home__section">
-        <h2 className="tikkie-home__section-title">How you get paid</h2>
-        <TikkieExplainer />
-      </section>
+      {hasActivity && (
+        <section className="tikkie-home__section">
+          <h2 className="tikkie-home__section-title">How you get paid</h2>
+          <TikkieExplainer />
+        </section>
+      )}
 
       {/* ── Lifetime impact — the same card every other PackPerks mode
              shows, reused verbatim from UserPage. ── */}

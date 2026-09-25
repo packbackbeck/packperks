@@ -241,6 +241,17 @@ button.tikkie-home__hero:active { transform: scale(0.99); }
 .tikkie-home__emailcopy {
   margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: #6C6259;
 }
+/* The same form inside a sheet: the sheet is already the card, so it drops
+   the chrome rather than putting a white box on a white box. */
+.tikkie-home__emailcard--bare {
+  background: none; box-shadow: none; border-radius: 0; padding: 0;
+}
+
+/* The impact card is borrowed from UserPage, which lays its cards out in a
+   fixed 330px column. Every section on this screen is full width, so the
+   borrowed width has to go or the card sits short of the edge. */
+.tikkie-home .user-page__impact-card,
+.tikkie-home .user-page__card { width: 100%; box-sizing: border-box; }
 
 /* Redeem sheet buttons: "Do it later" first and highlighted, per design. */
 .tk-sheet__actions { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }

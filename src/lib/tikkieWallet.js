@@ -8,6 +8,7 @@
  * ───────────────────────────────────────────────────────────────────── */
 
 import { getDeviceId } from './deviceId';
+import { supabase } from './supabase';
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bin-tikkie`;
 const FN_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -78,6 +79,30 @@ export const setEmail = (orgId, email, marketing) =>
     action: 'set_email', org_id: orgId, device_id: deviceId(),
     email, privacy_accepted: true, marketing_consent: marketing === true,
   });
+
+/* ── Marketing consent ──
+ * The wallet call does not carry it, and the account view's switch has to
+ * show the truth rather than guess it. Stage 2 binds a customer row to the
+ * device that created it (migration 046), so this device may read and
+ * change its own — through src/lib/supabase.js, which sends the
+ * `x-device-id` header that makes the row visible at all. Consent is still
+ * only ever set by a switch the customer moved. */
+export async function getMarketingConsent(userId) {
+  if (!userId) return false;
+  const { data, error } = await supabase
+    .from('users').select('marketing_consent').eq('id', userId).maybeSingle();
+  if (error) return false;
+  return data?.marketing_consent === true;
+}
+
+export async function setMarketingConsent(userId, on) {
+  if (!userId) return false;
+  const { error } = await supabase.from('users').update({
+    marketing_consent: on === true,
+    marketing_consent_at: on === true ? new Date().toISOString() : null,
+  }).eq('id', userId);
+  return !error;
+}
 
 export const savePendingEmail = (orgId, batchId, email, marketing) =>
   invokeBinTikkie({

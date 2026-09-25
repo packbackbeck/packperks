@@ -5,6 +5,7 @@ import { getSmartbinLocations } from '../lib/api';
 import {
   readStoredProfile, storeProfile, fetchWallet, scanBatch,
   scanBackupCups, scanStaticQr, redeemWallet, donateWallet, setEmail, savePendingEmail, checkBatch,
+  getMarketingConsent, setMarketingConsent,
 } from '../lib/tikkieWallet';
 import { animalForProfile } from '../lib/animals';
 import { useRegion } from '../lib/RegionContext';
@@ -244,7 +245,7 @@ function BinMap({ bins }) {
 /* ── The email section: save the balance to an address. Same consent
    pattern as the sign-in sheet (privacy required, marketing optional and
    unticked until the customer ticks it). ── */
-function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy }) {
+function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, inSheet = false }) {
   const [email, setEmailVal] = useState('');
   const [privacyOk, setPrivacyOk] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -266,9 +267,11 @@ function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy }) {
   }
 
   return (
-    <section className="tikkie-home__section">
-      <h2 className="tikkie-home__section-title">Save your balance</h2>
-      <form className="tikkie-home__emailcard" onSubmit={submit}>
+    <section className={inSheet ? 'tikkie-home__emailsheet' : 'tikkie-home__section'}>
+      {inSheet
+        ? <h2 className="tk-sheet__title">Add your email</h2>
+        : <h2 className="tikkie-home__section-title">Save your balance</h2>}
+      <form className={`tikkie-home__emailcard${inSheet ? ' tikkie-home__emailcard--bare' : ''}`} onSubmit={submit}>
         <p className="tikkie-home__emailcopy">
           Add your email to keep your balance safe and get back to it from any device.
         </p>
@@ -336,6 +339,11 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
   const [login, setLogin] = useState(() => (UX_PREVIEW === 'login' ? { email: '' } : null));
   const [showPolicy, setShowPolicy] = useState(UX_PREVIEW === 'privacy-policy');
   const [showAccount, setShowAccount] = useState(UX_PREVIEW === 'account');
+  /* The add-email form, as a sheet. The account view and its Edit popup
+   * both open it, so it is not tied to the home screen's own section. */
+  const [emailSheet, setEmailSheet] = useState(false);
+  /* Marketing consent is on the customer's row, not in the wallet reply. */
+  const [marketing, setMarketing] = useState(false);
   const [impactOpen, setImpactOpen] = useState(UX_PREVIEW === 'impact');
   const [openItem, setOpenItem] = useState(() => (
     UX_PREVIEW === 'activity-detail' ? DEMO_WALLET.history.find(h => h.kind === 'payout') || DEMO_WALLET.history[1] : null
@@ -375,6 +383,16 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
                 : 'home';
   useEffect(() => { uxScreen(uxView); }, [uxView]);
   useEffect(() => { setUxUser(profile?.user_id || null); }, [profile?.user_id]);
+
+  /* Read the switch's real position once there is an account to read it
+   * from. Demo states carry their own value and must not touch the network. */
+  useEffect(() => {
+    const id = profile?.user_id;
+    if (!id || DEMO) return undefined;
+    let alive = true;
+    getMarketingConsent(id).then(v => { if (alive) setMarketing(v); });
+    return () => { alive = false; };
+  }, [profile?.user_id]);
 
   /* What the customer is owed: the wallet balance plus every Tikkie link
    * they have not collected. Tikkie cannot cancel or merge a link once it
@@ -625,27 +643,78 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     );
   }
 
+  /* An email just saved: remember it here and on the device. */
+  const applySavedProfile = (p) => {
+    if (!p) return;
+    setProfile(p);
+    storeProfile(org?.id, { userId: p.user_id, email: p.email, name: p.name });
+  };
+
+  /* The add-email form as a sheet, so the account view and its Edit popup
+   * can offer it without sending anyone back to the home screen first. */
+  const emailSheetNode = emailSheet ? (
+    <Sheet onClose={() => setEmailSheet(false)} label="Add your email">
+      <EmailSection
+        inSheet
+        org={org}
+        onShowPolicy={() => setShowPolicy(true)}
+        onSaved={(p) => { setEmailSheet(false); applySavedProfile(p); }}
+        onVerifyNeeded={(email) => { setEmailSheet(false); setLogin({ email, startAtCode: true }); }}
+      />
+    </Sheet>
+  ) : null;
+
+  /* Marketing consent is the one thing the Edit popup changes in this mode:
+   * the name is the venue's animal identity, and the email has its own
+   * sheet. The switch answers immediately and rolls back if the write
+   * fails, so it never shows a promise the row didn't keep. */
+  const saveAccountProfile = (patch) => {
+    if (!patch || !('marketingConsent' in patch)) return;
+    const on = patch.marketingConsent === true;
+    setMarketing(on);
+    if (DEMO) return;
+    setMarketingConsent(profile?.user_id, on).then((ok) => { if (!ok) setMarketing(!on); });
+  };
+
   /* ── Account view ── */
   if (showAccount) {
     return (
-      <UserPage
-        tikkieOnly
-        profile={{
-          displayName: profile?.name || 'My account',
-          email: profile?.email || '',
-          animalIndex: profile?.animal_index ?? 0,
-        }}
-        onSaveProfile={() => {}}
-        cupCount={0}
-        history={[]}
-        userClaims={[]}
-        authEmail={profile?.email || null}
-        isVisitor={!profile}
-        showActivity={false}
-        showImpact={false}
-        storeName={org?.name}
-        onClose={() => setShowAccount(false)}
-      />
+      <>
+        <UserPage
+          tikkieOnly
+          profile={{
+            displayName: profile?.name || 'My account',
+            email: profile?.email || '',
+            animalIndex: profile?.animal_index ?? 0,
+            marketingConsent: marketing,
+          }}
+          onSaveProfile={saveAccountProfile}
+          cupCount={0}
+          history={[]}
+          userClaims={[]}
+          authEmail={profile?.email || null}
+          isVisitor={!profile}
+          showActivity={false}
+          showImpact={false}
+          storeName={org?.name}
+          privacyPolicy={settings?.privacyPolicyText}
+          onOpenSignIn={() => setEmailSheet(true)}
+          onClose={() => setShowAccount(false)}
+        />
+        {emailSheetNode}
+        {showPolicy && (
+          <PrivacyPolicyView text={settings?.privacyPolicyText} onClose={() => setShowPolicy(false)} />
+        )}
+        {login && (
+          <LoginSheet
+            org={org}
+            initialEmail={login.email || ''}
+            startAtCode={!!login.startAtCode}
+            onClose={() => setLogin(null)}
+            onLoggedIn={(p) => { setLogin(null); applySavedProfile(p); }}
+          />
+        )}
+      </>
     );
   }
 
@@ -751,12 +820,14 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         </div>
       )}
 
-      {/* ── Save the balance to an email (profiles without one) ── */}
-      {profile && !profile.email && (
+      {/* ── Save the balance to an email ──
+             Shown to anyone without one, profile or not: a first visit has
+             no account yet, and saving an email is what creates it. */}
+      {!profile?.email && (
         <EmailSection
           org={org}
           onShowPolicy={() => setShowPolicy(true)}
-          onSaved={(p) => { setProfile(p); storeProfile(org?.id, { userId: p.user_id, email: p.email, name: p.name }); }}
+          onSaved={applySavedProfile}
           onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
         />
       )}

@@ -71,6 +71,34 @@ exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
   once there is activity it moves below it (`hasActivity` in
   `TikkieHomePage`), and that block is a normal card that follows the
   venue's colours.
+
+  **Its account view is `UserPage` with this mode's handlers.** That
+  component is built for the other modes, so anything it offers is only as
+  alive as the prop behind it: without `onOpenSignIn` both *Add email to
+  save balance* and the Edit popup's Email row are dead buttons (the Edit
+  one closes the popup and does nothing, which is exactly what it looked
+  like), and with `onSaveProfile` stubbed the Marketing-emails switch moves
+  and saves nothing. Both now go somewhere: the email opens the mode's own
+  `EmailSection` in a sheet (`inSheet`) over the account page, and the
+  switch writes for real. Adding a prop to `UserPage` for this mode means
+  wiring it here too.
+
+  **Save-your-balance is offered before there is an account.** The card
+  used to need `profile` to exist, so a first visit — no scan, no
+  balance, nobody — never saw it. `set_email` creates the profile, so the
+  only question is whether an email is already saved (`!profile?.email`).
+
+  **Marketing consent is read and written on the customer's own row.** The
+  wallet reply does not carry it, and the switch must show the truth, so
+  `getMarketingConsent` / `setMarketingConsent` (`tikkieWallet.js`) go
+  straight to `users` — Stage 2 binds that row to this device (migration
+  046), and the write is optimistic with a rollback if it fails. Consent
+  still only ever comes from a switch the customer moved.
+
+  **`UserPage`'s cards are a fixed 330px.** They are laid out in its own
+  narrow column, so a card borrowed onto this screen (the impact card) has
+  to be widened or it sits short of the edge: `.tikkie-home
+  .user-page__card` is where that is undone.
   Its Dashboard rebuilds per-cup activity from those claims
   (`getAdminStats(orgIds, { mode })`, `buildTikkieMetrics`): there are no
   cup balances or `activity_history` rows for this mode.

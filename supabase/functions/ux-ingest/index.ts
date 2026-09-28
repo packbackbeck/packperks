@@ -25,6 +25,13 @@
 //     layouts: [...] }
 //     → { stored }
 //
+//   { action: "replay", org_id, session_id, user_id?, seq, events: [...] }
+//     → { stored }
+//       One chunk of an rrweb recording, in order. Only when the venue has
+//       replay on. The browser masks every field's value and blocks the
+//       profile block before this is ever called; here it is capped, and
+//       `seq` makes a retry idempotent.
+//
 // CONSENT is the app's job and the app's alone: it posts nothing unless the
 // customer turned the Analytical cookie category on. Nothing here identifies
 // a person beyond the user_id the app already owns — no IP, no text typed,
@@ -128,6 +135,13 @@ const int = (v: unknown, min: number, max: number): number | null => {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : null;
 };
 const bool = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
+const flag = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
+/* A page pixel. Signed, because a tap can land a hair outside a box, and
+ * bounded so nothing silly reaches the column. */
+const px = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(2_000_000, Math.max(-100_000, Math.round(n))) : null;
+};
 
 /* The venue's Capture settings (`ux:capture:<orgId>`), merged over the
  * defaults. Its own app_config row, like `byo:cap:<orgId>`, so publishing
@@ -145,6 +159,47 @@ async function readConfig(orgId: string): Promise<Config> {
     layouts:       bool(v.layouts, DEFAULTS.layouts),
     retentionDays: int(v.retentionDays, 1, 400) ?? DEFAULTS.retentionDays,
   };
+}
+
+/* ── A chunk of a session recording ────────────────────────────────────
+ * rrweb sends the DOM snapshot and the changes after it, in order. The
+ * browser has already masked every field's value and blocked the profile
+ * block; this end decides whether the venue wants recordings at all, and
+ * puts a ceiling on how much one visit may write.
+ *
+ * `seq` makes a chunk idempotent: a retry after a flaky flush lands on the
+ * same row instead of doubling the recording. */
+const REPLAY_MAX_EVENTS_PER_CHUNK = 500;
+const REPLAY_MAX_CHUNKS = 80;
+
+async function storeReplay(
+  req: Request,
+  body: Record<string, unknown>,
+  orgId: string,
+  config: Config,
+): Promise<Response> {
+  if (!config.enabled || !config.replay) return json(req, { stored: 0, enabled: config.enabled });
+
+  const sessionId = str(body.session_id, 64);
+  if (!sessionId || !SESSION_RE.test(sessionId)) return json(req, { error: "session_required" }, 400);
+
+  const seq = int(body.seq, 0, 100_000);
+  if (seq == null) return json(req, { error: "seq_required" }, 400);
+  if (seq >= REPLAY_MAX_CHUNKS) return json(req, { stored: 0, full: true });
+
+  const events = Array.isArray(body.events) ? body.events.slice(0, REPLAY_MAX_EVENTS_PER_CHUNK) : [];
+  if (!events.length) return json(req, { stored: 0 });
+
+  const rawUser = str(body.user_id, 64);
+  const userId  = rawUser && UUID_RE.test(rawUser) ? rawUser : null;
+
+  const { error } = await supabase
+    .from("ux_replays")
+    .upsert({ org_id: orgId, session_id: sessionId, user_id: userId, seq, events },
+            { onConflict: "session_id,seq", ignoreDuplicates: true });
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { stored: events.length });
 }
 
 Deno.serve(async (req) => {
@@ -165,6 +220,7 @@ Deno.serve(async (req) => {
   const action = str(body.action, 16) ?? "flush";
 
   if (action === "config") return json(req, config);
+  if (action === "replay") return await storeReplay(req, body, orgId, config);
   if (action !== "flush")  return json(req, { error: "unknown_action" }, 400);
 
   // Capture off: say so and store nothing. The app stops asking for the
@@ -214,6 +270,14 @@ Deno.serve(async (req) => {
       x:  frac(e.x),
       y:  frac(e.y),
       yv: frac(e.yv),
+      // Where in the control's own box the finger landed (migration 067):
+      // this is what lets the heatmap put a tap back on its button whatever
+      // height that page happened to be.
+      ox: frac(e.ox),
+      oy: frac(e.oy),
+      px: px(e.px),
+      py: px(e.py),
+      pinned: flag(e.pinned),
       vw: int(e.vw, 0, 32000),
       vh: int(e.vh, 0, 32000),
       dh: int(e.dh, 0, 2_000_000),

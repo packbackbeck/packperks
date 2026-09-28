@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Flame, Layers, MoveVertical, SquareDashedMousePointer } from 'lucide-react';
 import { Card, CardBody, CardHeader, EmptyState, InfoTip, Segmented } from '../../ui';
 import { fmtInt } from '../../ui/timeSeries';
@@ -8,6 +8,8 @@ import { fmtRate } from '../behaviourModel';
 import ScreenFrame from './ScreenFrame';
 import useFitHeight from './useFitHeight';
 import { rampColor } from './heatRamp';
+import { anchorPoints } from './heatPoints';
+import HeatCanvas from './HeatCanvas';
 
 /* ─────────────────────────────────────────────────────────────────────
  * The heatmap.
@@ -33,61 +35,6 @@ const VIEWS = [
   { id: 'controls', label: 'Controls', icon: SquareDashedMousePointer },
 ];
 
-/* Draw the heat: an alpha pass of blurred blobs, then the ramp applied to
- * that alpha. The same two steps every heatmap library uses, and the
- * reason the result reads as one surface instead of a pile of circles. */
-function paintHeat(canvas, cells, grid, intensity) {
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const w = canvas.width;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  if (!cells?.length || !w || !h) return;
-
-  const max = Math.max(...cells.map(c => Number(c.n) || 0)) || 1;
-  const radius = Math.max(16, w / 9) * intensity;
-
-  for (const c of cells) {
-    const x = ((Number(c.cx) + 0.5) / grid.cols) * w;
-    const y = ((Number(c.cy) + 0.5) / grid.rows) * h;
-    // A square-rooted weight, so one runaway hotspot doesn't flatten
-    // everything else into invisibility.
-    const a = Math.min(1, Math.sqrt((Number(c.n) || 0) / max)) * 0.85;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    g.addColorStop(0, `rgba(0,0,0,${a})`);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  const img = ctx.getImageData(0, 0, w, h);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const a = d[i + 3] / 255;
-    if (!a) continue;
-    const [r, g, b] = rampColor(a);
-    d[i] = r; d[i + 1] = g; d[i + 2] = b;
-    d[i + 3] = Math.round(Math.min(1, a * 1.3) * 225);
-  }
-  ctx.putImageData(img, 0, 0);
-}
-
-function HeatCanvas({ cells, grid, intensity, width, height }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas || !width || !height) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    paintHeat(canvas, cells, grid, intensity);
-  }, [cells, grid, intensity, width, height]);
-  return <canvas ref={ref} className="ufs-heat" aria-hidden="true" />;
-}
-
 /* The bands: each twentieth of the page, shaded by the share of visits
  * that got that far. */
 function ScrollBands({ curve }) {
@@ -112,28 +59,30 @@ function ScrollBands({ curve }) {
   );
 }
 
-/* Controls, shaded by use. Their rectangles come from what capture
- * measured on the real visits, so they sit where the customer's controls
- * sat, at the same fractions of the page. */
-function ControlHeat({ elements, byTarget, max, onHover }) {
+/* Controls, shaded by use, drawn on the boxes the app is rendering RIGHT
+ * NOW — read out of the embedded page rather than recalled from the
+ * fractions one visit happened to measure. That is what keeps the outline
+ * on the button instead of near it. */
+function ControlHeat({ controls, byTarget, max, onHover }) {
+  if (!controls?.size) return null;
   return (
     <div className="ufs-controls">
-      {elements.map((el, i) => {
-        const t = byTarget[el.k];
+      {[...controls.entries()].map(([key, box]) => {
+        const t = byTarget[key];
         const heat = t ? (Number(t.taps) || 0) / max : 0;
         const [r, g, b] = rampColor(heat);
         return (
           <div
-            key={`${el.k}-${i}`}
+            key={key}
             className={`ufs-control${t ? '' : ' ufs-control--cold'}`}
             style={{
-              left: `${(Number(el.x) || 0) * 100}%`,
-              top: `${(Number(el.y) || 0) * 100}%`,
-              width: `${(Number(el.w) || 0) * 100}%`,
-              height: `${(Number(el.h) || 0) * 100}%`,
+              left: `${box.left}px`,
+              top: `${box.top}px`,
+              width: `${box.width}px`,
+              height: `${box.height}px`,
               ...(t ? { background: `rgba(${r},${g},${b},${0.22 + heat * 0.5})`, borderColor: `rgb(${r},${g},${b})` } : null),
             }}
-            onMouseEnter={() => onHover({ el, t })}
+            onMouseEnter={() => onHover({ el: { k: key, l: box.label }, t })}
             onMouseLeave={() => onHover(null)}
           >
             {t && <span className="ufs-control__n">{fmtInt(t.taps)}</span>}
@@ -154,25 +103,29 @@ export default function HeatmapCard({
   const [hover, setHover] = useState(null);
   const [geo, setGeo] = useState(null);
   const onGeometry = useCallback(g => setGeo(g), []);
+  /* Where the embedded app is drawing its controls right now. A tap is put
+   * back on the control it hit, so this — not a remembered fraction — is
+   * what decides where the heat goes. */
+  const [controls, setControls] = useState(null);
+  const onControls = useCallback(map => setControls(map), []);
   const fit = useRef(null);
   useFitHeight(fit);
 
   const cells = useMemo(() => data?.cells || [], [data]);
-  const layout = data?.layout || null;
   const targets = useMemo(() => data?.targets || [], [data]);
-  const grid = useMemo(() => data?.grid || { cols: 36, rows: 64 }, [data]);
   const row = screens.find(s => s.screen === screen) || null;
 
   const taps = cells.reduce((s, c) => s + (Number(c.n) || 0), 0);
   const busiest = cells.reduce((s, c) => Math.max(s, Number(c.sessions) || 0), 0);
   const byTarget = useMemo(() => Object.fromEntries(targets.map(t => [t.target, t])), [targets]);
   const maxTargetTaps = Math.max(1, ...targets.map(t => Number(t.taps) || 0));
-  const controls = useMemo(
-    () => (layout?.elements || []).filter(e => e.t === 'btn' || e.t === undefined),
-    [layout],
+  const points = useMemo(() => data?.points || [], [data]);
+  const anchored = useMemo(
+    () => (controls ? anchorPoints(points, controls, { width: geo?.width, pageHeight: geo?.pageHeight }) : null),
+    [points, controls, geo?.width, geo?.pageHeight],
   );
 
-  const nothing = !loading && !cells.length && !targets.length;
+  const nothing = !loading && !cells.length && !targets.length && !points.length;
 
   return (
     <Card className="uf-heatcard">
@@ -228,14 +181,15 @@ export default function HeatmapCard({
                     screen={screen}
                     device={device || 'mobile'}
                     onGeometry={onGeometry}
+                    onControls={onControls}
                     note="This venue has no address to preview yet."
                   >
                     {view === 'taps' && (
                       <>
                         <span className="ufs-veil" aria-hidden="true" />
                         <HeatCanvas
-                          cells={cells}
-                          grid={grid}
+                          points={points}
+                          controls={controls}
                           intensity={intensity}
                           width={geo?.width}
                           height={geo?.pageHeight}
@@ -248,9 +202,9 @@ export default function HeatmapCard({
                         <ScrollBands curve={data?.curve || []} />
                       </>
                     )}
-                    {view === 'controls' && controls.length > 0 && (
+                    {view === 'controls' && (
                       <ControlHeat
-                        elements={controls}
+                        controls={controls}
                         byTarget={byTarget}
                         max={maxTargetTaps}
                         onHover={setHover}
@@ -265,6 +219,17 @@ export default function HeatmapCard({
                       <span className="uf-heat__stat">
                         <strong>{fmtInt(taps)}</strong> taps
                         {busiest > 0 && <> · busiest spot touched by <strong>{fmtInt(busiest)}</strong> visits</>}
+                        {/* Say which taps are on their control and which are
+                            only near it: rows recorded before taps were
+                            anchored can never be better than approximate. */}
+                        {anchored?.loose > 0 && (
+                          <InfoTip label={` · ${fmtInt(anchored.loose)} approximate`}>
+                            {fmtInt(anchored.anchored)} of these taps are drawn on the control they
+                            hit. {fmtInt(anchored.loose)} were recorded before taps carried their
+                            control, so they are placed from the page position alone and can sit a
+                            little off.
+                          </InfoTip>
+                        )}
                       </span>
                       <span className="uf-heat__legend" aria-hidden="true">
                         <em>quiet</em>

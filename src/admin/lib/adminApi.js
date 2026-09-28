@@ -2227,6 +2227,40 @@ export async function getUxFlowStats(range = null, orgIds, mode = null, device =
 }
 
 /** The heat on one screen, and how far down that screen people got. */
+/** The taps on one screen, as points rather than a pre-binned grid.
+ *
+ * The heatmap anchors each one to the control it hit and draws it at that
+ * control's real position in the embedded app, so a point has to arrive
+ * with its offset inside that control (`ox`,`oy`) rather than a fraction
+ * of a page height that only meant something on the visit it came from
+ * (migration 067). Taps that hit no control keep their page pixels. */
+export async function getUxPoints(screen, range = null, orgIds, mode = null, device = null, limit = 4000) {
+  if (!screen) return [];
+  if (DEMO_MODE) {
+    const world = demoUx(orgIds, mode);
+    return uxSlice(world.events, world.sessions, { ...range, device })
+      .filter(e => e.screen === screen && ['click', 'rage', 'dead'].includes(e.kind))
+      .slice(0, limit);
+  }
+  const rows = await uxRpc('ux_points', {
+    p_orgs: orgIds?.length ? orgIds : null,
+    p_screen: screen,
+    ...uxRange(range),
+    p_device: device || null,
+    p_limit: limit,
+  });
+  return Array.isArray(rows) ? rows : [];
+}
+
+/** One visit's rrweb recording, in order, as one list of events. */
+export async function getUxRecording(sessionId) {
+  if (!sessionId || DEMO_MODE) return [];
+  const { data, error } = await supabase
+    .from('ux_replays').select('events').eq('session_id', sessionId).order('seq', { ascending: true });
+  if (error) return [];
+  return (data || []).flatMap(r => (Array.isArray(r.events) ? r.events : []));
+}
+
 export async function getUxScreen(screen, range = null, orgIds, mode = null, device = null, grid = {}) {
   const cols = uxInt(grid.cols, 4, 80, 36);
   const rows = uxInt(grid.rows, 4, 160, 64);

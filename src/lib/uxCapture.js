@@ -29,6 +29,9 @@
 import { supabase } from './supabase';
 import { hasAnalyticsConsent } from './consent';
 import { getEntryContext, getSessionId } from '../utils/analytics';
+import {
+  MAX_ELEMENTS, isPinned, isPrivate, keyFor, labelFor, pressableAncestor, pressableNodes,
+} from './uxKeys';
 
 const FLUSH_MS       = 5000;   // how often a non-empty buffer goes out
 const FLUSH_AT       = 40;     // …or sooner, once this many are waiting
@@ -40,58 +43,13 @@ const LAYOUT_SETTLE  = 3200;   // …and again, once its content has loaded
 const RAGE_WINDOW_MS = 1200;   // three taps this close together…
 const RAGE_RADIUS    = 44;     // …and this close on screen, is frustration
 const RAGE_COUNT     = 3;
-
-/* Controls worth naming. Anything tapped outside this is a dead tap: the
- * customer aimed at something that does nothing, which is the whole reason
- * to record it.
- *
- * The native list is not enough on its own. Half this app's controls are
- * card-shaped divs with an onClick — a reward card, an activity row, a
- * store tile — and React leaves no attribute to find them by. What they do
- * have is `cursor: pointer`, which is how the stylesheet already tells the
- * customer they are pressable, so that is what we match on. Without it
- * every tap on a reward would be filed as a tap that did nothing. */
-const INTERACTIVE = 'button, a[href], [role="button"], [role="tab"], [role="switch"], input, select, textarea, label, summary, [data-ppk]';
-const MAX_SCAN = 3000;      // elements a snapshot will look at
-const MAX_ELEMENTS = 140;   // controls kept per screen
-
-const cursorOf = (el) => {
-  try { return getComputedStyle(el).cursor; } catch { return ''; }
-};
-
-/* The control a tap belongs to. A native one if there is one; otherwise the
- * OUTERMOST element of the pointer region under the finger — `cursor` is
- * inherited, so the innermost would be whichever label happened to be
- * under the thumb. */
-function pressableAncestor(node) {
-  const native = node.closest?.(INTERACTIVE);
-  if (native) return native;
-  let best = null;
-  for (let el = node; el && el !== document.body; el = el.parentElement) {
-    if (cursorOf(el) === 'pointer') best = el;
-    else if (best) break;
-    else if (el.parentElement === document.body) break;
-  }
-  return best;
-}
-
-/* Every control on the screen right now, for the repainted screen. */
-function pressableNodes() {
-  const out = new Set(document.querySelectorAll(INTERACTIVE));
-  const all = document.body ? document.body.querySelectorAll('*') : [];
-  const limit = Math.min(all.length, MAX_SCAN);
-  for (let i = 0; i < limit; i++) {
-    const el = all[i];
-    if (out.has(el)) continue;
-    if (cursorOf(el) !== 'pointer') continue;
-    // Only the outermost of a pointer region: a price inside a reward card
-    // is not a control of its own.
-    const parent = el.parentElement;
-    if (parent && parent !== document.body && cursorOf(parent) === 'pointer') continue;
-    out.add(el);
-  }
-  return [...out];
-}
+/* Session replay (rrweb). A recording is a copy of the screen, so it is
+ * capped hard: a visit stops recording once it hits either limit and the
+ * rest of the visit is still counted, just not filmed. */
+const REPLAY_MAX_EVENTS = 2000;
+const REPLAY_MAX_BYTES  = 600_000;
+const REPLAY_FLUSH_MS   = 8000;
+const REPLAY_FLUSH_AT   = 60;
 
 const state = {
   on: false,
@@ -122,6 +80,13 @@ const state = {
   timer: null,
   layoutTimer: null,
   listeners: false,
+  // rrweb
+  rec: null,           // the recorder's stop() once it is running
+  replay: [],          // events waiting to be sent
+  replayCount: 0,      // how many this visit has recorded in total
+  replayBytes: 0,
+  replaySeq: 0,        // chunk number, so the player can order them
+  replayTimer: null,
 };
 
 /* ── Small helpers ─────────────────────────────────────────────────── */
@@ -158,39 +123,6 @@ function inSample(sessionId, percent) {
   return ((h >>> 0) % 100) < percent;
 }
 
-const slug = (s) => String(s || '')
-  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
-
-/** What a person calls this control. Never a field's contents. */
-function labelFor(el) {
-  const aria = el.getAttribute?.('aria-label');
-  if (aria) return aria.trim().slice(0, 60);
-  const title = el.getAttribute?.('title');
-  if (title) return title.trim().slice(0, 60);
-  const tag = el.tagName?.toLowerCase();
-  if (tag === 'input' || tag === 'textarea' || tag === 'select') {
-    // A field's own name, never what is in it.
-    const name = el.getAttribute('name') || el.getAttribute('placeholder') || el.type;
-    return String(name || tag).trim().slice(0, 60);
-  }
-  const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-  return text ? text.slice(0, 60) : (tag || 'element');
-}
-
-/** A key that means the same control tomorrow. `data-ppk` wins wherever a
- *  component sets one; otherwise the tag, one meaningful class and the
- *  control's own name, which is stable for every button in this app. */
-function keyFor(el) {
-  const explicit = el.getAttribute?.('data-ppk');
-  if (explicit) return `ppk:${slug(explicit)}`;
-  const tag = el.tagName?.toLowerCase() || 'el';
-  const cls = (el.className && typeof el.className === 'string' ? el.className : '')
-    .split(/\s+/)
-    .filter(c => c && !/^(is-|has-|ui-kpi--|active$|open$|selected$)/.test(c))[0] || '';
-  const name = slug(labelFor(el));
-  return `${tag}:${slug(cls)}${name ? `:${name}` : ''}`.slice(0, 110);
-}
-
 /* Where this visit came from, in the same words the App opens breakdown
  * uses. Read once, at start, while the cup deeplink is still in the URL. */
 const MSG_REF = /whatsapp|wa\.me|telegram|t\.me|t\.co|instagram|facebook|fb\.|messenger|twitter|x\.com|tiktok|line|snapchat|reddit|linkedin/;
@@ -203,11 +135,6 @@ function entryClass() {
   if (p.in_app === true) return 'in_app';
   if (ref) return 'website';
   return 'direct';
-}
-
-/** Nothing inside a subtree the app marked private is ever identified. */
-function isPrivate(el) {
-  return !!el.closest?.('[data-ppk-private]');
 }
 
 /* ── The buffer ────────────────────────────────────────────────────── */
@@ -286,6 +213,125 @@ function flushBeacon() {
   flush();
 }
 
+/* ── Session replay ────────────────────────────────────────────────────
+ * rrweb records the DOM and every change to it, and the dashboard replays
+ * that in an iframe — the actual visit, not a re-enactment of it over a
+ * sample screen. It is loaded only when a venue has replay on and this
+ * visit is being recorded, so a customer who is not filmed never downloads
+ * the recorder.
+ *
+ * What it must never film. `maskAllInputs` replaces every field's value
+ * with asterisks before it leaves the page, so nothing anyone types is
+ * recorded. `[data-ppk-private]` — the block that shows a name, an email
+ * and a device — is blocked outright, and its text is masked as well, so
+ * neither the characters nor their shape survive. No canvas (the QR code),
+ * no fonts, and the whole thing only ever runs behind the Analytical
+ * cookie the customer turned on.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+const PRIVATE_SELECTOR = '[data-ppk-private]';
+
+async function startReplay() {
+  if (state.rec || !state.on || !state.config?.replay) return;
+  try {
+    const [{ record }, { pack }] = await Promise.all([
+      import('rrweb'),
+      import('@rrweb/packer/pack'),
+    ]);
+    if (!state.on || !state.config?.replay) return;   // turned off while loading
+    state.rec = record({
+      /* Packed before it leaves the browser. A snapshot of this app is
+       * three quarters of a megabyte of JSON, most of it the stylesheet
+       * inlined so the recording stays self-contained and still renders
+       * after the next deploy changes every asset name. Packed it is a
+       * fraction of that on the customer's connection; the player unpacks
+       * it again.
+       *
+       * Then base64. rrweb's packer deflates to a BINARY string, and a
+       * deflate stream is full of NUL bytes — which `jsonb` refuses
+       * outright ("unsupported Unicode escape sequence"), so every chunk
+       * came back 500 until this was here. Base64 gives back about a
+       * third of what deflate saved and is still several times smaller
+       * than the raw snapshot. */
+      packFn: (event) => btoa(pack(event)),
+      emit(event) {
+        if (!state.on) return;
+        if (state.replayCount >= REPLAY_MAX_EVENTS || state.replayBytes >= REPLAY_MAX_BYTES) {
+          stopReplay();
+          return;
+        }
+        state.replayCount += 1;
+        state.replay.push(event);
+        // Rough, and deliberately so: the point is a ceiling, not a metric.
+        state.replayBytes += JSON.stringify(event).length;
+        if (state.replay.length >= REPLAY_FLUSH_AT) flushReplay();
+      },
+      maskAllInputs: true,
+      maskTextSelector: PRIVATE_SELECTOR,
+      blockSelector: PRIVATE_SELECTOR,
+      recordCanvas: false,
+      collectFonts: false,
+      sampling: { scroll: 150, media: 800, input: 'last' },
+    }) || null;
+    if (state.rec && !state.replayTimer) {
+      state.replayTimer = setInterval(flushReplay, REPLAY_FLUSH_MS);
+    }
+  } catch (e) {
+    // No recorder is a missing nicety, never a broken app — but a silent
+    // one is how you end up staring at an empty table, so say so in dev.
+    if (import.meta.env.DEV) console.warn('[ux] the recorder did not start:', e);
+    state.rec = null;
+  }
+}
+
+function stopReplay() {
+  try { state.rec?.(); } catch { /* already stopped */ }
+  state.rec = null;
+  if (state.replayTimer) { clearInterval(state.replayTimer); state.replayTimer = null; }
+}
+
+/* Its own call, not part of the event flush: one chunk can be a hundred
+ * kilobytes, which is far past what a beacon will carry. */
+async function flushReplay() {
+  if (!state.on || state.pending || !state.replay.length) return;
+  const events = state.replay;
+  state.replay = [];
+  const body = {
+    action: 'replay',
+    org_id: state.orgId,
+    session_id: getSessionId(),
+    user_id: state.userId,
+    seq: state.replaySeq++,
+    events,
+  };
+  /* Plain fetch, for the same reason tikkieWallet uses it:
+   * supabase.functions.invoke queues behind the client's auth lock, and
+   * with a signed-in customer it sends the request with credentials, which
+   * a wildcard CORS origin refuses outright — a chunk simply never
+   * arrived. A recording chunk is also the largest thing this app uploads,
+   * and it has no business waiting on an auth refresh. */
+  try {
+    const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ux-ingest`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify(body),
+      keepalive: false,
+    });
+    // A chunk that does not arrive leaves a gap in one replay and nothing
+    // else, but a silent one is how you end up staring at an empty table.
+    if (import.meta.env.DEV && !resp.ok) {
+      console.warn('[ux] replay chunk', body.seq, 'refused:', resp.status, await resp.clone().text());
+    }
+  } catch (e) {
+    // A lost chunk leaves a gap in one replay, nothing more.
+    if (import.meta.env.DEV) console.warn('[ux] replay chunk failed:', e);
+  }
+}
+
 /* ── Listeners ─────────────────────────────────────────────────────── */
 
 function onPointerDown(e) {
@@ -293,15 +339,35 @@ function onPointerDown(e) {
   const t = e.target;
   if (!t || t.nodeType !== 1) return;
 
+  const cx = e.clientX || 0;
+  const cy = e.clientY || 0;
   const vw = window.innerWidth || 1;
   const dh = docHeight() || 1;
-  const pageY = (e.clientY || 0) + (window.scrollY || 0);
-  const x = clamp01((e.clientX || 0) / vw);
-  const y = clamp01(pageY / dh);
-  const yv = clamp01((e.clientY || 0) / (window.innerHeight || 1));
 
   const el = pressableAncestor(t);
   const secret = !el || isPrivate(el);
+
+  /* A sheet, a modal, the cookie banner: pinned to the viewport, so the
+   * scroll position behind it is not part of where the finger landed.
+   * Adding it is what smeared every popup screen down the page. */
+  const pinned = el ? isPinned(el) : false;
+  const pageY = pinned ? cy : cy + (window.scrollY || 0);
+  const x = clamp01(cx / vw);
+  const y = clamp01(pageY / dh);
+  const yv = clamp01(cy / (window.innerHeight || 1));
+
+  /* Where in the control's OWN box the finger landed. This is what makes a
+   * tap replayable: the page can be any height on any visit, but "38% across
+   * and 60% down the Collect button" is the same place every time. */
+  let ox = null;
+  let oy = null;
+  if (el && !secret) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      ox = clamp01((cx - r.left) / r.width);
+      oy = clamp01((cy - r.top) / r.height);
+    }
+  }
 
   // Three taps in one spot in a second and a bit: something did not react.
   const now = Date.now();
@@ -318,6 +384,12 @@ function onPointerDown(e) {
 
   push(kind, {
     x, y, yv,
+    ox, oy,
+    // Page pixels as they were measured, so a reader can rescale rather
+    // than inherit a ratio baked against one visit's page height.
+    px: Math.round(cx + (window.scrollX || 0)),
+    py: Math.round(pageY),
+    pinned,
     target: el && !secret ? keyFor(el) : null,
     label: el && !secret ? labelFor(el) : null,
   });
@@ -348,6 +420,7 @@ function onHide() {
   if (document.visibilityState === 'hidden') {
     push('leave', { depth: state.scrollMax || null });
     flushBeacon();
+    flushReplay();
   }
 }
 
@@ -472,6 +545,7 @@ export function initUxCapture({ orgId, mode = null, entry = null } = {}) {
       state.config = data;
       state.pending = false;
       if (!state.timer) state.timer = setInterval(flush, FLUSH_MS);
+      if (data.replay) startReplay();
       // The app is already on a screen by the time this answers, and that
       // first view is the one the whole flow hangs off.
       if (state.screen && !state.buffer.some(e => e.kind === 'view')) {
@@ -491,6 +565,8 @@ export function stopUxCapture() {
   state.pending = true;
   state.buffer = [];
   state.layouts = [];
+  stopReplay();
+  state.replay = [];
   if (state.timer) { clearInterval(state.timer); state.timer = null; }
   if (state.layoutTimer) { clearTimeout(state.layoutTimer); state.layoutTimer = null; }
   removeListeners();

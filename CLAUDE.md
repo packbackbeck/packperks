@@ -120,8 +120,13 @@ refetches nothing:
   running in a phone, plus the table of every control and how long it
   takes to reach. It takes the window's height, because the screen is the
   subject.
-- *Session replay* — one visit, played back step by step over the same
-  phone, which scrolls to follow it.
+- *Session replay* — the visit itself, played back. rrweb recorded a
+  snapshot of the DOM and every change to it while the customer was there,
+  and `rrweb-player` rebuilds that in an iframe
+  (`userflow/RrwebStage`): their screen, their balance, their activity,
+  scrolling when they scrolled. A visit with no recording — captured
+  before this existed, or on a venue with replay off — falls back to the
+  step-through over the sample screen.
 
 In Deferred Tikkie the four moved tiles are absent (that mode's reader
 has no such metrics) and the tabs show the capture-built ones alone, over
@@ -130,12 +135,40 @@ top as the screen, so the wallet gets a real heatmap rather than one page
 called "home".
 
 **UX capture** (`src/lib/uxCapture.js`, `supabase/functions/ux-ingest`,
-migrations 061–063) is what fills it. Taps (position plus the name of the
-control under the finger), scroll depth, screen views and the visit's end,
-written to `ux_events` / `ux_sessions`, plus `ux_layouts`: where the
-CONTROLS were on each screen, as fractions of the page. That last one is
-only for the Controls view — which button is where, so taps can be
-attributed to one and the unused ones shown cold.
+migrations 061–063, 067) is what fills it. Taps, scroll depth, screen
+views and the visit's end, written to `ux_events` / `ux_sessions`, plus
+`ux_layouts`: where the CONTROLS were on each screen.
+
+**A tap is anchored to the control it hit, not to a place on the page**
+(migration 067). It carries `target` — the control's key — and `ox`/`oy`,
+where inside that control's own box the finger landed. The dashboard reads
+the control's real rectangle out of the embedded app and puts the tap back
+on it, so the page can be any height on any visit and the heat still lands
+on the button. `px`/`py` (page pixels, beside the `vw`/`dh` they were
+measured at) are the fallback for a tap that hit nothing, and `pinned`
+says the control does not scroll, so its y was never given the scroll
+position.
+
+What that replaces: `y` used to be `pageY / dh`, a fraction of the
+document height of *that* visit. On the home screen the page ran
+1153→1947px between visits, so one button's taps were filed across a
+sixth of the screen — measured, 154px of spread on a button 48px tall.
+Every sheet and modal is `position: fixed` and was being given the scroll
+position behind it on top of that. The tools that do this well converged
+on anchoring for the same reason (Clarity aggregates per DOM element;
+PostHog's clickmap does too, and says coordinate heatmaps "drift onto
+non-clickable areas"; Mixpanel keeps the page dimensions beside each click
+rather than baking a ratio into it). The drawing itself is `simpleheat`.
+
+**The control key must not contain a value** (`src/lib/uxKeys.js`, used by
+BOTH the app and the dashboard so the two can never disagree). It is
+`data-ppk` when a component sets one; otherwise the tag, one meaningful
+class, and an `aria-label` or the first three words of the visible text
+with the digits removed. The wallet tile says "Available to collect €0.90"
+— and on a split balance appends a note after it — so keying on the label
+as written gave one control a different identity per customer, and none of
+them matched the same control in the preview the heat is drawn on. Three
+words, no numbers, is what survives both.
 
 **The screen under the heat is the real app.** `userflow/ScreenFrame`
 embeds the customer app at `/<slug>/?uxpreview=<screen>` in a device that
@@ -626,12 +659,21 @@ be readable with the public key, which let anyone list unclaimed cup ids and
 claim them. Never add a broader read policy; the customer app claims through
 claim-cups.
 
-**UX capture is not shared with PackPulse.** `ux_events`, `ux_sessions`
-and `ux_layouts` have no `packpulse_*` view, on purpose: the shared pages
-are Dashboard, System health and Reports, and a connection has no
-business replaying a venue's visits. If User flow is ever added to the
-shared pages, each table needs its own view and a `PACKPULSE_VIEWS`
-entry, like everything else below.
+**A recording is the most sensitive thing this app stores.** `ux_replays`
+holds a copy of the screen the customer had, so: written only by
+ux-ingest with the service role, readable only by a dashboard account
+(RLS), never given a `packpulse_*` view, and deleted on the same clock as
+the taps (`ux_run_retention`, and `ux_erase_user` when a customer is
+deleted). Field values are masked in the browser before they are ever
+sent (`maskAllInputs`) and `[data-ppk-private]` is blocked outright, so
+neither what anyone typed nor the profile block exists in a recording at
+all. A PackPulse connection sharing User analytics gets the heatmap and
+the flow and **zero** recordings — tested; the Session replay tab falls
+back to the step-through there.
+
+`ux_events`, `ux_sessions` and `ux_layouts` *are* shared with a
+connection that has User analytics on (migration 064), through their own
+views and `ux_guard(p_orgs)`.
 
 **The PackPulse embed reads views, not tables.** A shared page's reader
 that starts reading a new table shows zeros in PackPulse until that table

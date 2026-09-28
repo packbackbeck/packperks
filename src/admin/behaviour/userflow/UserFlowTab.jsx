@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, EmptyState, InsightsCard, KpiGrid, Segmented, TrendCard, useChartSelection,
 } from '../../ui';
 import {
-  getUxCaptureConfig, getUxFlowStats, getUxReplay, getUxReplaySessions, getUxScreen,
+  getUxCaptureConfig, getUxFlowStats, getUxPoints, getUxRecording, getUxReplay, getUxReplaySessions, getUxScreen,
   getUxTargetSeries, saveUxCaptureConfig, UX_CAPTURE_DEFAULTS,
 } from '../../lib/adminApi';
 import { BREAKDOWNS } from '../behaviourCopy';
@@ -161,14 +161,34 @@ export default function UserFlowTab({
     if (!activeScreen || !orgId) return undefined;
     let alive = true;
     const key = screenKey;
-    getUxScreen(activeScreen, range, orgIds, mode, screenDevice)
-      .then(d => { if (alive) setScreenData({ key, ...d }); })
-      .catch(() => { if (alive) setScreenData({ key, cells: [], curve: [], targets: [], layout: null }); });
+    // The points are what the heat is drawn from now; the rest of the
+    // screen's summary still comes from the aggregate reader.
+    Promise.all([
+      getUxScreen(activeScreen, range, orgIds, mode, screenDevice),
+      getUxPoints(activeScreen, range, orgIds, mode, screenDevice),
+    ])
+      .then(([d, points]) => { if (alive) setScreenData({ key, ...d, points }); })
+      .catch(() => { if (alive) setScreenData({ key, cells: [], curve: [], targets: [], layout: null, points: [] }); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screenKey]);
   const screenReady = screenData?.key === screenKey ? screenData : null;
   const screenBusy = !!activeScreen && !screenReady;
+
+  /* The rrweb recording of the selected visit, when there is one. A visit
+   * captured before recordings existed, or on a venue with replay off,
+   * simply has none and the step-through plays instead. */
+  const [recording, setRecording] = useState(null);
+  useEffect(() => {
+    if (!replayId) return undefined;
+    let alive = true;
+    // Never cleared on the way in: the result carries the id it was loaded
+    // for, and the reader ignores one that is not the visit on screen.
+    getUxRecording(replayId)
+      .then(evts => { if (alive) setRecording({ id: replayId, events: evts }); })
+      .catch(() => { if (alive) setRecording({ id: replayId, events: [] }); });
+    return () => { alive = false; };
+  }, [replayId]);
 
   useEffect(() => {
     if (!replayId) return undefined;
@@ -392,6 +412,7 @@ export default function UserFlowTab({
           onSelect={setReplayId}
           replay={replayReady}
           replayLoading={replayBusy}
+          recording={recording?.id === replayId ? recording.events : null}
           onOpenSettings={canEdit ? () => setDialog(true) : undefined}
           slug={orgSlug}
         />

@@ -7,6 +7,7 @@ import { fmtInt } from '../../ui/timeSeries';
 import { fmtDuration } from '../../lib/behaviourFormat';
 import { screenName } from '../behaviourCopy';
 import ScreenFrame from './ScreenFrame';
+import RrwebStage from './RrwebStage';
 import useFitHeight from './useFitHeight';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -57,7 +58,8 @@ function toSteps(events) {
 }
 
 export default function ReplayCard({
-  sessions = [], replayOn, loading, phrase, selected, onSelect, replay, replayLoading, onOpenSettings, slug,
+  sessions = [], replayOn, loading, phrase, selected, onSelect, replay, replayLoading, recording = null,
+  onOpenSettings, slug,
 }) {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState('2');
@@ -66,6 +68,8 @@ export default function ReplayCard({
   const fit = useRef(null);
   useFitHeight(fit);
 
+  /* rrweb needs a snapshot and at least one thing after it to play. */
+  const hasRecording = Array.isArray(recording) && recording.length > 1;
   const steps = useMemo(() => toSteps(replay?.events), [replay]);
   const step = steps[Math.min(at, Math.max(0, steps.length - 1))] || null;
 
@@ -175,6 +179,12 @@ export default function ReplayCard({
               </EmptyState>
             ) : replayLoading ? (
               <div className="uf-replay__loading" aria-busy="true">Loading the visit…</div>
+            ) : hasRecording ? (
+              /* A real recording of this visit: the screen they actually
+                 had, not this screen re-enacted. */
+              <div className="uf-replay__phone uf-replay__phone--rrweb">
+                <RrwebStage events={recording} speed={Number(speed) || 1} />
+              </div>
             ) : !steps.length ? (
               <EmptyState icon={Play} title="Nothing to play">
                 This visit has no steps left — it may have fallen outside the venue’s retention window.

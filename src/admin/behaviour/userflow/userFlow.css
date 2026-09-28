@@ -351,6 +351,18 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
   overflow: hidden;
 }
 .uf-replay__loading { padding: 40px; text-align: center; color: var(--ui-muted); font-size: 13px; }
+
+/* A real recording brings its own player, with its own controls and its
+   own idea of the screen's size — it is the customer's viewport, not a
+   phone we chose. So this box only centres it and lets it scroll if the
+   visit was on something bigger than the card. */
+.uf-replay__phone--rrweb {
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow: auto; padding: 12px;
+}
+.uf-rrweb { max-width: 100%; }
+.uf-rrweb .rr-player { box-shadow: var(--ui-shadow, 0 2px 14px rgba(0, 0, 0, .08)); border-radius: 12px; }
+.uf-rrweb .replayer-wrapper { background: #fff; }
 /* Under the phone, not over it: the phone's box clips, and a caption
  * half-hidden by a bezel is worse than one on its own line. */
 .uf-replay__caption {

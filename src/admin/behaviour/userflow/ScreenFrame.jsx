@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BatteryFull, Signal, Wifi } from 'lucide-react';
+import { measureControls } from '../../../lib/uxKeys';
 
 /* ─────────────────────────────────────────────────────────────────────
  * The customer's screen, for real.
@@ -20,7 +21,12 @@ import { BatteryFull, Signal, Wifi } from 'lucide-react';
  * on the thing it was measured against.
  *
  * `onGeometry` reports the rendered page height once the app has settled,
- * which is what the overlays size themselves against.
+ * which is what the overlays size themselves against, and `onControls`
+ * reports where every named control ended up — measured out of the live
+ * document, in its own page pixels. That is what a tap is put back onto:
+ * the control it hit, wherever it is on THIS render, rather than a
+ * fraction of whatever height the page happened to be on the visit it was
+ * recorded in.
  * ───────────────────────────────────────────────────────────────────── */
 
 const DEVICE = {
@@ -30,7 +36,7 @@ const DEVICE = {
 };
 
 export default function ScreenFrame({
-  slug, screen, device = 'mobile', children, scrollTo = null, onGeometry, note,
+  slug, screen, device = 'mobile', children, scrollTo = null, onGeometry, onControls, note,
 }) {
   const box = useRef(null);
   const frame = useRef(null);
@@ -77,11 +83,16 @@ export default function ScreenFrame({
       if (!doc?.body) return;
       const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight, dev.h);
       setPageHeight((prev) => (prev && Math.abs(prev - h) < 4 ? prev : h));
+      if (onControls) {
+        // The same keys the customer app wrote onto each tap (lib/uxKeys),
+        // so a tap and a control cannot disagree about what they are called.
+        onControls(measureControls(doc, el.contentWindow));
+      }
     } catch {
       // Cross-origin would land here; this app is always same-origin.
       setFailed(true);
     }
-  }, [dev.h]);
+  }, [dev.h, onControls]);
 
   // A different screen is a different page: forget the old one's height
   // while rendering, so the overlay is never sized against the last one.

@@ -11,7 +11,7 @@ import {
  * dashboard tab (cup sharing, donations) takes the tab with it when it is
  * switched off. Everything else is grouped by what a person is deciding:
  * how customers are paid, the limits, the venue's locations, and the privacy
- * policy. App text lives in Design & copy; the organisation's profile, its
+ * policy. App text lives in Client app; the organisation's profile, its
  * programme model, people and roles live in Master Settings.
  * ───────────────────────────────────────────────────────────────────── */
 
@@ -54,7 +54,7 @@ export const FEATURES = [
     key: 'featureDonations', group: 'app', icon: HeartHandshake, tone: 'rose', modes: ALL, fallback: true,
     label: 'Donations',
     summary: 'Customers give their cups, or their wallet balance, to your charity partner.',
-    detail: 'Switching it off removes the donate button from the app and the Donations tab from this dashboard. In Deferred Tikkie the customer picks how much of their balance to give. The charity’s name is set in Design & copy (Plastic Soup Foundation unless changed).',
+    detail: 'Switching it off removes the donate button from the app and the Donations tab from this dashboard. In Deferred Tikkie the customer picks how much of their balance to give. The charity’s name is set in Client app (Plastic Soup Foundation unless changed).',
     tab: 'donations',
   },
   {

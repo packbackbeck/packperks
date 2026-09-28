@@ -898,7 +898,7 @@ function StepCopy({ data, grouped, onChange }) {
   return (
     <div className="oow-form">
       <p className="oow-step-intro">
-        The words on the customer’s home screen, filled in for the programme you picked. You can change them later in Design &amp; copy.
+        The words on the customer’s home screen, filled in for the programme you picked. You can change them later in Client app.
         {grouped && ' A venue in a group shows the group’s headline instead.'}
       </p>
       <Field label="Headline">

@@ -82,45 +82,6 @@
   overflow: hidden;
 }
 
-/* ── The device (ScreenFrame) ───────────────────────────────────────
- *
- * A real 375 × 812 phone viewport with the real customer app inside it,
- * scaled down as one piece so the app is never asked to lay out at a
- * width it was not designed for — everything inside keeps its true
- * proportions, the way Design & copy's phone does.
- *
- * The phone keeps its own colours in both themes: it stands in for a
- * customer's device, and that device does not have a dark mode because
- * the dashboard does. */
-.ufs {
-  position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-}
-.ufs__device { position: absolute; top: 0; left: 0; transform-origin: top left; }
-.ufs__bezel {
-  position: relative; width: 100%; height: 100%;
-  padding: 12px; box-sizing: border-box;
-  border-radius: 58px;
-  background: linear-gradient(150deg, #3A3844 0%, #17161C 45%, #26242E 100%);
-  box-shadow:
-    inset 0 0 0 1.5px rgb(255 255 255 / 10%),
-    inset 0 0 0 5px #0E0D12,
-    0 40px 80px -36px rgb(38 24 92 / 45%),
-    0 18px 36px -20px rgb(23 21 31 / 40%);
-}
-.ufs--desktop .ufs__bezel, .ufs--tablet .ufs__bezel { padding: 10px; border-radius: 20px; }
-
-/* The screen scrolls its page exactly as the phone does. */
-.ufs__screen {
-  position: relative; width: 100%; height: 100%;
-  overflow-y: auto; overflow-x: hidden;
-  border-radius: 46px; background: #FFFFFF;
-  scroll-behavior: smooth;
-  scrollbar-width: none;
-}
-.ufs__screen::-webkit-scrollbar { width: 0; height: 0; }
-.ufs--desktop .ufs__screen, .ufs--tablet .ufs__screen { border-radius: 10px; }
-
 .ufs__app { display: block; border: 0; pointer-events: none; background: transparent; }
 .ufs__note {
   position: absolute; inset: 0; margin: 0;
@@ -170,24 +131,6 @@
 @keyframes ufs-tap {
   0% { transform: scale(0.3); opacity: 1; }
   100% { transform: scale(2.1); opacity: 0; }
-}
-
-/* The phone's own furniture, over the screen. */
-.ufs__status {
-  position: absolute; top: 12px; left: 12px; right: 12px; height: 46px;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px; color: #17151F; pointer-events: none;
-  font-size: 14px; font-weight: 700;
-}
-.ufs__island {
-  position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
-  width: 118px; height: 33px; border-radius: 999px; background: #0E0D12;
-}
-.ufs__icons { display: inline-flex; align-items: center; gap: 4px; }
-.ufs__homebar {
-  position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
-  width: 134px; height: 5px; border-radius: 999px;
-  background: rgb(23 21 31 / 30%); pointer-events: none;
 }
 
 .uf-heat__foot {
@@ -343,54 +286,191 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
 }
 
 .uf-replay__stage {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 14px 16px; min-width: 0; align-items: center;
+  display: flex; align-items: stretch; justify-content: center;
+  min-width: 0; min-height: 0;
 }
-.uf-replay__phone {
-  position: relative; flex: 1 1 auto; min-height: 320px; width: 100%;
-  overflow: hidden;
-}
-.uf-replay__loading { padding: 40px; text-align: center; color: var(--ui-muted); font-size: 13px; }
+.uf-replay__stage > .ui-empty { align-self: center; }
+.uf-replay__loading { align-self: center; padding: 40px; text-align: center; color: var(--ui-muted); font-size: 13px; }
 
-/* A real recording brings its own player, with its own controls and its
-   own idea of the screen's size — it is the customer's viewport, not a
-   phone we chose. So this box only centres it and lets it scroll if the
-   visit was on something bigger than the card. */
-.uf-replay__phone--rrweb {
-  display: flex; align-items: flex-start; justify-content: center;
-  overflow: auto; padding: 12px;
+/* ── The player (ReplayPlayer) ──────────────────────────────────────
+ * The screen on the left, what they did on the right, one transport
+ * under the screen. Every part reads the same clock. */
+.uf-rp {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "stage side" "transport side";
 }
-.uf-rrweb { max-width: 100%; }
-.uf-rrweb .rr-player { box-shadow: var(--ui-shadow, 0 2px 14px rgba(0, 0, 0, .08)); border-radius: 12px; }
-.uf-rrweb .replayer-wrapper { background: #fff; }
-/* Under the phone, not over it: the phone's box clips, and a caption
- * half-hidden by a bezel is worse than one on its own line. */
-.uf-replay__caption {
-  display: inline-flex; align-items: baseline; gap: 6px;
-  margin: 0; max-width: 100%;
-  padding: 5px 12px; border-radius: 999px;
-  background: var(--ui-soft); border: 1px solid var(--ui-border);
-  font-size: 12px; color: var(--ui-muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* The device is placed absolutely inside this box, so the box must have
+ * a definite size of its own (see ScreenFrame / DeviceChrome). */
+.uf-rp__stage { grid-area: stage; position: relative; min-height: 0; margin: 16px 16px 4px; }
+.uf-rp__msg { margin: 0; padding: 24px; font-size: 13px; color: var(--ui-muted); text-align: center; }
+.uf-rp__msg--over {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 18px; color: #6B6778; background: #F7F6FA; z-index: 4;
 }
-.uf-replay__caption strong { font-size: 12.5px; color: var(--ui-fg); }
 
-.uf-replay__controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; }
-.uf-replay__scrub { flex: 1 1 140px; accent-color: var(--ui-primary); }
-.uf-replay__time { font-size: 12px; color: var(--ui-muted); font-variant-numeric: tabular-nums; min-width: 58px; }
-.uf-replay__marks { position: relative; height: 10px; width: 100%; }
-.uf-mark {
-  position: absolute; top: 3px; width: 3px; height: 4px; margin-left: -1px;
-  border-radius: 2px; background: var(--ui-border-2);
+.uf-rp__side {
+  grid-area: side; display: flex; flex-direction: column; min-height: 0;
+  border-left: 1px solid var(--ui-border); background: var(--ui-card);
 }
-.uf-mark--view { background: var(--ui-primary); }
-.uf-mark--click { background: var(--ui-muted-2); }
-.uf-mark--rage { background: var(--ui-danger); height: 8px; top: 1px; }
-.uf-mark--dead { background: var(--ui-accent); height: 7px; top: 2px; }
-.uf-mark--now { background: var(--ui-fg); height: 10px; top: 0; width: 2px; }
-.uf-replay__note {
-  display: flex; align-items: flex-start; gap: 6px; margin: 0; width: 100%;
-  font-size: 11.5px; color: var(--ui-muted); line-height: 1.5;
+.uf-rp__sidehead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 14px 16px 10px; border-bottom: 1px solid var(--ui-border);
+}
+.uf-rp__sidehead strong { font-size: 13px; font-weight: 700; color: var(--ui-fg); }
+.uf-rp__sidehead span { font-size: 11.5px; color: var(--ui-muted); }
+.uf-rp__steps {
+  list-style: none; margin: 0; padding: 6px;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; position: relative;
+}
+.uf-rp__none { padding: 12px 10px; font-size: 12px; color: var(--ui-muted); }
+.uf-rp__source {
+  margin: 0; padding: 10px 16px 14px; border-top: 1px solid var(--ui-border);
+  font-size: 11px; line-height: 1.5; color: var(--ui-muted);
+}
+
+.uf-step {
+  display: grid; grid-template-columns: 34px 22px minmax(0, 1fr); align-items: center; gap: 8px;
+  width: 100%; padding: 6px 8px; border: 0; border-radius: var(--ui-radius-sm);
+  background: transparent; text-align: left; cursor: pointer;
+  font: inherit; font-size: 12.5px; line-height: 1.35; color: var(--ui-fg-2);
+  transition: background 0.12s var(--ui-ease), color 0.12s var(--ui-ease);
+}
+.uf-step:hover { background: var(--ui-soft); }
+.uf-step:focus-visible { outline: 2px solid var(--ui-primary-line); outline-offset: -2px; }
+.uf-step--next { color: var(--ui-muted); }
+.uf-step--next .uf-step__text strong { color: var(--ui-fg-2); }
+.uf-step--now { background: var(--ui-primary-soft); color: var(--ui-fg); }
+.uf-step--now:hover { background: var(--ui-primary-soft); }
+.uf-step__time { font-size: 11px; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.uf-step__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: var(--ui-soft); color: var(--ui-fg-2);
+}
+.uf-step--click .uf-step__icon { background: var(--ui-primary-soft); color: var(--ui-primary); }
+.uf-step--now.uf-step--click .uf-step__icon { background: var(--ui-primary); color: var(--ui-primary-fg); }
+.uf-step--rage .uf-step__icon { background: var(--ui-danger-soft); color: var(--ui-danger); }
+.uf-step--dead .uf-step__icon { background: var(--ui-accent-soft); color: var(--ui-accent); }
+.uf-step__text {
+  min-width: 0; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.uf-step__text strong { font-weight: 600; color: var(--ui-fg); }
+
+/* The transport. */
+.uf-tp {
+  grid-area: transport; display: flex; flex-direction: column; gap: 6px;
+  padding: 6px 16px 14px;
+}
+.uf-tp__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.uf-tp__spacer { flex: 1 1 auto; }
+.uf-tp__play {
+  flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ui-primary); color: var(--ui-primary-fg); cursor: pointer;
+  transition: background 0.12s var(--ui-ease);
+}
+.uf-tp__play:hover { background: var(--ui-primary-hover); }
+.uf-tp__play:disabled { opacity: 0.4; cursor: default; }
+.uf-tp__play:focus-visible { outline: 2px solid var(--ui-primary-line); outline-offset: 2px; }
+.uf-tp__time {
+  flex: none; min-width: 76px;
+  font-size: 12.5px; font-weight: 600; color: var(--ui-fg); font-variant-numeric: tabular-nums;
+}
+.uf-tp__time em { font-style: normal; font-weight: 400; color: var(--ui-muted); }
+.uf-tp__track { position: relative; height: 26px; }
+.uf-tp__rail, .uf-tp__fill {
+  position: absolute; left: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 999px;
+}
+.uf-tp__rail { right: 0; background: var(--ui-border); }
+.uf-tp__fill { background: var(--ui-primary); }
+.uf-tp__mark {
+  position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  border-radius: 50%; background: var(--ui-card); border: 2px solid var(--ui-primary);
+  pointer-events: none;
+}
+.uf-tp__mark--view, .uf-tp__mark--leave {
+  width: 2px; height: 12px; margin: -6px 0 0 -1px; border: 0; border-radius: 1px; background: var(--ui-muted-2);
+}
+.uf-tp__mark--rage { border-color: var(--ui-danger); background: var(--ui-danger); }
+.uf-tp__mark--dead { border-color: var(--ui-accent); }
+.uf-tp__track input[type="range"] {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer;
+}
+.uf-tp__track input[type="range"]:disabled { cursor: default; }
+.uf-tp__track input[type="range"]::-webkit-slider-runnable-track { height: 26px; background: transparent; }
+.uf-tp__track input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; margin-top: 6px; border-radius: 50%;
+  background: var(--ui-card); border: 2px solid var(--ui-primary); box-shadow: var(--ui-shadow-sm);
+}
+.uf-tp__track input[type="range"]::-moz-range-track { background: transparent; }
+.uf-tp__track input[type="range"]::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--ui-card); border: 2px solid var(--ui-primary);
+}
+.uf-tp__track input[type="range"]:focus-visible { outline: 2px solid var(--ui-primary-line); outline-offset: 2px; border-radius: 6px; }
+.uf-tp__skip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ui-fg-2); cursor: pointer; }
+
+/* The recording, inside the device. Sizes here are the customer's own
+ * pixels: the whole device is scaled down as one piece afterwards. */
+.ufs__screen--rec { overflow: hidden; }
+.uf-rec { position: absolute; top: 0; left: 0; background: #FFFFFF; }
+.uf-rec iframe { display: block; border: 0; background: #FFFFFF; }
+/* Taps are drawn by us, with the control's name; rrweb's own touch ring
+ * would be a second circle in a different place. A desktop cursor stays. */
+.uf-rec .replayer-mouse.touch-device { display: none; }
+.uf-rec__over { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.uf-rec__tap {
+  position: absolute; z-index: 2;
+  width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+  background: rgb(91 63 214 / 28%); border: 3px solid rgb(91 63 214 / 92%);
+  animation: uf-rec-tap 1.4s var(--ui-ease) forwards;
+}
+.uf-rec__tap--rage { background: rgb(217 45 85 / 30%); border-color: rgb(217 45 85 / 92%); }
+.uf-rec__tap--dead { background: rgb(226 85 43 / 28%); border-color: rgb(226 85 43 / 92%); }
+@keyframes uf-rec-tap {
+  0% { transform: scale(0.35); opacity: 1; }
+  30% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+.uf-rec__hit {
+  position: absolute; box-sizing: border-box;
+  border: 3px solid #5B3FD6; border-radius: 12px;
+  box-shadow: 0 0 0 5px rgb(91 63 214 / 18%);
+  animation: uf-rec-fade 1.6s ease forwards;
+}
+.uf-rec__labelrow {
+  position: absolute; left: 14px; right: 14px; z-index: 3;
+  display: flex; justify-content: center;
+}
+.uf-rec__label {
+  max-width: 100%; padding: 7px 14px; border-radius: 999px;
+  background: #17151F; color: #FFFFFF;
+  font: 600 17px/1.25 var(--ui-font, system-ui, sans-serif);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 6px 18px -6px rgb(23 21 31 / 45%);
+  animation: uf-rec-fade 1.6s ease forwards;
+}
+@keyframes uf-rec-fade {
+  0%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uf-rec__tap, .uf-rec__hit, .uf-rec__label { animation-duration: 0.01s; animation-delay: 1.2s; }
+}
+
+@media (max-width: 1240px) {
+  .uf-rp {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto 190px;
+    grid-template-areas: "stage" "transport" "side";
+  }
+  .uf-rp__side { border-left: 0; border-top: 1px solid var(--ui-border); }
+  .uf-rp__source { display: none; }
 }
 
 /* ── Capture settings ───────────────────────────────────────────── */
@@ -463,7 +543,7 @@ button.uf-step:hover { border-color: var(--ui-border-2); }
    * hangs out of the card. */
   .uf-heat, .uf-heat__rail, .uf-replay__body, .uf-replay__list { height: auto; }
   .uf-heat__stage, .uf-replay__stage { height: auto; }
-  .uf-heat__phone, .uf-replay__phone { height: min(70vh, 560px); flex: none; }
+  .uf-heat__phone, .uf-rp__stage { height: min(70vh, 560px); flex: none; }
   .uf-heat__rail, .uf-replay__list {
     flex-direction: row; overflow-x: auto; max-height: none;
     border-right: 0; border-bottom: 1px solid var(--ui-border);

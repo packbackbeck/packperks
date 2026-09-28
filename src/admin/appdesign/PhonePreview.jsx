@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { BatteryFull, ChevronLeft, Gift, Pencil, Plus, Signal, User, Wifi, X } from 'lucide-react';
 import packbackLogo from '../../assets/images/packback-logo.png';
 import cupIcon from '../../assets/images/cup-icon.svg';
@@ -100,7 +101,7 @@ function HomeScreen({ view }) {
           </div>
         )}
         <div className="dzp-header__tiles">
-          <span className="dzp-tile dzp-tile--add"><Plus size={20} strokeWidth={2.4} /></span>
+          {show.addButton && <span className="dzp-tile dzp-tile--add"><Plus size={20} strokeWidth={2.4} /></span>}
           <span className="dzp-tile dzp-tile--cups">
             <span className="dzp-tile__count">{collected}</span>
             <img src={cupIcon} alt="" className="dzp-tile__cup" />
@@ -109,62 +110,81 @@ function HomeScreen({ view }) {
         </div>
       </div>
 
-      <div className="dzp-hero">
-        {view.headline && <h1 className="dzp-hero__headline">{view.headline.replace(/,\s*/g, ',\n')}</h1>}
-        {view.showSubtext && view.subtext && <p className="dzp-hero__sub">{view.subtext}</p>}
-      </div>
-
-      <CupTrack collected={collected} target={need} />
-
-      <section className="dzp-feat">
-        <div className={`dzp-feat__top${unlocked ? ' is-complete' : ''}`}>
-          <div className="dzp-feat__fill" style={{ width: `${Math.min(100, (collected / need) * 100)}%` }} />
-          <div className="dzp-feat__content">
-            <RewardImage reward={reward} className="dzp-feat__img" />
-            <div className="dzp-feat__info">
-              <h2 className="dzp-feat__name">{reward.displayLines?.length ? reward.displayLines.join('\n') : reward.name}</h2>
-              <div className="dzp-feat__tags">
-                {(reward.tags || []).filter(t => t && t.toUpperCase() !== 'FREE').map(t => (
-                  <span key={t} className="dzp-feat__tag">{t}</span>
-                ))}
-                <span className="dzp-feat__tag dzp-feat__tag--cups">
-                  {money(reward.value)} for <MugGlyph size={12} /> {need} cups
-                </span>
+      {/* The home's sections in the venue's order (lib/appLayout.js). */}
+      {view.order.map((key) => {
+        if (key === 'headline') {
+          if (!show.headline) return null;
+          return (
+            <Fragment key={key}>
+              <div className="dzp-hero">
+                {view.headline && <h1 className="dzp-hero__headline">{view.headline.replace(/,\s*/g, ',\n')}</h1>}
+                {view.showSubtext && view.subtext && <p className="dzp-hero__sub">{view.subtext}</p>}
               </div>
-            </div>
-          </div>
-        </div>
-        <div className="dzp-feat__bottom">
-          <img src={zigzagImg} alt="" className="dzp-feat__zigzag" />
-          <p className="dzp-feat__desc">
-            {view.isVoucher ? (
-              <>{unlocked ? 'Show' : 'Once you unlock this, show'} your voucher to the staff at <strong>{view.store}</strong> and enjoy it. </>
-            ) : (
-              <>
-                {unlocked ? 'Buy it from ' : 'Once you unlock this, buy it from '}
-                <strong>{view.store}</strong> and take a picture of the receipt to claim the reward.{' '}
-                {view.isTikkie ? <>We&apos;ll send your cashback via <b className="dzp-feat__tikkie">Tikkie</b>.</> : <>We&apos;ll send your cashback to you.</>}{' '}
-                <em className="dzp-feat__link">Cashback terms</em>
-              </>
-            )}
-            {show.directRefund && (
-              <><span style={{ margin: '0 4px' }}>or</span><em className="dzp-feat__link">Get the direct refund</em></>
-            )}
-          </p>
-          <span className={`dzp-feat__claim${unlocked ? '' : ' is-locked'}`}>
-            {view.isVoucher ? 'Redeem at the counter' : (
-              <><img src={cashbackIcon} alt="" className="dzp-feat__claim-icon" />Get {money(reward.value)} cashback</>
-            )}
-          </span>
-        </div>
-      </section>
-
-      {others.length > 0 && (
-        <section className="dzp-goals">
-          <h2 className="dzp-goals__title">Change your goal</h2>
-          {others.map(r => <GoalCard key={r.id} reward={r} collected={collected} money={money} />)}
-        </section>
-      )}
+            </Fragment>
+          );
+        }
+        if (key === 'progress') return <CupTrack key={key} collected={collected} target={need} />;
+        if (key === 'featured') {
+          return (
+            <Fragment key={key}>
+              <section className="dzp-feat">
+                <div className={`dzp-feat__top${unlocked ? ' is-complete' : ''}`}>
+                  <div className="dzp-feat__fill" style={{ width: `${Math.min(100, (collected / need) * 100)}%` }} />
+                  <div className="dzp-feat__content">
+                    <RewardImage reward={reward} className="dzp-feat__img" />
+                    <div className="dzp-feat__info">
+                      <h2 className="dzp-feat__name">{reward.displayLines?.length ? reward.displayLines.join('\n') : reward.name}</h2>
+                      <div className="dzp-feat__tags">
+                        {(reward.tags || []).filter(t => t && t.toUpperCase() !== 'FREE').map(t => (
+                          <span key={t} className="dzp-feat__tag">{t}</span>
+                        ))}
+                        <span className="dzp-feat__tag dzp-feat__tag--cups">
+                          {money(reward.value)} for <MugGlyph size={12} /> {need} cups
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="dzp-feat__bottom">
+                  <img src={zigzagImg} alt="" className="dzp-feat__zigzag" />
+                  <p className="dzp-feat__desc">
+                    {view.isVoucher ? (
+                      <>{unlocked ? 'Show' : 'Once you unlock this, show'} your voucher to the staff at <strong>{view.store}</strong> and enjoy it. </>
+                    ) : (
+                      <>
+                        {unlocked ? 'Buy it from ' : 'Once you unlock this, buy it from '}
+                        <strong>{view.store}</strong> and take a picture of the receipt to claim the reward.{' '}
+                        {view.isTikkie ? <>We&apos;ll send your cashback via <b className="dzp-feat__tikkie">Tikkie</b>.</> : <>We&apos;ll send your cashback to you.</>}{' '}
+                        <em className="dzp-feat__link">Cashback terms</em>
+                      </>
+                    )}
+                    {show.directRefund && (
+                      <><span style={{ margin: '0 4px' }}>or</span><em className="dzp-feat__link">Get the direct refund</em></>
+                    )}
+                  </p>
+                  <span className={`dzp-feat__claim${unlocked ? '' : ' is-locked'}`}>
+                    {view.isVoucher ? 'Redeem at the counter' : (
+                      <><img src={cashbackIcon} alt="" className="dzp-feat__claim-icon" />Get {money(reward.value)} cashback</>
+                    )}
+                  </span>
+                </div>
+              </section>
+            </Fragment>
+          );
+        }
+        if (key === 'more') {
+          if (!show.more || !others.length) return null;
+          return (
+            <Fragment key={key}>
+              <section className="dzp-goals">
+                <h2 className="dzp-goals__title">Change your goal</h2>
+                {others.map(r => <GoalCard key={r.id} reward={r} collected={collected} money={money} />)}
+              </section>
+            </Fragment>
+          );
+        }
+        return null;
+      })}
     </div>
   );
 }

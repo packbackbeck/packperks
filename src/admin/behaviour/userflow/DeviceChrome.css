@@ -1,0 +1,67 @@
+/* DeviceChrome — a phone, tablet or laptop drawn around a screen of an
+ * exact size. Used by the heatmap, session replay and Client app's live
+ * preview, so it carries its own stylesheet rather than borrowing one
+ * page's. Prefixed `ufs-`: the customer app's support form owns `.sf`,
+ * and both apps' CSS ends up in one bundle (see CLAUDE.md). */
+
+/* ── The device (DeviceChrome) ──────────────────────────────────────
+ *
+ * A real 375 × 812 phone viewport with the real customer app inside it,
+ * scaled down as one piece so the app is never asked to lay out at a
+ * width it was not designed for — everything inside keeps its true
+ * proportions, the way Client app's phone does.
+ *
+ * The phone keeps its own colours in both themes: it stands in for a
+ * customer's device, and that device does not have a dark mode because
+ * the dashboard does. */
+.ufs {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+}
+.ufs__device { position: absolute; top: 0; left: 0; transform-origin: top left; }
+.ufs__bezel {
+  position: relative; width: 100%; height: 100%;
+  box-sizing: border-box; /* padding is the bezel, set by DeviceChrome */
+  border-radius: 58px;
+  background: linear-gradient(150deg, #3A3844 0%, #17161C 45%, #26242E 100%);
+  box-shadow:
+    inset 0 0 0 1.5px rgb(255 255 255 / 10%),
+    inset 0 0 0 5px #0E0D12,
+    0 40px 80px -36px rgb(38 24 92 / 45%),
+    0 18px 36px -20px rgb(23 21 31 / 40%);
+}
+.ufs--desktop .ufs__bezel, .ufs--tablet .ufs__bezel { border-radius: 20px; }
+
+/* The screen scrolls its page exactly as the phone does. */
+.ufs__screen {
+  position: relative; width: 100%; height: 100%;
+  overflow-y: auto; overflow-x: hidden;
+  border-radius: 46px; background: #FFFFFF;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+.ufs__screen::-webkit-scrollbar { width: 0; height: 0; }
+.ufs--desktop .ufs__screen, .ufs--tablet .ufs__screen { border-radius: 10px; }
+
+/* The phone's own furniture, over the screen. */
+.ufs__status {
+  position: absolute; top: 12px; left: 12px; right: 12px; height: 46px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; color: #17151F; pointer-events: none;
+  font-size: 14px; font-weight: 700;
+}
+.ufs__island {
+  position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
+  width: 118px; height: 33px; border-radius: 999px; background: #0E0D12;
+}
+.ufs__icons { display: inline-flex; align-items: center; gap: 4px; }
+.ufs__homebar {
+  position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
+  width: 134px; height: 5px; border-radius: 999px;
+  background: rgb(23 21 31 / 30%); pointer-events: none;
+}
+
+/* A recording brings its own top of the screen: no status bar, and a
+   smaller corner so the customer's page is not cut. */
+.ufs--bare .ufs__screen { border-radius: 36px; }
+.ufs--bare.ufs--desktop .ufs__screen, .ufs--bare.ufs--tablet .ufs__screen { border-radius: 10px; }

@@ -600,7 +600,7 @@ function CopyTab({ group, copy, setCopy, preset, saved, busy, run }) {
 
       <Sec
         title="How it works"
-        hint="A venue with its own guide in Design & copy shows that one instead. Venues that pay with the slider voucher show a counter step in place of the last one."
+        hint="A venue with its own guide in Client app shows that one instead. Venues that pay with the slider voucher show a counter step in place of the last one."
         action={<UseDefault show={JSON.stringify(copy.steps) !== JSON.stringify(preset.steps)} onClick={reset({ steps: preset.steps })} />}
       >
         <ol className="ms-steps">
@@ -644,7 +644,7 @@ function CopyTab({ group, copy, setCopy, preset, saved, busy, run }) {
 
       <Sec
         title="Button labels"
-        hint="These replace the labels set in Design & copy for every venue in the group."
+        hint="These replace the labels set in Client app for every venue in the group."
         action={<UseDefault show={LABELS.some(([k]) => copy.labels[k] !== preset.labels[k])} onClick={reset({ labels: preset.labels })} />}
       >
         <div className="ms-fields">

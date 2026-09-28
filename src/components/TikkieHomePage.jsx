@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getSmartbinLocations } from '../lib/api';
@@ -18,6 +18,8 @@ import Header from './Header';
 import TikkieActivitySheet from './TikkieActivitySheet';
 import { setUxUser, uxScreen } from '../lib/uxCapture';
 import { payoutLinkState } from '../lib/payoutLink';
+import { homeOrder, savedOrder } from '../lib/appLayout';
+import { useDraftPreview } from '../lib/draftPreview';
 import smartbinTop from '../assets/images/smartbin-top.png';
 import './TikkieHomePage.css';
 
@@ -302,7 +304,17 @@ function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, inSheet = fa
   );
 }
 
-export default function TikkieHomePage({ org, settings = {}, batchId = '', cupIds = [], staticQr = null, consentReady = true }) {
+const NO_SETTINGS = {};
+
+export default function TikkieHomePage({ org, settings: publishedSettings = NO_SETTINGS, batchId = '', cupIds = [], staticQr = null, consentReady = true }) {
+  // In Client app's preview the dashboard's draft is laid over what is
+  // published (lib/draftPreview); everywhere else this is the published row.
+  const draftSettings = useDraftPreview();
+  const settings = useMemo(
+    () => (draftSettings ? { ...publishedSettings, ...draftSettings } : publishedSettings),
+    [publishedSettings, draftSettings],
+  );
+  const design = useMemo(() => mergeDesign(settings?.design), [settings?.design]);
   // Currency AND payout copy follow the active region: a UAE venue shows
   // AED and never names Tikkie, which is a Dutch product with no UAE
   // equivalent wired up yet (payments.js). `isLinkPayout` gates every
@@ -349,7 +361,7 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     UX_PREVIEW === 'activity-detail' ? DEMO_WALLET.history.find(h => h.kind === 'payout') || DEMO_WALLET.history[1] : null
   ));   // an activity row, opened
 
-  /* A venue with its own colours (Design & copy) wears them here too: the
+  /* A venue with its own colours (Client app) wears them here too: the
    * tile takes the accent, buttons and text the rest of the palette. A
    * venue without any keeps the PackPerks orange. */
   const ownColors = settings?.design?.colors && Object.keys(settings.design.colors).length
@@ -733,6 +745,24 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
     : null;
   const lifetimeCups = returns.reduce((t, h) => t + Number(h.cups || 0), 0);
 
+  /* What shows, and in what order. The venue's switches and order live in
+   * settings.design (Client app → Sections). With the default order, How
+   * you get paid sits above Activity for somebody who has none yet and
+   * moves below it once there is some; a venue that set its own order
+   * gets exactly that order. */
+  const sections = design.sections;
+  const show = {
+    email: sections.showEmailCard !== false,
+    howPaid: sections.showHowPaid !== false,
+    activity: sections.showActivity !== false,
+    impact: sections.showImpact !== false,
+    bins: sections.showBinMap !== false,
+  };
+  const donateShown = donationsOn && sections.showDonate !== false;
+  const order = savedOrder(design.layout, 'tikkie') || !hasActivity
+    ? homeOrder(design.layout, 'tikkie')
+    : homeOrder(null, 'tikkie').filter(k => k !== 'howPaid').flatMap(k => (k === 'activity' ? [k, 'howPaid'] : [k]));
+
   const canCollect = owed > 0;
 
   return (
@@ -742,201 +772,229 @@ export default function TikkieHomePage({ org, settings = {}, batchId = '', cupId
         onBadgeClick={() => setShowAccount(true)}
         onAddCup={() => setScanner(true)}
         org={org}
-        design={mergeDesign(settings?.design)}
+        design={design}
         claimStatus={balance > 0 ? 'ready' : null}
-        showAdd
+        showAdd={design.sections.showAddButton !== false}
         showCups={false}
       />
 
-      {/* ── The wallet tile: the AVAILABLE amount, tap to collect ── */}
-      <button
-        type="button"
-        className="tikkie-home__hero"
-        style={ownColors?.accent ? { '--tk-hero': ownColors.accent } : undefined}
-        onClick={() => (canCollect ? setPopup({ type: 'redeem' }) : setScanner(true))}
-      >
-        <div className="tikkie-home__hero-copy">
-          <span className="tikkie-home__hero-label">Available to collect</span>
-          <div className="tikkie-home__hero-amount">{money(shownOwed)}</div>
-          {/* Only when the total really is split — some in the wallet, some
-              in a link nobody opened. Then say how to get it and where the
-              older part lives, in as few words as possible. One part alone
-              needs no explaining. */}
-          {openLinkTotal > 0 && balance > 0 && (
-            <span className="tikkie-home__hero-note">
-              {actionButtons ? 'Collect it all below.' : 'Tap to collect it all.'}
-              <br />{money(openLinkTotal)} sits in a link in your activity.
-            </span>
-          )}
-          {!actionButtons && (
-            <span className="tikkie-home__hero-cta">
-              {canCollect ? collectLabel : 'Scan a receipt'}
-            </span>
-          )}
-        </div>
-        <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
-      </button>
-
-      {/* ── Collect and Donate, as two big buttons under the tile ── */}
-      {actionButtons && (
-        <div className={`tikkie-home__actions${donationsOn ? '' : ' tikkie-home__actions--single'}`}>
-          {canCollect ? (
+      {/* The home screen's sections, in the venue's order (Client app →
+          Sections; lib/appLayout.js). Each is drawn only when its switch
+          is on and it has something to say. */}
+      {order.map((key) => {
+        if (key === 'wallet') {
+          /* ── The wallet tile: the AVAILABLE amount, tap to collect. Always
+                shown: without it there is no app. ── */
+          return (
+            <Fragment key={key}>
             <button
               type="button"
-              className={`tikkie-home__action ${isLinkPayout ? 'tikkie-home__action--tikkie' : 'tikkie-home__action--collect'}`}
-              onClick={handleOpenTikkie}
-              disabled={redeeming}
+              className="tikkie-home__hero"
+              style={ownColors?.accent ? { '--tk-hero': ownColors.accent } : undefined}
+              onClick={() => (canCollect ? setPopup({ type: 'redeem' }) : setScanner(true))}
             >
-              <span className="tikkie-home__action-icon" aria-hidden="true">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" /><path d="M2.5 10h19" /><path d="M6.5 14.5h4" /></svg>
-              </span>
-              <span className="tikkie-home__action-label">{redeeming ? 'Preparing…' : collectLabel}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="tikkie-home__action tikkie-home__action--scan"
-              onClick={() => setScanner(true)}
-            >
-              <span className="tikkie-home__action-icon" aria-hidden="true">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" /><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" /><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" /><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" /><rect x="8.5" y="8.5" width="7" height="7" rx="1" /></svg>
-              </span>
-              <span className="tikkie-home__action-label">Scan a QR code</span>
-            </button>
-          )}
-          {donationsOn && (
-            <button
-              type="button"
-              className="tikkie-home__action tikkie-home__action--donate"
-              onClick={() => setPopup({ type: 'donate' })}
-              disabled={donating || balance <= 0}
-            >
-              <span className="tikkie-home__action-icon" aria-hidden="true">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" /></svg>
-              </span>
-              <span className="tikkie-home__action-label">{donating ? 'Donating…' : 'Donate'}</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Save the balance to an email ──
-             Shown to anyone without one, profile or not: a first visit has
-             no account yet, and saving an email is what creates it. */}
-      {!profile?.email && (
-        <EmailSection
-          org={org}
-          onShowPolicy={() => setShowPolicy(true)}
-          onSaved={applySavedProfile}
-          onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
-        />
-      )}
-
-      {/* ── How you get paid ──
-             A first-time visitor needs the instructions before anything
-             else, so they sit above Activity until there is activity to
-             read; after that they move below it, out of the way. */}
-      {!hasActivity && (
-        <section className="tikkie-home__section">
-          <h2 className="tikkie-home__section-title">How you get paid</h2>
-          <TikkieExplainer />
-        </section>
-      )}
-
-      {/* ── Activity ── */}
-      <section className="tikkie-home__section">
-        <h2 className="tikkie-home__section-title">Activity</h2>
-        {history.length === 0 ? (
-          <div className="tikkie-home__empty">
-            No returns yet. Drop your cups in a smart bin and scan the printed receipt.
-          </div>
-        ) : (
-          <ul className="tikkie-home__history">
-            {history.map(h => {
-              const link = h.kind === 'payout'
-                ? payoutLinkState(h, h.id === openPayoutId ? outstanding?.url : null, linkOpts)
-                : null;
-              return (
-              <li key={h.id}>
-                <button type="button" className="tikkie-home__row" onClick={() => setOpenItem(h)}>
-                <span
-                  className={`tikkie-home__row-icon${
-                    link?.state === 'collected' ? ' tikkie-home__row-icon--done' : ''
-                  }${h.kind === 'pending' || link?.state === 'open' || link?.state === 'pending' ? ' tikkie-home__row-icon--wait' : ''}${
-                    h.kind === 'donation' ? ' tikkie-home__row-icon--gift' : ''}`}
-                  aria-hidden="true"
-                >
-                  {h.kind === 'payout' ? (link.state === 'collected' ? '✓' : link.state === 'expired' ? '◷' : '→') : h.kind === 'pending' ? '◷' : h.kind === 'donation' ? '♥' : '♻︎'}
-                </span>
-                <div className="tikkie-home__row-main">
-                  <span className="tikkie-home__row-title">
-                    {h.kind === 'payout'
-                      ? (!isLinkPayout
-                        ? (link.state === 'collected' ? 'Cashback sent' : 'Cashback on its way')
-                        : link.state === 'collected' ? 'Collected via Tikkie'
-                          : link.state === 'expired' ? 'Tikkie link expired'
-                            : link.state === 'open' ? 'Tikkie ready to collect'
-                              : 'Tikkie payout')
-                      : h.kind === 'donation'
-                        ? `Donated to ${charity}`
-                      : h.kind === 'pending'
-                        ? 'Scanned and held for a review'
-                        : `${h.cups} cup${h.cups === 1 ? '' : 's'} returned`}
-                  </span>
-                  <span className="tikkie-home__row-date">
-                    {h.kind === 'pending'
-                      ? `${fmtWhen(h.created_at)} · waiting for the bin`
-                      : fmtWhen(h.created_at)}
-                  </span>
-                </div>
-                {/* A pending scan carries no amount yet: the bin hasn't told
-                    us how many cups went in. */}
-                {h.kind === 'pending' ? (
-                  <span className="tikkie-home__row-amount tikkie-home__row-amount--wait">Pending</span>
-                ) : (
-                  <span className={`tikkie-home__row-amount${h.kind === 'payout' || h.kind === 'donation' ? ' tikkie-home__row-amount--out' : ''}`}>
-                    {h.kind === 'payout' || h.kind === 'donation' ? '−' : '+'}{money(Number(h.amount || 0))}
+              <div className="tikkie-home__hero-copy">
+                <span className="tikkie-home__hero-label">Available to collect</span>
+                <div className="tikkie-home__hero-amount">{money(shownOwed)}</div>
+                {/* Only when the total really is split — some in the wallet, some
+                    in a link nobody opened. Then say how to get it and where the
+                    older part lives, in as few words as possible. One part alone
+                    needs no explaining. */}
+                {openLinkTotal > 0 && balance > 0 && (
+                  <span className="tikkie-home__hero-note">
+                    {actionButtons ? 'Collect it all below.' : 'Tap to collect it all.'}
+                    <br />{money(openLinkTotal)} sits in a link in your activity.
                   </span>
                 )}
+                {!actionButtons && (
+                  <span className="tikkie-home__hero-cta">
+                    {canCollect ? collectLabel : 'Scan a receipt'}
+                  </span>
+                )}
+              </div>
+              <img className="tikkie-home__hero-art" src={smartbinTop} alt="" aria-hidden="true" />
+            </button>
+            </Fragment>
+          );
+        }
+        if (key === 'actions') {
+          /* ── Collect and Donate, as two big buttons under the tile ── */
+          if (!actionButtons) return null;
+          return (
+            <Fragment key={key}>
+            <div className={`tikkie-home__actions${donateShown ? '' : ' tikkie-home__actions--single'}`}>
+              {canCollect ? (
+                <button
+                  type="button"
+                  className={`tikkie-home__action ${isLinkPayout ? 'tikkie-home__action--tikkie' : 'tikkie-home__action--collect'}`}
+                  onClick={handleOpenTikkie}
+                  disabled={redeeming}
+                >
+                  <span className="tikkie-home__action-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" /><path d="M2.5 10h19" /><path d="M6.5 14.5h4" /></svg>
+                  </span>
+                  <span className="tikkie-home__action-label">{redeeming ? 'Preparing…' : collectLabel}</span>
                 </button>
-              </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      {hasActivity && (
-        <section className="tikkie-home__section">
-          <h2 className="tikkie-home__section-title">How you get paid</h2>
-          <TikkieExplainer />
-        </section>
-      )}
-
-      {/* ── Lifetime impact — the same card every other PackPerks mode
-             shows, reused verbatim from UserPage. ── */}
-      {lifetimeCups > 0 && (
-        <section className="tikkie-home__section">
-          <h2 className="tikkie-home__section-title">Your impact</h2>
-          <button
-            type="button"
-            className="user-page__card user-page__card--list user-page__impact-card"
-            onClick={() => setImpactOpen(true)}
-            aria-label="See your detailed impact"
-          >
-            <ImpactSummary cups={lifetimeCups} />
-          </button>
-        </section>
-      )}
-
-      {/* ── Where the bins are ── */}
-      <section className="tikkie-home__section">
-        <h2 className="tikkie-home__section-title">Smart bins near you</h2>
-        <BinMap bins={bins} />
-        {!bins.length && (
-          <p className="tikkie-home__map-note">Bin locations are on their way.</p>
-        )}
-      </section>
+              ) : (
+                <button
+                  type="button"
+                  className="tikkie-home__action tikkie-home__action--scan"
+                  onClick={() => setScanner(true)}
+                >
+                  <span className="tikkie-home__action-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" /><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" /><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" /><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" /><rect x="8.5" y="8.5" width="7" height="7" rx="1" /></svg>
+                  </span>
+                  <span className="tikkie-home__action-label">Scan a QR code</span>
+                </button>
+              )}
+              {donateShown && (
+                <button
+                  type="button"
+                  className="tikkie-home__action tikkie-home__action--donate"
+                  onClick={() => setPopup({ type: 'donate' })}
+                  disabled={donating || balance <= 0}
+                >
+                  <span className="tikkie-home__action-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" /></svg>
+                  </span>
+                  <span className="tikkie-home__action-label">{donating ? 'Donating…' : 'Donate'}</span>
+                </button>
+              )}
+            </div>
+            </Fragment>
+          );
+        }
+        if (key === 'email') {
+          /* ── Save the balance to an email ──
+                Shown to anyone without one, profile or not: a first visit
+                has no account yet, and saving an email is what creates it.
+                Hidden, the account view still offers it. */
+          if (profile?.email || !show.email) return null;
+          return (
+            <Fragment key={key}>
+            <EmailSection
+              org={org}
+              onShowPolicy={() => setShowPolicy(true)}
+              onSaved={applySavedProfile}
+              onVerifyNeeded={(email) => setLogin({ email, startAtCode: true })}
+            />
+            </Fragment>
+          );
+        }
+        if (key === 'howPaid') {
+          if (!show.howPaid) return null;
+          return (
+            <section key={key} className="tikkie-home__section">
+              <h2 className="tikkie-home__section-title">How you get paid</h2>
+              <TikkieExplainer />
+            </section>
+          );
+        }
+        if (key === 'activity') {
+          if (!show.activity) return null;
+          return (
+            <Fragment key={key}>
+            <section className="tikkie-home__section">
+              <h2 className="tikkie-home__section-title">Activity</h2>
+              {history.length === 0 ? (
+                <div className="tikkie-home__empty">
+                  No returns yet. Drop your cups in a smart bin and scan the printed receipt.
+                </div>
+              ) : (
+                <ul className="tikkie-home__history">
+                  {history.map(h => {
+                    const link = h.kind === 'payout'
+                      ? payoutLinkState(h, h.id === openPayoutId ? outstanding?.url : null, linkOpts)
+                      : null;
+                    return (
+                    <li key={h.id}>
+                      <button type="button" className="tikkie-home__row" onClick={() => setOpenItem(h)}>
+                      <span
+                        className={`tikkie-home__row-icon${
+                          link?.state === 'collected' ? ' tikkie-home__row-icon--done' : ''
+                        }${h.kind === 'pending' || link?.state === 'open' || link?.state === 'pending' ? ' tikkie-home__row-icon--wait' : ''}${
+                          h.kind === 'donation' ? ' tikkie-home__row-icon--gift' : ''}`}
+                        aria-hidden="true"
+                      >
+                        {h.kind === 'payout' ? (link.state === 'collected' ? '✓' : link.state === 'expired' ? '◷' : '→') : h.kind === 'pending' ? '◷' : h.kind === 'donation' ? '♥' : '♻︎'}
+                      </span>
+                      <div className="tikkie-home__row-main">
+                        <span className="tikkie-home__row-title">
+                          {h.kind === 'payout'
+                            ? (!isLinkPayout
+                              ? (link.state === 'collected' ? 'Cashback sent' : 'Cashback on its way')
+                              : link.state === 'collected' ? 'Collected via Tikkie'
+                                : link.state === 'expired' ? 'Tikkie link expired'
+                                  : link.state === 'open' ? 'Tikkie ready to collect'
+                                    : 'Tikkie payout')
+                            : h.kind === 'donation'
+                              ? `Donated to ${charity}`
+                            : h.kind === 'pending'
+                              ? 'Scanned and held for a review'
+                              : `${h.cups} cup${h.cups === 1 ? '' : 's'} returned`}
+                        </span>
+                        <span className="tikkie-home__row-date">
+                          {h.kind === 'pending'
+                            ? `${fmtWhen(h.created_at)} · waiting for the bin`
+                            : fmtWhen(h.created_at)}
+                        </span>
+                      </div>
+                      {/* A pending scan carries no amount yet: the bin hasn't told
+                          us how many cups went in. */}
+                      {h.kind === 'pending' ? (
+                        <span className="tikkie-home__row-amount tikkie-home__row-amount--wait">Pending</span>
+                      ) : (
+                        <span className={`tikkie-home__row-amount${h.kind === 'payout' || h.kind === 'donation' ? ' tikkie-home__row-amount--out' : ''}`}>
+                          {h.kind === 'payout' || h.kind === 'donation' ? '−' : '+'}{money(Number(h.amount || 0))}
+                        </span>
+                      )}
+                      </button>
+                    </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+            </Fragment>
+          );
+        }
+        if (key === 'impact') {
+          /* ── Lifetime impact — the same card every other PackPerks mode
+                shows, reused verbatim from UserPage. ── */
+          if (!(lifetimeCups > 0) || !show.impact) return null;
+          return (
+            <Fragment key={key}>
+            <section className="tikkie-home__section">
+              <h2 className="tikkie-home__section-title">Your impact</h2>
+              <button
+                type="button"
+                className="user-page__card user-page__card--list user-page__impact-card"
+                onClick={() => setImpactOpen(true)}
+                aria-label="See your detailed impact"
+              >
+                <ImpactSummary cups={lifetimeCups} />
+              </button>
+            </section>
+            </Fragment>
+          );
+        }
+        if (key === 'bins') {
+          /* ── Where the bins are ── */
+          if (!show.bins) return null;
+          return (
+            <Fragment key={key}>
+            <section className="tikkie-home__section">
+              <h2 className="tikkie-home__section-title">Smart bins near you</h2>
+              <BinMap bins={bins} />
+              {!bins.length && (
+                <p className="tikkie-home__map-note">Bin locations are on their way.</p>
+              )}
+            </section>
+            </Fragment>
+          );
+        }
+        return null;
+      })}
 
       {/* ═══ Popups ═══ */}
 

@@ -3,18 +3,19 @@ import {
   Check, ChevronLeft, ChevronRight, Ellipsis, ExternalLink, Eye, LockOpen, Palette, RotateCcw, Send, TriangleAlert,
 } from 'lucide-react';
 import {
-  Badge, Button, Card, CardBody, Menu, MenuItem, Modal, PageHeader, Segmented, Tabs, ToggleChip,
+  Badge, Button, Card, Menu, MenuItem, Modal, PageHeader, Segmented, Tabs, ToggleChip,
 } from '../ui';
 import { supabase } from '../../lib/supabase';
 import { composeGroupCopy } from '../../lib/groups';
 import { resolvePaymentMethod, voucherGuideSteps } from '../../lib/paymentMethods';
 import { effectiveRates } from '../../lib/rates';
 import { formatMoney, getRegion } from '../../lib/regions';
+import { homeOrder, layoutPatch } from '../../lib/appLayout';
 import { useOrg } from '../context/OrgContext';
 import { useViewRole } from '../context/ViewRole';
 import { logAction } from '../auth/actionLog';
 import { useAdminMoney } from '../lib/adminMoney';
-import { DEFAULT_DESIGN, mergeDesign } from './designDefaults';
+import { mergeDesign } from './designDefaults';
 import { BUILT_IN_GUIDE, COLOR_KEYS, SCREENS, TABS, featureOn, resolveGuideStep } from './designModel';
 import { toHex } from './colorUtils';
 import { Callout } from './DesignFields';
@@ -23,10 +24,11 @@ import CopyPanel from './CopyPanel';
 import SectionsPanel from './SectionsPanel';
 import GuidePanel from './GuidePanel';
 import PhonePreview from './PhonePreview';
+import TikkieLivePreview from './TikkieLivePreview';
 import './AdminAppDesign.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * Design & copy — how one organisation's customer app looks and reads.
+ * Client app — how one organisation's customer app looks and reads.
  *
  *   ┌ header ─────────────────────── status · ⋯ · Revert · Publish ┐
  *   │ Colours │ Copy │ Sections │ Guide          ┌ preview ────────┐ │
@@ -47,6 +49,11 @@ const TAB_STORAGE_KEY = 'pp_admin_appdesign_tab';
 /* The tabs that apply to a Deferred Tikkie venue. */
 const TIKKIE_TABS = ['colors', 'sections'];
 const COPY_KEYS = ['heroHeadline', 'heroSubtext', 'donationRecipient', 'donationDescription'];
+/* Top-level settings this page owns besides the copy: the Collect and
+ * Donate buttons are a section on the Deferred Tikkie home, so they are
+ * switched here (and in Settings → Features, which writes the same key). */
+const SECTION_SETTING_KEYS = ['tikkieActionButtons'];
+const PAGE_KEYS = [...COPY_KEYS, ...SECTION_SETTING_KEYS];
 const NO_SETTINGS = {};
 const SAMPLE_REWARD = { id: 'sample', name: 'Your featured reward', cupsNeeded: 5, tags: [], image: '' };
 
@@ -89,9 +96,10 @@ function useLogoWidth(orgId) {
 
 export default function AdminAppDesign({ draftState }) {
   const { activeOrg, activeGroupId, activeGroup, activeGroupMode, activeOrgMode } = useOrg();
-  // Deferred Tikkie has no rewards, copy blocks or guide: only its colours
-  // and the two logos in the header apply there.
+  // Deferred Tikkie has no rewards, copy blocks or guide: its colours and
+  // its sections (the wallet home's order, what shows) apply there.
   const tikkieMode = activeOrgMode === 'tikkie_only';
+  const layoutKind = tikkieMode ? 'tikkie' : 'rewards';
   const { access } = useViewRole();
   const readOnly = !!access && !access.canEdit('appdesign');
   const isMaster = !!access?.isMaster;
@@ -145,9 +153,16 @@ export default function AdminAppDesign({ draftState }) {
   function patchDesign(group, patch) {
     draftState.updateDraft(prev => {
       const merged = mergeDesign(prev.settings?.design);
+      // Only the group being changed is written out in full. Writing the
+      // merged design put the default palette into a venue that never set
+      // one, and a Deferred Tikkie wallet treats "has colours" as "is
+      // branded": hiding a section recoloured the wallet tile.
       return {
         ...prev,
-        settings: { ...prev.settings, design: { ...merged, [group]: { ...merged[group], ...patch } } },
+        settings: {
+          ...prev.settings,
+          design: { ...(prev.settings?.design || {}), [group]: { ...merged[group], ...patch } },
+        },
       };
     });
     setJustPublished(false);
@@ -175,7 +190,7 @@ export default function AdminAppDesign({ draftState }) {
   function handlePublish() {
     // publishDraft stores the snapshot locally and pushes the whole draft to
     // app_config `published:<orgId>`; the customer app reads it on next load.
-    draftState.publishDraft('Design & copy update');
+    draftState.publishDraft('Client app update');
     logAction({
       action: 'design.publish',
       targetType: 'organization',
@@ -191,13 +206,15 @@ export default function AdminAppDesign({ draftState }) {
     const base = published;
     draftState.updateDraft(prev => {
       if (!base) {
-        // Nothing published yet: the design goes back to the defaults.
-        return { ...prev, settings: { ...prev.settings, design: structuredClone(DEFAULT_DESIGN) } };
+        // Nothing published yet: the design goes back to the defaults. An
+        // empty design IS the defaults (mergeDesign), and unlike a written-out
+        // copy of them it does not count as colours of the venue's own.
+        return { ...prev, settings: { ...prev.settings, design: {} } };
       }
-      const restoredCopy = Object.fromEntries(COPY_KEYS.filter(k => k in base).map(k => [k, base[k]]));
+      const restoredCopy = Object.fromEntries(PAGE_KEYS.filter(k => k in base).map(k => [k, base[k]]));
       return {
         ...prev,
-        settings: { ...prev.settings, ...restoredCopy, design: mergeDesign(base.design) },
+        settings: { ...prev.settings, ...restoredCopy, design: structuredClone(base.design || {}) },
       };
     });
     setDialog(null);
@@ -206,7 +223,7 @@ export default function AdminAppDesign({ draftState }) {
   function handleResetAll() {
     draftState.updateDraft(prev => ({
       ...prev,
-      settings: { ...prev.settings, design: structuredClone(DEFAULT_DESIGN) },
+      settings: { ...prev.settings, design: {} },
     }));
     setDialog(null);
   }
@@ -225,7 +242,7 @@ export default function AdminAppDesign({ draftState }) {
   return (
     <div className="ui-page dz-page">
       <PageHeader
-        title="Design & copy"
+        title="Client app"
         subtitle={`How the customer app looks and reads for ${orgName}. Edits save to your draft as you make them; publishing puts them live.`}
       >
         {readOnly ? (
@@ -300,11 +317,14 @@ export default function AdminAppDesign({ draftState }) {
             )}
             {shownTab === 'sections' && (
               <SectionsPanel
-                only={tikkieMode ? ['showPackbackLogo', 'showBrandLogo'] : null}
+                kind={layoutKind}
                 sections={design.sections}
+                layout={design.layout}
                 settings={settings}
                 readOnly={readOnly}
                 onPatch={(p) => patchDesign('sections', p)}
+                onOrder={(order) => patchDesign('layout', layoutPatch(layoutKind, order))}
+                onSetting={patchSetting}
                 onReveal={reveal}
               />
             )}
@@ -326,25 +346,29 @@ export default function AdminAppDesign({ draftState }) {
         {tikkieMode ? (
         <aside className="dz-preview" aria-label="Preview">
           <Card className="dz-preview__card">
-            <CardBody>
-              <div className="dz-tk-preview">
-                <h3 className="dz-tk-preview__title">Deferred Tikkie app</h3>
-                <p className="dz-tk-preview__text">
-                  The preview here shows the rewards app, which this venue doesn’t run. Publish your colours and
-                  logos, then open the app to see them on the wallet screen.
-                </p>
-                <div className="dz-tk-preview__swatches" aria-hidden="true">
-                  {['accent', 'accentDeep', 'primary', 'background'].map(k => (
-                    <span key={k} style={{ background: design.colors[k] }} />
-                  ))}
-                </div>
-                {activeOrg?.slug && (
-                  <a className="ui-btn ui-btn--outline" href={`/${activeOrg.slug}/`} target="_blank" rel="noreferrer">
-                    <ExternalLink size={15} aria-hidden="true" /> Open the app
-                  </a>
-                )}
-              </div>
-            </CardBody>
+            <div className="dz-preview__bar">
+              <span className="dz-preview__title">Wallet home</span>
+              {activeOrg?.slug && (
+                <a
+                  className="ui-btn ui-btn--ghost ui-btn--sm ui-btn--icon"
+                  href={`/${activeOrg.slug}/`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open the live app in a new tab. It shows what is published, not your draft."
+                  aria-label="Open the live app"
+                >
+                  <ExternalLink size={14} aria-hidden="true" />
+                </a>
+              )}
+            </div>
+            <div className="dz-preview__stage dz-preview__stage--live">
+              <TikkieLivePreview slug={activeOrg?.slug} settings={settings} />
+            </div>
+            <div className="dz-preview__foot">
+              <span className="dz-preview__note">
+                Your draft on the real app, with a sample wallet. Scroll and tap it: nothing here is saved.
+              </span>
+            </div>
           </Card>
         </aside>
         ) : (
@@ -412,7 +436,7 @@ export default function AdminAppDesign({ draftState }) {
       >
         <ul className="dz-publish-list">
           <li>
-            <span className="dz-publish-list__label">Design & copy</span>
+            <span className="dz-publish-list__label">Client app</span>
             <span>{describeChanges(changes, !!published)}</span>
           </li>
           <li>
@@ -441,7 +465,7 @@ export default function AdminAppDesign({ draftState }) {
         )}
       >
         <p className="dz-modal-text">
-          Colours, copy, sections and the guide go back to what customers see now ({describeChanges(changes, true).toLowerCase()}).
+          Colours, copy, sections, their order and the guide go back to what customers see now ({describeChanges(changes, true).toLowerCase()}).
           Unpublished changes on other pages stay in your draft.
         </p>
       </Modal>
@@ -460,7 +484,7 @@ export default function AdminAppDesign({ draftState }) {
         )}
       >
         <p className="dz-modal-text">
-          Colours, button labels, sections and the guide go back to the PackBack defaults. The headline and donation
+          Colours, button labels, sections, their order and the guide go back to the PackBack defaults. The headline and donation
           text stay as they are. Nothing changes for customers until you publish.
         </p>
       </Modal>
@@ -520,7 +544,11 @@ function buildPreviewView({ design, settings, org, rewards, groupCopy, isVoucher
       donate: featureOn(settings, 'featureDonations') && sections.showDonate !== false,
       impact: sections.showImpact !== false,
       activity: sections.showActivity !== false,
+      addButton: sections.showAddButton !== false,
+      headline: sections.showHeadline !== false,
+      more: sections.showMoreRewards !== false,
     },
+    order: homeOrder(design.layout, 'rewards'),
     reward,
     others,
     collected,
@@ -540,7 +568,9 @@ function countChanges(settings, published) {
   const colors = COLOR_KEYS.filter(k => (toHex(draft.colors[k]) || str(draft.colors[k])) !== (toHex(base.colors[k]) || str(base.colors[k]))).length;
   const copy = Object.keys({ ...draft.copy, ...base.copy }).filter(k => str(draft.copy[k]) !== str(base.copy[k])).length
     + COPY_KEYS.filter(k => str(settings?.[k]) !== str(published?.[k])).length;
-  const sections = Object.keys({ ...draft.sections, ...base.sections }).filter(k => (draft.sections[k] !== false) !== (base.sections[k] !== false)).length;
+  const sections = Object.keys({ ...draft.sections, ...base.sections }).filter(k => (draft.sections[k] !== false) !== (base.sections[k] !== false)).length
+    + SECTION_SETTING_KEYS.filter(k => (settings?.[k] !== false) !== (published?.[k] !== false)).length
+    + ['rewards', 'tikkie'].filter(kind => homeOrder(draft.layout, kind).join() !== homeOrder(base.layout, kind).join()).length;
   const guide = JSON.stringify(draft.guide.steps) !== JSON.stringify(base.guide.steps) ? 1 : 0;
   return { colors, copy, sections, guide, total: colors + copy + sections + guide };
 }
@@ -564,7 +594,7 @@ function hasOtherChanges(draft, published) {
   const strip = (s) => {
     const rest = { ...(s || {}) };
     delete rest.design;
-    COPY_KEYS.forEach(k => { delete rest[k]; });
+    PAGE_KEYS.forEach(k => { delete rest[k]; });
     return rest;
   };
   return stableJson(draft.rewards || []) !== stableJson(published.rewards || [])

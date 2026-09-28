@@ -2357,7 +2357,7 @@ export async function getUxReplay(sessionId, orgIds, mode = null) {
   const [sessRes, evRes] = await Promise.all([
     supabase.from('ux_sessions').select('*').eq('session_id', sessionId).maybeSingle(),
     supabase.from('ux_events')
-      .select('seq, kind, screen, target, label, x, y, yv, vw, vh, dh, depth, t_ms, at')
+      .select('seq, kind, screen, target, label, ox, oy, px, py, pinned, x, y, yv, vw, vh, dh, depth, t_ms, at')
       .eq('session_id', sessionId).order('seq', { ascending: true }).limit(3000),
   ]);
   if (evRes.error) throw evRes.error;

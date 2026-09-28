@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────────────
  * Is this render a preview of the app rather than a customer using it?
  *
- * Two places embed the customer app read-only: Design & copy's iframe
+ * Two places embed the customer app read-only: Client app's iframe
  * (`?preview=1`) and User analytics → Heatmap / Session replay
  * (`?uxpreview=<screen>`). Both want the screens to LOOK right and
  * nothing else to happen — no account, no writes, nothing tracked.

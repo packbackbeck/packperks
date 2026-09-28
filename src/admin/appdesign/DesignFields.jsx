@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { Pipette } from 'lucide-react';
 import { pickerValue, toHex } from './colorUtils';
 
-/* Small form pieces shared by the Design & copy panels. */
+/* Small form pieces shared by the Client app panels. */
 
 /* A colour swatch that opens the system picker, with a hex field beside it.
  * Only a valid hex is saved; anything else snaps back when the field loses

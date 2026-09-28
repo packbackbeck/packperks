@@ -539,7 +539,7 @@ function Preview({ org, minutes }) {
           <div className="sfa-preview__text">
             <h3>What staff see</h3>
             <p>
-              The app uses {org.name}'s colours and logo from Design & copy, so it matches the customer app.
+              The app uses {org.name}'s colours and logo from Client app, so it matches the customer app.
               Try it: pick the cups and tap Show QR code. Codes made in this preview are samples and give nobody cups.
             </p>
             <ul>

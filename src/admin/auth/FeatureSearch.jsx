@@ -182,10 +182,10 @@ const FEATURES = [
   { id: 'f-changelog',    name: 'Dashboard changelog',     desc: 'What we shipped recently',          group: 'System',     page: 'support',  icon: Icon.history,  keywords: 'changelog release notes updates new shipped recent' },
 
   // ── App Design ─────────────────────────────────────────────────────
-  { id: 'f-appdesign',      name: 'Design & Copy',           desc: 'Customise the customer app',        group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'design copy theme colours colors branding customise customer app look palette preview appearance text wording' },
+  { id: 'f-appdesign',      name: 'Client app',              desc: 'Customise the customer app',        group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'client app design and copy design copy theme colours colors branding customise customer app look palette preview appearance text wording' },
   { id: 'f-design-colours', name: 'Brand colours',           desc: 'Palette for the customer app',      group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'colour color palette primary accent background surface text contrast brand hex' },
   { id: 'f-design-copy',    name: 'App copy and text',       desc: 'Headline + wording customers see',  group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'copy text headline wording message customer app words subtext' },
-  { id: 'f-design-sections',name: 'App sections',            desc: 'Show or hide app sections',         group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'sections layout blocks show hide toggle app guide stories smart import' },
+  { id: 'f-design-sections',name: 'App sections',            desc: 'Show, hide and reorder sections',   group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'sections layout blocks show hide toggle reorder rearrange order move buttons add more cups activity impact map app guide stories smart import' },
   { id: 'f-design-preview', name: 'Live app preview',        desc: 'Preview the customer app',          group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'preview phone live customer app mockup design' },
 
   // ── Static QR code (BYO counter QR) + held-scan review ─────────────

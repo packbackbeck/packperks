@@ -5,12 +5,13 @@
  * inherits the same per-org isolation that everything else in
  * settings already has.
  *
- * Three groups:
+ * The groups:
  *   • colors   — applied to the user app via CSS variables on :root
  *   • copy     — button/label text the user app reads at render time
  *   • sections — visibility toggles for individual UI blocks beyond
  *                the existing feature flags (those still live in
  *                Quick Settings to keep that one click handy)
+ *   • layout   — the home screen's order (src/lib/appLayout.js)
  *
  * Every consumer should merge with DEFAULT_DESIGN before reading so a
  * brand-new org (or a legacy row that predates this schema) doesn't
@@ -45,6 +46,18 @@ export const DEFAULT_DESIGN = {
     showImpact:          true,
     showPackbackLogo:    true,
     showBrandLogo:       true,
+    showAddButton:       true,   // the + in the header (add more cups / scan a receipt)
+    showHeadline:        true,   // rewards home: the headline and subtext
+    showMoreRewards:     true,   // rewards home: the other rewards under the featured one
+    showEmailCard:       true,   // Deferred Tikkie: Save your balance
+    showHowPaid:         true,   // Deferred Tikkie: How you get paid
+    showBinMap:          true,   // Deferred Tikkie: Smart bins near you
+  },
+  // The home screen's order, per kind of app (src/lib/appLayout.js). Null
+  // means the default order.
+  layout: {
+    home:       null,
+    tikkieHome: null,
   },
   // Guide "stories" (the How-it-works walkthrough). Empty steps → the app
   // falls back to the built-in / group-mode steps. When an admin adds steps
@@ -61,6 +74,7 @@ export function mergeDesign(partial) {
     colors:   { ...DEFAULT_DESIGN.colors,   ...(p.colors   || {}) },
     copy:     { ...DEFAULT_DESIGN.copy,     ...(p.copy     || {}) },
     sections: { ...DEFAULT_DESIGN.sections, ...(p.sections || {}) },
+    layout:   { ...DEFAULT_DESIGN.layout,   ...(p.layout   || {}) },
     guide:    { steps: Array.isArray(p.guide?.steps) ? p.guide.steps : [] },
   };
 }

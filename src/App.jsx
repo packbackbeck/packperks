@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import { applyDesignColors, mergeDesign } from './admin/appdesign/designDefaults';
 import { regionForCountry, regionForOnboardingCountry, getRegion, getAllRegions, formatMoney, DEFAULT_REGION } from './lib/regions';
@@ -84,6 +84,7 @@ import { pickSmartReward, sortRewardsByReach } from './lib/smartSorting';
 import './App.css';
 import { effectiveRates } from './lib/rates';
 import { isAppPreview } from './lib/isPreview';
+import { homeOrder } from './lib/appLayout';
 
 /* Best-effort device fingerprint from the user agent. Falls back to a
  * generic string when no platform-specific token is found. Used in the
@@ -2476,61 +2477,91 @@ export default function App({ consentReady = true } = {}) {
         org={activeOrg}
         design={design}
         claimStatus={claimStatus}
+        showAdd={design.sections.showAddButton !== false}
       />
 
-      <section className="app__hero">
-        <h1 className="app__headline">{(heroHeadline || '').replace(/,\s*/g, ',\n')}</h1>
-        {/* BYO venues keep the hero tight — no subtext under the headline. */}
-        {!isByo && <p className="app__subtext">{heroSubtext}</p>}
-      </section>
+      {/* The home screen's sections, in the venue's order (Client app →
+          Sections; lib/appLayout.js). The progress bar and the featured
+          reward are the programme itself and always show. */}
+      {homeOrder(design.layout, 'rewards').map((key) => {
+        if (key === 'headline') {
+          if (design.sections.showHeadline === false) return null;
+          return (
+            <Fragment key={key}>
+            <section className="app__hero">
+              <h1 className="app__headline">{(heroHeadline || '').replace(/,\s*/g, ',\n')}</h1>
+              {/* BYO venues keep the hero tight — no subtext under the headline. */}
+              {!isByo && <p className="app__subtext">{heroSubtext}</p>}
+            </section>
+            </Fragment>
+          );
+        }
+        if (key === 'progress') {
+          return (
+            <Fragment key={key}>
+            <CupProgress
+              collected={cupCount}
+              target={selectedReward.cupsNeeded}
+              nudgeCount={nudgeCount}
+            />
 
-      <CupProgress
-        collected={cupCount}
-        target={selectedReward.cupsNeeded}
-        nudgeCount={nudgeCount}
-      />
-
-      {/* "Collect N more cups" — its own block right after the progress bar,
-          shown once the user taps the locked CTA (and gone once unlocked). */}
-      {nudgeActive && !isUnlocked && (
-        <div className="cup-nudge" role="status">
-          <p className="cup-nudge__text">
-            Collect <strong>{cupsRemaining}</strong> more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
-          </p>
-          <button type="button" className="cup-nudge__btn" onClick={handleAddCup}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add more cups
-          </button>
-        </div>
-      )}
-
-      <FeaturedReward
-        key={selectedRewardId}
-        reward={selectedReward}
-        isUnlocked={isUnlocked}
-        cupsCollected={cupCount}
-        claimed={claimed}
-        onClaim={handleClaim}
-        onClaimAttempt={handleClaimAttempt}
-        budgetBlocked={rewardBudgetBlocked}
-        onBudgetBlocked={handleBudgetBlocked}
-        onResetClaim={handleResetClaim}
-        onOpenTerms={handleOpenTerms}
-        onOpenRefund={showRefund ? handleOpenRefund : null}
-        onViewDetail={() => handleViewDetail(selectedReward)}
-        onExplain={handleLockedClaim}
-        orgName={activeOrg?.partner_brand_name || activeOrg?.name}
-        isVoucher={isVoucher}
-      />
-
-      <GoalSection
-        rewards={otherRewards}
-        cupCount={cupCount}
-        onSelectReward={handlePickReward}
-        onViewDetail={handleViewDetail}
-      />
+            {/* "Collect N more cups" — its own block right after the progress bar,
+                shown once the user taps the locked CTA (and gone once unlocked). */}
+            {nudgeActive && !isUnlocked && (
+              <div className="cup-nudge" role="status">
+                <p className="cup-nudge__text">
+                  Collect <strong>{cupsRemaining}</strong> more cup{cupsRemaining !== 1 ? 's' : ''} to unlock your cashback.
+                </p>
+                <button type="button" className="cup-nudge__btn" onClick={handleAddCup}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Add more cups
+                </button>
+              </div>
+            )}
+            </Fragment>
+          );
+        }
+        if (key === 'featured') {
+          return (
+            <Fragment key={key}>
+            <FeaturedReward
+              key={selectedRewardId}
+              reward={selectedReward}
+              isUnlocked={isUnlocked}
+              cupsCollected={cupCount}
+              claimed={claimed}
+              onClaim={handleClaim}
+              onClaimAttempt={handleClaimAttempt}
+              budgetBlocked={rewardBudgetBlocked}
+              onBudgetBlocked={handleBudgetBlocked}
+              onResetClaim={handleResetClaim}
+              onOpenTerms={handleOpenTerms}
+              onOpenRefund={showRefund ? handleOpenRefund : null}
+              onViewDetail={() => handleViewDetail(selectedReward)}
+              onExplain={handleLockedClaim}
+              orgName={activeOrg?.partner_brand_name || activeOrg?.name}
+              isVoucher={isVoucher}
+            />
+            </Fragment>
+          );
+        }
+        if (key === 'more') {
+          if (design.sections.showMoreRewards === false) return null;
+          return (
+            <Fragment key={key}>
+            <GoalSection
+              rewards={otherRewards}
+              cupCount={cupCount}
+              onSelectReward={handlePickReward}
+              onViewDetail={handleViewDetail}
+            />
+            </Fragment>
+          );
+        }
+        return null;
+      })}
 
       {detailReward && (
         <RewardDetailSheet

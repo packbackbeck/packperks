@@ -1,12 +1,12 @@
 import {
-  Activity, Banknote, BookOpen, EyeOff, Gift, HeartHandshake, House, Image, Leaf,
-  Palette, Share2, Store, Type, LayoutGrid, User,
+  Activity, Banknote, BookOpen, CircleHelp, CirclePlus, CupSoda, EyeOff, Gift, HeartHandshake, House, Image, Leaf,
+  LayoutList, Mail, MapPin, MousePointerClick, Palette, Share2, Store, Type, LayoutGrid, User, Wallet,
 } from 'lucide-react';
 import { DEFAULT_DESIGN } from './designDefaults';
 import { paletteFromBrand } from './colorUtils';
 
 /* ─────────────────────────────────────────────────────────────────────
- * What the Design & copy page edits, described once: colour roles, ready
+ * What the Client app page edits, described once: colour roles, ready
  * palettes, copy fields, section switches and the built-in guide. The
  * wording says what each setting does in the customer app today, checked
  * against src/components and src/App.jsx.
@@ -216,6 +216,43 @@ export const SECTION_GROUPS = [
     ],
   },
 ];
+
+/* ── The home screen, in order ───────────────────────────────────────
+ * One entry per section the venue can move (src/lib/appLayout.js owns
+ * the keys and the default order). `toggle` is the design.sections switch
+ * that hides it; `setting` is a top-level setting that does the same job
+ * (so there is one switch, not two); `locked` sections are the programme
+ * itself and always show. */
+export const HOME_SECTIONS = {
+  rewards: {
+    headline: { label: 'Headline', icon: Type, tone: 'slate', toggle: 'showHeadline', summary: 'The big line at the top and the text under it.' },
+    progress: { label: 'Cup progress', icon: CupSoda, tone: 'amber', locked: true, summary: 'Cups collected towards the featured reward.' },
+    featured: { label: 'Featured reward', icon: Gift, tone: 'orange', locked: true, summary: 'The reward they are collecting for, and its claim button.' },
+    more: { label: 'More rewards', icon: LayoutList, tone: 'violet', toggle: 'showMoreRewards', summary: 'The other rewards, to change their goal.' },
+  },
+  tikkie: {
+    wallet: { label: 'Wallet', icon: Wallet, tone: 'orange', locked: true, summary: 'Available to collect: the amount, tap to collect.' },
+    actions: { label: 'Collect and Donate buttons', icon: MousePointerClick, tone: 'violet', setting: 'tikkieActionButtons', summary: 'Two big buttons under the wallet. Off, the wallet carries one collect button.' },
+    email: { label: 'Save your balance', icon: Mail, tone: 'sky', toggle: 'showEmailCard', summary: 'The email form, for customers without one. The account screen offers it too.' },
+    howPaid: { label: 'How you get paid', icon: CircleHelp, tone: 'emerald', toggle: 'showHowPaid', summary: 'How a Tikkie payout works, step by step.' },
+    activity: { label: 'Activity', icon: Activity, tone: 'amber', toggle: 'showActivity', summary: 'Returns, payouts and donations, newest first.' },
+    impact: { label: 'Your impact', icon: Leaf, tone: 'lime', toggle: 'showImpact', summary: 'Lifetime cups and the CO₂ they saved. Appears after a first return.' },
+    bins: { label: 'Smart bins map', icon: MapPin, tone: 'rose', toggle: 'showBinMap', summary: 'Where the bins are.' },
+  },
+};
+
+/* Buttons and marks that can be hidden but have no place in the order. */
+const ADD_BUTTON = { key: 'showAddButton', label: 'Add more cups button', icon: CirclePlus, tone: 'amber', summary: 'The + at the top right, which opens the camera to scan a code.' };
+const LOGO_ROWS = SECTION_GROUPS[0].rows.filter(r => r.key === 'showPackbackLogo' || r.key === 'showBrandLogo');
+export const BUTTON_ROWS = {
+  rewards: [ADD_BUTTON, ...SECTION_GROUPS[0].rows],
+  tikkie: [
+    ADD_BUTTON,
+    { key: 'showDonate', label: 'Donate button', icon: HeartHandshake, tone: 'rose', summary: 'Next to Collect: gives some or all of the balance to your charity partner.', feature: 'featureDonations', featureLabel: 'Donations' },
+    ...LOGO_ROWS,
+  ],
+};
+export const ACCOUNT_ROWS = SECTION_GROUPS[1].rows;
 
 /* Feature switches default to on when a draft doesn't carry them. */
 export function featureOn(settings, key) {

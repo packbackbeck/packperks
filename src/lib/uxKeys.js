@@ -34,8 +34,21 @@ function cursorOf(el, win) {
   try { return (win || window).getComputedStyle(el).cursor; } catch { return ''; }
 }
 
-/** What a person calls this control. Never a field's contents. */
-export function labelFor(el) {
+/* A control's words, one space between each piece of text. `textContent`
+ * runs a card's lines together ("2 cups returned16 Sept+€0.20"), which is
+ * unreadable as a name on a dashboard. */
+function spacedText(el) {
+  const parts = [];
+  const doc = el.ownerDocument || document;
+  const walk = doc.createTreeWalker(el, 4 /* NodeFilter.SHOW_TEXT */);
+  for (let n = walk.nextNode(); n && parts.length < 40; n = walk.nextNode()) {
+    const v = n.nodeValue.replace(/\s+/g, ' ').trim();
+    if (v) parts.push(v);
+  }
+  return parts.join(' ').replace(/\s+([.,!?:;])/g, '$1');
+}
+
+function nameOf(el, text) {
   const aria = el.getAttribute?.('aria-label');
   if (aria) return aria.trim().slice(0, 60);
   const title = el.getAttribute?.('title');
@@ -46,8 +59,13 @@ export function labelFor(el) {
     const name = el.getAttribute('name') || el.getAttribute('placeholder') || el.type;
     return String(name || tag).trim().slice(0, 60);
   }
-  const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-  return text ? text.slice(0, 60) : (tag || 'element');
+  const words = text(el);
+  return words ? words.slice(0, 60) : (tag || 'element');
+}
+
+/** What a person calls this control. Never a field's contents. */
+export function labelFor(el) {
+  return nameOf(el, spacedText);
 }
 
 /** The part of a key that comes from what the control says.
@@ -65,8 +83,10 @@ export function labelFor(el) {
  *  "Collect via Tikkie", short enough to survive whatever the app appends
  *  after it. */
 function keyName(el) {
-  const aria = el.getAttribute?.('aria-label');
-  const raw = aria || labelFor(el);
+  // Deliberately the run-together text, not labelFor's spaced one: every
+  // key already stored was made from this, and a key that changed would
+  // stop matching its own control.
+  const raw = nameOf(el, (e) => (e.textContent || '').replace(/\s+/g, ' ').trim());
   return slug(raw)
     .replace(/\d+/g, '')
     .split('-')

@@ -112,7 +112,7 @@ flowchart LR
   F1 --- F2["Budget caps per reward"]
   F2 --- F3["Smart sorting of the list"]
 
-  GB --> T_appdesign["Design & copy"]
+  GB --> T_appdesign["Client app"]
   T_appdesign --- G1["Colours and logos"]
   G1 --- G2["Every text in the customer app"]
   G2 --- G3["Show or hide app sections"]

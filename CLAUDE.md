@@ -122,11 +122,20 @@ refetches nothing:
   subject.
 - *Session replay* — the visit itself, played back. rrweb recorded a
   snapshot of the DOM and every change to it while the customer was there,
-  and `rrweb-player` rebuilds that in an iframe
-  (`userflow/RrwebStage`): their screen, their balance, their activity,
-  scrolling when they scrolled. A visit with no recording — captured
-  before this existed, or on a venue with replay off — falls back to the
-  step-through over the sample screen.
+  and rrweb's `Replayer` rebuilds that in an iframe
+  (`userflow/RecordingStage`): their screen, their balance, their activity,
+  scrolling when they scrolled. We drive the Replayer ourselves, not
+  rrweb-player (its controller was sized for a desktop page and said
+  nothing about what was tapped): every tap is drawn as a pulse with the
+  control's name, *What they did* lists every screen, tap, scroll and exit
+  from `ux_events` beside it (highlighted as it plays, click one to jump
+  there), and one transport with a mark per action runs under the phone
+  (`userflow/ReplayPlayer`). The recording's clock and `ux_events.at` are
+  the same browser's, so an action sits at `at − first timestamp`. A visit
+  with no recording — captured before this existed, or on a venue with
+  replay off — steps through the same list over the venue's app as it is
+  today. The Replayer runs on animation frames, so it stands still in a
+  background tab: front the tab before testing it.
 
 In Deferred Tikkie the four moved tiles are absent (that mode's reader
 has no such metrics) and the tabs show the capture-built ones alone, over
@@ -180,6 +189,12 @@ the only thing that needs it: **a preview never opens the camera**. The
 cup scanner and the receipt camera check it, or previewing those screens
 would ask whoever is reading a heatmap for their webcam.
 
+**One device frame: `userflow/DeviceChrome`.** The heatmap, the replay
+and Client app's Deferred Tikkie preview all sit in it, with its own
+stylesheet. The bezel is added AROUND the screen, never taken out of it:
+it used to be padding inside the 375px box, which left a 351px screen
+showing a 375px app, and the right 24px of every screen was cut off.
+
 **The dashboard's device frame is prefixed `ufs-`, not `sf-`.** The
 customer app's support form already owns `.sf`, with `min-height: 100dvh`
 on it, and the dashboard bundle carries that CSS — so the phone inherited
@@ -198,7 +213,7 @@ device nothing to measure and it renders at a fallback size and hangs out
 again. How tall the section itself is, is measured rather than guessed
 (`userflow/useFitHeight.js`) — everything above it differs by venue, role
 and how the subtitle wraps, and a constant left the card 180px below the
-fold on a real dashboard. `?uxpreview=` is the same read-only boot Design & copy's iframe
+fold on a real dashboard. `?uxpreview=` is the same read-only boot Client app's iframe
 has always used (`isPreviewMode` in `src/App.jsx`) — no auth, no account,
 no writes, no cookie banner, no maintenance screen, and `uxScreen`/`track`
 are skipped so a preview can never record itself into the numbers it is
@@ -247,7 +262,7 @@ is the same sums in JavaScript, for "Demo numbers".
 
 **Dashboard sidebar** (`TABS` and `TAB_GROUPS` in `src/admin/lib/access.js`,
 in sidebar order): Analytics (Dashboard, User analytics, System health,
-Reports & alerts), Customers (Users, Rewards & offers, Design & copy, Email
+Reports & alerts), Customers (Users, Rewards & offers, Client app, Email
 templates, Future vendors, Smart bin locations), Generate (Static QR code,
 Dynamic QR code, Receipt generator, Staff app), Circulation (Cup scans,
 Claims, Tikkie payouts, Cup shares, Donations, Backup cups), Workspace
@@ -355,9 +370,39 @@ loads or it is sized against Helvetica and overflows the artwork. On the
 Epson the sheet goes out turned a quarter turn (`rasteriseForThermal`):
 printed upright on an 80 mm roll its QR lands at about 10 mm and will not
 scan. Fonts are self-hosted in `public/fonts/` (Figtree, Playfair Display,
-Bevan — all OFL), same rule as DM Sans. Every mode has **Design & copy** (`appdesign`); in Deferred
-Tikkie it shows only Colours and the two header logos (`showPackbackLogo`,
-`showBrandLogo`).
+Bevan — all OFL), same rule as DM Sans.
+
+**Client app** (`appdesign`, formerly "Design & copy") is in every mode;
+Deferred Tikkie gets only Colours and Sections. *Sections* is what the
+customer app shows and in what order:
+- **Home screen**: every section of the home, dragged (or moved with its
+  arrows) into order and switched off to hide. The order is
+  `settings.design.layout` (`home` for Deposit Rewards / Bring Your Own,
+  `tikkieHome` for Deferred Tikkie), read by the app and the preview
+  through `homeOrder()` in `src/lib/appLayout.js`, which drops unknown keys
+  and puts a section the saved list lacks back in its default place. The
+  programme itself (wallet, cup progress, featured reward) moves but never
+  hides. With the default order the Tikkie home keeps its own rule (How you
+  get paid above Activity until there is activity); a saved order is used
+  exactly as set, and *Default order* clears it.
+- **Buttons and logos** / **Account screen**: `settings.design.sections`
+  switches (`showAddButton`, `showDonate`, the logos, …).
+- The Tikkie home's *Collect and Donate buttons* row writes
+  `tikkieActionButtons`, the same key as Settings → Features: one switch,
+  two places to reach it.
+
+Deferred Tikkie's preview is the real wallet (`TikkieLivePreview`,
+`/<slug>/?uxpreview=home` in a DeviceChrome) with the unpublished draft
+posted into it: `useDraftPreview()` (`src/lib/draftPreview.js`) lays the
+draft's settings over the published ones, only under `isAppPreview()`,
+only from the framing page on this origin. The other modes keep the
+hand-built `PhonePreview`.
+
+**Write only the design group you change.** `patchDesign`, Revert and
+Reset used to store the whole merged design, defaults included — and a
+Deferred Tikkie wallet treats "has colours" as "is branded", so hiding a
+section recoloured an unbranded wallet on the next publish. An empty
+design IS the defaults; store only what the venue set.
 
 Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund only”,
 “Titaan Direct Refund”, “Rewards only” — are stale. The code keys stay.
@@ -495,7 +540,8 @@ access, so any account above vendor may use it.
 | `src/staff/` | PackPerks Staff: login, the QR screen, history, profile |
 | `src/admin/staffapp/` | Generate → Staff app: switch, accounts and requests, logs, preview |
 | `src/lib/uxCapture.js` | taps, scrolls and screen flow from the customer app |
-| `src/admin/behaviour/userflow/` | User flow, Heatmap and Session replay: tiles, the embedded app (ScreenFrame), controls, flow, replay, capture settings |
+| `src/lib/appLayout.js` | the home screen's section order, for the app and Client app |
+| `src/admin/behaviour/userflow/` | User flow, Heatmap and Session replay: tiles, the device (DeviceChrome), the embedded app (ScreenFrame), controls, flow, the replay player, capture settings |
 | `src/admin/lib/uxAggregate.js` | the User flow sums in JS — the demo's half of migration 061 |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |
 | `src/admin/ui/` | the dashboard's design system: tokens, cards, KPI tiles, the trend chart, insights |
@@ -670,6 +716,13 @@ neither what anyone typed nor the profile block exists in a recording at
 all. A PackPulse connection sharing User analytics gets the heatmap and
 the flow and **zero** recordings — tested; the Session replay tab falls
 back to the step-through there.
+
+**A key must not change when a label does.** `labelFor` (what a control
+is called on a dashboard) joins a control's pieces of text with spaces;
+the key (`keyFor` → `keyName`) is still made from the run-together
+`textContent`, because every stored tap carries a key made that way and a
+key that changed would stop matching its own control. Checked across the
+53 controls of the Tikkie home: 0 keys changed.
 
 `ux_events`, `ux_sessions` and `ux_layouts` *are* shared with a
 connection that has User analytics on (migration 064), through their own

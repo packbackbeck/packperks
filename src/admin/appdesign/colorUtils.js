@@ -1,4 +1,4 @@
-/* Colour helpers for Design & copy: parsing, mixing and WCAG contrast. */
+/* Colour helpers for Client app: parsing, mixing and WCAG contrast. */
 
 const HEX_RE = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i;
 

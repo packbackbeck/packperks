@@ -1,41 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRef } from 'react';
 import {
-  Hand, Monitor, Pause, Play, RotateCcw, Smartphone, Tablet, Video, VideoOff, Zap,
+  Monitor, Play, Smartphone, Tablet, Video, VideoOff, Zap,
 } from 'lucide-react';
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Segmented } from '../../ui';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState } from '../../ui';
 import { fmtInt } from '../../ui/timeSeries';
 import { fmtDuration } from '../../lib/behaviourFormat';
-import { screenName } from '../behaviourCopy';
-import ScreenFrame from './ScreenFrame';
-import RrwebStage from './RrwebStage';
+import ReplayPlayer from './ReplayPlayer';
 import useFitHeight from './useFitHeight';
 
 /* ─────────────────────────────────────────────────────────────────────
- * Session replay.
+ * Session replay: the visits on the left, the one picked played back on
+ * the right (ReplayPlayer).
  *
- * WHAT THIS IS, EXACTLY. Not a video and not a recording of the page.
- * Nothing a customer typed or had in a field is stored anywhere, and no
- * screenshot is ever taken. What is stored is the ordered stream of what
- * they DID — screen opened, scrolled this far, tapped here, left — and
- * this plays it back over the venue's actual app, opened read-only in a
- * phone the way the heatmap does (ScreenFrame). So you watch the
- * behaviour — the page moving, the taps landing — rather than the person.
+ * A visit captured while the venue had replay on carries an rrweb
+ * recording of the customer's own screen, masked (see uxCapture.js); one
+ * from before recordings existed is stepped through over the venue's app
+ * as it is today. Either way every tap is drawn and named, and the list of
+ * what happened runs beside it.
  *
  * It only lists visits captured while the venue had replay switched on
  * (`ux_sessions.replay`, written by ux-ingest from the venue's own
  * setting), so turning it off hides everything it was off for rather
  * than quietly keeping it.
- *
- * The clock is the visit's own, with idle gaps squeezed to a couple of
- * seconds — nobody needs to watch a real ninety-second pause.
  * ───────────────────────────────────────────────────────────────────── */
 
-const SPEEDS = [
-  { id: '1', label: '1×' },
-  { id: '2', label: '2×' },
-  { id: '4', label: '4×' },
-];
-const MAX_GAP_MS = 2000;
 const DEVICE_ICON = { mobile: Smartphone, tablet: Tablet, desktop: Monitor };
 
 function when(iso) {
@@ -46,69 +34,12 @@ function when(iso) {
   });
 }
 
-/* The visit's steps, each with how long to hold on it. */
-function toSteps(events) {
-  const kept = (events || []).filter(e => ['view', 'click', 'rage', 'dead', 'scroll', 'leave'].includes(e.kind));
-  return kept.map((e, i) => {
-    const next = kept[i + 1];
-    const raw = next ? Date.parse(next.at) - Date.parse(e.at) : 900;
-    const hold = Number.isFinite(raw) ? Math.min(MAX_GAP_MS, Math.max(220, raw)) : 700;
-    return { ...e, hold };
-  });
-}
-
 export default function ReplayCard({
   sessions = [], replayOn, loading, phrase, selected, onSelect, replay, replayLoading, recording = null,
   onOpenSettings, slug,
 }) {
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState('2');
-  const [at, setAt] = useState(0);
-  const timer = useRef(null);
   const fit = useRef(null);
   useFitHeight(fit);
-
-  /* rrweb needs a snapshot and at least one thing after it to play. */
-  const hasRecording = Array.isArray(recording) && recording.length > 1;
-  const steps = useMemo(() => toSteps(replay?.events), [replay]);
-  const step = steps[Math.min(at, Math.max(0, steps.length - 1))] || null;
-
-  // Advance on the visit's own clock, scaled by the chosen speed. At the
-  // end there is simply nothing left to schedule, and the button turns
-  // into "Again".
-  const atEnd = at >= steps.length - 1;
-  useEffect(() => {
-    if (!playing || atEnd || !steps.length) return undefined;
-    const hold = steps[at]?.hold || 700;
-    timer.current = setTimeout(() => setAt(i => i + 1), hold / Number(speed));
-    return () => clearTimeout(timer.current);
-  }, [playing, atEnd, at, steps, speed]);
-
-  // A different visit starts from its own beginning. Reset while
-  // rendering rather than in an effect, so the old visit's position is
-  // never painted against the new one's steps.
-  const [shown, setShown] = useState(selected);
-  if (shown !== selected) {
-    setShown(selected);
-    setAt(0);
-    setPlaying(false);
-  }
-
-  const restart = useCallback(() => { setAt(0); setPlaying(true); }, []);
-
-  // Where the page sits: the last scroll we saw, held until the next.
-  const held = useMemo(() => {
-    let d = 0;
-    for (let i = 0; i <= at && i < steps.length; i++) {
-      if (steps[i].kind === 'view') d = 0;
-      if (steps[i].kind === 'scroll' && Number.isFinite(Number(steps[i].depth))) d = Number(steps[i].depth);
-    }
-    return d;
-  }, [at, steps]);
-
-  const elapsed = step && replay?.session
-    ? Math.max(0, Date.parse(step.at) - Date.parse(replay.session.started_at))
-    : 0;
 
   if (!replayOn) {
     return (
@@ -134,7 +65,7 @@ export default function ReplayCard({
       <CardHeader
         title="Session replay"
         icon={Video}
-        subtitle={`Visits captured ${phrase}, played back from what was tapped — never from a recording of the screen.`}
+        subtitle={`Visits captured ${phrase}. Pick one to watch it, with every tap marked and named.`}
         actions={<Badge tone="violet">{fmtInt(sessions.length)} visits</Badge>}
       />
       <CardBody flush>
@@ -174,91 +105,26 @@ export default function ReplayCard({
           <div className="uf-replay__stage">
             {!selected ? (
               <EmptyState icon={Play} title="Pick a visit">
-                Choose one on the left and watch it play out: screens opening, the page scrolling, each tap
-                where it landed.
+                Choose one on the left to watch it: the screens they opened, how far they scrolled and
+                every tap, with the name of what they pressed.
               </EmptyState>
-            ) : replayLoading ? (
+            ) : replayLoading || recording === null ? (
+              /* The steps and the recording arrive separately; the player
+                 waits for both, or it would start stepping through the
+                 visit and then swap to the recording under the viewer. */
               <div className="uf-replay__loading" aria-busy="true">Loading the visit…</div>
-            ) : hasRecording ? (
-              /* A real recording of this visit: the screen they actually
-                 had, not this screen re-enacted. */
-              <div className="uf-replay__phone uf-replay__phone--rrweb">
-                <RrwebStage events={recording} speed={Number(speed) || 1} />
-              </div>
-            ) : !steps.length ? (
+            ) : !(replay?.events?.length) && !(Array.isArray(recording) && recording.length > 1) ? (
               <EmptyState icon={Play} title="Nothing to play">
                 This visit has no steps left — it may have fallen outside the venue’s retention window.
               </EmptyState>
             ) : (
-              <>
-                <div className="uf-replay__phone">
-                  <ScreenFrame
-                    slug={slug}
-                    screen={step?.screen}
-                    device={replay?.session?.device || 'mobile'}
-                    scrollTo={held}
-                    note="This venue has no address to preview yet."
-                  >
-                    {step && (step.kind === 'click' || step.kind === 'rage' || step.kind === 'dead') && step.x != null && (
-                      <span
-                        key={`${step.seq}`}
-                        className={`ufs-tap ufs-tap--${step.kind}`}
-                        style={{ left: `${Number(step.x) * 100}%`, top: `${Number(step.y) * 100}%` }}
-                      />
-                    )}
-                  </ScreenFrame>
-                </div>
-                <p className="uf-replay__caption">
-                  <strong>{screenName(step?.screen)}</strong>
-                  <span>
-                    {step?.kind === 'view' && 'opened this screen'}
-                    {step?.kind === 'scroll' && `scrolled to ${Math.round((Number(step.depth) || 0) * 100)}%`}
-                    {step?.kind === 'click' && `tapped ${step.label || 'the screen'}`}
-                    {step?.kind === 'rage' && `tapped ${step.label || 'here'} again — nothing happened`}
-                    {step?.kind === 'dead' && 'tapped something that does nothing'}
-                    {step?.kind === 'leave' && 'left'}
-                  </span>
-                </p>
-
-                <div className="uf-replay__controls">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    icon={atEnd ? RotateCcw : playing ? Pause : Play}
-                    onClick={() => (atEnd ? restart() : setPlaying(p => !p))}
-                  >
-                    {atEnd ? 'Again' : playing ? 'Pause' : 'Play'}
-                  </Button>
-                  <input
-                    className="uf-replay__scrub"
-                    type="range"
-                    min="0"
-                    max={Math.max(0, steps.length - 1)}
-                    value={at}
-                    onChange={(e) => { setPlaying(false); setAt(Number(e.target.value)); }}
-                    aria-label="Position in the visit"
-                  />
-                  <span className="uf-replay__time">{fmtDuration(elapsed) || '0 sec'}</span>
-                  <Segmented options={SPEEDS} value={speed} onChange={setSpeed} ariaLabel="Playback speed" />
-                </div>
-
-                <div className="uf-replay__marks" aria-hidden="true">
-                  {steps.map((s, i) => (
-                    <span
-                      key={s.seq}
-                      className={`uf-mark uf-mark--${s.kind}${i === at ? ' uf-mark--now' : ''}`}
-                      style={{ left: `${(i / Math.max(1, steps.length - 1)) * 100}%` }}
-                    />
-                  ))}
-                </div>
-
-                <p className="uf-replay__note">
-                  <Hand size={13} aria-hidden="true" />
-                  Reconstructed: the taps and scrolls this visit made, played over the venue’s own app
-                  opened read-only. The page itself was never recorded, so nothing typed or shown in a
-                  field exists to play back.
-                </p>
-              </>
+              <ReplayPlayer
+                key={selected}
+                replay={replay}
+                recording={recording}
+                slug={slug}
+                device={replay?.session?.device || 'mobile'}
+              />
             )}
           </div>
         </div>

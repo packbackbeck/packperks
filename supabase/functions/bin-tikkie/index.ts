@@ -818,6 +818,149 @@ async function userByEmail(orgId: string, email: string): Promise<{ id: string; 
   return (data as { id: string; device_id: string | null } | null) ?? null;
 }
 
+/* ── One account, on the phone that just proved it owns it ──────────────
+ * The wallet is read by device (walletAction), so "logging in" means this
+ * device has to BECOME the account's device. Before this existed the login
+ * only stored the account id in the browser, and a customer who logged in
+ * on a new phone still saw that phone's empty wallet.
+ *
+ * Proof comes from either door, and both lead here: the 6-digit code we
+ * emailed (login_verify) or a verified Google login (oauth_login). Either
+ * way the person controls the email AND holds this phone, so:
+ *
+ *   • no account has the email  → this phone's profile takes it (made if
+ *     (nor this Google login)     there is none yet; an address it was
+ *                                 already saved under is kept);
+ *   • the account is this phone → nothing moves;
+ *   • the account is elsewhere  → it moves to this phone, and whatever this
+ *                                 phone had collected before logging in
+ *                                 (its own receipts, payouts, donations)
+ *                                 goes with it. The emptied row is marked
+ *                                 merged, the same way every other mode
+ *                                 retires a duplicate.
+ *
+ * Money only ever moves between two rows the same person has just proven
+ * are theirs. A receipt credited to anyone else's wallet stays put.
+ *
+ * Marketing consent is never touched here: only a box the customer ticks
+ * sets it. */
+interface AdoptResult {
+  profile: ProfileRow;
+  outcome: "created" | "linked" | "same" | "moved";
+}
+async function adoptAccountOnDevice(
+  orgId: string,
+  deviceId: string,
+  email: string,
+  authUserId: string | null,
+): Promise<AdoptResult | null> {
+  // The account this login belongs to: the one that already carries this
+  // Google login, else the one saved under this email.
+  let owner: { id: string; device_id: string | null } | null = null;
+  if (authUserId) {
+    const { data } = await supabase
+      .from("users").select("id, device_id")
+      .eq("org_id", orgId).eq("auth_user_id", authUserId)
+      .is("merged_into", null)
+      .maybeSingle();
+    owner = (data as { id: string; device_id: string | null } | null) ?? null;
+  }
+  if (!owner) owner = await userByEmail(orgId, email);
+  const { data: here } = await supabase
+    .from("users").select("id, auth_user_id, email")
+    .eq("org_id", orgId).eq("device_id", deviceId)
+    .is("merged_into", null)
+    .maybeSingle();
+  const now = new Date().toISOString();
+
+  // Another row of this venue already carries this login (users_auth_org_key
+  // is unique), so only claim it for a row that is not someone else's.
+  const authPatch = async (rowId: string) => {
+    if (!authUserId) return {};
+    const { data: holder } = await supabase.from("users").select("id")
+      .eq("org_id", orgId).eq("auth_user_id", authUserId).maybeSingle();
+    return !holder || holder.id === rowId ? { auth_user_id: authUserId } : {};
+  };
+
+  if (!owner) {
+    if (here?.id) {
+      // A wallet already saved under another address keeps it: the login is
+      // linked to the wallet (auth_user_id), so Google still finds it, and a
+      // code to the saved address still works too. Nothing is renamed.
+      const { data: updated, error } = await supabase.from("users")
+        .update({ email: here.email || email, updated_at: now, ...(await authPatch(here.id)) })
+        .eq("id", here.id).select(PROFILE_COLS).maybeSingle();
+      if (error || !updated) return null;
+      return { profile: updated as ProfileRow, outcome: "linked" };
+    }
+    const created = await findOrCreateProfile(orgId, deviceId, email, false);
+    if (!created) return null;
+    const patch = await authPatch(created.id);
+    if (Object.keys(patch).length) await supabase.from("users").update(patch).eq("id", created.id);
+    return { profile: created, outcome: "created" };
+  }
+
+  if (here?.id === owner.id) {
+    const patch = await authPatch(owner.id);
+    if (Object.keys(patch).length) await supabase.from("users").update({ ...patch, updated_at: now }).eq("id", owner.id);
+    const { data: same } = await supabase.from("users").select(PROFILE_COLS).eq("id", owner.id).maybeSingle();
+    return same ? { profile: same as ProfileRow, outcome: "same" } : null;
+  }
+
+  // The account lives on another phone (or none). Bring this phone's own
+  // history along, then free the device slot (users_device_org_key) and the
+  // login slot before the account takes them.
+  if (here?.id) {
+    await supabase.from("claims").update({ user_id: owner.id }).eq("user_id", here.id);
+    await supabase.from("pending_batches").update({ user_id: owner.id }).eq("user_id", here.id);
+    const { error: retireErr } = await supabase.from("users")
+      .update({ merged_into: owner.id, device_id: null, auth_user_id: null, updated_at: now })
+      .eq("id", here.id);
+    if (retireErr) {
+      console.error(`[bin-tikkie] adopt: retire failed: ${retireErr.message}`);
+      return null;
+    }
+  }
+  const { data: moved, error: moveErr } = await supabase.from("users")
+    .update({ device_id: deviceId, updated_at: now, ...(await authPatch(owner.id)) })
+    .eq("id", owner.id).select(PROFILE_COLS).maybeSingle();
+  if (moveErr || !moved) {
+    console.error(`[bin-tikkie] adopt: move failed: ${moveErr?.message}`);
+    return null;
+  }
+  return { profile: moved as ProfileRow, outcome: "moved" };
+}
+
+/* A receipt that started a login is attached to the account it ends in —
+ * but only if nobody's wallet has it yet (the wallet model never re-points
+ * money that is already somebody's). */
+async function attachBatch(batchId: string, userId: string, email: string): Promise<void> {
+  if (!UUID_RE.test(batchId)) return;
+  await supabase.from("claims")
+    .update({ user_id: userId })
+    .eq("batch_id", batchId)
+    .is("user_id", null);
+  await supabase.from("pending_batches")
+    .update({ email, user_id: userId }).eq("batch_id", batchId);
+}
+
+function loginReply(r: AdoptResult, loginEmail: string): Response {
+  // The address the wallet is saved under, which a code can be sent to.
+  const email = r.profile.email || loginEmail;
+  return json({
+    status: "ok",
+    outcome: r.outcome,
+    user_id: r.profile.id,
+    email,
+    profile: {
+      user_id: r.profile.id,
+      name: r.profile.display_name,
+      animal_index: r.profile.animal_index,
+      email,
+    },
+  });
+}
+
 /* login_request — {email, org_id}: send a code to an email that owns an
  * account here. Deliberately explicit when there is no account: the link
  * that opens this popup only exists for people trying to log in. */
@@ -861,18 +1004,42 @@ async function loginVerify(body: Record<string, unknown>): Promise<Response> {
   const user = await userByEmail(orgId, email);
   if (!user) return json({ error: "no_account" }, 404);
 
-  const batchId = String(body.batch_id || otp.batch_id || "").trim().toLowerCase();
-  if (UUID_RE.test(batchId)) {
-    // Attach the receipt — but never MOVE money: a claim already credited
-    // to another wallet stays where it is (wallet model).
-    await supabase.from("claims")
-      .update({ user_id: user.id })
-      .eq("batch_id", batchId)
-      .is("user_id", null);
-    await supabase.from("pending_batches")
-      .update({ email, user_id: user.id }).eq("batch_id", batchId);
-  }
-  return json({ status: "ok", user_id: user.id, email });
+  // The code proved the email; the request came from this phone. Make this
+  // phone the account's phone, so the wallet it reads is the account's.
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  if (!deviceId) return json({ status: "ok", user_id: user.id, email });
+  const adopted = await adoptAccountOnDevice(orgId, deviceId, email, null);
+  if (!adopted) return json({ error: "account_failed" }, 500);
+
+  await attachBatch(String(body.batch_id || otp.batch_id || "").trim().toLowerCase(), adopted.profile.id, email);
+  return loginReply(adopted, email);
+}
+
+/* oauth_login — {org_id, device_id, access_token, batch_id?}: the same
+ * door as login_verify, opened by a Google login instead of an emailed
+ * code. Supabase Auth has already confirmed the address with Google; this
+ * checks that with the token itself (never the client's say-so) and then
+ * does exactly what a verified code does. A first-time visitor gets a
+ * profile; somebody who used the same email before, with a code or with
+ * Google, lands in that same account. */
+async function oauthLogin(body: Record<string, unknown>): Promise<Response> {
+  const orgId = String(body.org_id || "").trim();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  const token = String(body.access_token || "").trim();
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+  if (!token) return json({ error: "missing_token" }, 401);
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return json({ error: "invalid_token" }, 401);
+  const email = String(user.email || "").trim().toLowerCase();
+  if (!email || !user.email_confirmed_at) return json({ error: "email_not_verified" }, 403);
+
+  const adopted = await adoptAccountOnDevice(orgId, deviceId, email, user.id);
+  if (!adopted) return json({ error: "account_failed" }, 500);
+
+  await attachBatch(String(body.batch_id || "").trim().toLowerCase(), adopted.profile.id, email);
+  return loginReply(adopted, email);
 }
 
 /* save_email — the held-for-review popup's email capture. Two situations:
@@ -1263,6 +1430,9 @@ Deno.serve(async (req) => {
   if (await rateLimited(req)) return json({ error: "rate_limited" }, 429);
 
   if (body.action === "login_verify") return loginVerify(body);
+
+  // Google login: the same account door as login_verify (see oauthLogin).
+  if (body.action === "oauth_login") return oauthLogin(body);
 
   // Bulk redemption: the ONLY place a Tikkie link is minted now.
   if (body.action === "redeem") return redeemAction(body);

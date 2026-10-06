@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   sendMagicLink,
   signOutUser,
-  getCurrentAuthEmail,
   requestRestoreOtp,
   verifyRestoreOtp,
   finaliseRestore,
@@ -12,6 +11,8 @@ import {
   changeAuthEmail,
 } from '../lib/api';
 import PrivacyPolicyView from './PrivacyPolicyView';
+import GoogleSignIn, { GoogleMark } from './GoogleSignIn';
+import { getAuthInfo, useGoogleAvailable } from '../lib/oauth';
 import './SignInSheet.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -40,8 +41,21 @@ import './SignInSheet.css';
  * compact banner with the email + a Sign out action instead of the
  * form. This is the only place in the user app where signing out is
  * exposed — outside the sheet there's no reason for them to do it.
+ *
+ * Google is the second door into the same account (lib/oauth.js). It sits
+ * above the email field, on the restore screen, and next to the code when
+ * an email already has cups, because Google proves the address just as a
+ * code does. It leaves the app and comes back, so App.jsx reopens this
+ * sheet on return with `oauthReturn` ({ provider, error? }) and keeps any
+ * claim or refund that was waiting (`pendingAction`) for the Continue
+ * button. Both doors lead to one login: Supabase links an email login and
+ * a Google login with the same verified address automatically.
  */
-export default function SignInSheet({ open, onClose, onLinked, onVerified, onMergeHeld, requireVerification = true, savedEmail = null, onSaveEmailDirect, marketingConsent: savedMarketingConsent = false, onMarketingConsent, privacyPolicy = null, __devStatus = null, __devEmail = null }) {
+export default function SignInSheet({ open, onClose, onLinked, onVerified, onMergeHeld, requireVerification = true, savedEmail = null, onSaveEmailDirect, marketingConsent: savedMarketingConsent = false, onMarketingConsent, privacyPolicy = null, pendingAction = null, oauthReturn = null, __devStatus = null, __devEmail = null, __devProviders = null }) {
+  const googleAvailable = useGoogleAvailable();
+  // How the signed-in login can sign in: ['email'], ['google'] or both.
+  // (__devProviders: DEV screen audits only, like __devStatus below.)
+  const [providers, setProviders] = useState(() => (import.meta.env.DEV && __devProviders) || []);
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -92,18 +106,28 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     let cancelled = false;
     // No-verification mode: the email lives on the user row, there's no auth
     // session to read. Show the saved email (if any) without an OTP round-trip.
-    if (!requireVerification) {
+    // Coming back from Google is the exception: that IS a login, so it reads
+    // the session like any verified venue does.
+    const backFromGoogle = !!oauthReturn && !oauthReturn.error;
+    if (!requireVerification && !backFromGoogle) {
       if (savedEmail) { setCurrentEmail(savedEmail); setStatus('savedDirect'); }
       else { setCurrentEmail(null); setStatus('idle'); }
       return () => { cancelled = true; };
     }
-    getCurrentAuthEmail().then(e => {
+    getAuthInfo().then(({ email: e, providers: p }) => {
       if (cancelled) return;
+      setProviders(p);
       if (e) { setCurrentEmail(e); setStatus('signedIn'); }
-      else   { setCurrentEmail(null); setStatus('idle'); }
+      else {
+        setCurrentEmail(null);
+        setStatus('idle');
+        // Google sent them back without a session: say why, on the form
+        // they can try again from.
+        if (oauthReturn?.error) setError(oauthReturn.error);
+      }
     });
     return () => { cancelled = true; };
-  }, [open, requireVerification, savedEmail]);
+  }, [open, requireVerification, savedEmail, oauthReturn]);
 
   // Auto-focus the email input (save mode or first step of restore)
   // or the OTP input (restore code-entry step) when the sheet opens.
@@ -413,6 +437,14 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
             >
               Send 6-digit code
             </button>
+            {/* If that address is a Google account, Google proves it just as
+                well, and signing in combines the cups the same way. */}
+            <GoogleSignIn
+              intent={{ kind: 'rewards', pending: pendingAction }}
+              showPolicyNote={false}
+              divider={null}
+              disabled={status === 'restore_sending'}
+            />
             <button
               type="button"
               className="signin-btn signin-btn--ghost"
@@ -444,31 +476,85 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
           </div>
         )}
 
-        {/* Already signed in */}
-        {status === 'signedIn' && (
-          <div className="signin-state">
-            <div className="signin-art signin-art--ok">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
+        {/* Already signed in — and how. Both doors open this one account,
+            so the copy names whichever ones apply rather than leaving the
+            customer to guess which button to press on their next phone. */}
+        {status === 'signedIn' && (() => {
+          const viaGoogle = providers.includes('google');
+          const viaEmail = providers.includes('email');
+          const justBack = !!oauthReturn && !oauthReturn.error;
+          const continueLabel = pendingAction === 'claim'
+            ? 'Continue to my cashback'
+            : pendingAction === 'refund' ? 'Continue to my refund' : null;
+          return (
+            <div className="signin-state">
+              <div className={`signin-art ${justBack && viaGoogle ? 'signin-art--google' : 'signin-art--ok'}`}>
+                {justBack && viaGoogle ? <GoogleMark size={30} /> : (
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                )}
+              </div>
+              <h2 className="signin-title">{justBack && viaGoogle ? 'Signed in with Google' : 'You’re all set'}</h2>
+              <p className="signin-sub">
+                Your cups are backed up to <strong>{currentEmail}</strong>.{' '}
+                {viaGoogle && viaEmail
+                  ? 'On any device, continue with Google or ask for a code sent to this email.'
+                  : viaGoogle
+                    ? 'On another device, continue with Google, or ask for a code sent to this email. Both open this same account.'
+                    : googleAvailable
+                      ? 'On another device, ask for a code sent to this email. If it’s a Google address, Continue with Google opens the same account.'
+                      : 'You can sign in from any device with this email. Your balance and history will be right there.'}
+              </p>
+
+              {(viaGoogle || viaEmail) && (
+                <ul className="signin-methods" aria-label="Ways to sign in">
+                  {viaGoogle && <li className="signin-method"><GoogleMark size={14} /> Google</li>}
+                  {viaEmail && (
+                    <li className="signin-method">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="22,6 12,13 2,6" />
+                      </svg>
+                      Email code
+                    </li>
+                  )}
+                </ul>
+              )}
+
+              {/* Google gives an address, not a choice: offers stay off until
+                  the customer ticks this, the same rule as the email form. */}
+              {justBack && !savedMarketingConsent && onMarketingConsent && (
+                <label className="signin-consent signin-consent--solo">
+                  <input
+                    type="checkbox"
+                    className="signin-consent__box"
+                    checked={marketingConsent}
+                    onChange={e => { setMarketingConsent(e.target.checked); onMarketingConsent(e.target.checked); }}
+                  />
+                  <span className="signin-consent__text">Send me offers and reward updates.</span>
+                </label>
+              )}
+
+              <button
+                className="signin-btn signin-btn--primary"
+                onClick={continueLabel ? () => onVerified?.() : onClose}
+              >
+                {continueLabel || 'Done'}
+              </button>
+              {/* A Google login's address is Google's; changing it here would
+                  leave Google pointing at an address the account no longer
+                  shows. Email-code accounts can change theirs. */}
+              {!(viaGoogle && !viaEmail) && (
+                <button
+                  className="signin-btn signin-btn--ghost"
+                  onClick={() => { setNewEmail(''); setError(null); setStatus('change_email'); }}
+                >
+                  Change email
+                </button>
+              )}
             </div>
-            <h2 className="signin-title">You're all set</h2>
-            <p className="signin-sub">
-              Your cups are backed up to <strong>{currentEmail}</strong>.
-              You can sign in from any device with this email. Your
-              balance and history will be right there.
-            </p>
-            <button className="signin-btn signin-btn--primary" onClick={onClose}>
-              Done
-            </button>
-            <button
-              className="signin-btn signin-btn--ghost"
-              onClick={() => { setNewEmail(''); setError(null); setStatus('change_email'); }}
-            >
-              Change email
-            </button>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Change the email on THIS account (keeps your cups). Supabase sends a
             confirmation to the new address; the change lands once it's opened. */}
@@ -607,6 +693,12 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
                 : <>Add an email to your balance so you can recover it later. No code needed. It's saved right away.</>}
             </p>
 
+            <GoogleSignIn
+              intent={{ kind: 'rewards', pending: pendingAction }}
+              onShowPolicy={() => setShowPolicy(true)}
+              disabled={status === 'sending'}
+            />
+
             <label className="signin-label" htmlFor="signin-email">Email</label>
             <input
               id="signin-email"
@@ -690,6 +782,15 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
               to confirm it's you, then bring your cup balance back to
               this device.
             </p>
+
+            {/* Signed up with Google? That restores the account just as well:
+                Google proves the address the same way the code does. */}
+            <GoogleSignIn
+              intent={{ kind: 'rewards', pending: pendingAction }}
+              onShowPolicy={() => setShowPolicy(true)}
+              divider="or get a code by email"
+              disabled={status === 'restore_sending'}
+            />
 
             <label className="signin-label" htmlFor="restore-email">Email</label>
             <input

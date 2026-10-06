@@ -323,3 +323,12 @@
 .mergereq__actions-cell { text-align: right; cursor: default; }
 .mergereq__actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
 .mergereq__reject { border: 1px solid #F3C9D3; }
+
+/* Sign-in: which doors a customer uses (Google, emailed code). The Google
+   mark keeps its own colours in both themes, per Google's branding rules. */
+.au-signin-row { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.au-signin { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.au-signin svg { flex: none; }
+.au-signin-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.au-signin-last { font-size: 12px; font-weight: 500; color: var(--ui-muted); }
+.au-signin-note { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--ui-muted); }

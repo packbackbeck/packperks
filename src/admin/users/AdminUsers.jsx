@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Check, Dot, ExternalLink, Eye, Gift, GitMerge, Heart, Monitor, Plus, Search, Send, Smartphone, Tablet,
+  Check, Dot, ExternalLink, Eye, Gift, GitMerge, Heart, Mail, Monitor, Plus, Search, Send, Smartphone, Tablet,
   Undo2, UserCheck, Users, X,
 } from 'lucide-react';
+import { GoogleMark } from '../../components/GoogleSignIn';
 import { getAdminUsers, getUserActivity, getUserClaims, adjustUserBalance, adminUpdateUser, deleteRecords, deleteGroupAccounts, getMergeLimit, saveMergeLimit, getMergeRequests, approveMergeRequest, rejectMergeRequest, MERGE_LIMIT_DEFAULT } from '../lib/adminApi';
 import { useOrg } from '../context/OrgContext';
 import { logAction } from '../auth/actionLog';
@@ -71,6 +72,53 @@ function TypeTag({ visitor }) {
     </Badge>
   );
 }
+
+/* ── How a customer signs in ─────────────────────────────────────────
+ * From the login behind the row (admin_customer_logins, migration 068).
+ * Google and an emailed code are two doors into ONE login: Supabase links
+ * them when the address is the same, so a customer with both sees one
+ * account whichever they use. A row with an email but no login typed it
+ * in without signing in (a venue that doesn't ask for verification, or
+ * Deferred Tikkie's Save-your-balance card). */
+function signInKind(user) {
+  const p = user.signIn?.providers || [];
+  const google = p.includes('google');
+  const email = p.includes('email');
+  if (google && email) return 'both';
+  if (google) return 'google';
+  if (email) return 'email';
+  return user.email ? 'unverified' : 'none';
+}
+const SIGNIN_RANK = { both: 4, google: 3, email: 2, unverified: 1, none: 0 };
+
+function GoogleChip() {
+  return <span className="ui-badge ui-badge--neutral au-signin"><GoogleMark size={11} /><span>Google</span></span>;
+}
+function EmailChip() {
+  return <span className="ui-badge ui-badge--neutral au-signin"><Mail size={11} aria-hidden="true" /><span>Email code</span></span>;
+}
+
+function SignInBadges({ user }) {
+  const kind = signInKind(user);
+  if (kind === 'none') return <span className="ot-faint">—</span>;
+  if (kind === 'unverified') {
+    return <span className="ot-faint" title="Email saved without signing in">Email only</span>;
+  }
+  return (
+    <span className="au-signin-row">
+      {(kind === 'google' || kind === 'both') && <GoogleChip />}
+      {(kind === 'email' || kind === 'both') && <EmailChip />}
+    </span>
+  );
+}
+
+const SIGNIN_NOTE = {
+  both: 'Has used Google and emailed codes. Both open this one account.',
+  google: 'Signs in with Google. A code sent to the same address opens the same account.',
+  email: 'Signs in with an emailed code. Continue with Google on the same address opens the same account.',
+  unverified: 'The email was saved without signing in, so it isn’t confirmed. Signing in with a code or Google to this address would confirm it.',
+  none: 'Hasn’t signed in. The account lives on their device only.',
+};
 
 const ACT_META = {
   cup_added:      { tone: 'emerald', icon: Plus },
@@ -217,6 +265,16 @@ function UserDetailPanel({ user, onClose, onAdjustBalance, onUpdateUser, hideCup
             <span className="udp__meta-label">Device / browser</span>
             <span className={`udp__meta-val${user.device ? '' : ' udp__meta-val--muted'}`}>{user.device || 'Not detected'}</span>
           </div>
+          <div className="udp__meta-item udp__meta-item--wide">
+            <span className="udp__meta-label">Sign-in</span>
+            <span className="udp__meta-val au-signin-detail">
+              <SignInBadges user={user} />
+              {user.signIn?.lastSignInAt && (
+                <span className="au-signin-last">Last signed in {timeAgo(user.signIn.lastSignInAt)}</span>
+              )}
+            </span>
+            <span className="au-signin-note">{SIGNIN_NOTE[signInKind(user)]}</span>
+          </div>
           <div className="udp__meta-item udp__meta-item--wide udp__meta-item--row">
             <span className="udp__consent-text">
               <span className="udp__meta-label">Marketing email</span>
@@ -344,6 +402,7 @@ const SORT_KEYS = {
   name:    (u) => (u.display_name || '').toLowerCase(),
   type:    (u) => (u.isVisitor ? 1 : 0),
   email:   (u) => (u.email || '').toLowerCase(),
+  signin:  (u) => SIGNIN_RANK[signInKind(u)],
   marketing:(u) => (u.marketing_consent ? 1 : 0),
   device:  (u) => (u.device || '').toLowerCase(),
   cups:    (u) => u.cupBalance,
@@ -379,6 +438,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
   const columnConfig = [
     { id: 'type', label: 'Type', defaultOn: true },
     { id: 'email', label: 'Email', defaultOn: true },
+    { id: 'signin', label: 'Sign-in', desc: 'Google, emailed code, or both', defaultOn: true },
     { id: 'marketing', label: 'Marketing', defaultOn: true },
     { id: 'device', label: 'Device', defaultOn: true },
     ...(isTikkie ? [] : [
@@ -390,7 +450,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
     { id: 'active', label: 'Last active', defaultOn: true },
   ];
   const defaultVisibleCols = () => {
-    const s = new Set(['type', 'email', 'marketing', 'device', 'joined', 'active']);
+    const s = new Set(['type', 'email', 'signin', 'marketing', 'device', 'joined', 'active']);
     if (!isTikkie) {
       s.add('lifetime');
       if (grouped) { s.add('total'); s.add(`org:${activeOrgId}`); }
@@ -489,7 +549,9 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
       list = list.filter(u =>
         (u.display_name || '').toLowerCase().includes(q) ||
         (u.email || '').toLowerCase().includes(q) ||
-        (u.id || '').toLowerCase().includes(q)
+        (u.id || '').toLowerCase().includes(q) ||
+        // "google" finds everyone who signs in with Google.
+        (q === 'google' && (u.signIn?.providers || []).includes('google'))
       );
     }
     const getter =
@@ -509,7 +571,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
   // Number of columns actually rendered (checkbox + User + visible value cols),
   // for the empty-state colSpan.
   const valueColCount =
-    (isCol('type') ? 1 : 0) + (isCol('email') ? 1 : 0) + (isCol('marketing') ? 1 : 0) + (isCol('device') ? 1 : 0) +
+    (isCol('type') ? 1 : 0) + (isCol('email') ? 1 : 0) + (isCol('signin') ? 1 : 0) + (isCol('marketing') ? 1 : 0) + (isCol('device') ? 1 : 0) +
     (grouped ? orgCols.filter(c => isCol(c.id)).length + (isCol('total') ? 1 : 0) : (isTikkie ? 0 : 1)) +
     (isCol('lifetime') ? 1 : 0) + (isCol('joined') ? 1 : 0) + (isCol('active') ? 1 : 0);
   const tableColSpan = 2 + valueColCount;
@@ -574,6 +636,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                     {th('User', 'name')}
                     {isCol('type') && th('Type', 'type', { width: 110 })}
                     {isCol('email') && th('Email', 'email')}
+                    {isCol('signin') && th('Sign-in', 'signin', { width: 170 })}
                     {isCol('marketing') && th('Marketing', 'marketing', { width: 110 })}
                     {isCol('device') && th('Device', 'device', { width: 160 })}
                     {grouped
@@ -643,6 +706,7 @@ export default function AdminUsers({ onNavigate, focusUserId, onFocusConsumed, f
                           <PiiMask type="email" value={user.email} targetType="user" targetId={user.id} inline />
                         </td>
                       )}
+                      {isCol('signin') && <td><SignInBadges user={user} /></td>}
                       {isCol('marketing') && (
                         <td>
                           {user.marketing_consent

@@ -413,6 +413,32 @@ only when money leaves — a cashback claim or a direct refund — and is verifi
 (signed in) wherever the venue has `requireEmailVerification` on. Payout links
 are shown in the app, never in the email.
 
+**Sign in with Google** (`src/lib/oauth.js`, `components/GoogleSignIn.jsx`)
+is a second door into the SAME account an emailed code opens: Supabase Auth
+links an email login and a Google login with the same verified address
+automatically, in either order, so there is never a "this email is taken"
+dead end. It sits above every customer email form: the rewards apps'
+`SignInSheet` (save, restore, and the "this email already has cups" step)
+and Deferred Tikkie's Save-your-balance card, email sheet and log-in sheet.
+The button renders **only once Google is switched on** for the project
+(read live from `/auth/v1/settings`); DEV can force it with `?google=1`.
+Google leaves the app, so the reason is kept in sessionStorage as an
+*intent* and picked up on the way back: the rewards apps in App.jsx's auth
+listener (it also handles `INITIAL_SESSION`, because the session can be
+parsed out of the address before the listener exists), reopening the sheet
+on "Signed in with Google" with any claim or refund still waiting; Deferred
+Tikkie in `TikkieHomePage` via `bin-tikkie` action `oauth_login`. Google
+gives an address, not consent: marketing stays off until ticked, offered
+on the return screen. To switch it on: Google Cloud OAuth client (web) →
+Supabase → Authentication → Providers → Google, with
+`https://<ref>.supabase.co/auth/v1/callback` as the redirect and
+`https://perks.packback.network/**` in Supabase's Redirect URLs; a Supabase
+custom auth domain keeps the project id off Google's consent screen.
+Dashboard → Users shows each customer's sign-in (Google, Email code, both,
+or an email saved without signing in) from `admin_customer_logins`
+(migration 068: providers, last sign-in, confirmed — dashboard accounts
+only, the anon key cannot execute it).
+
 **Marketing consent is opt-in.** It comes only from a box or switch the
 customer turns on: the email form, the wallet's save-your-balance form, Edit
 profile, or the cookie banner's Marketing switch (recorded only when changed
@@ -540,6 +566,7 @@ access, so any account above vendor may use it.
 | `src/staff/` | PackPerks Staff: login, the QR screen, history, profile |
 | `src/admin/staffapp/` | Generate → Staff app: switch, accounts and requests, logs, preview |
 | `src/lib/uxCapture.js` | taps, scrolls and screen flow from the customer app |
+| `src/lib/oauth.js` | Sign in with Google: availability, the round trip's intent, errors on return |
 | `src/lib/appLayout.js` | the home screen's section order, for the app and Client app |
 | `src/admin/behaviour/userflow/` | User flow, Heatmap and Session replay: tiles, the device (DeviceChrome), the embedded app (ScreenFrame), controls, flow, the replay player, capture settings |
 | `src/admin/lib/uxAggregate.js` | the User flow sums in JS — the demo's half of migration 061 |
@@ -757,6 +784,18 @@ control names came back. Fixed 23 Sep 2026 by migration 065: the guard is
 `volatile` and each CTE is `materialized`. Test a guard as `anon` against a
 venue that actually has rows before believing it — with no rows the join
 short-circuits and an unguarded call looks like an empty one.
+
+**A Deferred Tikkie login has to move the wallet.** That mode's wallet is
+read by device (`walletAction`), so a login that only remembers the account
+in the browser shows the new phone's empty wallet — which is what the
+emailed-code login did until Oct 2026. Both doors (`login_verify`,
+`oauth_login`) now go through `adoptAccountOnDevice` in `bin-tikkie`: the
+account (found by its Google login, else its email) becomes this phone's,
+this phone's own earlier receipts go with it, and the emptied row is marked
+`merged_into`. The account leaves the phone it was on; logging in there
+again brings it back. An address a wallet was already saved under is never
+renamed by a Google login with a different one — the login is linked
+(`auth_user_id`) instead.
 
 **Customer emails are email only.** Push notifications were removed; the
 `notify_push` column stays and is always false.

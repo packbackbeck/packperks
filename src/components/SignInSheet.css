@@ -82,6 +82,8 @@
 .signin-art--sent { background: #FBEEDA; color: var(--pb-orange, #E4572E); }
 .signin-art--ok   { background: #E3F3E8; color: var(--pb-green, #1A8737); }
 .signin-art--pending { background: #FCEBDD; color: #C7891F; }
+/* Google's mark keeps its own colours, on white (Google's branding rules). */
+.signin-art--google { background: #FFFFFF; border: 1px solid #E3E3E3; }
 
 .signin-title {
   margin: 0 0 8px;
@@ -272,3 +274,20 @@
   color: #4A4540;
 }
 .signin-consent__muted { color: #9E9A93; }
+
+/* The ways this login signs in — "Google", "Email code" — as quiet chips
+   under the confirmation, so the customer knows which door to use on
+   their next phone (either opens the same account). */
+.signin-methods {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin: -6px 0 18px; padding: 0; list-style: none;
+}
+.signin-method {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  background: #F4F2EF; border: 1px solid #E7E2DA;
+  font-size: 13px; font-weight: 600; color: #3A3632;
+}
+.signin-method svg { flex: none; }
+/* A lone opt-in under a confirmation (after Google), not part of a form. */
+.signin-consent--solo { justify-content: center; width: auto; margin: -6px 0 14px; }

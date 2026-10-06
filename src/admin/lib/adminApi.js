@@ -2530,12 +2530,19 @@ export async function getAdminUsers(orgIds) {
   const { data: users, error } = await applyOrgFilter(
     supabase
       .from('users')
-      .select('id, identity_id, org_id, display_name, email, device, selected_reward_id, marketing_consent, marketing_consent_at, created_at, updated_at')
+      .select('id, identity_id, org_id, display_name, email, device, selected_reward_id, marketing_consent, marketing_consent_at, created_at, updated_at, auth_user_id')
       .order('created_at', { ascending: false }),
     orgIds
   );
 
   if (error) throw error;
+
+  // How each customer signs in (email code, Google, both). Logins live in
+  // auth.*, which the API cannot read; admin_customer_logins (migration 068)
+  // returns just the providers, last sign-in and whether the address is
+  // confirmed, to dashboard accounts only. A failure here only blanks the
+  // column — it never stops the page.
+  const signInByAuth = await getCustomerSignIns((users || []).map(u => u.auth_user_id));
 
   const { data: balances } = await applyOrgFilter(
     supabase
@@ -2567,7 +2574,7 @@ export async function getAdminUsers(orgIds) {
       u.selected_reward_id ||
       scanUserIds.has(u.id)
     );
-    return { ...u, cupBalance, lifetimeCups, isVisitor };
+    return { ...u, cupBalance, lifetimeCups, isVisitor, signIn: signInByAuth.get(u.auth_user_id) || null };
   });
 
   if (!grouped) return enriched;
@@ -2606,6 +2613,8 @@ export async function getAdminUsers(orgIds) {
         cur.email = cur.email || r.email;
         cur.display_name = cur.display_name || r.display_name;
       }
+      // One person, one login: whichever store's row carries it.
+      cur.signIn = mergeSignIn(cur.signIn, r.signIn);
     }
     cur.storeCount += 1;
     cur.memberUserIds.push(r.id);
@@ -2617,6 +2626,33 @@ export async function getAdminUsers(orgIds) {
     cur.orgBalances[r.org_id] = ob;
   }
   return Array.from(byIdentity.values());
+}
+
+/* auth_user_id → { providers: ['email'|'google'…], lastSignInAt, confirmed }. */
+async function getCustomerSignIns(authIds) {
+  const ids = [...new Set((authIds || []).filter(Boolean))];
+  const out = new Map();
+  if (!ids.length || DEMO_MODE) return out;
+  for (let i = 0; i < ids.length; i += 1000) {
+    const { data, error } = await supabase.rpc('admin_customer_logins', { p_auth_ids: ids.slice(i, i + 1000) });
+    if (error) return out;
+    for (const r of data || []) {
+      out.set(r.auth_user_id, {
+        providers: Array.isArray(r.providers) ? r.providers : [],
+        lastSignInAt: r.last_sign_in_at || null,
+        confirmed: r.email_confirmed === true,
+      });
+    }
+  }
+  return out;
+}
+
+function mergeSignIn(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  const providers = [...new Set([...(a.providers || []), ...(b.providers || [])])].sort();
+  const lastSignInAt = [a.lastSignInAt, b.lastSignInAt].filter(Boolean).sort().pop() || null;
+  return { providers, lastSignInAt, confirmed: a.confirmed || b.confirmed };
 }
 
 export async function getUserActivity(userId) {

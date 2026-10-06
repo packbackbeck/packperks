@@ -1,0 +1,42 @@
+/* "Continue with Google" — shared by every customer sign-in surface.
+ * Prefixed ppk-gsi so it can't collide with either app's stylesheets
+ * (both ship in one bundle). The button's look is Google's, not the
+ * venue's: white, a grey outline, the four-colour mark. */
+.ppk-gsi { display: flex; flex-direction: column; gap: 10px; width: 100%; margin: 4px 0 2px; }
+
+.ppk-gsi__btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; min-height: 50px; padding: 0 18px;
+  border: 1px solid #747775; border-radius: 999px;
+  background: #FFFFFF; color: #1F1F1F;
+  font-family: inherit; font-size: 15.5px; font-weight: 600; line-height: 1.2; letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.ppk-gsi__btn:hover:not(:disabled) { background: #F8F9FA; box-shadow: 0 1px 3px rgba(60, 64, 67, 0.22); }
+.ppk-gsi__btn:active:not(:disabled) { background: #F1F3F4; }
+.ppk-gsi__btn:focus-visible { outline: 3px solid #4285F4; outline-offset: 2px; }
+.ppk-gsi__btn:disabled { cursor: default; opacity: 0.72; }
+.ppk-gsi__btn svg { flex: none; }
+
+.ppk-gsi__note {
+  margin: 0; text-align: center;
+  font-size: 12.5px; line-height: 1.45; color: var(--text-muted, #6C6259);
+}
+.ppk-gsi__link {
+  padding: 0; border: 0; background: none; font: inherit; color: inherit;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.ppk-gsi__nowrap { white-space: nowrap; }
+.ppk-gsi__error { margin: 0; text-align: center; font-size: 13px; line-height: 1.45; color: #B3261E; }
+
+.ppk-gsi__or { display: flex; align-items: center; gap: 12px; margin: 6px 0 2px; }
+.ppk-gsi__rule { flex: 1; height: 1px; background: currentColor; opacity: 0.14; }
+.ppk-gsi__orlabel {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted, #6C6259); white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ppk-gsi__btn { transition: none; }
+}

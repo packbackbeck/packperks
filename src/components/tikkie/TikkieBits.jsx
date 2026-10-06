@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { loginRequest, loginVerify, storeProfile } from '../../lib/tikkieWallet';
+import GoogleSignIn from '../GoogleSignIn';
 import tikkieClaimShot from '../../assets/images/tikkie-claim-screen.png';
 import { useRegion } from '../../lib/RegionContext';
 import './tikkie.css';
@@ -79,9 +80,11 @@ export function Sheet({ onClose, label, children }) {
 
 /* ── Log in with a one-time email code. Two steps: email → code.
  * `startAtCode` skips ahead when the server already sent one (an email
- * that belongs to another device's profile). Success stores the profile
- * for this device and hands it back. ── */
-export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = false, onClose, onLoggedIn }) {
+ * that belongs to another device's profile). Success moves the account
+ * onto this phone on the server (bin-tikkie adoptAccountOnDevice), stores
+ * it here and hands it back. Google is offered above the email: it opens
+ * the same account, by the same server step. ── */
+export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = false, onClose, onLoggedIn, onShowPolicy }) {
   const [step, setStep] = useState(startAtCode ? 'code' : 'email');
   const [email, setEmailVal] = useState(initialEmail);
   const [code, setCode] = useState('');
@@ -111,8 +114,8 @@ export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = fals
     const data = await loginVerify(org?.id, email.trim(), code.trim(), batchId);
     setBusy(false);
     if (data?.status === 'ok' && data.user_id) {
-      const profile = { userId: data.user_id, email: data.email || email.trim() };
-      if (org?.id) storeProfile(org.id, profile);
+      const profile = data.profile || { user_id: data.user_id, email: data.email || email.trim() };
+      if (org?.id) storeProfile(org.id, { userId: profile.user_id, email: profile.email, name: profile.name });
       onLoggedIn?.(profile);
       return;
     }
@@ -131,6 +134,12 @@ export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = fals
           <p className="tk-sheet__sub">
             Enter the email of your PackPerks account and we’ll send you a one-time code.
           </p>
+          <GoogleSignIn
+            intent={{ kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null }}
+            onShowPolicy={onShowPolicy}
+            divider="or get a code by email"
+            disabled={busy}
+          />
           <input
             type="email"
             inputMode="email"

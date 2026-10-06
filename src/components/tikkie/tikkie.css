@@ -173,3 +173,9 @@
   font-family: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
 }
 .tk-donate__pick--on { border-color: #1A8737; background: #E4F5E9; color: #1A8737; }
+
+/* Google sign-in: its own mark on white (Google's branding rules), and the
+   quieter second choice beside a primary button. */
+.tk-icon--google { background: #FFFFFF; border: 1px solid #DADCE0; }
+.tk-btn--ghost { background: transparent; border-color: transparent; color: #6C6259; }
+.tk-consent--center { justify-content: center; margin: 4px 2px 0; }

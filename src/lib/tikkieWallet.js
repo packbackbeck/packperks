@@ -116,6 +116,15 @@ export const checkBatch = (batchId) =>
 export const loginRequest = (orgId, email) =>
   invokeBinTikkie({ action: 'login_request', org_id: orgId, email, device_id: deviceId() });
 
+/* Google login: Supabase Auth has the verified address; bin-tikkie checks
+ * the token itself and moves the account onto this phone, the same as a
+ * verified code does (adoptAccountOnDevice). */
+export const oauthWalletLogin = (orgId, accessToken, batchId) =>
+  invokeBinTikkie({
+    action: 'oauth_login', org_id: orgId, device_id: deviceId(),
+    access_token: accessToken, batch_id: batchId || null,
+  });
+
 export const loginVerify = (orgId, email, code, batchId) =>
   invokeBinTikkie({
     action: 'login_verify', org_id: orgId, email, code,

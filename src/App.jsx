@@ -73,6 +73,7 @@ import {
   mintByoCup,
   consolidateIdentity,
 } from './lib/api';
+import { peekOAuthIntent, takeOAuthIntent, takeOAuthReturnError } from './lib/oauth';
 import { getGroupContext, composeGroupCopy, getGroupBalances, getGroupStores, getGroupBySlug } from './lib/groups';
 import BudgetPausedModal from './components/BudgetPausedModal';
 import StoresPage from './components/StoresPage';
@@ -90,6 +91,12 @@ import { homeOrder } from './lib/appLayout';
  * generic string when no platform-specific token is found. Used in the
  * user profile so the activity / claim "Device" field is honest instead
  * of the old hardcoded "iPhone 15 Pro" placeholder. */
+/* Came back from Google without a session (they closed the picker, or the
+ * provider refused)? Read once, when the app loads, so the sign-in sheet can
+ * open again with the reason and whatever claim was waiting. See
+ * lib/oauth.js; a successful return is handled by the auth listener. */
+const BOOT_OAUTH_FAIL = typeof window !== 'undefined' ? takeOAuthReturnError('rewards') : null;
+
 function detectDevice() {
   if (typeof navigator === 'undefined') return 'Unknown device';
   const ua = navigator.userAgent || '';
@@ -251,12 +258,17 @@ export default function App({ consentReady = true } = {}) {
   // and set once they've verified an email via the magic-link flow.
   // We surface it in the UserPage as "Signed in as …".
   const [authEmail, setAuthEmail] = useState(null);
-  const [showSignIn, setShowSignIn] = useState(false);
+  const [showSignIn, setShowSignIn] = useState(() => !!BOOT_OAUTH_FAIL);
   // When a claim is attempted without an email, we open the sign-in sheet and
   // remember to continue to the receipt step the moment the email verifies.
-  const [claimAfterSignIn, setClaimAfterSignIn] = useState(false);
+  const [claimAfterSignIn, setClaimAfterSignIn] = useState(() => BOOT_OAUTH_FAIL?.intent?.pending === 'claim');
   // Same, for a direct refund: reopen the refund sheet once the email is in.
-  const [refundAfterSignIn, setRefundAfterSignIn] = useState(false);
+  const [refundAfterSignIn, setRefundAfterSignIn] = useState(() => BOOT_OAUTH_FAIL?.intent?.pending === 'refund');
+  // Back from Google: { provider: 'google', error? }. The sign-in sheet reads
+  // it to say "Signed in with Google" (or why not) and offer to continue.
+  const [oauthReturn, setOauthReturn] = useState(() => (
+    BOOT_OAUTH_FAIL ? { provider: 'google', error: BOOT_OAUTH_FAIL.message } : null
+  ));
   // A short message when a refund or donation didn't go through.
   const [actionNotice, setActionNotice] = useState(null);
 
@@ -1349,11 +1361,21 @@ export default function App({ consentReady = true } = {}) {
     getCurrentAuthEmail().then(e => { if (!cancelled) setAuthEmail(e); });
     const unsubscribe = onAuthStateChange(async (event, session) => {
       if (cancelled) return;
+      const intent = peekOAuthIntent();
+      // A Deferred Tikkie venue finishes its own Google return: its wallet is
+      // keyed by device, so TikkieHomePage hands the session to bin-tikkie.
+      if (intent?.kind === 'tikkie') return;
       const nextEmail = session?.user?.email || null;
       setAuthEmail(nextEmail);
+      // Back from Google. The session is parsed out of the address while the
+      // client starts, which can be before this listener exists — then the
+      // SIGNED_IN has already gone by and only INITIAL_SESSION arrives. The
+      // intent says it was ours either way.
+      const backFromGoogle = intent?.kind === 'rewards' && !!session
+        && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION');
       // On SIGNED_IN, refresh our local user row so the new auth_user_id
       // link takes effect and `signed in as …` appears in the UserPage.
-      if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' || backFromGoogle) {
         try {
           const refreshed = await getOrCreateUser(activeOrgIdRef.current);
           setUserId(refreshed.id);
@@ -1368,6 +1390,15 @@ export default function App({ consentReady = true } = {}) {
           await adoptGroupIdentity(reRead || refreshed, session?.user?.id, nextEmail);
         } catch (err) {
           console.error('post-signin user refresh failed:', err);
+        }
+        if (backFromGoogle && !cancelled) {
+          // Exactly once: reopen the sheet on "Signed in with Google", with
+          // the claim or refund that sent them there still waiting.
+          const it = takeOAuthIntent();
+          if (it?.pending === 'claim') setClaimAfterSignIn(true);
+          else if (it?.pending === 'refund') setRefundAfterSignIn(true);
+          setOauthReturn({ provider: 'google' });
+          setShowSignIn(true);
         }
       }
     });
@@ -2223,6 +2254,7 @@ export default function App({ consentReady = true } = {}) {
 
   /* Pick up whatever was waiting on an email. */
   const continueAfterEmail = () => {
+    setOauthReturn(null);
     if (claimAfterSignIn) {
       setClaimAfterSignIn(false);
       setShowSignIn(false);
@@ -2249,7 +2281,9 @@ export default function App({ consentReady = true } = {}) {
   const signInSheetNode = (
     <SignInSheet
       open={showSignIn}
-      onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); setRefundAfterSignIn(false); }}
+      onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); setRefundAfterSignIn(false); setOauthReturn(null); }}
+      pendingAction={claimAfterSignIn ? 'claim' : refundAfterSignIn ? 'refund' : null}
+      oauthReturn={oauthReturn}
       onLinked={async (opts) => {
         try {
           // Sign-out: back to anonymous device-only mode — don't consolidate/adopt.

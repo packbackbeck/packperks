@@ -173,6 +173,64 @@ export function oauthErrorMessage(err) {
   return 'Google sign-in didn’t go through. Try again, or use your email instead.';
 }
 
+/* ── Landing somewhere else ────────────────────────────────────────────
+ * Supabase sends the browser back to `redirectTo` only when that address is
+ * in its Redirect URLs list; otherwise it falls back to the project's Site
+ * URL — another venue. That is what turned a Cartouche sign-in into a t2
+ * one (6 Oct 2026). The round trip remembers where it started, so if it
+ * lands anywhere else we let the client store the session from the
+ * address, then go back to the right venue, where the intent is finished.
+ * Keep `https://perks.packback.network/**` in the Redirect URLs list too:
+ * this is the safety net, not the plan. */
+function samePath(a, b) {
+  return String(a || '').replace(/\/+$/, '') === String(b || '').replace(/\/+$/, '');
+}
+
+export function misroutedReturnTarget() {
+  if (typeof window === 'undefined') return null;
+  const it = readIntent();
+  if (!it?.path || samePath(it.path, window.location.pathname)) return null;
+  const { hash, search } = window.location;
+  const carriesReturn = /(^|[#&])(access_token|error)=/.test(hash) || /[?&](code|error)=/.test(search);
+  return carriesReturn ? it.path : null;
+}
+
+export async function bounceBackTo(path) {
+  const q = new URLSearchParams(window.location.search);
+  const h = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const err = q.get('error') || h.get('error');
+  // Let supabase-js read and store the session from this address first.
+  try { await supabase.auth.getSession(); } catch { /* the target page retries */ }
+  const keep = err
+    ? `?${new URLSearchParams({ error: err, error_description: q.get('error_description') || h.get('error_description') || '' })}`
+    : '';
+  window.location.replace(path + keep);
+}
+
+/** How THIS session was signed in: 'google' or 'email' (a code), from the
+ *  access token's own record of it (amr). An account can hold both
+ *  identities; what the screens offer depends on the door used now. */
+export function sessionMethod(session) {
+  const token = session?.access_token;
+  if (!token) return null;
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(atob(part.padEnd(part.length + ((4 - (part.length % 4)) % 4), '=')));
+    const amr = Array.isArray(claims.amr) ? claims.amr.map(a => a?.method) : [];
+    if (amr.includes('oauth')) return 'google';
+    if (amr.length) return 'email';
+  } catch { /* fall back to the identities */ }
+  const p = providersOf(session);
+  return p.length === 1 && p[0] === 'google' ? 'google' : (p.length ? 'email' : null);
+}
+
+/** Sign out of the customer login, then straight back to Google's account
+ *  picker for a different account. */
+export async function switchGoogleAccount(intent) {
+  try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* signing in again replaces it anyway */ }
+  return startGoogleSignIn(intent);
+}
+
 /** The ways the current login can sign in: ['email'], ['google'] or both. */
 export function providersOf(session) {
   const meta = session?.user?.app_metadata || {};
@@ -187,6 +245,7 @@ export async function getAuthInfo() {
   return {
     email: session?.user?.email || null,
     providers: providersOf(session),
+    method: sessionMethod(session),
     accessToken: session?.access_token || null,
   };
 }

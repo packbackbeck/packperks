@@ -291,3 +291,11 @@
 .signin-method svg { flex: none; }
 /* A lone opt-in under a confirmation (after Google), not part of a form. */
 .signin-consent--solo { justify-content: center; width: auto; margin: -6px 0 14px; }
+
+/* Quiet third action (Sign out) under the two buttons. */
+.signin-text-btn {
+  margin-top: 12px; padding: 6px 10px; border: 0; background: none;
+  font: inherit; font-size: 14px; font-weight: 600; color: #6A6058;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.signin-text-btn:hover { color: #2A2724; }

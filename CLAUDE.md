@@ -434,6 +434,27 @@ Supabase → Authentication → Providers → Google, with
 `https://<ref>.supabase.co/auth/v1/callback` as the redirect and
 `https://perks.packback.network/**` in Supabase's Redirect URLs; a Supabase
 custom auth domain keeps the project id off Google's consent screen.
+**What each kind of sign-in may do** (both modes). Signed in with Google →
+the address is Google's: no "Change email"; instead *Use a different
+Google account* (sign out, then the account picker) and *Sign out*.
+Signed in with a code → *Change email* (an email form, never Google:
+Google signs in, it doesn't edit) and *Sign out*. The rewards apps read
+how THIS session signed in from the token's `amr` (`sessionMethod`);
+Deferred Tikkie's wallet reports `signed_in_with` (its login has a Google
+identity, else its email). A Google login whose address differs from the
+wallet already on a Tikkie phone is refused (`signed_in_as_other`) and the
+customer is offered *Sign out and switch account*: switching is a choice,
+never a side effect. Tikkie's *Sign out* (`bin-tikkie` action `sign_out`)
+frees the phone; the account keeps its money for the next sign-in, and an
+anonymous wallet can't be signed out of (it would strand the money).
+**Landing at the wrong venue:** Supabase only returns to `redirectTo` when
+it is in its Redirect URLs list, otherwise to the Site URL — another
+venue (6 Oct 2026, Cartouche → t2). `main.jsx` now bounces such a return
+back to the venue the round trip started on before anything boots
+(`misroutedReturnTarget`), but keep `https://perks.packback.network/**`
+in the list. **A login no longer sweeps up rows saved under another
+address** (migration 069): `consolidate_identity` gathers an unclaimed row
+on the device only when it has no email or the login's own.
 Dashboard → Users shows each customer's sign-in (Google, Email code, both,
 or an email saved without signing in) from `admin_customer_logins`
 (migration 068: providers, last sign-in, confirmed — dashboard accounts

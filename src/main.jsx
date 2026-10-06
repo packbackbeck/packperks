@@ -11,6 +11,7 @@ import { RegionProvider } from './lib/RegionContext.jsx'
 import CollectPreview from './components/CollectPreview.jsx'
 import StaffApp from './staff/LazyStaffApp.jsx'
 import PackPulseEmbed from './admin/embed/PackPulseEmbed.jsx'
+import { bounceBackTo, misroutedReturnTarget } from './lib/oauth.js'
 
 const path = window.location.pathname
 const isStaff = path === '/staff' || path.startsWith('/staff/')
@@ -26,7 +27,13 @@ const isSupport = path.startsWith('/support')
 // customer app (which would resolve a fallback org — historically Burger King).
 const isRoot = path === '/' || path === ''
 
-createRoot(document.getElementById('root')).render(
+// Back from Google at the wrong venue (lib/oauth.js): store the session,
+// then return to the venue the sign-in started on, before anything boots.
+const misrouted = !isAdmin && !isStaff && !isPackPulseEmbed && !isMockup ? misroutedReturnTarget() : null
+
+if (misrouted) {
+  bounceBackTo(misrouted)
+} else createRoot(document.getElementById('root')).render(
   <StrictMode>
     {isPackPulseEmbed
       ? <PackPulseEmbed />

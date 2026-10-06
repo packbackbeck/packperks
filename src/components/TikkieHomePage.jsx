@@ -5,9 +5,12 @@ import { getSmartbinLocations } from '../lib/api';
 import {
   readStoredProfile, storeProfile, fetchWallet, scanBatch,
   scanBackupCups, scanStaticQr, redeemWallet, donateWallet, setEmail, savePendingEmail, checkBatch,
-  getMarketingConsent, setMarketingConsent, oauthWalletLogin,
+  getMarketingConsent, setMarketingConsent, oauthWalletLogin, signOutWallet,
 } from '../lib/tikkieWallet';
-import { getAuthInfo, peekOAuthIntent, startGoogleSignIn, takeOAuthIntent, takeOAuthReturnError } from '../lib/oauth';
+import {
+  getAuthInfo, peekOAuthIntent, startGoogleSignIn, switchGoogleAccount, takeOAuthIntent, takeOAuthReturnError,
+} from '../lib/oauth';
+import { supabase } from '../lib/supabase';
 import GoogleSignIn, { GoogleMark } from './GoogleSignIn';
 import { animalForProfile } from '../lib/animals';
 import { useRegion } from '../lib/RegionContext';
@@ -249,7 +252,7 @@ function BinMap({ bins }) {
 /* ── The email section: save the balance to an address. Same consent
    pattern as the sign-in sheet (privacy required, marketing optional and
    unticked until the customer ticks it). ── */
-function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, googleIntent = null, inSheet = false }) {
+function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, googleIntent = null, inSheet = false, change = false }) {
   const [email, setEmailVal] = useState('');
   const [privacyOk, setPrivacyOk] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -273,13 +276,16 @@ function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, googleIntent
   return (
     <section className={inSheet ? 'tikkie-home__emailsheet' : 'tikkie-home__section'}>
       {inSheet
-        ? <h2 className="tk-sheet__title">Add your email</h2>
+        ? <h2 className="tk-sheet__title">{change ? 'Change your email' : 'Add your email'}</h2>
         : <h2 className="tikkie-home__section-title">Save your balance</h2>}
       <form className={`tikkie-home__emailcard${inSheet ? ' tikkie-home__emailcard--bare' : ''}`} onSubmit={submit}>
         <p className="tikkie-home__emailcopy">
-          Add your email to keep your balance safe and get back to it from any device.
+          {change
+            ? 'Your wallet moves to the new address. If that address already has a wallet, we’ll send it a code first.'
+            : 'Add your email to keep your balance safe and get back to it from any device.'}
         </p>
-        {googleIntent && (
+        {/* Google signs in; it never changes an email. */}
+        {googleIntent && !change && (
           <GoogleSignIn intent={googleIntent} onShowPolicy={onShowPolicy} disabled={busy} />
         )}
         <input
@@ -302,7 +308,7 @@ function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, googleIntent
         </label>
         {err && <p className="tk-err">{err}</p>}
         <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || !email.trim() || !privacyOk}>
-          {busy ? 'Saving…' : 'Save my balance'}
+          {busy ? 'Saving…' : change ? 'Save new email' : 'Save my balance'}
         </button>
       </form>
     </section>
@@ -342,7 +348,10 @@ function finishGoogleLogin(orgId, batchId) {
   return googleLoginRun;
 }
 
-function googleLoginMessage(code) {
+function googleLoginMessage(code, savedEmail) {
+  if (code === 'signed_in_as_other') {
+    return `This phone holds the wallet saved to ${savedEmail || 'another address'}. Sign out of it first, then continue with the Google account you want.`;
+  }
   if (code === 'email_not_verified') {
     return 'That Google account’s email isn’t verified yet, so it can’t hold a balance. Use your email instead.';
   }
@@ -400,6 +409,10 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
   /* The add-email form, as a sheet. The account view and its Edit popup
    * both open it, so it is not tied to the home screen's own section. */
   const [emailSheet, setEmailSheet] = useState(false);
+  // Its steps (main | change | confirm_signout) and the sign-out in flight.
+  const [sheetStep, setSheetStep] = useState('main'); // main | change | confirm_signout
+  const [signingOut, setSigningOut] = useState(false);
+  const [sheetErr, setSheetErr] = useState(null);
   /* Marketing consent is on the customer's row, not in the wallet reply. */
   const [marketing, setMarketing] = useState(false);
   const [impactOpen, setImpactOpen] = useState(UX_PREVIEW === 'impact');
@@ -502,10 +515,17 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
       if (res?.status === 'ok' && res.profile) {
         setProfile(res.profile);
         storeProfile(org.id, { userId: res.profile.user_id, email: res.profile.email, name: res.profile.name });
+        // The Google session did its job (bin-tikkie checked it); this mode's
+        // wallet is keyed by the phone, so no login stays open in the browser.
+        supabase.auth.signOut({ scope: 'local' }).catch(() => {});
         setGoogleReturn({ outcome: res.outcome, email: res.email });
         refreshWallet();
       } else {
-        setGoogleReturn({ error: googleLoginMessage(res?.error), intent: googleReturn.intent });
+        setGoogleReturn({
+          error: googleLoginMessage(res?.error, res?.saved_email),
+          code: res?.error || null,
+          intent: googleReturn.intent,
+        });
       }
     });
     return () => { alive = false; };
@@ -728,18 +748,106 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     storeProfile(org?.id, { userId: p.user_id, email: p.email, name: p.name });
   };
 
-  /* The add-email form as a sheet, so the account view and its Edit popup
-   * can offer it without sending anyone back to the home screen first. */
+  /* The email sheet, opened from the account view, its Edit popup and the
+   * home screen. What it offers depends on how the wallet signs in:
+   *
+   *   nobody yet         → "Add your email": Google, or an email
+   *   saved to an email  → that address, "Change email" (an email form,
+   *                        never Google: Google signs in, it doesn't edit)
+   *                        and "Sign out"
+   *   a Google login     → that address, read-only (it is Google's),
+   *                        "Use a different Google account" and "Sign out"
+   *
+   * Signing out frees this phone: the wallet stays with the account and
+   * comes back with the next sign-in, on this phone or another. */
+  const closeEmailSheet = () => { setEmailSheet(false); setSheetStep('main'); setSheetErr(null); };
+  const googleIntent = { kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null };
+
+  const signOutHere = async ({ thenGoogle = false } = {}) => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSheetErr(null);
+    const res = DEMO ? { status: 'signed_out' } : await signOutWallet(org?.id);
+    if (res?.status !== 'signed_out') {
+      setSigningOut(false);
+      setSheetErr('We couldn’t sign you out just now. Please try again.');
+      return;
+    }
+    try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* no customer login to end */ }
+    storeProfile(org?.id, null);
+    setProfile(null);
+    setMarketing(false);
+    setSigningOut(false);
+    if (thenGoogle) {
+      switchGoogleAccount(googleIntent).catch(() => setSheetErr('Google sign-in isn’t available right now.'));
+      return;
+    }
+    closeEmailSheet();
+    setShowAccount(false);
+    refreshWallet();
+  };
+
+  const signedInWith = profile?.email ? (profile.signed_in_with === 'google' ? 'google' : 'email') : null;
   const emailSheetNode = emailSheet ? (
-    <Sheet onClose={() => setEmailSheet(false)} label="Add your email">
-      <EmailSection
-        inSheet
-        org={org}
-        onShowPolicy={() => setShowPolicy(true)}
-        googleIntent={{ kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null }}
-        onSaved={(p) => { setEmailSheet(false); applySavedProfile(p); }}
-        onVerifyNeeded={(email) => { setEmailSheet(false); setLogin({ email, startAtCode: true }); }}
-      />
+    <Sheet onClose={signingOut ? undefined : closeEmailSheet} label={signedInWith ? 'Your account' : 'Add your email'}>
+      {!signedInWith || sheetStep === 'change' ? (
+        <EmailSection
+          inSheet
+          change={sheetStep === 'change'}
+          org={org}
+          onShowPolicy={() => setShowPolicy(true)}
+          googleIntent={googleIntent}
+          onSaved={(p) => { closeEmailSheet(); applySavedProfile(p); refreshWallet(); }}
+          onVerifyNeeded={(email) => { closeEmailSheet(); setLogin({ email, startAtCode: true }); }}
+        />
+      ) : sheetStep === 'confirm_signout' ? (
+        <>
+          <h2 className="tk-sheet__title">Sign out on this phone?</h2>
+          <p className="tk-sheet__sub">
+            {balance > 0 ? <>Your {money(balance)} stays saved to <strong>{profile.email}</strong>. </> : <>Your wallet stays saved to <strong>{profile.email}</strong>. </>}
+            Sign back in {signedInWith === 'google' ? 'with Google' : 'with a code sent to that email'} to see it again, here or on another phone.
+          </p>
+          {sheetErr && <p className="tk-err">{sheetErr}</p>}
+          <div className="tk-sheet__actions">
+            <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={() => signOutHere()} disabled={signingOut}>
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </button>
+            <button type="button" className="tk-btn tk-btn--ghost tk-btn--full" onClick={() => setSheetStep('main')} disabled={signingOut}>
+              Stay signed in
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className={`tk-icon ${signedInWith === 'google' ? 'tk-icon--google' : 'tk-icon--ok'}`} aria-hidden="true">
+            {signedInWith === 'google' ? <GoogleMark size={24} /> : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            )}
+          </div>
+          <h2 className="tk-sheet__title tk-sheet__title--center">
+            {signedInWith === 'google' ? 'Signed in with Google' : 'Your wallet is saved'}
+          </h2>
+          <p className="tk-sheet__sub tk-sheet__sub--center">
+            {signedInWith === 'google'
+              ? <>Your wallet is saved to <strong>{profile.email}</strong>. This address comes from your Google account; to use another, sign out and continue with a different one.</>
+              : <>Your wallet is saved to <strong>{profile.email}</strong>. On another phone, ask for a code sent to this address.</>}
+          </p>
+          {sheetErr && <p className="tk-err">{sheetErr}</p>}
+          <div className="tk-sheet__actions">
+            <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={closeEmailSheet}>Done</button>
+            {signedInWith === 'google' ? (
+              <button type="button" className="tk-btn tk-btn--full" onClick={() => signOutHere({ thenGoogle: true })} disabled={signingOut}>
+                {signingOut ? 'Signing out…' : 'Use a different Google account'}
+              </button>
+            ) : (
+              <button type="button" className="tk-btn tk-btn--full" onClick={() => setSheetStep('change')}>Change email</button>
+            )}
+            <button type="button" className="tk-btn tk-btn--ghost tk-btn--full" onClick={() => setSheetStep('confirm_signout')} disabled={signingOut}>
+              Sign out
+            </button>
+          </div>
+        </>
+      )}
     </Sheet>
   ) : null;
 
@@ -1243,27 +1351,53 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
               <div className="tk-icon tk-icon--warn" aria-hidden="true">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><line x1="12" y1="7.5" x2="12" y2="13" /><line x1="12" y1="16.5" x2="12" y2="16.6" /></svg>
               </div>
-              <h2 className="tk-sheet__title tk-sheet__title--center">Google sign-in didn’t finish</h2>
+              <h2 className="tk-sheet__title tk-sheet__title--center">
+                {googleReturn.code === 'signed_in_as_other' ? 'Another wallet is on this phone' : 'Google sign-in didn’t finish'}
+              </h2>
               <p className="tk-sheet__sub tk-sheet__sub--center">{googleReturn.error}</p>
-              <div className="tk-sheet__actions">
-                <button
-                  type="button"
-                  className="tk-btn tk-btn--primary tk-btn--full"
-                  onClick={() => {
-                    const intent = googleReturn.intent || { kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null };
-                    startGoogleSignIn(intent).catch(() => setGoogleReturn({ error: googleLoginMessage('unavailable'), intent }));
-                  }}
-                >
-                  Try again
-                </button>
-                <button
-                  type="button"
-                  className="tk-btn tk-btn--ghost tk-btn--full"
-                  onClick={() => { setGoogleReturn(null); setEmailSheet(true); }}
-                >
-                  Use my email instead
-                </button>
-              </div>
+              {googleReturn.code === 'signed_in_as_other' ? (
+                /* Another account's wallet is on this phone: switching is a
+                   choice, never a side effect of signing in. */
+                <div className="tk-sheet__actions">
+                  <button
+                    type="button"
+                    className="tk-btn tk-btn--primary tk-btn--full"
+                    onClick={() => { setGoogleReturn(null); signOutHere({ thenGoogle: true }); }}
+                  >
+                    Sign out and switch account
+                  </button>
+                  <button
+                    type="button"
+                    className="tk-btn tk-btn--ghost tk-btn--full"
+                    onClick={async () => {
+                      try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* nothing to end */ }
+                      setGoogleReturn(null);
+                    }}
+                  >
+                    Keep this wallet
+                  </button>
+                </div>
+              ) : (
+                <div className="tk-sheet__actions">
+                  <button
+                    type="button"
+                    className="tk-btn tk-btn--primary tk-btn--full"
+                    onClick={() => {
+                      const intent = googleReturn.intent || { kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null };
+                      startGoogleSignIn(intent).catch(() => setGoogleReturn({ error: googleLoginMessage('unavailable'), intent }));
+                    }}
+                  >
+                    Try again
+                  </button>
+                  <button
+                    type="button"
+                    className="tk-btn tk-btn--ghost tk-btn--full"
+                    onClick={() => { setGoogleReturn(null); setEmailSheet(true); }}
+                  >
+                    Use my email instead
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <>

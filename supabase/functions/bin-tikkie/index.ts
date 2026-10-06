@@ -848,22 +848,31 @@ interface AdoptResult {
   profile: ProfileRow;
   outcome: "created" | "linked" | "same" | "moved";
 }
+/* A Google login whose address differs from the wallet already on this
+ * phone is a DIFFERENT account. It is never folded in quietly (that is how a
+ * test wallet ended up answering to someone else's Google login on 6 Oct
+ * 2026): the phone has to sign out of the wallet first. */
+interface AdoptConflict { conflict: "signed_in_as_other"; savedEmail: string | null }
 async function adoptAccountOnDevice(
   orgId: string,
   deviceId: string,
   email: string,
   authUserId: string | null,
-): Promise<AdoptResult | null> {
+): Promise<AdoptResult | AdoptConflict | null> {
   // The account this login belongs to: the one that already carries this
-  // Google login, else the one saved under this email.
+  // Google login (if it isn't saved under some other address), else the one
+  // saved under this email.
   let owner: { id: string; device_id: string | null } | null = null;
   if (authUserId) {
     const { data } = await supabase
-      .from("users").select("id, device_id")
+      .from("users").select("id, device_id, email")
       .eq("org_id", orgId).eq("auth_user_id", authUserId)
       .is("merged_into", null)
       .maybeSingle();
-    owner = (data as { id: string; device_id: string | null } | null) ?? null;
+    const byLogin = data as { id: string; device_id: string | null; email: string | null } | null;
+    if (byLogin && (!byLogin.email || byLogin.email.toLowerCase() === email)) {
+      owner = { id: byLogin.id, device_id: byLogin.device_id };
+    }
   }
   if (!owner) owner = await userByEmail(orgId, email);
   const { data: here } = await supabase
@@ -882,11 +891,17 @@ async function adoptAccountOnDevice(
     return !holder || holder.id === rowId ? { auth_user_id: authUserId } : {};
   };
 
+  // This phone holds a wallet saved under another address, or answering to
+  // another Google login: that is somebody (or some account) else.
+  if (authUserId && here?.id && owner?.id !== here.id) {
+    const otherEmail = here.email && here.email.toLowerCase() !== email;
+    const otherLogin = here.auth_user_id && here.auth_user_id !== authUserId;
+    if (otherEmail || otherLogin) return { conflict: "signed_in_as_other", savedEmail: here.email };
+  }
+
   if (!owner) {
     if (here?.id) {
-      // A wallet already saved under another address keeps it: the login is
-      // linked to the wallet (auth_user_id), so Google still finds it, and a
-      // code to the saved address still works too. Nothing is renamed.
+      // An anonymous wallet on this phone becomes this login's account.
       const { data: updated, error } = await supabase.from("users")
         .update({ email: here.email || email, updated_at: now, ...(await authPatch(here.id)) })
         .eq("id", here.id).select(PROFILE_COLS).maybeSingle();
@@ -944,7 +959,7 @@ async function attachBatch(batchId: string, userId: string, email: string): Prom
     .update({ email, user_id: userId }).eq("batch_id", batchId);
 }
 
-function loginReply(r: AdoptResult, loginEmail: string): Response {
+function loginReply(r: AdoptResult, loginEmail: string, method: "google" | "email"): Response {
   // The address the wallet is saved under, which a code can be sent to.
   const email = r.profile.email || loginEmail;
   return json({
@@ -957,8 +972,51 @@ function loginReply(r: AdoptResult, loginEmail: string): Response {
       name: r.profile.display_name,
       animal_index: r.profile.animal_index,
       email,
+      signed_in_with: method,
     },
   });
+}
+
+async function signInMethodOf(authUserId: string | null, email: string | null): Promise<"google" | "email" | null> {
+  if (authUserId) {
+    try {
+      const { data } = await supabase.auth.admin.getUserById(authUserId);
+      const providers = (data?.user?.app_metadata?.providers as string[] | undefined) ?? [];
+      if (providers.includes("google")) return "google";
+    } catch { /* fall through to the email */ }
+  }
+  return email ? "email" : null;
+}
+
+/* Show an address without spelling it out: "be•••@gmail.com". */
+function maskEmail(e: string | null): string | null {
+  if (!e) return null;
+  const [user, domain] = e.split("@");
+  return `${user.slice(0, 2)}•••@${domain || ""}`;
+}
+
+/* sign_out — {org_id, device_id}: this phone lets go of its wallet. The
+ * account keeps every cent, under its email (and Google login, if any);
+ * signing in again with either brings it back to whichever phone does it.
+ * An anonymous wallet has nothing to sign back in with, so it can't be
+ * signed out of — that would strand its money. */
+async function signOutAction(body: Record<string, unknown>): Promise<Response> {
+  const orgId = String(body.org_id || "").trim();
+  const deviceId = String(body.device_id || "").trim().slice(0, 64);
+  if (!await validateTikkieOrg(orgId)) return json({ error: "batch_not_found" }, 404);
+  if (!deviceId) return json({ error: "missing_device" }, 400);
+  const { data: row } = await supabase
+    .from("users").select("id, email, auth_user_id")
+    .eq("org_id", orgId).eq("device_id", deviceId)
+    .is("merged_into", null)
+    .maybeSingle();
+  if (!row) return json({ status: "signed_out" });
+  if (!row.email && !row.auth_user_id) return json({ error: "nothing_to_sign_out" }, 409);
+  const { error } = await supabase.from("users")
+    .update({ device_id: null, updated_at: new Date().toISOString() })
+    .eq("id", row.id);
+  if (error) return json({ error: "db_error" }, 500);
+  return json({ status: "signed_out" });
 }
 
 /* login_request — {email, org_id}: send a code to an email that owns an
@@ -1009,10 +1067,10 @@ async function loginVerify(body: Record<string, unknown>): Promise<Response> {
   const deviceId = String(body.device_id || "").trim().slice(0, 64);
   if (!deviceId) return json({ status: "ok", user_id: user.id, email });
   const adopted = await adoptAccountOnDevice(orgId, deviceId, email, null);
-  if (!adopted) return json({ error: "account_failed" }, 500);
+  if (!adopted || "conflict" in adopted) return json({ error: "account_failed" }, 500);
 
   await attachBatch(String(body.batch_id || otp.batch_id || "").trim().toLowerCase(), adopted.profile.id, email);
-  return loginReply(adopted, email);
+  return loginReply(adopted, email, "email");
 }
 
 /* oauth_login — {org_id, device_id, access_token, batch_id?}: the same
@@ -1037,9 +1095,12 @@ async function oauthLogin(body: Record<string, unknown>): Promise<Response> {
 
   const adopted = await adoptAccountOnDevice(orgId, deviceId, email, user.id);
   if (!adopted) return json({ error: "account_failed" }, 500);
+  if ("conflict" in adopted) {
+    return json({ error: "signed_in_as_other", saved_email: maskEmail(adopted.savedEmail) }, 409);
+  }
 
   await attachBatch(String(body.batch_id || "").trim().toLowerCase(), adopted.profile.id, email);
-  return loginReply(adopted, email);
+  return loginReply(adopted, email, "google");
 }
 
 /* save_email — the held-for-review popup's email capture. Two situations:
@@ -1135,7 +1196,7 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
   if (!deviceId) return json({ error: "missing_device" }, 400);
 
   const { data: profile } = await supabase
-    .from("users").select(PROFILE_COLS)
+    .from("users").select(`${PROFILE_COLS}, auth_user_id`)
     .eq("org_id", orgId).eq("device_id", deviceId)
     .is("merged_into", null)
     .maybeSingle();
@@ -1208,6 +1269,10 @@ async function walletAction(body: Record<string, unknown>): Promise<Response> {
       name: profile.display_name,
       animal_index: profile.animal_index,
       email: profile.email,
+      // How this wallet signs in: a login that has Google, an email, or
+      // neither (anonymous). A linked login isn't always Google — an email
+      // sign-in in another mode can link one — so ask Auth what it holds.
+      signed_in_with: await signInMethodOf(profile.auth_user_id, profile.email),
     },
     balance,
     history,
@@ -1433,6 +1498,9 @@ Deno.serve(async (req) => {
 
   // Google login: the same account door as login_verify (see oauthLogin).
   if (body.action === "oauth_login") return oauthLogin(body);
+
+  // This phone lets go of its wallet (the account keeps it).
+  if (body.action === "sign_out") return signOutAction(body);
 
   // Bulk redemption: the ONLY place a Tikkie link is minted now.
   if (body.action === "redeem") return redeemAction(body);

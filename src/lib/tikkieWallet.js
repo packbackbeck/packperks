@@ -125,6 +125,11 @@ export const oauthWalletLogin = (orgId, accessToken, batchId) =>
     access_token: accessToken, batch_id: batchId || null,
   });
 
+/* This phone lets go of its wallet; the account keeps it under its email
+ * (and Google login), ready for the next sign-in on any phone. */
+export const signOutWallet = (orgId) =>
+  invokeBinTikkie({ action: 'sign_out', org_id: orgId, device_id: deviceId() });
+
 export const loginVerify = (orgId, email, code, batchId) =>
   invokeBinTikkie({
     action: 'login_verify', org_id: orgId, email, code,

@@ -12,7 +12,7 @@ import {
 } from '../lib/api';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import GoogleSignIn, { GoogleMark } from './GoogleSignIn';
-import { getAuthInfo, useGoogleAvailable } from '../lib/oauth';
+import { getAuthInfo, switchGoogleAccount, useGoogleAvailable } from '../lib/oauth';
 import './SignInSheet.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -56,6 +56,12 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
   // How the signed-in login can sign in: ['email'], ['google'] or both.
   // (__devProviders: DEV screen audits only, like __devStatus below.)
   const [providers, setProviders] = useState(() => (import.meta.env.DEV && __devProviders) || []);
+  // How THIS session signed in ('google' | 'email'). It decides what the
+  // signed-in screen offers: a Google login's address belongs to Google, so
+  // it can't be changed here; the way to another address is to sign out.
+  const [method, setMethod] = useState(() => (
+    import.meta.env.DEV && __devProviders ? (__devProviders.includes('google') ? 'google' : 'email') : null
+  ));
   /* Mode = which top-level flow the sheet is showing. The original
    * one-flow design grew to two:
    *   • 'save'    — link an email to back the current device up
@@ -114,9 +120,10 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
       else { setCurrentEmail(null); setStatus('idle'); }
       return () => { cancelled = true; };
     }
-    getAuthInfo().then(({ email: e, providers: p }) => {
+    getAuthInfo().then(({ email: e, providers: p, method: m }) => {
       if (cancelled) return;
       setProviders(p);
+      setMethod(m);
       if (e) { setCurrentEmail(e); setStatus('signedIn'); }
       else {
         setCurrentEmail(null);
@@ -290,6 +297,8 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     try {
       await signOutUser();
       setCurrentEmail(null);
+      setProviders([]);
+      setMethod(null);
       setStatus('idle');
       // Notify the parent so it can refresh the user row (back to
       // anonymous device-only mode for any further reads).
@@ -480,37 +489,43 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
             so the copy names whichever ones apply rather than leaving the
             customer to guess which button to press on their next phone. */}
         {status === 'signedIn' && (() => {
-          const viaGoogle = providers.includes('google');
-          const viaEmail = providers.includes('email');
+          // The rules, in one place:
+          //   signed in with Google → the address is Google's. No "Change
+          //     email": the way to a different address is "Use a different
+          //     Google account" (sign out, pick another) or "Sign out".
+          //   signed in with a code → "Change email" (confirmed by a link to
+          //     the new address) and "Sign out". Google is never offered as a
+          //     way to change an email: it signs in, it doesn't edit.
+          const viaGoogle = method === 'google';
+          const hasGoogle = providers.includes('google');
+          const hasEmail = providers.includes('email');
           const justBack = !!oauthReturn && !oauthReturn.error;
           const continueLabel = pendingAction === 'claim'
             ? 'Continue to my cashback'
             : pendingAction === 'refund' ? 'Continue to my refund' : null;
           return (
             <div className="signin-state">
-              <div className={`signin-art ${justBack && viaGoogle ? 'signin-art--google' : 'signin-art--ok'}`}>
-                {justBack && viaGoogle ? <GoogleMark size={30} /> : (
+              <div className={`signin-art ${viaGoogle ? 'signin-art--google' : 'signin-art--ok'}`}>
+                {viaGoogle ? <GoogleMark size={30} /> : (
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 )}
               </div>
-              <h2 className="signin-title">{justBack && viaGoogle ? 'Signed in with Google' : 'You’re all set'}</h2>
+              <h2 className="signin-title">{viaGoogle ? 'Signed in with Google' : 'You’re all set'}</h2>
               <p className="signin-sub">
                 Your cups are backed up to <strong>{currentEmail}</strong>.{' '}
-                {viaGoogle && viaEmail
-                  ? 'On any device, continue with Google or ask for a code sent to this email.'
-                  : viaGoogle
-                    ? 'On another device, continue with Google, or ask for a code sent to this email. Both open this same account.'
-                    : googleAvailable
-                      ? 'On another device, ask for a code sent to this email. If it’s a Google address, Continue with Google opens the same account.'
-                      : 'You can sign in from any device with this email. Your balance and history will be right there.'}
+                {viaGoogle
+                  ? 'This address comes from your Google account. To use a different one, sign out and continue with another account.'
+                  : hasGoogle
+                    ? 'On any device, continue with Google or ask for a code sent to this email.'
+                    : 'On another device, ask for a code sent to this email.'}
               </p>
 
-              {(viaGoogle || viaEmail) && (
+              {(hasGoogle || hasEmail) && (
                 <ul className="signin-methods" aria-label="Ways to sign in">
-                  {viaGoogle && <li className="signin-method"><GoogleMark size={14} /> Google</li>}
-                  {viaEmail && (
+                  {hasGoogle && <li className="signin-method"><GoogleMark size={14} /> Google</li>}
+                  {hasEmail && (
                     <li className="signin-method">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="22,6 12,13 2,6" />
@@ -535,16 +550,28 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
                 </label>
               )}
 
+              {error && <p className="signin-error">{error}</p>}
+
               <button
                 className="signin-btn signin-btn--primary"
                 onClick={continueLabel ? () => onVerified?.() : onClose}
               >
                 {continueLabel || 'Done'}
               </button>
-              {/* A Google login's address is Google's; changing it here would
-                  leave Google pointing at an address the account no longer
-                  shows. Email-code accounts can change theirs. */}
-              {!(viaGoogle && !viaEmail) && (
+              {viaGoogle ? (
+                <button
+                  className="signin-btn signin-btn--ghost"
+                  onClick={async () => {
+                    // Off this account first, so the cups here go back to an
+                    // anonymous device, then the account picker.
+                    try { await handleSignOut(); } catch { /* shown by handleSignOut */ }
+                    switchGoogleAccount({ kind: 'rewards', pending: pendingAction })
+                      .catch(() => setError('Google sign-in isn’t available right now. Sign in with your email instead.'));
+                  }}
+                >
+                  Use a different Google account
+                </button>
+              ) : (
                 <button
                   className="signin-btn signin-btn--ghost"
                   onClick={() => { setNewEmail(''); setError(null); setStatus('change_email'); }}
@@ -552,6 +579,9 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
                   Change email
                 </button>
               )}
+              <button type="button" className="signin-text-btn" onClick={handleSignOut}>
+                Sign out
+              </button>
             </div>
           );
         })()}

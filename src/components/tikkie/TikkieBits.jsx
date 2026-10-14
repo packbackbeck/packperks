@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { loginRequest, loginVerify, storeProfile } from '../../lib/tikkieWallet';
+import { loginRequest, loginVerify, storeProfile, setMarketingConsent } from '../../lib/tikkieWallet';
 import GoogleSignIn from '../GoogleSignIn';
 import tikkieClaimShot from '../../assets/images/tikkie-claim-screen.png';
 import { useRegion } from '../../lib/RegionContext';
@@ -88,6 +88,9 @@ export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = fals
   const [step, setStep] = useState(startAtCode ? 'code' : 'email');
   const [email, setEmailVal] = useState(initialEmail);
   const [code, setCode] = useState('');
+  // Offers opt-in: unticked until the customer ticks it. A tick only ever
+  // switches consent on; leaving it unticked never withdraws a saved yes.
+  const [marketing, setMarketing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -116,6 +119,7 @@ export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = fals
     if (data?.status === 'ok' && data.user_id) {
       const profile = data.profile || { user_id: data.user_id, email: data.email || email.trim() };
       if (org?.id) storeProfile(org.id, { userId: profile.user_id, email: profile.email, name: profile.name });
+      if (marketing) await setMarketingConsent(profile.user_id, true);
       onLoggedIn?.(profile);
       return;
     }
@@ -133,7 +137,7 @@ export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = fals
           <h2 className="tk-sheet__title">Log in</h2>
           <div className="tk-sheet__stack tk-sheet__stack--spaced">
             <GoogleSignIn
-              intent={{ kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null }}
+              intent={{ kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null, marketing }}
               showPolicyNote={false}
               divider="or"
               disabled={busy}
@@ -155,6 +159,10 @@ export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = fals
               {busy ? 'Sending…' : 'Email me a code'}
             </button>
           </div>
+          <label className="tk-consent">
+            <input type="checkbox" checked={marketing} onChange={e => setMarketing(e.target.checked)} disabled={busy} />
+            <span>Send me offers and updates</span>
+          </label>
           <p className="tk-note">
             By continuing you confirm you’ve read our{' '}
             <span className="tk-nowrap">

@@ -413,23 +413,61 @@ only when money leaves — a cashback claim or a direct refund — and is verifi
 (signed in) wherever the venue has `requireEmailVerification` on. Payout links
 are shown in the app, never in the email.
 
+**The sign-in sheet is one short form, in every mode**: a title, *Continue
+with Google*, "or", an email field, one primary button, the marketing
+opt-in and one line naming the Privacy Policy (a notice to read, not a box
+to tick). No subtext, no separate "restore" path: an address that already
+has cups signs in to them (or, where no code is asked for, goes to *This
+email already has cups*), so new and returning customers use the same
+form. A sheet has two button styles and one shape: a filled primary and
+white-with-grey-outline for everything else, which is also Google's own
+button (`--ppk-gsi-*` gives it the sheet's height and radius), in a stack
+with one gap (`.signin-actions`, `.tk-sheet__stack` / `.tk-sheet__actions`).
+**Every successful sign-in goes straight back to the app**: no "you're
+signed in" screen, after a code or after Google; a claim or refund that
+asked for the email carries on into itself. Changing an email to the one
+already on the account is refused before anything is sent ("That's
+already your email."), in both modes.
+
+**Sign out vs the old "Reset this device".** An anonymous customer IS
+their device id, so ending the login alone (what Sign out used to do) left
+the device pointing at the same row, and the email and cups were still on
+screen; Reset did the forgetting with `localStorage.clear()`, which also
+signed out the dashboard and the staff app sharing this origin, and for
+someone with no email it made the cups unreachable. Now there is one
+*Sign out* (`signOutThisDevice` in `api.js` → `forgetThisDevice` in
+`deviceId.js`): the login ends (local scope) and the customer's own keys
+are forgotten (device id, Tikkie wallet profile, avatar, region, claim
+bookkeeping), cookie choices and every dashboard/staff key stay, and the
+app reloads as a new visitor. It is offered only to someone signed in
+(Data & privacy → Sign out, which opens the sheet at *Sign out on this
+phone?*, and the account sheet); Deferred Tikkie signs out through
+`bin-tikkie` `sign_out`. *Use a different Google account* forgets the
+device too, or the next account would be matched to the first one's row.
+
+**"What is Tikkie?"** lives under Help on the account page (`FaqSheet`
+`topic="tikkie"`) wherever cashback is a Tikkie link (NL, not voucher).
+The word "Tikkie" on the home screen is plain text, not a link out.
+
 **Sign in with Google** (`src/lib/oauth.js`, `components/GoogleSignIn.jsx`)
 is a second door into the SAME account an emailed code opens: Supabase Auth
 links an email login and a Google login with the same verified address
 automatically, in either order, so there is never a "this email is taken"
 dead end. It sits above every customer email form: the rewards apps'
-`SignInSheet` (save, restore, and the "this email already has cups" step)
+`SignInSheet` (the form, and the "this email already has cups" step)
 and Deferred Tikkie's Save-your-balance card, email sheet and log-in sheet.
 The button renders **only once Google is switched on** for the project
 (read live from `/auth/v1/settings`); DEV can force it with `?google=1`.
 Google leaves the app, so the reason is kept in sessionStorage as an
 *intent* and picked up on the way back: the rewards apps in App.jsx's auth
 listener (it also handles `INITIAL_SESSION`, because the session can be
-parsed out of the address before the listener exists), reopening the sheet
-on "Signed in with Google" with any claim or refund still waiting; Deferred
-Tikkie in `TikkieHomePage` via `bin-tikkie` action `oauth_login`. Google
-gives an address, not consent: marketing stays off until ticked, offered
-on the return screen. To switch it on: Google Cloud OAuth client (web) →
+parsed out of the address before the listener exists), which shows nothing
+and carries on into a claim or refund still waiting once boot is done
+(`resumeAfterGoogle`); Deferred Tikkie in `TikkieHomePage` via `bin-tikkie`
+action `oauth_login`, also with no screen. Only a return that failed gets
+one. Google gives an address, not consent: marketing comes only from the
+offers box on the form, carried in the intent (`marketing: true`) when it
+was ticked before tapping Google. To switch it on: Google Cloud OAuth client (web) →
 Supabase → Authentication → Providers → Google, with
 `https://<ref>.supabase.co/auth/v1/callback` as the redirect and
 `https://perks.packback.network/**` in Supabase's Redirect URLs; a Supabase

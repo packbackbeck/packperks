@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { generateProfile } from './animals'
-import { getDeviceId, newUUID } from './deviceId'
+import { getDeviceId, newUUID, forgetThisDevice } from './deviceId'
 
 // ── Profile generation (for brand-new users) ───────────────────────────────
 // A random adjective + animal (e.g. "Bouncy Axolotl"), with a matching emoji
@@ -441,9 +441,19 @@ export async function changeAuthEmail(newEmail) {
   if (error) throw error
 }
 
-export async function signOutUser() {
-  const { error } = await supabase.auth.signOut()
-  if (error) throw error
+/* Sign out on this phone. Ends the login AND forgets the device: an
+ * anonymous customer is their device id, so ending the login alone (what
+ * this used to do) left the device pointing at the same row, and the
+ * account, its email and its cups were all still on screen. The cups stay
+ * with the account; signing in again, here or anywhere, brings them back.
+ * Local scope: other phones signed in to the same account stay signed in.
+ * The caller reloads (or leaves for Google) so the app boots as a new
+ * visitor. This replaced "Reset this device", which did the forgetting
+ * with localStorage.clear() and so also signed out the dashboard and the
+ * staff app that share this origin. */
+export async function signOutThisDevice() {
+  try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* the token is dropped below anyway */ }
+  forgetThisDevice()
 }
 
 // ── Restore-by-email flow (lost-my-cups recovery) ─────────────────────────

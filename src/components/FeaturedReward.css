@@ -232,15 +232,6 @@
   font-weight: var(--fw-bold, 800);
 }
 
-/* "Tikkie" link — how the cashback arrives. */
-.featured-reward__tikkie-link {
-  color: var(--pb-purple-600, #5333A5);
-  font-weight: var(--fw-bold, 700);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.featured-reward__tikkie-link:hover { color: var(--pb-purple-700, #42298B); }
-
 .featured-reward__claim-label {
   font-family: var(--font-primary);
   font-weight: var(--fw-bold);

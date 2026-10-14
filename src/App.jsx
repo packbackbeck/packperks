@@ -264,11 +264,18 @@ export default function App({ consentReady = true } = {}) {
   const [claimAfterSignIn, setClaimAfterSignIn] = useState(() => BOOT_OAUTH_FAIL?.intent?.pending === 'claim');
   // Same, for a direct refund: reopen the refund sheet once the email is in.
   const [refundAfterSignIn, setRefundAfterSignIn] = useState(() => BOOT_OAUTH_FAIL?.intent?.pending === 'refund');
-  // Back from Google: { provider: 'google', error? }. The sign-in sheet reads
-  // it to say "Signed in with Google" (or why not) and offer to continue.
+  // Google came back without a session: { provider: 'google', error }. The
+  // sign-in sheet reopens on its form and says why. A successful return
+  // shows nothing at all (see resumeAfterGoogle).
   const [oauthReturn, setOauthReturn] = useState(() => (
     BOOT_OAUTH_FAIL ? { provider: 'google', error: BOOT_OAUTH_FAIL.message } : null
   ));
+  // Back from Google signed in, with a claim or refund still waiting on the
+  // email: carry on into it once the app has finished booting.
+  const [resumeAfterGoogle, setResumeAfterGoogle] = useState(false);
+  // 'signout' opens the sheet straight at "Sign out on this phone?"
+  // (Data & privacy → Sign out).
+  const [signInStart, setSignInStart] = useState(null);
   // A short message when a refund or donation didn't go through.
   const [actionNotice, setActionNotice] = useState(null);
 
@@ -1388,22 +1395,44 @@ export default function App({ consentReady = true } = {}) {
           await consolidateIdentity().catch(() => {});
           const reRead = await getOrCreateUser(activeOrgIdRef.current).catch(() => refreshed);
           await adoptGroupIdentity(reRead || refreshed, session?.user?.id, nextEmail);
+          // The offers box, ticked on the form before Google: the only way
+          // marketing is ever switched on from a Google sign-in.
+          const it = backFromGoogle ? peekOAuthIntent() : null;
+          if (it?.marketing === true && (reRead || refreshed)?.id) {
+            persist(updateUserProfile((reRead || refreshed).id, { marketingConsent: true, marketingConsentSource: 'signin_google' }));
+            setProfile(p => (p ? { ...p, marketingConsent: true } : p));
+          }
         } catch (err) {
           console.error('post-signin user refresh failed:', err);
         }
         if (backFromGoogle && !cancelled) {
-          // Exactly once: reopen the sheet on "Signed in with Google", with
-          // the claim or refund that sent them there still waiting.
+          // Exactly once, and no screen of its own: they are back where they
+          // were, signed in. A claim or refund that sent them to Google
+          // carries straight on (resumeAfterGoogle, below).
           const it = takeOAuthIntent();
-          if (it?.pending === 'claim') setClaimAfterSignIn(true);
-          else if (it?.pending === 'refund') setRefundAfterSignIn(true);
-          setOauthReturn({ provider: 'google' });
-          setShowSignIn(true);
+          if (it?.pending === 'claim') { setClaimAfterSignIn(true); setResumeAfterGoogle(true); }
+          else if (it?.pending === 'refund') { setRefundAfterSignIn(true); setResumeAfterGoogle(true); }
         }
       }
     });
     return () => { cancelled = true; unsubscribe?.(); };
   }, [isPreviewMode]);
+
+  /* Carry on after Google, once boot is done: the boot sets the page it
+   * restores, so doing this from the listener could be overwritten.
+   * Adjusted while rendering (the flag is cleared in the same pass), the
+   * way React recommends for state that follows other state. */
+  if (resumeAfterGoogle && !isLoading && userId) {
+    setResumeAfterGoogle(false);
+    if (claimAfterSignIn) {
+      setClaimAfterSignIn(false);
+      setDetailReward(null);
+      setPage('receipt');
+    } else if (refundAfterSignIn) {
+      setRefundAfterSignIn(false);
+      setDirectRefundOpen(true);
+    }
+  }
 
   /* Remember the last "durable" page (account / stores / home) so a plain
    * browser refresh returns the user to where they were — most importantly
@@ -2281,18 +2310,13 @@ export default function App({ consentReady = true } = {}) {
   const signInSheetNode = (
     <SignInSheet
       open={showSignIn}
-      onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); setRefundAfterSignIn(false); setOauthReturn(null); }}
+      onClose={() => { setShowSignIn(false); setClaimAfterSignIn(false); setRefundAfterSignIn(false); setOauthReturn(null); setSignInStart(null); }}
       pendingAction={claimAfterSignIn ? 'claim' : refundAfterSignIn ? 'refund' : null}
       oauthReturn={oauthReturn}
-      onLinked={async (opts) => {
+      startAt={signInStart}
+      onLinked={async () => {
         try {
-          // Sign-out: back to anonymous device-only mode — don't consolidate/adopt.
-          if (opts?.signedOut) {
-            const refreshed = await getOrCreateUser(activeOrg?.id);
-            setUserId(refreshed.id);
-            identityIdRef.current = null;
-            return;
-          }
+          // (Signing out reloads the app as a new visitor; it never comes here.)
           // Signed in / reconnected: unify ALL of this person's rows across the
           // group under one auth-linked identity and merge any duplicate per-store
           // rows (the fix for "cross-store cups show 0 after reset"). Then re-read
@@ -2304,12 +2328,14 @@ export default function App({ consentReady = true } = {}) {
         } catch (e) { console.error(e); }
       }}
       /* Fired the moment the email is verified. If the user was mid-claim or
-         mid-refund (no email when they tapped it), continue straight on. */
-      onVerified={continueAfterEmail}
+         mid-refund (no email when they tapped it), continue straight on;
+         otherwise just close. No "you're signed in" screen to dismiss. */
+      onVerified={() => { continueAfterEmail(); setShowSignIn(false); }}
       /* Venues that don't ask for verification save the email directly. */
       onSaveEmailDirect={(email) => {
         setProfile((prev) => ({ ...prev, email }));
         continueAfterEmail();
+        setShowSignIn(false);
       }}
       /* Per-org (Settings → Feature flags). Default ON: every email, first
          time or changed, is confirmed with the 6-digit code we send. Off,
@@ -2325,6 +2351,7 @@ export default function App({ consentReady = true } = {}) {
       }
       __devStatus={shot?.signInStatus || null}
       __devEmail={shot?.signInEmail || null}
+      __devProviders={shot?.signInProviders || null}
     />
   );
 
@@ -2383,6 +2410,8 @@ export default function App({ consentReady = true } = {}) {
           availableRegions={getAllRegions().filter(r => r.enabled)}
           onChangeRegion={handleChangeRegion}
           onOpenSignIn={() => setShowSignIn(true)}
+          onSignOut={authEmail ? () => { setSignInStart('signout'); setShowSignIn(true); } : null}
+          isVoucher={isVoucher}
           onAddCup={handleAddCup}
           isVisitor={isVisitor}
           onWithdraw={showRefund ? handleWithdraw : null}

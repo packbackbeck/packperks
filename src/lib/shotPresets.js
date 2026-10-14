@@ -47,6 +47,8 @@ export const SHOT_PRESETS = {
   'signin-signedin': { page: 'home', cupCount: 12, profile: memberProfile, authEmail: memberProfile.email, showSignIn: true, signInStatus: 'signedIn', signInEmail: memberProfile.email },
   'signin-change':   { page: 'home', cupCount: 12, profile: memberProfile, authEmail: memberProfile.email, showSignIn: true, signInStatus: 'change_email', signInEmail: memberProfile.email },
   'signin-merge':    { page: 'home', cupCount: 0,  profile: visitorProfile, showSignIn: true, signInStatus: 'merge_offer', signInEmail: 'sanne@example.com' },
+  'signin-google':   { page: 'home', cupCount: 12, profile: memberProfile, authEmail: memberProfile.email, showSignIn: true, signInStatus: 'signedIn', signInEmail: memberProfile.email, signInProviders: ['google'] },
+  'signin-signout':  { page: 'user', cupCount: 12, profile: memberProfile, authEmail: memberProfile.email, showSignIn: true, signInStatus: 'confirm_signout', signInEmail: memberProfile.email },
 
   // ── Claim → receipt → verdict flow ──
   'receipt-rules':   { page: 'receipt', cupCount: 12, profile: memberProfile },

@@ -5,13 +5,13 @@ import cupIcon from '../assets/images/cup-icon.svg';
 import { track, EVENTS } from '../utils/analytics';
 import ActivityDetailModal from './ActivityDetailModal';
 import PrivacyPolicyView from './PrivacyPolicyView';
-import FaqSheet from './FaqSheet';
 import PendingClaims from './PendingClaims';
 import { getGlobalImpact, deleteMyAccount } from '../lib/api';
 import { getCollectedMap, markClaimCollected, getDismissedSet, dismissClaim } from '../lib/collectedClaims';
 import { clearConsent } from '../lib/consent';
 import { animalForProfile, generateProfile } from '../lib/animals';
-import { useMoney } from '../lib/RegionContext';
+import { useMoney, useRegion } from '../lib/RegionContext';
+import FaqSheet from './FaqSheet';
 import { getRegion, formatMoney } from '../lib/regions';
 import { CO2_GRAMS_PER_CUP, NETWORK_BASE_CUPS, formatCo2, pickComparison as pickImpactComparison } from '../lib/impact';
 
@@ -135,6 +135,11 @@ export default function UserPage({
   // hide the cups⇄value box and the history blocks (refund history lives
   // on the TikkieHomePage instead).
   tikkieOnly = false,
+  // Sign out on this phone. Passed only while someone is signed in; each
+  // mode signs out its own way (App.jsx, TikkieHomePage).
+  onSignOut = null,
+  // Cashback comes as a voucher at the counter, so Tikkie never appears.
+  isVoucher = false,
 }) {
   // Refresh claim status when the user enters this page — admin approvals
   // that happened while the user wasn't looking get pulled in automatically.
@@ -351,17 +356,17 @@ export default function UserPage({
   // ── Data & privacy controls (GDPR items 13, 19, 21) ──
   const [policyOpen, setPolicyOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+  const [tikkieHelpOpen, setTikkieHelpOpen] = useState(false);
+  // Cashback paid as a Tikkie link (NL), not a voucher at the counter: the
+  // one case where "Tikkie" appears in the app, so the one case it's explained.
+  const { payoutNoun } = useRegion();
+  const tikkiePayouts = payoutNoun === 'Tikkie link' && !isVoucher;
   // Re-open the cookie banner IN PLACE (ConsentGate listens for this) instead of
   // clearing consent + reloading. The old reload re-bootstrapped the app and could
   // dump the user on the "trouble loading your cups" error screen and strand them.
   const handleManageCookies = () => {
     try { window.dispatchEvent(new CustomEvent('packperks:open-consent')); }
     catch { clearConsent(); window.location.reload(); } // last-resort fallback
-  };
-  const handleResetDevice = () => {
-    if (!window.confirm('Reset this device? Your cups stay safe in your account, but this browser will forget your local data and sign out.')) return;
-    try { localStorage.clear(); } catch { /* ignore */ }
-    window.location.reload();
   };
   const dsar = (subject, extra = '') => {
     const body = `Please handle the request below for my PackPerks account.\n\nDisplay name: ${profile.displayName}\n${email ? 'Email: ' + email : 'Email: (none saved)'}\n${extra}`;
@@ -421,7 +426,7 @@ export default function UserPage({
     // instantly. Without an email there's no session to authenticate a delete,
     // so we fall back to the email erasure request.
     if (!email) {
-      if (!window.confirm('You haven’t saved an email, so there’s nothing tied to an account yet. Reset this device to clear local data?')) return;
+      if (!window.confirm('You haven’t saved an email, so nothing is tied to an account yet. Send us a request to erase what this phone has collected?')) return;
       saveProfile({ email: '' });
       dsar('PackPerks: delete my account (erasure request)', 'I want my account and all associated personal data deleted.');
       return;
@@ -818,6 +823,7 @@ export default function UserPage({
             { label: 'Contact support', on: () => { try { sessionStorage.setItem('pp_open_page', 'user'); } catch { /* ignore */ } window.location.href = '/support'; } },
             ...(onOpenHowItWorks ? [{ label: 'How does it work?', on: () => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); } }] : []),
             { label: 'FAQ', on: () => setFaqOpen(true) },
+            ...(tikkiePayouts ? [{ label: 'What is Tikkie?', on: () => setTikkieHelpOpen(true) }] : []),
           ].map((row, i) => (
             <div key={row.label}>
               {i > 0 && <div className="user-page__divider" />}
@@ -844,7 +850,11 @@ export default function UserPage({
             { label: 'Privacy & cookie policy', on: () => setPolicyOpen(true) },
             { label: 'Manage cookie choices', on: handleManageCookies },
             { label: 'Export my data', on: handleExportData },
-            { label: 'Reset this device', on: handleResetDevice },
+            // Only for someone signed in: signing out frees this phone and the
+            // cups stay with the account. Without a login there is nothing to
+            // sign back in to, so the old "Reset this device" (which only
+            // made an anonymous balance unreachable) is gone.
+            ...(onSignOut ? [{ label: 'Sign out', on: onSignOut }] : []),
             { label: 'Delete my account', on: handleDeleteAccount, danger: true },
           ].map((row, i) => (
             <div key={row.label}>
@@ -870,6 +880,7 @@ export default function UserPage({
 
       {policyOpen && <PrivacyPolicyView text={privacyPolicy} onClose={() => setPolicyOpen(false)} />}
       {faqOpen && <FaqSheet onClose={() => setFaqOpen(false)} />}
+      {tikkieHelpOpen && <FaqSheet topic="tikkie" onClose={() => setTikkieHelpOpen(false)} />}
 
       {editOpen && (
         <ProfileEditModal

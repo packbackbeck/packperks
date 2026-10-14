@@ -131,58 +131,67 @@ export function LoginSheet({ org, batchId, initialEmail = '', startAtCode = fals
       {step === 'email' ? (
         <form onSubmit={requestCode}>
           <h2 className="tk-sheet__title">Log in</h2>
-          <p className="tk-sheet__sub">
-            Enter the email of your PackPerks account and we’ll send you a one-time code.
+          <div className="tk-sheet__stack tk-sheet__stack--spaced">
+            <GoogleSignIn
+              intent={{ kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null }}
+              showPolicyNote={false}
+              divider="or"
+              disabled={busy}
+            />
+            <input
+              type="email"
+              inputMode="email"
+              aria-label="Email"
+              className="tk-input"
+              placeholder="Email address"
+              value={email}
+              onChange={e => setEmailVal(e.target.value)}
+              disabled={busy}
+              autoFocus
+              required
+            />
+            {err && <p className="tk-err">{err}</p>}
+            <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || !email.trim()}>
+              {busy ? 'Sending…' : 'Email me a code'}
+            </button>
+          </div>
+          <p className="tk-note">
+            By continuing you confirm you’ve read our{' '}
+            <span className="tk-nowrap">
+              {onShowPolicy
+                ? <button type="button" className="tk-link tk-link--quiet" onClick={onShowPolicy}>Privacy Policy</button>
+                : 'Privacy Policy'}.
+            </span>
           </p>
-          <GoogleSignIn
-            intent={{ kind: 'tikkie', orgId: org?.id || null, batchId: batchId || null }}
-            onShowPolicy={onShowPolicy}
-            divider="or get a code by email"
-            disabled={busy}
-          />
-          <input
-            type="email"
-            inputMode="email"
-            className="tk-input"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmailVal(e.target.value)}
-            disabled={busy}
-            autoFocus
-            required
-          />
-          {err && <p className="tk-err">{err}</p>}
-          <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || !email.trim()}>
-            {busy ? 'Sending…' : 'Send code'}
-          </button>
         </form>
       ) : (
         <form onSubmit={verify}>
-          <h2 className="tk-sheet__title">Enter your code</h2>
-          <p className="tk-sheet__sub">
-            We’ve emailed a 6-digit code to <strong>{email}</strong>. It expires in 10 minutes.
-          </p>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9]*"
-            maxLength={6}
-            className="tk-input tk-input--code"
-            placeholder="000000"
-            value={code}
-            onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
-            disabled={busy}
-            autoFocus
-            required
-          />
-          {err && <p className="tk-err">{err}</p>}
-          <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || code.length !== 6}>
-            {busy ? 'Checking…' : 'Log in'}
-          </button>
-          <button type="button" className="tk-link tk-link--center" onClick={requestCode} disabled={busy}>
-            Send a new code
-          </button>
+          <h2 className="tk-sheet__title">Enter the code</h2>
+          <p className="tk-sheet__sub">Sent to <strong>{email}</strong></p>
+          <div className="tk-sheet__stack">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              aria-label="6-digit code"
+              className="tk-input tk-input--code"
+              placeholder="000000"
+              value={code}
+              onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+              disabled={busy}
+              autoFocus
+              required
+            />
+            {err && <p className="tk-err">{err}</p>}
+            <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || code.length !== 6}>
+              {busy ? 'Checking…' : 'Continue'}
+            </button>
+            <button type="button" className="tk-btn tk-btn--full" onClick={requestCode} disabled={busy}>
+              Send a new code
+            </button>
+          </div>
         </form>
       )}
     </Sheet>

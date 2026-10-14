@@ -300,7 +300,6 @@
 }
 .dzp-feat__desc { font-size: 14px; font-weight: 500; line-height: 1.5; color: var(--black); }
 .dzp-feat__desc strong { font-weight: 700; }
-.dzp-feat__tikkie { color: #5333A5; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .dzp-feat__link { font-size: 14px; font-style: italic; font-weight: 400; color: rgba(0, 0, 0, 0.5); text-decoration: underline; }
 .dzp-feat__claim {
   display: flex;

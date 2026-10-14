@@ -154,7 +154,7 @@ function HomeScreen({ view }) {
                       <>
                         {unlocked ? 'Buy it from ' : 'Once you unlock this, buy it from '}
                         <strong>{view.store}</strong> and take a picture of the receipt to claim the reward.{' '}
-                        {view.isTikkie ? <>We&apos;ll send your cashback via <b className="dzp-feat__tikkie">Tikkie</b>.</> : <>We&apos;ll send your cashback to you.</>}{' '}
+                        {view.isTikkie ? <>We&apos;ll send your cashback via Tikkie.</> : <>We&apos;ll send your cashback to you.</>}{' '}
                         <em className="dzp-feat__link">Cashback terms</em>
                       </>
                     )}

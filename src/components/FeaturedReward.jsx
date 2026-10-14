@@ -4,8 +4,6 @@ import cashbackIcon from '../assets/images/cashback-icon.png';
 import { rewardImageStyle } from '../utils/imageTransform';
 import { useMoney, useRegion } from '../lib/RegionContext';
 
-const TIKKIE_URL = 'https://www.tikkie.me/particulier/statiegeld-terugkrijgen';
-
 export default function FeaturedReward({
   reward,
   isUnlocked,
@@ -25,8 +23,8 @@ export default function FeaturedReward({
 }) {
   const money = useMoney();
   const { payout, payoutNoun } = useRegion();
-  // Only NL's Tikkie payout has a public explainer page to deep-link to; other
-  // regions render the payout noun as plain text.
+  // Only NL pays through Tikkie, so only NL names it. Plain text: what
+  // Tikkie is lives under Help → What is Tikkie? on the account page.
   const isTikkie = payoutNoun === 'Tikkie link';
   const isComplete = cupsCollected >= reward.cupsNeeded;
   const cashbackAmount = reward.euros ?? (reward.cupsNeeded * 1.25);
@@ -145,8 +143,7 @@ export default function FeaturedReward({
                   ? <>Buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>
                   : <>Once you unlock this, buy it from <strong>{store}</strong> and take a picture of the receipt to claim the reward. </>}
                 {isVoucher ? null : isTikkie
-                  ? <>We'll send your cashback via{' '}
-                      <a className="featured-reward__tikkie-link" href={TIKKIE_URL} target="_blank" rel="noopener noreferrer">Tikkie</a>.</>
+                  ? <>We'll send your cashback via Tikkie.</>
                   : <>We'll send your cashback to you.</>}
                 {isVoucher ? '' : ' '}
                 {!isVoucher && <button className="featured-reward__info-link" onClick={onOpenTerms}>Cashback terms</button>}

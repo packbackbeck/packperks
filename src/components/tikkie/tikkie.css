@@ -66,7 +66,6 @@
   font-family: inherit; font-size: 13px; font-weight: 700;
   color: #1A8737; text-decoration: underline; cursor: pointer;
 }
-.tk-link--center { display: block; width: 100%; margin-top: 12px; text-align: center; }
 .tk-err { margin: 9px 0 0; font-size: 12.5px; color: #C4472B; }
 .tk-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: #9A9186; }
 
@@ -179,3 +178,21 @@
 .tk-icon--google { background: #FFFFFF; border: 1px solid #DADCE0; }
 .tk-btn--ghost { background: transparent; border-color: transparent; color: #6C6259; }
 .tk-consent--center { justify-content: center; margin: 4px 2px 0; }
+
+/* A form's field, error and buttons in one stack (Save your balance, Log
+   in): one gap between all of them, and "Continue with Google" the same
+   height as the buttons it sits with, so the sheet has one button shape. */
+.tk-sheet__stack {
+  display: flex; flex-direction: column; gap: 10px;
+  --ppk-gsi-margin: 0; --ppk-gsi-height: 48px;
+}
+.tk-sheet__stack > .tk-btn,
+.tk-sheet__actions > .tk-btn { min-height: 48px; }
+.tk-sheet__stack > .tk-btn--full,
+.tk-sheet__stack > .tk-err,
+.tk-sheet__actions > .tk-btn--full { margin-top: 0; }
+.tk-link--quiet { font-size: inherit; font-weight: 600; color: inherit; }
+/* A title with no line under it: the stack keeps its distance. */
+.tk-sheet__stack--spaced { margin-top: 14px; }
+.tk-sheet__stack > .tk-input { min-height: 48px; padding: 0 18px; border-radius: 999px; }
+.tk-nowrap { white-space: nowrap; }

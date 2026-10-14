@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
+import { forgetThisDevice } from './deviceId';
 
 /* ─────────────────────────────────────────────────────────────────────
  * Sign in with Google, for the customer app.
@@ -80,8 +81,10 @@ export function useGoogleAvailable() {
 }
 
 /** Send the customer to Google. `intent` says what to do on the way back:
- *  { kind: 'rewards', pending: 'claim' | 'refund' | null }
- *  { kind: 'tikkie', orgId, batchId } */
+ *  { kind: 'rewards', pending: 'claim' | 'refund' | null, marketing }
+ *  { kind: 'tikkie', orgId, batchId, marketing }
+ *  `marketing` is true only when the customer ticked the offers box on the
+ *  form before tapping Google; it is never assumed from the login. */
 export async function startGoogleSignIn(intent = {}) {
   try {
     sessionStorage.setItem(INTENT_KEY, JSON.stringify({
@@ -224,10 +227,13 @@ export function sessionMethod(session) {
   return p.length === 1 && p[0] === 'google' ? 'google' : (p.length ? 'email' : null);
 }
 
-/** Sign out of the customer login, then straight back to Google's account
- *  picker for a different account. */
+/** Sign out of the customer login and forget this phone's device id, then
+ *  straight back to Google's account picker for a different account. The
+ *  device id goes too: kept, it would still point at the first account's
+ *  row, and the next account would be matched to it on the way back. */
 export async function switchGoogleAccount(intent) {
   try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* signing in again replaces it anyway */ }
+  forgetThisDevice();
   return startGoogleSignIn(intent);
 }
 

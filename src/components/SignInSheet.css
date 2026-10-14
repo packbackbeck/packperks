@@ -29,6 +29,10 @@
   border-radius: 22px 22px 0 0;
   padding: 28px 24px 32px;
   box-shadow: 0 -8px 30px rgba(83, 51, 165, 0.18);
+  /* "Continue with Google" takes the same shape as the buttons beside it. */
+  --ppk-gsi-radius: 999px;
+  --ppk-gsi-height: 50px;
+  --ppk-gsi-margin: 0;
   animation: signin-slide-up 0.28s cubic-bezier(0.32, 1.12, 0.55, 1);
 }
 
@@ -86,11 +90,12 @@
 .signin-art--google { background: #FFFFFF; border: 1px solid #E3E3E3; }
 
 .signin-title {
-  margin: 0 0 8px;
+  margin: 4px 36px 8px;
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: #1A1A1A;
+  text-wrap: balance;
 }
 
 .signin-sub {
@@ -101,15 +106,6 @@
   max-width: 340px;
 }
 .signin-sub strong { color: #2A2724; font-weight: 700; }
-
-.signin-label {
-  align-self: flex-start;
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #4A4540;
-  letter-spacing: 0.02em;
-}
 
 .signin-input {
   width: 100%;
@@ -159,11 +155,12 @@
 
 .signin-btn {
   width: 100%;
-  padding: 13px 18px;
-  border-radius: 12px;
-  border: none;
+  min-height: 50px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.005em;
   cursor: pointer;
@@ -178,17 +175,31 @@
 }
 .signin-btn--primary:hover:not(:disabled) { background: var(--pb-purple-700); }
 
-.signin-btn--ghost {
-  background: #F8F4EC;
-  color: #4A4540;
-  border: 1px solid #E5DECF;
+/* Every other action: white with a grey outline, the same as Google's
+   button, so a screen has two kinds of button and no more. */
+.signin-btn--secondary {
+  background: #FFFFFF;
+  color: #1F1F1F;
+  border-color: #747775;
 }
-.signin-btn--ghost:hover:not(:disabled) {
-  background: #ECE5D8;
-  color: #2A2724;
+.signin-btn--secondary:hover:not(:disabled) { background: #F8F9FA; }
+
+/* The stack under a title: field, error, buttons, Google. One gap between
+   all of them, set here rather than by margins on each piece. */
+.signin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
-/* Roomier gap between stacked buttons in the sheet. */
-.signin-btn + .signin-btn { margin-top: 12px; }
+.signin-actions > .signin-input,
+.signin-actions > .signin-error { margin: 0; }
+/* Fields take the buttons' height and shape: one row height in the stack. */
+.signin-actions > .signin-input {
+  min-height: 50px;
+  padding: 0 20px;
+  border-radius: 999px;
+}
 
 /* Inline "Privacy Policy" link inside a consent row. */
 .signin-link {
@@ -205,49 +216,16 @@
 .signin-link:hover { color: var(--pb-purple-700, #42298B); }
 
 .signin-fine {
-  margin: 14px 0 0;
-  font-size: 11.5px;
-  color: #9E9A93;
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #8A847C;
   line-height: 1.45;
   max-width: 320px;
 }
+.signin-fine .signin-link { font-weight: 600; color: inherit; }
 
-/* Divider between the primary "save email" form and the secondary
- * "restore" entry point — keeps the visual hierarchy clear that
- * "restore" is the lesser-used path without hiding it in a menu. */
-.signin-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin: 18px 0 10px;
-}
-.signin-divider__rule {
-  flex: 1;
-  height: 1px;
-  background: #E5DECF;
-}
-.signin-divider__label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #9E9A93;
-  white-space: nowrap;
-}
-
-/* ── Consent block ──────────────────────────────────────────────────────
- * Service email is lawful without consent, so it's shown as a plain notice
- * line. Marketing is a genuine opt-in: an unticked checkbox by default. */
-.signin-notice {
-  align-self: flex-start;
-  margin: 0 0 12px;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: #6E6A63;
-  text-align: left;
-}
-
+/* ── Marketing opt-in ─────────────────────────────────────────────────
+ * A genuine opt-in: an unticked checkbox by default. */
 /* Plain checkbox + text — no box outline or fill. */
 .signin-consent {
   display: flex;
@@ -256,7 +234,7 @@
   width: 100%;
   box-sizing: border-box;
   padding: 3px 2px;
-  margin-bottom: 2px;
+  margin-top: 14px;
   cursor: pointer;
   text-align: left;
 }
@@ -273,29 +251,7 @@
   line-height: 1.45;
   color: #4A4540;
 }
-.signin-consent__muted { color: #9E9A93; }
 
-/* The ways this login signs in — "Google", "Email code" — as quiet chips
-   under the confirmation, so the customer knows which door to use on
-   their next phone (either opens the same account). */
-.signin-methods {
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-  margin: -6px 0 18px; padding: 0; list-style: none;
-}
-.signin-method {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: 999px;
-  background: #F4F2EF; border: 1px solid #E7E2DA;
-  font-size: 13px; font-weight: 600; color: #3A3632;
-}
-.signin-method svg { flex: none; }
-/* A lone opt-in under a confirmation (after Google), not part of a form. */
-.signin-consent--solo { justify-content: center; width: auto; margin: -6px 0 14px; }
-
-/* Quiet third action (Sign out) under the two buttons. */
-.signin-text-btn {
-  margin-top: 12px; padding: 6px 10px; border: 0; background: none;
-  font: inherit; font-size: 14px; font-weight: 600; color: #6A6058;
-  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
-}
-.signin-text-btn:hover { color: #2A2724; }
+/* A title with nothing under it but the form (the sign-in form itself). */
+.signin-title + .signin-actions { margin-top: 14px; }
+.signin-nowrap { white-space: nowrap; }

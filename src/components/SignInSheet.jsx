@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   sendMagicLink,
-  signOutUser,
+  signOutThisDevice,
   requestRestoreOtp,
   verifyRestoreOtp,
   finaliseRestore,
@@ -12,22 +12,27 @@ import {
 } from '../lib/api';
 import PrivacyPolicyView from './PrivacyPolicyView';
 import GoogleSignIn, { GoogleMark } from './GoogleSignIn';
-import { getAuthInfo, switchGoogleAccount, useGoogleAvailable } from '../lib/oauth';
+import { getAuthInfo, switchGoogleAccount } from '../lib/oauth';
 import './SignInSheet.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * SignInSheet — modal sheet for "Save your cups across devices".
+ * SignInSheet — the "Save your cups" sheet: sign in, or manage the account.
  *
  * The user app is anonymous by default (device_id only). This sheet
  * lets a customer optionally bind their balance to an email so they
  * can recover it on a new phone or after clearing cookies.
  *
  * States:
- *   • idle       — email input + "Send link" button
+ *   • idle       — Google, or an email; one opt-in box, one policy line
  *   • sending    — spinner inside the button
- *   • sent       — confirmation card with "open mail app" CTA
- *   • signedIn   — banner saying "Signed in as foo@bar" + Sign out
+ *   • sent       — enter the 6-digit code
+ *   • signedIn   — the account: change email (or Google account), sign out
+ *   • confirm_signout — "Sign out on this phone?"
  *   • error      — inline error message
+ *
+ * Every successful sign-in closes the sheet (onVerified): the customer is
+ * back where they were, or carried on into the claim or refund that asked
+ * for the email. There is no "you're signed in" screen to dismiss.
  *
  * Magic-link flow:
  *   1. User types email → tap "Send link" → sendMagicLink() fires
@@ -37,28 +42,26 @@ import './SignInSheet.css';
  *      → that triggers a getOrCreateUser refresh which links the
  *      auth.users.id onto our existing PackPerks users row.
  *
- * If the user is already signed in (auth session exists), we show a
- * compact banner with the email + a Sign out action instead of the
- * form. This is the only place in the user app where signing out is
- * exposed — outside the sheet there's no reason for them to do it.
+ * If the user is already signed in (auth session exists), we show the
+ * account instead of the form. Signing out (here, or Data & privacy →
+ * Sign out, which opens this sheet at confirm_signout) ends the login and
+ * forgets the device (signOutThisDevice), so the phone really is signed out.
  *
  * Google is the second door into the same account (lib/oauth.js). It sits
  * above the email field, on the restore screen, and next to the code when
  * an email already has cups, because Google proves the address just as a
- * code does. It leaves the app and comes back, so App.jsx reopens this
- * sheet on return with `oauthReturn` ({ provider, error? }) and keeps any
- * claim or refund that was waiting (`pendingAction`) for the Continue
- * button. Both doors lead to one login: Supabase links an email login and
- * a Google login with the same verified address automatically.
+ * code does. It leaves the app and comes back; App.jsx carries on from
+ * there with no screen of its own (a claim or refund that was waiting
+ * continues), and reopens this sheet only when Google came back with an
+ * error (`oauthReturn.error`). Both doors lead to one login: Supabase links
+ * an email login and a Google login with the same verified address
+ * automatically.
  */
-export default function SignInSheet({ open, onClose, onLinked, onVerified, onMergeHeld, requireVerification = true, savedEmail = null, onSaveEmailDirect, marketingConsent: savedMarketingConsent = false, onMarketingConsent, privacyPolicy = null, pendingAction = null, oauthReturn = null, __devStatus = null, __devEmail = null, __devProviders = null }) {
-  const googleAvailable = useGoogleAvailable();
-  // How the signed-in login can sign in: ['email'], ['google'] or both.
-  // (__devProviders: DEV screen audits only, like __devStatus below.)
-  const [providers, setProviders] = useState(() => (import.meta.env.DEV && __devProviders) || []);
+export default function SignInSheet({ open, onClose, onLinked, onVerified, onMergeHeld, requireVerification = true, savedEmail = null, onSaveEmailDirect, marketingConsent: savedMarketingConsent = false, onMarketingConsent, privacyPolicy = null, pendingAction = null, oauthReturn = null, startAt = null, __devStatus = null, __devEmail = null, __devProviders = null }) {
   // How THIS session signed in ('google' | 'email'). It decides what the
   // signed-in screen offers: a Google login's address belongs to Google, so
   // it can't be changed here; the way to another address is to sign out.
+  // (__devProviders: DEV screen audits only, like __devStatus below.)
   const [method, setMethod] = useState(() => (
     import.meta.env.DEV && __devProviders ? (__devProviders.includes('google') ? 'google' : 'email') : null
   ));
@@ -72,23 +75,28 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
   const mergeFromSave = useRef(false); // true once we've routed Save → merge OTP
   const verifyingRef = useRef(false);  // C.7: blocks a double-submit of the code
   const statusRef = useRef('idle');    // C.7: live status, so a late catch can't clobber a success
-  const [mergeOtherCount, setMergeOtherCount] = useState(0); // for the merge-offer prompt
   const [mode, setMode] = useState('save'); // 'save' | 'restore'
   // __devStatus/__devEmail: DEV-only, used solely by the screen-audit harness
   // (?__shot=…) to open the sheet directly in a given status for screenshots.
   const [status, setStatus] = useState(import.meta.env.DEV && __devStatus ? __devStatus : 'idle');
   const [email, setEmail] = useState(import.meta.env.DEV && __devEmail ? __devEmail : '');
-  // Two consent boxes on the email form: privacy-policy acknowledgement
-  // (required to continue) and a marketing opt-in. Marketing consent has to
-  // be a deliberate tick (GDPR), so the box starts from the account's saved
-  // choice — unticked for anyone who hasn't opted in. Starting unticked for
-  // someone who had would silently withdraw their consent on submit.
+  // One box on the form: the marketing opt-in. It has to be a deliberate
+  // tick (GDPR), so it starts from the account's saved choice — unticked for
+  // anyone who hasn't opted in. Starting unticked for someone who had would
+  // silently withdraw their consent on submit. It applies to Google too: a
+  // tick made before tapping Google travels in the round trip's intent.
+  // The privacy policy is a line under the buttons, not a box to tick:
+  // reading a notice is not a consent, and the box only added a step.
   const [marketingConsent, setMarketingConsent] = useState(!!savedMarketingConsent);
-  const [privacyRead, setPrivacyRead] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [newEmail, setNewEmail] = useState(''); // for the change-email flow
-  const [restoreResult, setRestoreResult] = useState(null); // { status, merged_balance? }
+  // No-verification venues: the idle form doubles as "Change email".
+  const [changing, setChanging] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  // Opened straight at the sign-out question (Data & privacy → Sign out):
+  // "Stay signed in" then closes instead of showing the account.
+  const signOutOnly = startAt === 'signout';
   const [mergeHeldMsg, setMergeHeldMsg] = useState(null); // weekly-limit "sent for review" copy
   const [error, setError] = useState(null);
   const [currentEmail, setCurrentEmail] = useState(import.meta.env.DEV && __devEmail ? __devEmail : null);
@@ -110,31 +118,23 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     // DEV screen-audit: honour the forced __devStatus, don't reset on open.
     if (import.meta.env.DEV && __devStatus) return;
     let cancelled = false;
-    // No-verification mode: the email lives on the user row, there's no auth
-    // session to read. Show the saved email (if any) without an OTP round-trip.
-    // Coming back from Google is the exception: that IS a login, so it reads
-    // the session like any verified venue does.
-    const backFromGoogle = !!oauthReturn && !oauthReturn.error;
-    if (!requireVerification && !backFromGoogle) {
-      if (savedEmail) { setCurrentEmail(savedEmail); setStatus('savedDirect'); }
-      else { setCurrentEmail(null); setStatus('idle'); }
-      return () => { cancelled = true; };
-    }
-    getAuthInfo().then(({ email: e, providers: p, method: m }) => {
+    // A login is a login wherever the venue stands on codes, so the session
+    // is read first: signed in (with a code or with Google) shows the
+    // account. Without one, a venue that asks for no code keeps the email
+    // on the user row, so show that (if any) without an OTP round-trip.
+    getAuthInfo().then(({ email: e, method: m }) => {
       if (cancelled) return;
-      setProviders(p);
       setMethod(m);
-      if (e) { setCurrentEmail(e); setStatus('signedIn'); }
-      else {
-        setCurrentEmail(null);
-        setStatus('idle');
-        // Google sent them back without a session: say why, on the form
-        // they can try again from.
-        if (oauthReturn?.error) setError(oauthReturn.error);
-      }
+      if (e) { setCurrentEmail(e); setStatus(signOutOnly ? 'confirm_signout' : 'signedIn'); return; }
+      if (!requireVerification && savedEmail) { setCurrentEmail(savedEmail); setStatus('savedDirect'); return; }
+      setCurrentEmail(null);
+      setStatus('idle');
+      // Google sent them back without a session: say why, on the form
+      // they can try again from.
+      if (oauthReturn?.error) setError(oauthReturn.error);
     });
     return () => { cancelled = true; };
-  }, [open, requireVerification, savedEmail, oauthReturn]);
+  }, [open, requireVerification, savedEmail, oauthReturn, signOutOnly]);
 
   // Auto-focus the email input (save mode or first step of restore)
   // or the OTP input (restore code-entry step) when the sheet opens.
@@ -157,7 +157,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     if (open) return;
     setOtpCode('');
     setNewEmail('');
-    setRestoreResult(null);
+    setChanging(false);
     setError(null);
     // C.1: also reset `mode` — otherwise a reopen after the Restore flow lands
     // in (mode='restore', status='idle'), which no render branch handles, and
@@ -180,6 +180,11 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     e.preventDefault();
     if (!email.trim()) return;
     setError(null);
+    if (currentEmail && email.trim().toLowerCase() === currentEmail.trim().toLowerCase()) {
+      setError('That’s already your email.');
+      setStatus('error');
+      return;
+    }
 
     // Record the marketing-email choice on submit — independent of email
     // verification. Service email is lawful without consent; marketing is what
@@ -200,11 +205,11 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
       try {
         const check = await checkEmailSaveOrMerge(email);
         if (check?.status === 'merge_required') {
-          setMergeOtherCount(check.other_count || 1);
           setStatus('merge_offer');
         } else {
           // Server saved the email; sync local state.
           setCurrentEmail(email.trim());
+          setChanging(false);
           setStatus('savedDirect');
           // Best-effort: also notify the parent so its in-memory profile updates.
           try { await onSaveEmailDirect?.(email.trim()); } catch { /* server already saved */ }
@@ -277,7 +282,7 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     const email = newEmail.trim();
     if (!email) return;
     if (currentEmail && email.toLowerCase() === currentEmail.trim().toLowerCase()) {
-      setError('That’s already your email on this account.');
+      setError('That’s already your email.');
       return;
     }
     setError(null);
@@ -293,20 +298,24 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     }
   }
 
+  /* Sign out on this phone: end the login, forget the device, and boot
+   * again as a new visitor. The cups stay with the account. */
   async function handleSignOut() {
-    try {
-      await signOutUser();
-      setCurrentEmail(null);
-      setProviders([]);
-      setMethod(null);
-      setStatus('idle');
-      // Notify the parent so it can refresh the user row (back to
-      // anonymous device-only mode for any further reads).
-      onLinked?.({ signedOut: true });
-    } catch (err) {
-      setError(err.message);
-      setStatus('error');
-    }
+    if (signingOut) return;
+    setSigningOut(true);
+    await signOutThisDevice();
+    window.location.reload();
+  }
+
+  /* A Google login's address is Google's: the way to another one is to sign
+   * out and pick a different account. switchGoogleAccount forgets the device
+   * first, so the next account can't be matched to this one's row. */
+  function handleSwitchGoogle() {
+    if (signingOut) return;
+    setSigningOut(true);
+    switchGoogleAccount({ kind: 'rewards', pending: pendingAction })
+      // Google unavailable: already signed out, so boot as a visitor.
+      .catch(() => window.location.reload());
   }
 
   /* ── Restore-by-email flow ────────────────────────────────────────────
@@ -358,13 +367,13 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
       // duplicate per-store rows, so cross-store balances appear immediately and
       // no duplicate accounts are created.
       await verifyRestoreOtp(email, otpCode);
-      setRestoreResult({ status: 'restored' });
       setCurrentEmail(email.trim());
-      setStatus('restore_done');
+      setStatus('signedIn');
       onLinked?.();
+      onVerified?.(); // straight back to the app, like every other sign-in
     } catch (err) {
       // C.7 fix 2: don't let a late failure erase a finished restore.
-      if (statusRef.current !== 'restore_done') {
+      if (statusRef.current !== 'signedIn') {
         const code = err?.detail?.error || err?.message;
         const friendly =
           code === 'invalid_code'
@@ -384,16 +393,9 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
     }
   }
 
-  function switchToRestore() {
-    setError(null);
-    setStatus('restore_email');
-    setMode('restore');
-  }
-
   function switchToSave() {
     setError(null);
     setOtpCode('');
-    setRestoreResult(null);
     mergeFromSave.current = false;
     setStatus('idle');
     setMode('save');
@@ -419,535 +421,387 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
 
   if (!open) return null;
 
+  const mailIcon = (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+      <polyline points="22,6 12,13 2,6" />
+    </svg>
+  );
+  const policyLine = (
+    <p className="signin-fine">
+      By continuing you confirm you’ve read our{' '}
+      <span className="signin-nowrap"><button type="button" className="signin-link" onClick={() => setShowPolicy(true)}>Privacy Policy</button>.</span>
+    </p>
+  );
+
   return (
     <div className="signin-overlay" onClick={onClose}>
       <div className="signin-sheet" onClick={e => e.stopPropagation()}>
         <button className="signin-close" onClick={onClose} aria-label="Close">×</button>
 
-        {/* Email is already on another account — offer to verify + merge */}
+        {/* Email is already on another account — verify it's theirs, then
+            combine the cups. Google proves the address just as well. */}
         {status === 'merge_offer' && (
           <div className="signin-state">
-            <div className="signin-art">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="9" />
-              </svg>
-            </div>
             <h2 className="signin-title">This email already has cups</h2>
             <p className="signin-sub">
-              <strong>{email}</strong> is already linked to {mergeOtherCount > 1 ? `${mergeOtherCount} other accounts` : 'another account'} on PackPerks.
-              <br />To use it here, we'll send a 6-digit code to verify it's you, then combine the cups into one account.
+              Confirm <strong>{email}</strong> is yours and we’ll combine the cups into one account.
             </p>
             {error && <p className="signin-error">{error}</p>}
-            <button
-              type="button"
-              className="signin-btn signin-btn--primary"
-              onClick={handleSendMergeCode}
-              disabled={status === 'restore_sending'}
-            >
-              Send 6-digit code
-            </button>
-            {/* If that address is a Google account, Google proves it just as
-                well, and signing in combines the cups the same way. */}
-            <GoogleSignIn
-              intent={{ kind: 'rewards', pending: pendingAction }}
-              showPolicyNote={false}
-              divider={null}
-              disabled={status === 'restore_sending'}
-            />
-            <button
-              type="button"
-              className="signin-btn signin-btn--ghost"
-              onClick={() => { setEmail(''); setError(null); setStatus('idle'); }}
-            >
-              Use a different email
-            </button>
+            <div className="signin-actions">
+              <button
+                type="button"
+                className="signin-btn signin-btn--primary"
+                onClick={handleSendMergeCode}
+                disabled={status === 'restore_sending'}
+              >
+                Email me a code
+              </button>
+              <GoogleSignIn
+                intent={{ kind: 'rewards', pending: pendingAction, marketing: marketingConsent }}
+                showPolicyNote={false}
+                divider={null}
+                disabled={status === 'restore_sending'}
+              />
+              <button
+                type="button"
+                className="signin-btn signin-btn--secondary"
+                onClick={() => { setEmail(''); setError(null); setStatus('idle'); }}
+              >
+                Use a different email
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Email saved without verification (verification toggle is off) */}
+        {/* Email saved without verification (the venue doesn't ask for a
+            code), so there is no login to sign out of. */}
         {status === 'savedDirect' && (
           <div className="signin-state">
-            <div className="signin-art signin-art--ok">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
+            <h2 className="signin-title">Your email</h2>
+            <p className="signin-sub"><strong>{currentEmail}</strong></p>
+            <div className="signin-actions">
+              <button
+                className="signin-btn signin-btn--secondary"
+                onClick={() => { setEmail(''); setError(null); setChanging(true); setStatus('idle'); }}
+              >
+                Change email
+              </button>
             </div>
-            <h2 className="signin-title">Email saved</h2>
-            <p className="signin-sub">
-              Your balance is linked to <strong>{currentEmail}</strong>. You can update it any time.
-            </p>
-            <button
-              className="signin-btn signin-btn--ghost"
-              onClick={() => { setEmail(''); setError(null); setStatus('idle'); }}
-            >
-              Change email
-            </button>
           </div>
         )}
 
-        {/* Already signed in — and how. Both doors open this one account,
-            so the copy names whichever ones apply rather than leaving the
-            customer to guess which button to press on their next phone. */}
+        {/* Signed in. The rules, in one place:
+              signed in with Google → the address is Google's. No "Change
+                email": the way to another address is "Use a different
+                Google account" (sign out, pick another) or "Sign out".
+              signed in with a code → "Change email" (confirmed by a link to
+                the new address) and "Sign out". Google is never offered as
+                a way to change an email: it signs in, it doesn't edit. */}
         {status === 'signedIn' && (() => {
-          // The rules, in one place:
-          //   signed in with Google → the address is Google's. No "Change
-          //     email": the way to a different address is "Use a different
-          //     Google account" (sign out, pick another) or "Sign out".
-          //   signed in with a code → "Change email" (confirmed by a link to
-          //     the new address) and "Sign out". Google is never offered as a
-          //     way to change an email: it signs in, it doesn't edit.
           const viaGoogle = method === 'google';
-          const hasGoogle = providers.includes('google');
-          const hasEmail = providers.includes('email');
-          const justBack = !!oauthReturn && !oauthReturn.error;
-          const continueLabel = pendingAction === 'claim'
-            ? 'Continue to my cashback'
-            : pendingAction === 'refund' ? 'Continue to my refund' : null;
           return (
             <div className="signin-state">
               <div className={`signin-art ${viaGoogle ? 'signin-art--google' : 'signin-art--ok'}`}>
-                {viaGoogle ? <GoogleMark size={30} /> : (
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                {viaGoogle ? <GoogleMark size={28} /> : (
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 )}
               </div>
-              <h2 className="signin-title">{viaGoogle ? 'Signed in with Google' : 'You’re all set'}</h2>
-              <p className="signin-sub">
-                Your cups are backed up to <strong>{currentEmail}</strong>.{' '}
-                {viaGoogle
-                  ? 'This address comes from your Google account. To use a different one, sign out and continue with another account.'
-                  : hasGoogle
-                    ? 'On any device, continue with Google or ask for a code sent to this email.'
-                    : 'On another device, ask for a code sent to this email.'}
-              </p>
-
-              {(hasGoogle || hasEmail) && (
-                <ul className="signin-methods" aria-label="Ways to sign in">
-                  {hasGoogle && <li className="signin-method"><GoogleMark size={14} /> Google</li>}
-                  {hasEmail && (
-                    <li className="signin-method">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="22,6 12,13 2,6" />
-                      </svg>
-                      Email code
-                    </li>
-                  )}
-                </ul>
-              )}
-
-              {/* Google gives an address, not a choice: offers stay off until
-                  the customer ticks this, the same rule as the email form. */}
-              {justBack && !savedMarketingConsent && onMarketingConsent && (
-                <label className="signin-consent signin-consent--solo">
-                  <input
-                    type="checkbox"
-                    className="signin-consent__box"
-                    checked={marketingConsent}
-                    onChange={e => { setMarketingConsent(e.target.checked); onMarketingConsent(e.target.checked); }}
-                  />
-                  <span className="signin-consent__text">Send me offers and reward updates.</span>
-                </label>
-              )}
-
+              <h2 className="signin-title">{viaGoogle ? 'Signed in with Google' : 'Signed in'}</h2>
+              <p className="signin-sub"><strong>{currentEmail}</strong></p>
               {error && <p className="signin-error">{error}</p>}
-
-              <button
-                className="signin-btn signin-btn--primary"
-                onClick={continueLabel ? () => onVerified?.() : onClose}
-              >
-                {continueLabel || 'Done'}
-              </button>
-              {viaGoogle ? (
-                <button
-                  className="signin-btn signin-btn--ghost"
-                  onClick={async () => {
-                    // Off this account first, so the cups here go back to an
-                    // anonymous device, then the account picker.
-                    try { await handleSignOut(); } catch { /* shown by handleSignOut */ }
-                    switchGoogleAccount({ kind: 'rewards', pending: pendingAction })
-                      .catch(() => setError('Google sign-in isn’t available right now. Sign in with your email instead.'));
-                  }}
-                >
-                  Use a different Google account
+              <div className="signin-actions">
+                {viaGoogle ? (
+                  <button className="signin-btn signin-btn--secondary" onClick={handleSwitchGoogle} disabled={signingOut}>
+                    Use a different Google account
+                  </button>
+                ) : (
+                  <button
+                    className="signin-btn signin-btn--secondary"
+                    onClick={() => { setNewEmail(''); setError(null); setStatus('change_email'); }}
+                  >
+                    Change email
+                  </button>
+                )}
+                <button className="signin-btn signin-btn--secondary" onClick={() => setStatus('confirm_signout')} disabled={signingOut}>
+                  Sign out
                 </button>
-              ) : (
-                <button
-                  className="signin-btn signin-btn--ghost"
-                  onClick={() => { setNewEmail(''); setError(null); setStatus('change_email'); }}
-                >
-                  Change email
-                </button>
-              )}
-              <button type="button" className="signin-text-btn" onClick={handleSignOut}>
-                Sign out
-              </button>
+              </div>
             </div>
           );
         })()}
+
+        {/* Sign out on this phone. The cups stay with the account. */}
+        {status === 'confirm_signout' && (
+          <div className="signin-state">
+            <h2 className="signin-title">Sign out on this phone?</h2>
+            <p className="signin-sub">
+              Your cups stay saved to <strong>{currentEmail}</strong>. Sign in again to see them.
+            </p>
+            <div className="signin-actions">
+              <button className="signin-btn signin-btn--primary" onClick={handleSignOut} disabled={signingOut}>
+                {signingOut ? 'Signing out…' : 'Sign out'}
+              </button>
+              <button
+                className="signin-btn signin-btn--secondary"
+                onClick={signOutOnly ? onClose : () => setStatus('signedIn')}
+                disabled={signingOut}
+              >
+                Stay signed in
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Change the email on THIS account (keeps your cups). Supabase sends a
             confirmation to the new address; the change lands once it's opened. */}
         {(status === 'change_email' || status === 'change_sending') && (
           <form className="signin-state" onSubmit={handleChangeEmail}>
-            <div className="signin-art">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-            </div>
             <h2 className="signin-title">Change your email</h2>
-            <p className="signin-sub">
-              Enter a new email for this account. We'll send a confirmation link to it.
-              Your current email <strong>{currentEmail}</strong> stays active until you open it.
-            </p>
-
-            <label className="signin-label" htmlFor="change-email">New email</label>
-            <input
-              id="change-email"
-              ref={inputRef}
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              className="signin-input"
-              placeholder="new@example.com"
-              value={newEmail}
-              onChange={e => { setNewEmail(e.target.value); setError(null); }}
-              disabled={status === 'change_sending'}
-              required
-            />
-
-            {error && <p className="signin-error">{error}</p>}
-
-            <button
-              type="submit"
-              className="signin-btn signin-btn--primary"
-              disabled={status === 'change_sending' || !newEmail.trim()}
-            >
-              {status === 'change_sending' ? 'Sending…' : 'Send confirmation link'}
-            </button>
-            <button
-              type="button"
-              className="signin-btn signin-btn--ghost"
-              onClick={() => { setError(null); setStatus('signedIn'); }}
-            >
-              Cancel
-            </button>
+            <p className="signin-sub">We’ll send a link to the new address to confirm it.</p>
+            <div className="signin-actions">
+              <input
+                id="change-email"
+                ref={inputRef}
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                aria-label="New email"
+                className="signin-input"
+                placeholder="New email address"
+                value={newEmail}
+                onChange={e => { setNewEmail(e.target.value); setError(null); }}
+                disabled={status === 'change_sending'}
+                required
+              />
+              {error && <p className="signin-error">{error}</p>}
+              <button
+                type="submit"
+                className="signin-btn signin-btn--primary"
+                disabled={status === 'change_sending' || !newEmail.trim()}
+              >
+                {status === 'change_sending' ? 'Sending…' : 'Send confirmation link'}
+              </button>
+              <button
+                type="button"
+                className="signin-btn signin-btn--secondary"
+                onClick={() => { setError(null); setStatus('signedIn'); }}
+              >
+                Cancel
+              </button>
+            </div>
           </form>
         )}
 
         {status === 'change_sent' && (
           <div className="signin-state">
-            <div className="signin-art signin-art--sent">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-            </div>
-            <h2 className="signin-title">Confirm the change</h2>
-            <p className="signin-sub">
-              We sent a confirmation link to <strong>{newEmail}</strong>. Open it to finish
-              switching your email. Until then, <strong>{currentEmail}</strong> stays on your account.
-            </p>
-            <button className="signin-btn signin-btn--primary" onClick={onClose}>Done</button>
-          </div>
-        )}
-
-        {/* "Check your inbox" — enter the 6-digit code (or tap the link). */}
-        {(status === 'sent' || status === 'verifying') && (
-          <form className="signin-state" onSubmit={handleVerifySaveCode}>
-            <div className="signin-art signin-art--sent">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-            </div>
+            <div className="signin-art signin-art--sent">{mailIcon}</div>
             <h2 className="signin-title">Check your inbox</h2>
             <p className="signin-sub">
-              We sent a 6-digit code to <strong>{email}</strong>.
-              <br />Enter it below to finish linking your cups.
+              Open the link we sent to <strong>{newEmail}</strong> to finish the change.
             </p>
+            <div className="signin-actions">
+              <button className="signin-btn signin-btn--primary" onClick={onClose}>Done</button>
+            </div>
+          </div>
+        )}
 
-            <label className="signin-label" htmlFor="save-code">6-digit code</label>
-            <input
-              id="save-code"
-              ref={codeRef}
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]*"
-              maxLength={6}
-              className="signin-input signin-input--code"
-              placeholder="123456"
-              value={otpCode}
-              onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              disabled={status === 'verifying'}
-              required
-            />
-
-            {error && <p className="signin-error">{error}</p>}
-
-            <button
-              type="submit"
-              className="signin-btn signin-btn--primary"
-              disabled={status === 'verifying' || otpCode.length !== 6}
-            >
-              {status === 'verifying' ? 'Verifying…' : 'Verify code'}
-            </button>
-
-            <button
-              type="button"
-              className="signin-btn signin-btn--ghost"
-              onClick={() => { setStatus('idle'); setEmail(''); setOtpCode(''); setError(null); }}
-            >
-              Use a different email
-            </button>
+        {/* Enter the 6-digit code (or tap the link in the email). */}
+        {(status === 'sent' || status === 'verifying') && (
+          <form className="signin-state" onSubmit={handleVerifySaveCode}>
+            <div className="signin-art signin-art--sent">{mailIcon}</div>
+            <h2 className="signin-title">Enter the code</h2>
+            <p className="signin-sub">Sent to <strong>{email}</strong></p>
+            <div className="signin-actions">
+              <input
+                id="save-code"
+                ref={codeRef}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                maxLength={6}
+                aria-label="6-digit code"
+                className="signin-input signin-input--code"
+                placeholder="123456"
+                value={otpCode}
+                onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                disabled={status === 'verifying'}
+                required
+              />
+              {error && <p className="signin-error">{error}</p>}
+              <button
+                type="submit"
+                className="signin-btn signin-btn--primary"
+                disabled={status === 'verifying' || otpCode.length !== 6}
+              >
+                {status === 'verifying' ? 'Checking…' : 'Continue'}
+              </button>
+              <button
+                type="button"
+                className="signin-btn signin-btn--secondary"
+                onClick={() => { setStatus('idle'); setEmail(''); setOtpCode(''); setError(null); }}
+              >
+                Use a different email
+              </button>
+            </div>
           </form>
         )}
 
-        {/* Idle form (or error variant of it) — "save" mode only */}
-        {/* C.1 fix 2: draw the idle/save form whenever status is idle/sending/
-            error REGARDLESS of mode, so a stray (mode='restore', status='idle')
-            can never leave the popup blank. Restore uses its own restore_* statuses. */}
+        {/* The form: Google, or an email. New and returning customers use the
+            same one: an address that already has cups signs in to them (or,
+            where no code is asked for, offers to combine them), so there is
+            no separate "restore" path to choose.
+            C.1 fix 2: draw it whenever status is idle/sending/error REGARDLESS
+            of mode, so a stray (mode='restore', status='idle') can never leave
+            the popup blank. Restore uses its own restore_* statuses. */}
         {(status === 'idle' || status === 'sending' || status === 'error') && (
           <form className="signin-state" onSubmit={handleSubmit}>
-            <div className="signin-art">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-            </div>
-            <h2 className="signin-title">Save your cups across devices</h2>
-            <p className="signin-sub">
-              {requireVerification
-                ? <>Link your balance to an email so you can pick up where you left off, even after switching phones or clearing your browser.</>
-                : <>Add an email to your balance so you can recover it later. No code needed. It's saved right away.</>}
-            </p>
-
-            <GoogleSignIn
-              intent={{ kind: 'rewards', pending: pendingAction }}
-              onShowPolicy={() => setShowPolicy(true)}
-              disabled={status === 'sending'}
-            />
-
-            <label className="signin-label" htmlFor="signin-email">Email</label>
-            <input
-              id="signin-email"
-              ref={inputRef}
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              className="signin-input"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={status === 'sending'}
-              required
-            />
-
-            <label className="signin-consent">
+            <h2 className="signin-title">{changing ? 'Change your email' : 'Save your cups'}</h2>
+            <div className="signin-actions">
+              {/* Google signs in; it never changes an email. */}
+              {!changing && (
+                <GoogleSignIn
+                  intent={{ kind: 'rewards', pending: pendingAction, marketing: marketingConsent }}
+                  showPolicyNote={false}
+                  divider="or"
+                  disabled={status === 'sending'}
+                />
+              )}
               <input
-                type="checkbox"
-                className="signin-consent__box"
-                checked={privacyRead}
-                onChange={e => setPrivacyRead(e.target.checked)}
+                id="signin-email"
+                ref={inputRef}
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                aria-label="Email"
+                className="signin-input"
+                placeholder={changing ? 'New email address' : 'Email address'}
+                value={email}
+                onChange={e => { setEmail(e.target.value); if (error) { setError(null); setStatus('idle'); } }}
                 disabled={status === 'sending'}
+                required
               />
-              <span className="signin-consent__text">
-                I have read the{' '}
-                <button type="button" className="signin-link" onClick={() => setShowPolicy(true)}>Privacy Policy</button>.
-              </span>
-            </label>
-
-            <label className="signin-consent">
-              <input
-                type="checkbox"
-                className="signin-consent__box"
-                checked={marketingConsent}
-                onChange={e => setMarketingConsent(e.target.checked)}
-                disabled={status === 'sending'}
-              />
-              <span className="signin-consent__text">Send me offers and reward updates.</span>
-            </label>
-
-            {error && <p className="signin-error">{error}</p>}
-
-            <button
-              type="submit"
-              className="signin-btn signin-btn--primary"
-              disabled={status === 'sending' || !email.trim() || !privacyRead}
-            >
-              {status === 'sending' ? 'Sending…' : 'Email me a 6-digit code'}
-            </button>
-
-            {/* Restore entry — sits at the bottom so the primary CTA
-                stays "Save", but lost-my-cups users can find their way
-                in without us inventing a separate route. */}
-            <div className="signin-divider">
-              <span className="signin-divider__rule" />
-              <span className="signin-divider__label">Already used PackPerks?</span>
-              <span className="signin-divider__rule" />
+              {error && <p className="signin-error">{error}</p>}
+              <button
+                type="submit"
+                className="signin-btn signin-btn--primary"
+                disabled={status === 'sending' || !email.trim()}
+              >
+                {status === 'sending' ? 'Sending…' : changing ? 'Save new email' : 'Continue with email'}
+              </button>
+              {changing && (
+                <button
+                  type="button"
+                  className="signin-btn signin-btn--secondary"
+                  onClick={() => { setChanging(false); setError(null); setStatus('savedDirect'); }}
+                >
+                  Cancel
+                </button>
+              )}
             </div>
-            <button
-              type="button"
-              className="signin-btn signin-btn--ghost"
-              onClick={switchToRestore}
-            >
-              I lost my cups. Restore by email
-            </button>
+            {!changing && (
+              <label className="signin-consent">
+                <input
+                  type="checkbox"
+                  className="signin-consent__box"
+                  checked={marketingConsent}
+                  onChange={e => setMarketingConsent(e.target.checked)}
+                  disabled={status === 'sending'}
+                />
+                <span className="signin-consent__text">Send me offers and reward updates</span>
+              </label>
+            )}
+            {!changing && policyLine}
           </form>
         )}
 
-        {/* ── Restore: step 1 — ask for email ── */}
+        {/* ── Restore: ask for the email again (from "Send a new code") ── */}
         {mode === 'restore' && (status === 'restore_email' || status === 'restore_sending') && (
           <form className="signin-state" onSubmit={handleRequestRestore}>
-            <div className="signin-art">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 4v6h6" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
+            <h2 className="signin-title">Get a new code</h2>
+            <div className="signin-actions">
+              <input
+                id="restore-email"
+                ref={inputRef}
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                aria-label="Email"
+                className="signin-input"
+                placeholder="Email address"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                disabled={status === 'restore_sending'}
+                required
+              />
+              {error && <p className="signin-error">{error}</p>}
+              <button
+                type="submit"
+                className="signin-btn signin-btn--primary"
+                disabled={status === 'restore_sending' || !email.trim()}
+              >
+                {status === 'restore_sending' ? 'Sending…' : 'Email me a code'}
+              </button>
+              <button
+                type="button"
+                className="signin-btn signin-btn--secondary"
+                onClick={switchToSave}
+              >
+                Back
+              </button>
             </div>
-            <h2 className="signin-title">Restore your cups</h2>
-            <p className="signin-sub">
-              Enter the email you used before. We'll send a 6-digit code
-              to confirm it's you, then bring your cup balance back to
-              this device.
-            </p>
-
-            {/* Signed up with Google? That restores the account just as well:
-                Google proves the address the same way the code does. */}
-            <GoogleSignIn
-              intent={{ kind: 'rewards', pending: pendingAction }}
-              onShowPolicy={() => setShowPolicy(true)}
-              divider="or get a code by email"
-              disabled={status === 'restore_sending'}
-            />
-
-            <label className="signin-label" htmlFor="restore-email">Email</label>
-            <input
-              id="restore-email"
-              ref={inputRef}
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              className="signin-input"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={status === 'restore_sending'}
-              required
-            />
-
-            {error && <p className="signin-error">{error}</p>}
-
-            <button
-              type="submit"
-              className="signin-btn signin-btn--primary"
-              disabled={status === 'restore_sending' || !email.trim()}
-            >
-              {status === 'restore_sending' ? 'Sending…' : 'Send 6-digit code'}
-            </button>
-            <button
-              type="button"
-              className="signin-btn signin-btn--ghost"
-              onClick={switchToSave}
-            >
-              Back to sign-in
-            </button>
           </form>
         )}
 
-        {/* ── Restore: step 2 — verify the code + merge ── */}
+        {/* ── Restore: verify the code, then the account comes to this phone ── */}
         {mode === 'restore' && (status === 'restore_code' || status === 'restore_verifying') && (
           <form className="signin-state" onSubmit={handleVerifyRestore}>
-            <div className="signin-art signin-art--sent">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
+            <div className="signin-art signin-art--sent">{mailIcon}</div>
+            <h2 className="signin-title">Enter the code</h2>
+            <p className="signin-sub">Sent to <strong>{email}</strong></p>
+            <div className="signin-actions">
+              <input
+                id="restore-code"
+                ref={codeRef}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                maxLength={6}
+                aria-label="6-digit code"
+                className="signin-input signin-input--code"
+                placeholder="123456"
+                value={otpCode}
+                onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                disabled={status === 'restore_verifying'}
+                required
+              />
+              {error && <p className="signin-error">{error}</p>}
+              <button
+                type="submit"
+                className="signin-btn signin-btn--primary"
+                disabled={status === 'restore_verifying' || otpCode.length !== 6}
+              >
+                {status === 'restore_verifying' ? 'Checking…' : 'Continue'}
+              </button>
+              <button
+                type="button"
+                className="signin-btn signin-btn--secondary"
+                onClick={() => {
+                  // Restart from step 1 — resends a new code.
+                  setOtpCode('');
+                  setError(null);
+                  setStatus('restore_email');
+                }}
+                disabled={status === 'restore_verifying'}
+              >
+                Send a new code
+              </button>
             </div>
-            <h2 className="signin-title">Enter your code</h2>
-            <p className="signin-sub">
-              We sent a 6-digit code to <strong>{email}</strong>. Type
-              it below, codes expire after a few minutes.
-            </p>
-
-            <label className="signin-label" htmlFor="restore-code">6-digit code</label>
-            <input
-              id="restore-code"
-              ref={codeRef}
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]*"
-              maxLength={6}
-              className="signin-input signin-input--code"
-              placeholder="123456"
-              value={otpCode}
-              onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              disabled={status === 'restore_verifying'}
-              required
-            />
-
-            {error && <p className="signin-error">{error}</p>}
-
-            <button
-              type="submit"
-              className="signin-btn signin-btn--primary"
-              disabled={status === 'restore_verifying' || otpCode.length !== 6}
-            >
-              {status === 'restore_verifying' ? 'Restoring…' : 'Restore my cups'}
-            </button>
-            <button
-              type="button"
-              className="signin-btn signin-btn--ghost"
-              onClick={() => {
-                // Restart from step 1 — resends a new code.
-                setOtpCode('');
-                setError(null);
-                setStatus('restore_email');
-              }}
-              disabled={status === 'restore_verifying'}
-            >
-              Send a new code
-            </button>
           </form>
-        )}
-
-        {/* ── Restore: step 3 — done ── */}
-        {mode === 'restore' && status === 'restore_done' && (
-          <div className="signin-state">
-            <div className="signin-art signin-art--ok">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-            </div>
-            <h2 className="signin-title">
-              {restoreResult?.status === 'merged'
-                ? 'Welcome back!'
-                : restoreResult?.status === 'no_prior_history'
-                  ? "You're signed in"
-                  : 'Cups restored'}
-            </h2>
-            <p className="signin-sub">
-              {restoreResult?.status === 'merged' ? (
-                <>
-                  Your previous balance has been merged into this device.
-                  You now have <strong>{restoreResult.merged_balance} cup{restoreResult.merged_balance === 1 ? '' : 's'}</strong> total.
-                </>
-              ) : restoreResult?.status === 'repointed' ? (
-                <>Your previous cup balance is now available on this device.</>
-              ) : restoreResult?.status === 'linked' ? (
-                <>This device is now backed up to <strong>{currentEmail}</strong>.</>
-              ) : restoreResult?.status === 'no_prior_history' ? (
-                <>We didn't find an earlier balance under <strong>{currentEmail}</strong>, but you're now signed in. Any cups you collect from now on will be saved to this email.</>
-              ) : (
-                <>You're all set.</>
-              )}
-            </p>
-            <button className="signin-btn signin-btn--primary" onClick={onClose}>
-              Done
-            </button>
-          </div>
         )}
 
         {status === 'merge_held' && (
@@ -959,9 +813,11 @@ export default function SignInSheet({ open, onClose, onLinked, onVerified, onMer
             </div>
             <h2 className="signin-title">Sent for review</h2>
             <p className="signin-sub">{mergeHeldMsg}</p>
-            <button className="signin-btn signin-btn--primary" onClick={onClose}>
-              Got it
-            </button>
+            <div className="signin-actions">
+              <button className="signin-btn signin-btn--primary" onClick={onClose}>
+                Got it
+              </button>
+            </div>
           </div>
         )}
 

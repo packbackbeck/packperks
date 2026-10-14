@@ -1,13 +1,15 @@
 /* "Continue with Google" — shared by every customer sign-in surface.
  * Prefixed ppk-gsi so it can't collide with either app's stylesheets
  * (both ship in one bundle). The button's look is Google's, not the
- * venue's: white, a grey outline, the four-colour mark. */
-.ppk-gsi { display: flex; flex-direction: column; gap: 10px; width: 100%; margin: 4px 0 2px; }
+ * venue's: white, a grey outline, the four-colour mark. Its shape and
+ * spacing follow the sheet it sits in (--ppk-gsi-*), so it lines up with
+ * the buttons around it instead of being a third style among them. */
+.ppk-gsi { display: flex; flex-direction: column; gap: 10px; width: 100%; margin: var(--ppk-gsi-margin, 4px 0 2px); }
 
 .ppk-gsi__btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 12px;
-  width: 100%; min-height: 50px; padding: 0 18px;
-  border: 1px solid #747775; border-radius: 999px;
+  width: 100%; min-height: var(--ppk-gsi-height, 50px); padding: 0 18px;
+  border: 1px solid #747775; border-radius: var(--ppk-gsi-radius, 999px);
   background: #FFFFFF; color: #1F1F1F;
   font-family: inherit; font-size: 15.5px; font-weight: 600; line-height: 1.2; letter-spacing: 0.1px;
   cursor: pointer;

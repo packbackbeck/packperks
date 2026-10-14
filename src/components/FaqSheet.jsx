@@ -51,7 +51,49 @@ const FAQ = [
   },
 ];
 
-export default function FaqSheet({ onClose }) {
+/* "What is Tikkie?" — the same popup, opened from Help wherever cashback is
+ * paid as a Tikkie link. It replaced the link that used to sit on the word
+ * "Tikkie" on the home screen: one place that explains it, instead of a
+ * tap that leaves the app mid-reward. */
+const TIKKIE_INFO_URL = 'https://www.tikkie.me/particulier/statiegeld-terugkrijgen';
+const TIKKIE_HELP = {
+  title: 'What is Tikkie?',
+  items: [
+    {
+      q: 'What is Tikkie?',
+      a: `Tikkie is a payment service from ABN AMRO, a Dutch bank. PackPerks uses it to send your cashback and refunds straight to your bank account.`,
+    },
+    {
+      q: 'How do I get my money?',
+      a: `When your money is ready, tap Collect in PackPerks. Tikkie opens in your browser: enter your IBAN and name, and the money arrives within minutes.`,
+    },
+    {
+      q: 'Do I need the Tikkie app?',
+      a: `No. The link opens in your browser, and the money goes to your own bank account.`,
+    },
+    {
+      q: 'Is it safe?',
+      a: `Yes. You enter your bank details on Tikkie’s own secure page, not in PackPerks.`,
+    },
+    {
+      q: 'Does the link expire?',
+      a: `Yes. Collect your money soon after it’s ready. PackPerks shows when a link expires.`,
+    },
+    {
+      q: 'Where can I read more?',
+      a: `Tikkie explains how it works on its own website:`,
+      link: { href: TIKKIE_INFO_URL, label: 'Open tikkie.me' },
+    },
+  ],
+};
+
+const TOPICS = {
+  faq: { title: 'Frequently asked questions', items: FAQ },
+  tikkie: TIKKIE_HELP,
+};
+
+export default function FaqSheet({ onClose, topic = 'faq' }) {
+  const { title, items } = TOPICS[topic] || TOPICS.faq;
   const [open, setOpen] = useState(0); // index of the expanded item; -1 for none
 
   useEffect(() => {
@@ -63,12 +105,12 @@ export default function FaqSheet({ onClose }) {
   }, [onClose]);
 
   return createPortal(
-    <div className="faq-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Frequently asked questions">
+    <div className="faq-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
       <div className="faq-sheet" onClick={(e) => e.stopPropagation()}>
         <header className="faq-head">
           <div>
             <span className="faq-head__eyebrow">Help</span>
-            <h2 className="faq-head__title">Frequently asked questions</h2>
+            <h2 className="faq-head__title">{title}</h2>
           </div>
           <button className="faq-close" onClick={onClose} aria-label="Close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -78,7 +120,7 @@ export default function FaqSheet({ onClose }) {
         </header>
 
         <div className="faq-body">
-          {FAQ.map((item, i) => {
+          {items.map((item, i) => {
             const isOpen = open === i;
             return (
               <div key={i} className={`faq-item${isOpen ? ' faq-item--open' : ''}`}>

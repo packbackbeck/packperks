@@ -24,10 +24,11 @@ import { clearReopen, peekReopen } from './orgShared';
 
 const FILTERS = [
   { id: 'all', label: 'All' },
+  { id: 'deposit', label: 'Deposit' },
+  { id: 'byo', label: 'BYO' },
   { id: 'reward_voucher', label: 'Voucher' },
   { id: 'reward_cashback', label: 'Cashback' },
   { id: 'deferred_refund', label: 'Deferred Refund' },
-  { id: 'byo', label: 'BYO' },
 ];
 
 /* Organisations: every venue, the groups that tie venues together, and the
@@ -109,6 +110,7 @@ export default function OrganisationsPanel({ onAddOrg, onNavigate, draftState, v
       appMode: modeOf(o),
       staffAppEnabled: !!o.staff_app_enabled,
       groupPayment: o.group_id ? groupById[o.group_id]?.config?.settings?.paymentMethod || null : null,
+      programme: o.programme,
     }),
     [settingsById, modeOf, groupById],
   );
@@ -282,11 +284,13 @@ function OrgList({
 
   const live = useMemo(() => (orgs || []).filter(o => !o.deleted_at), [orgs]);
   const archivedCount = (orgs || []).length - live.length;
-  /* Filter by the main way out, or by BYO (no SmartBin way in). */
+  /* Filter by programme (Deposit or BYO), or by the main way out. */
   const matches = useCallback((o, f) => {
     if (f === 'all') return true;
     const flow = flowOf(o);
-    return f === 'byo' ? isByo(flow) : flow.outs.has(f);
+    if (f === 'byo') return isByo(flow);
+    if (f === 'deposit') return !isByo(flow);
+    return flow.outs.has(f);
   }, [flowOf]);
   const counts = useMemo(() => {
     const c = {};

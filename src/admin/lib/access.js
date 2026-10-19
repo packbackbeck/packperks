@@ -89,7 +89,8 @@ const ALL_MODES = ['standard', 'byo', 'tikkie_only'];
 const APP_MODES = ['standard', 'byo'];
 
 /* Every page, in sidebar order.
- *   modes        — which programme models show it
+ *   modes        — which customer apps show it (orgModes.js)
+ *   programmes   — which programmes show it ('deposit' | 'byo'); all when unset
  *   feature      — a setting that has to be on (switching it off hides the tab)
  *   needsGroup   — only for venues that belong to a group
  *   masterOnly   — Master Settings
@@ -121,7 +122,7 @@ export const TABS = [
     description: 'Bin locations on the customer map.' },
 
   // Ways in: how a returned cup reaches the customer's phone.
-  { id: 'cupqr', label: 'SmartBin Receipt QR', group: 'generate', icon: QrCode, modes: ALL_MODES, editable: true,
+  { id: 'cupqr', label: 'SmartBin Receipt QR', group: 'generate', icon: QrCode, modes: ALL_MODES, programmes: ['deposit'], editable: true,
     description: 'Single-use QR codes for a set number of cups, the ones a SmartBin receipt carries: mint, print and revoke batches.' },
   { id: 'staffapp', label: 'Staff App', group: 'generate', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff', beta: true,
     description: 'The BYO way in where staff show a cup QR code on their phone: on or off, accounts, requests and every code made. Viewing is enough to approve requests.' },
@@ -262,7 +263,7 @@ export function previewAccess(access, roles) {
 }
 
 /* Why a tab is or isn't on screen for this account, venue and settings. */
-export function tabAvailability(tab, { access, mode, settings, hasGroup, workspace }) {
+export function tabAvailability(tab, { access, mode, programme, settings, hasGroup, workspace }) {
   if (!tab) return { visible: false, reason: 'unknown' };
   if (tab.masterOnly) {
     return access?.isMaster ? { visible: true } : { visible: false, reason: 'role' };
@@ -270,6 +271,8 @@ export function tabAvailability(tab, { access, mode, settings, hasGroup, workspa
   if (!tab.fixed && workspace && workspace[tab.id] === false) return { visible: false, reason: 'workspace' };
   if (!access || access.tabAccess(tab.id) === 'hidden') return { visible: false, reason: 'role' };
   if (tab.modes && !tab.modes.includes(mode || 'standard')) return { visible: false, reason: 'mode' };
+  // A BYO venue has no SmartBin: its programme hides the SmartBin pages.
+  if (tab.programmes && !tab.programmes.includes(programme || 'deposit')) return { visible: false, reason: 'programme' };
   if (tab.needsGroup && !hasGroup) return { visible: false, reason: 'group' };
   if (tab.feature) {
     // Unset means on, unless the tab names a default per programme

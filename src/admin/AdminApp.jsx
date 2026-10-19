@@ -131,6 +131,7 @@ function AdminShell() {
   const availabilityCtx = {
     access: effectiveAccess,
     mode,
+    programme: activeOrg?.programme || 'deposit',
     settings,
     hasGroup: !!activeOrg?.group_id,
     workspace,

@@ -26,10 +26,11 @@ export function useVenueFlow(settings) {
   const appMode = resolveEffectiveMode(org.activeOrgMode, org.activeGroupMode);
   const staff = !!org.activeOrg?.staff_app_enabled;
   const groupPayment = org.activeGroupSettings?.paymentMethod || null;
+  const programme = org.activeOrg?.programme || null;
   return useMemo(() => {
-    const flow = deriveFlow({ settings, appMode, staffAppEnabled: staff, groupPayment });
+    const flow = deriveFlow({ settings, appMode, staffAppEnabled: staff, groupPayment, programme });
     return { flow, appMode, issues: flowIssues(flow), byo: isByo(flow) };
-  }, [settings, appMode, staff, groupPayment]);
+  }, [settings, appMode, staff, groupPayment, programme]);
 }
 
 /* draftState: the dashboard's draft. notify(label, direct): an optional

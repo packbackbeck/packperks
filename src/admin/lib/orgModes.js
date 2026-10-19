@@ -103,7 +103,7 @@ export const TIKKIE_ONLY_PAGES = new Set([
 export const ORG_MODELS = {
   deposit: {
     key: 'deposit',
-    label: 'SmartBin + Rewards',
+    label: 'Deposit · Rewards',
     tagline: 'SmartBin Receipt QR → Reward',
     customer: 'Customers drop their packaging in the SmartBin, scan the printed receipt, and choose: cash out straight away, or save cups toward a menu reward.',
     dashboard: 'The whole dashboard — rewards, claims review, users, cup scans and analytics.',
@@ -119,7 +119,7 @@ export const ORG_MODELS = {
   },
   byo: {
     key: 'byo',
-    label: 'BYO + Rewards',
+    label: 'BYO · Rewards',
     tagline: 'Static QR tent or Staff App → Reward',
     customer: 'Customers bring a reusable cup, scan the QR on the counter, and collect cups toward a reward. No deposit and no direct cash-out.',
     dashboard: 'Rewards, claims review, users and the BYO QR codes page.',
@@ -136,7 +136,7 @@ export const ORG_MODELS = {
   },
   tikkie_only: {
     key: 'tikkie_only',
-    label: 'SmartBin + Deferred Refund',
+    label: 'Deposit · Deferred Refund',
     tagline: 'SmartBin Receipt QR → Deferred Refund',
     customer: 'Customers drop their packaging in the SmartBin and scan the printed receipt. The refund goes into their wallet, and they collect the whole balance whenever they like as one Tikkie link. No account is needed to start; adding an email keeps the balance safe on a new phone.',
     dashboard: 'The Receipt Generator, the Tikkie payout log, backup cups, bin locations, customer emails, customers, behaviour, system health and reports. No rewards pages.',

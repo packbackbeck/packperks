@@ -53,33 +53,41 @@ brand_color, logo_url, group_id, deleted_at`). Venues sharing a programme sit
 in an `org_groups` row. Config is published to `app_config` under
 `published:<orgId>`, group config under `published:group:<groupId>`.
 
-**Ways in and out** are how a venue is described, in every screen of the
-dashboard (`src/admin/lib/flowModes.js`, the one place the names and rules
-live). A venue has one or more of each:
+**Programme, then ways in and out.** A venue runs one **programme**,
+chosen in onboarding and stored on the venue (`organizations.programme`,
+migration 070): **Deposit** (a deposit on the cup) or **BYO** (customers
+bring their own). A BYO venue can never become Deposit: a trigger
+(`organizations_programme_guard`) refuses it for every caller. Inside the
+programme the venue has ways in and ways out (`src/admin/lib/flowModes.js`,
+the one place the names and rules live):
 
 | Way in | | Way out | |
 |---|---|---|---|
-| SmartBin NFC tag | | Reward Slider Voucher | main |
-| SmartBin Display QR | | Reward Cashback | main |
-| SmartBin Receipt QR | | Deferred Refund | main |
+| SmartBin NFC tag | Deposit | Reward Slider Voucher | main |
+| SmartBin Display QR | Deposit | Reward Cashback | main |
+| SmartBin Receipt QR | Deposit | Deferred Refund | main, Deposit |
 | Staff App | BYO | Donation | support |
-| Static QR tent | BYO | Direct Refund | support |
+| Static QR tent | BYO | Direct Refund | support, Deposit |
 
-Rules: Static QR tent combines with no other way in; Voucher and Cashback
-are never on together; a support way out needs a main one; a venue with no
-SmartBin way in is **BYO** (tagged) and can't have Deferred Refund or
-Direct Refund (no deposit); Deferred Refund next to a Reward or Direct
-Refund is allowed but **not built** (shown, locked) because the wallet and
-the rewards are separate customer apps. Each way maps onto a switch the app
-already reads (`binWaysIn`, `staff_app_enabled`, `featureStaticQr`,
-`paymentMethod`, `mode`, `featureDonations`, `featureDirectRefunds`), so
-`deriveFlow()` describes every venue, and one set up before the rules is
-shown with what it breaks (`flowIssues`). The switches live in Settings →
-Ways & features and Master settings → venue → Ways in & out (one component,
-`src/admin/flow/FlowEditor`); the top bar shows way in → way out. Switching
-to or from Deferred Refund changes the customer app: a master's switch,
-made at once after a typed confirm. A group is a **SmartBin group** or a
-**BYO group** (its copy and the Static QR tent default), not a programme.
+Rules: a BYO venue has only the BYO ways in and no Deferred Refund or
+Direct Refund (no deposit); a Deposit venue can have every way, the BYO
+ways in included (Cartouche: Receipt QR + Static QR tent → Deferred Refund);
+ways in combine freely; Voucher and Cashback are never on together; a
+support way out needs a main one; Deferred Refund next to a Reward or
+Direct Refund is allowed but **not built** (shown, locked) because the
+wallet and the rewards are separate customer apps. Each way maps onto a
+switch the app already reads (`binWaysIn`, `staff_app_enabled`,
+`featureStaticQr`, `paymentMethod`, `mode`, `featureDonations`,
+`featureDirectRefunds`), so `deriveFlow()` describes every venue, and one
+that breaks a rule says what (`flowIssues`). The switches live in Settings
+→ Ways & features and Master settings → venue → Ways in & out (one
+component, `src/admin/flow/FlowEditor`, which shows a BYO venue only what
+its programme has); the top bar shows way in → way out; tabs can carry
+`programmes` (SmartBin Receipt QR is Deposit only). Switching to or from
+Deferred Refund changes the customer app: a master's switch, made at once
+after a typed confirm. A group is a **SmartBin group** or a **BYO group**
+(its copy and the Static QR tent default); its type matches its venues'
+programme, and only same-programme venues can join it.
 
 **Mode** is now plumbing: which customer app a venue runs. Three apps,
 named in the few places that must say which (`src/admin/lib/orgModes.js`);

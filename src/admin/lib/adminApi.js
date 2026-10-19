@@ -3763,6 +3763,9 @@ export async function createOrganization(payload) {
     contact_email: legal.contact_email || null,
     contact_phone: legal.contact_phone || null,
     website: legal.website || null,
+    // The programme is chosen here, once (migration 070): a BYO venue can
+    // never become a Deposit venue.
+    programme: model === 'byo' ? 'byo' : 'deposit',
     created_by_packperks_admin: user?.id ?? null,
   };
   const { data: orgRow, error: orgErr } = await supabase
@@ -3829,7 +3832,8 @@ export async function createOrganization(payload) {
     maxCupsToShare:     economics.maxCupsToShare ?? 10,
     featureCupSharing:    features.featureCupSharing    ?? false,
     featureDonations:     features.featureDonations     ?? true,
-    featureDirectRefunds: features.featureDirectRefunds ?? true,
+    // No deposit in BYO, so no Direct Refund there whatever the wizard sent.
+    featureDirectRefunds: model === 'byo' ? false : (features.featureDirectRefunds ?? true),
     maintenanceMode: false,
     privacyUrl: copy.privacyUrl || '',
     termsUrl:   copy.termsUrl   || '',
@@ -4089,7 +4093,7 @@ export async function listOrgGroups() {
   const ids = list.map(g => g.id);
   const { data: orgs, error: orgErr } = await supabase
     .from('organizations')
-    .select('id, name, slug, brand_color, logo_url, group_id, group_active, deleted_at')
+    .select('id, name, slug, brand_color, logo_url, group_id, group_active, programme, deleted_at')
     .in('group_id', ids);
   if (orgErr) throw orgErr;
 

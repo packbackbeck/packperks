@@ -115,7 +115,7 @@ const EMPTY_DATA = {
  * model, so the progress bar and the step numbers always reflect the
  * steps this particular org will actually go through. */
 const ALL_STEPS = [
-  { id: 'model',     title: 'Ways in & out' },
+  { id: 'model',     title: 'Programme' },
   { id: 'group',     title: 'Group', when: (m) => !!m && ORG_MODELS[m].group !== 'never' },
   { id: 'brand',     title: 'Brand' },
   { id: 'legal',     title: 'Company details', optional: true },
@@ -316,7 +316,7 @@ export default function OrgOnboardingWizard({ onClose, onCreated }) {
                   </li>
                 );
               })}
-              {!model && <li className="oow-rail__item oow-rail__item--hint">More steps once you pick the ways in and out</li>}
+              {!model && <li className="oow-rail__item oow-rail__item--hint">More steps once you pick a programme</li>}
             </ol>
           </nav>
 
@@ -421,11 +421,12 @@ function StepModel({ value, onChange }) {
   return (
     <div className="oow-form">
       <p className="oow-step-intro">
-        How will returned cups reach customers, and what do they get for them? It decides which
-        customer app the venue runs, which dashboard tabs exist, and what the rest of this wizard
-        asks. Every way in and out can be fine-tuned later in Settings → Ways & features.
+        Is there a deposit on the cup (Deposit), or do customers bring their own (BYO)? The
+        programme decides which ways in and out the venue can ever have, which customer app it
+        runs and what the rest of this wizard asks. The ways inside it can be changed later in
+        Settings → Ways & features; a BYO venue can never become a Deposit venue.
       </p>
-      <div className="oow-models" role="radiogroup" aria-label="Ways in and out">
+      <div className="oow-models" role="radiogroup" aria-label="Programme">
         {ORG_MODEL_ORDER.map(key => {
           const m = ORG_MODELS[key];
           const on = value === key;
@@ -450,6 +451,7 @@ function StepModel({ value, onChange }) {
               <span className="oow-model__body"><b>Customer app:</b> {m.customer}</span>
               <span className="oow-model__body"><b>Dashboard:</b> {m.dashboard}</span>
               <span className="oow-model__foot">
+                {key === 'byo' ? 'Stays BYO: can’t become Deposit later · ' : ''}
                 {m.group === 'required' && 'Always in a group'}
                 {m.group === 'optional' && 'On its own or in a group'}
                 {m.group === 'never'    && 'Never in a group'}
@@ -1047,7 +1049,7 @@ function StepReview({ data, model, groups, steps }) {
   })();
 
   const rows = [
-    ['Ways in & out', model ? `${model.label} (${model.tagline})` : '—'],
+    ['Programme', model ? `${model.label} (${model.tagline})` : '—'],
     ...(model?.group === 'never' ? [] : [['Group', groupLabel]]),
     ['Name', data.brand.name || '—'],
     ['Customer app', data.brand.slug ? `/${data.brand.slug}/` : '—'],

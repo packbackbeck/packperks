@@ -247,6 +247,10 @@ function SettingsTab({ group, basics, setBasics, memberCount, copyChanged, unsav
   const current = payment || DEFAULT_PAYMENT_METHOD;
   const slugChanged = basics.slug.trim() !== (group.slug || '');
   const hasByoVenues = group.mode === 'byo' && memberCount > 0;
+  /* A group's type matches its venues' programme (organizations.programme):
+   * a BYO venue never becomes Deposit, so a group holding one stays BYO. */
+  const programmes = new Set((group.members || []).filter(m => !m.deleted_at).map(m => m.programme || 'deposit'));
+  const typeBlocked = (m) => [...programmes].some(p => p !== (m === 'byo' ? 'byo' : 'deposit'));
 
   return (
     <div className="ms-secs">
@@ -280,18 +284,25 @@ function SettingsTab({ group, basics, setBasics, memberCount, copyChanged, unsav
               key={m}
               on={group.mode === m}
               tag="Now"
-              disabled={busy}
+              disabled={busy || (group.mode !== m && typeBlocked(m))}
               icon={MODE_GLYPH[GROUP_MODE_TO_ORG[m]]}
               tone={GROUP_MODE_TO_ORG[m]}
               label={groupModeLabel(m)}
               blurb={GROUP_MODE_BLURB[m]}
-              onClick={() => { if (group.mode !== m) setModeTarget(m); }}
+              onClick={() => { if (group.mode !== m && !typeBlocked(m)) setModeTarget(m); }}
             />
           ))}
         </div>
+        {GROUP_MODES.some(m => group.mode !== m && typeBlocked(m)) && (
+          <p className="ms-note">
+            {programmes.has('byo')
+              ? 'Its venues run the BYO programme, and a BYO venue can’t become Deposit, so the group stays a BYO group.'
+              : 'Its venues run the Deposit programme, so the group stays a SmartBin group.'}
+          </p>
+        )}
       </Sec>
 
-      <Sec title="How rewards are paid" icon={Wallet} when="now" hint="The default for every venue in the group. A venue that picked its own method in Settings → Payouts keeps it.">
+      <Sec title="How rewards are paid" icon={Wallet} when="now" hint="The default for every venue in the group. A venue that picked Reward Cashback or Reward Slider Voucher itself (Settings → Ways & features) keeps it.">
         <div className="ms-choices ms-choices--2" role="radiogroup" aria-label="How rewards are paid">
           {PAYMENT_METHODS.map(m => (
             <ChoiceCard
@@ -419,7 +430,9 @@ function VenuesTab({ group, members, orgs, modes, busy, run, onEditOrg }) {
   const live = members.filter(m => !m.deleted_at);
   const countryOf = Object.fromEntries((orgs || []).map(o => [o.id, o.country]));
   const candidates = (orgs || [])
-    .filter(o => !o.deleted_at && !o.group_id && modes[o.id] !== 'tikkie_only')
+    // Same programme only: a group's type matches its venues' programme.
+    .filter(o => !o.deleted_at && !o.group_id && modes[o.id] !== 'tikkie_only'
+      && (o.programme || 'deposit') === (group.mode === 'byo' ? 'byo' : 'deposit'))
     .sort((a, b) => a.name.localeCompare(b.name));
   const regionKeys = [...new Set(live.map(m => regionForCountry(countryOf[m.id])?.key).filter(Boolean))];
   const hideLive = group.config?.settings?.hideLiveVendors === true;
@@ -501,7 +514,7 @@ function VenuesTab({ group, members, orgs, modes, busy, run, onEditOrg }) {
             Add to group
           </Button>
         </div>
-        <p className="ms-note">Only venues without a group are listed. Deferred Refund venues can’t join a group.</p>
+        <p className="ms-note">Only venues without a group, in the same programme as the group ({group.mode === 'byo' ? 'BYO' : 'Deposit'}), are listed. Deferred Refund venues can’t join a group.</p>
       </Sec>
 
       {confirm && (

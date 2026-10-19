@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, Lock, TriangleAlert, Zap } from 'lucide-react';
 import { Badge, Button, Switch } from '../ui';
 import TypedConfirmModal from '../shared/TypedConfirmModal';
-import { WAY_BY_KEY, flowSummary, turnOffCheck, turnOnCheck } from '../lib/flowModes';
+import { PROGRAMMES, WAY_BY_KEY, flowSummary, inProgramme, turnOffCheck, turnOnCheck } from '../lib/flowModes';
 import '../settings/SettingsPage.css';
 import './FlowEditor.css';
 
@@ -10,18 +10,19 @@ import './FlowEditor.css';
  * Ways in and out: the switches for one venue, laid out like the team's
  * chart. Ways in on top (SmartBin, then the BYO ones), ways out below
  * (main, then support). A switch that would break a rule is locked and
- * says why; one that takes another's place says which.
+ * says why; one that takes another's place says which. A BYO venue sees
+ * only what the BYO programme has: no SmartBin, no refunds.
  * ───────────────────────────────────────────────────────────────────── */
 
 const SIDES = [
   {
     side: 'in',
     title: 'Way in',
-    hint: 'How a returned cup reaches the customer’s phone. SmartBin ways in combine with each other and with the Staff App.',
+    hint: 'How a returned cup reaches the customer’s phone. Several can be on.',
     clusters: [
       { id: 'smartbin', label: 'SmartBin', keys: ['bin_nfc', 'bin_display_qr', 'bin_receipt_qr'] },
       { id: 'byo', label: 'BYO', tag: 'BYO', tinted: true, keys: ['staff_app', 'static_qr'],
-        note: 'A venue with no SmartBin way in is BYO: no deposit, so no Deferred Refund or Direct Refund.' },
+        note: 'The BYO ways in. A Deposit venue can use them too; a BYO venue has only these.' },
     ],
   },
   {
@@ -66,7 +67,14 @@ export default function FlowEditor({ flow, issues, byo, appMode, canEdit, canSwi
           </p>
         </div>
         <div className="wio-head__tags">
-          {byo && <Badge tone="warning" title="No SmartBin way in, so no deposit to refund.">BYO</Badge>}
+          <Badge
+            tone={byo ? 'warning' : 'neutral'}
+            title={byo
+              ? 'Chosen when the venue was created. A BYO venue can’t become a Deposit venue.'
+              : 'Chosen when the venue was created.'}
+          >
+            {PROGRAMMES[flow.programme]?.label || 'Deposit'} programme
+          </Badge>
         </div>
       </section>
 
@@ -82,14 +90,21 @@ export default function FlowEditor({ flow, issues, byo, appMode, canEdit, canSwi
       )}
       {actions.error && <p className="st-error" role="alert">{actions.error}</p>}
 
+      {byo && (
+        <p className="wio-programme-note">
+          BYO programme: customers bring their own cup, so there are no SmartBin ways in and no
+          Deferred Refund or Direct Refund. It stays BYO: a BYO venue can’t become a Deposit venue.
+        </p>
+      )}
+
       {SIDES.map(s => (
         <section key={s.side} className="wio-side" aria-labelledby={`wio-${s.side}`}>
           <div className="wio-side__head">
             <h3 id={`wio-${s.side}`} className="wio-side__title">{s.title}</h3>
             <p className="wio-side__hint">{s.hint}</p>
           </div>
-          <div className="wio-clusters">
-            {s.clusters.map(c => (
+          <div className={`wio-clusters${byo ? ' wio-clusters--single' : ''}`}>
+            {s.clusters.map(c => ({ ...c, keys: c.keys.filter(k => inProgramme(k, flow.programme)) })).filter(c => c.keys.length).map(c => (
               <div key={c.id} className={`wio-cluster${c.tinted ? ' wio-cluster--tinted' : ''}`}>
                 <div className="wio-cluster__head">
                   <span className="wio-cluster__label">{c.label}</span>

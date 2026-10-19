@@ -26,6 +26,15 @@
 .wio-head__blurb { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--ui-muted); }
 .wio-head__tags { display: flex; gap: 6px; flex: none; }
 
+.wio-programme-note {
+  margin: -8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ui-muted);
+}
+.wio-clusters--single { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@container (max-width: 860px) { .wio-clusters--single { grid-template-columns: minmax(0, 1fr); } }
+
 .wio-issues { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--ui-fg-2); }
 
 .wio-side { display: flex; flex-direction: column; gap: 10px; }

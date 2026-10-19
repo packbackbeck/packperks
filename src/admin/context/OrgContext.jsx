@@ -115,7 +115,7 @@ export function OrgProvider({ children }) {
       const [{ data, error: err }, { data: grpData }] = await Promise.all([
         supabase
           .from('organizations')
-          .select('id, name, slug, country, brand_color, logo_url, partner_brand_name, email_domain_hint, group_id, group_active, staff_app_enabled, created_at, updated_at')
+          .select('id, name, slug, country, brand_color, logo_url, partner_brand_name, email_domain_hint, group_id, group_active, staff_app_enabled, programme, created_at, updated_at')
           .is('deleted_at', null)
           .order('created_at', { ascending: true }),
         supabase.from('org_groups').select('id, name, slug'),

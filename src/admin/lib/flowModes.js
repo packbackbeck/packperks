@@ -4,12 +4,19 @@ import {
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────
- * Ways in and ways out: how a venue's programme is described.
+ * Programmes, and the ways in and out inside them.
  *
- * A venue is no longer "a mode". It has one or more WAYS IN (how a
- * returned cup reaches the customer's phone) and one or more WAYS OUT
- * (what the customer gets for it). These are the only names they go by
- * in anything a person reads.
+ * A venue runs one PROGRAMME, chosen when it is created and stored on the
+ * venue (organizations.programme, migration 070):
+ *   Deposit  a deposit on the cup. Every way in and every way out.
+ *   BYO      customers bring their own cup. Only the BYO ways in, and no
+ *            Deferred Refund or Direct Refund: there is no deposit to
+ *            refund. A BYO venue never becomes a Deposit venue (the
+ *            database refuses it).
+ * Inside it, the venue has one or more WAYS IN (how a returned cup
+ * reaches the customer's phone) and one or more WAYS OUT (what the
+ * customer gets for it). These are the only names they go by in anything
+ * a person reads.
  *
  *   Ways in                      Ways out
  *   SmartBin NFC tag             Reward Slider Voucher      main
@@ -19,19 +26,18 @@ import {
  *   Static QR tent     BYO       Direct Refund              support
  *
  * The rules (the team's compatibility charts, Oct 2026):
- *   • Static QR tent can't be combined with any other way in. The other
- *     four ways in combine freely.
+ *   • Ways in combine freely within the programme (Staff App and Static
+ *     QR tent together too).
  *   • Reward Slider Voucher and Reward Cashback can't be on together.
  *   • A support way out never stands alone: it needs a main one.
- *   • A venue counts as BYO when it has no SmartBin way in. There is no
- *     deposit to refund there, so Deferred Refund and Direct Refund
- *     need a SmartBin way in.
+ *   • SmartBin ways in, Deferred Refund and Direct Refund are Deposit
+ *     only.
  *   • Deferred Refund next to a Reward, or next to Direct Refund, is
  *     allowed by the rules but NOT BUILT: the customer app runs the
  *     wallet and the rewards as two separate apps. Shown, locked.
  *
- * Storage did not change. Each way maps onto the switch the customer app
- * and the edge functions already read:
+ * The programme is organizations.programme. Each way maps onto the switch
+ * the customer app and the edge functions already read:
  *   SmartBin ways in   settings.binWaysIn (a list; only the dashboard reads it)
  *   Staff App          organizations.staff_app_enabled
  *   Static QR tent     settings.featureStaticQr
@@ -52,7 +58,7 @@ export const WAYS_IN = [
     blurb: 'The bin prints a receipt with a QR code on it.' },
   { key: 'staff_app', label: 'Staff App', short: 'Staff App', family: 'byo', byo: true, icon: TabletSmartphone,
     blurb: 'Staff show a cup QR code on their phone at the counter.' },
-  { key: 'static_qr', label: 'Static QR tent', short: 'Static QR tent', family: 'byo', byo: true, alone: true, icon: QrCode,
+  { key: 'static_qr', label: 'Static QR tent', short: 'Static QR tent', family: 'byo', byo: true, icon: QrCode,
     blurb: 'A QR tent on the counter gives a cup per scan, up to a limit.' },
 ];
 
@@ -61,17 +67,31 @@ export const WAYS_OUT = [
     blurb: 'Cups unlock a reward the customer collects at the counter by sliding a voucher.' },
   { key: 'reward_cashback', label: 'Reward Cashback', short: 'Cashback', kind: 'main', icon: HandCoins,
     blurb: 'Cups unlock a reward. The customer buys it, sends the receipt and gets the money back by Tikkie.' },
-  { key: 'deferred_refund', label: 'Deferred Refund', short: 'Deferred Refund', kind: 'main', needsBin: true, icon: WalletCards,
+  { key: 'deferred_refund', label: 'Deferred Refund', short: 'Deferred Refund', kind: 'main', depositOnly: true, icon: WalletCards,
     blurb: 'Each return adds its refund to a wallet, collected later as one Tikkie link.' },
   { key: 'donation', label: 'Donation', short: 'Donation', kind: 'support', icon: HeartHandshake,
     blurb: 'Customers give their cups or balance to your charity partner.' },
-  { key: 'direct_refund', label: 'Direct Refund', short: 'Direct Refund', kind: 'support', needsBin: true, icon: Banknote,
+  { key: 'direct_refund', label: 'Direct Refund', short: 'Direct Refund', kind: 'support', depositOnly: true, icon: Banknote,
     blurb: 'Customers cash their cups out straight away instead of saving for a reward.' },
 ];
 
 export const WAY_BY_KEY = Object.fromEntries(
-  [...WAYS_IN.map(w => [w.key, { ...w, side: 'in' }]), ...WAYS_OUT.map(w => [w.key, { ...w, side: 'out' }])],
+  [
+    // SmartBin ways in need a deposit, so they are Deposit only too.
+    ...WAYS_IN.map(w => [w.key, { ...w, side: 'in', depositOnly: w.family === 'smartbin' }]),
+    ...WAYS_OUT.map(w => [w.key, { ...w, side: 'out' }]),
+  ],
 );
+
+export const PROGRAMMES = {
+  deposit: { key: 'deposit', label: 'Deposit', blurb: 'A deposit on the cup: every way in and every way out.' },
+  byo: { key: 'byo', label: 'BYO', blurb: 'Customers bring their own cup: only the BYO ways in, and no refunds.' },
+};
+
+/* Whether a way can exist at all in a programme. */
+export function inProgramme(key, programme) {
+  return !(programme === 'byo' && WAY_BY_KEY[key]?.depositOnly);
+}
 
 const BIN_KEYS = WAYS_IN.filter(w => w.family === 'smartbin').map(w => w.key);
 const REWARDS = ['reward_voucher', 'reward_cashback'];
@@ -84,13 +104,9 @@ const NOT_BUILT = [
 const label = (k) => WAY_BY_KEY[k]?.label || k;
 const list = (keys) => keys.map(label).join(' and ');
 
-export function hasBinWayIn(ins) {
-  return [...ins].some(k => BIN_KEYS.includes(k));
-}
-
-/* BYO: no SmartBin way in, so no deposit behind the cup. */
+/* BYO: the venue runs the BYO programme. */
 export function isByo(flow) {
-  return flow.ins.size > 0 && !hasBinWayIn(flow.ins);
+  return flow.programme === 'byo';
 }
 
 function notBuiltPartner(key, outs) {
@@ -109,19 +125,11 @@ function notBuiltPartner(key, outs) {
 export function turnOnCheck(key, flow) {
   const way = WAY_BY_KEY[key];
   if (!way) return { ok: false, reason: 'Unknown way.' };
-  if (way.side === 'in') {
-    const others = [...flow.ins].filter(k => k !== key);
-    if (way.alone && others.length) {
-      return { ok: false, reason: `Can’t be combined with another way in. Switch off ${list(others)} first.` };
-    }
-    const alone = others.find(k => WAY_BY_KEY[k]?.alone);
-    if (alone) return { ok: false, reason: `${label(alone)} can’t be combined with another way in.` };
-    return { ok: true };
+  if (!inProgramme(key, flow.programme)) {
+    return { ok: false, reason: 'Not part of the BYO programme: there is no deposit.' };
   }
+  if (way.side === 'in') return { ok: true };
   const outs = flow.outs;
-  if (way.needsBin && !hasBinWayIn(flow.ins)) {
-    return { ok: false, reason: 'Needs a SmartBin way in. A BYO venue has no deposit to refund.' };
-  }
   if (way.kind === 'support' && ![...outs].some(k => WAY_BY_KEY[k]?.kind === 'main')) {
     return { ok: false, reason: 'A support way out can’t stand alone. Switch on a main way out first.' };
   }
@@ -141,12 +149,8 @@ export function turnOffCheck(key, flow) {
   const way = WAY_BY_KEY[key];
   if (!way) return { ok: false, reason: 'Unknown way.' };
   if (way.side === 'in') {
-    const rest = new Set([...flow.ins].filter(k => k !== key));
-    if (!rest.size) return { ok: false, reason: 'A venue needs at least one way in.' };
-    if (BIN_KEYS.includes(key) && !hasBinWayIn(rest)) {
-      const needs = [...flow.outs].filter(k => WAY_BY_KEY[k]?.needsBin);
-      if (needs.length) return { ok: false, reason: `${list(needs)} needs a SmartBin way in. Switch ${needs.length > 1 ? 'them' : 'it'} off first.` };
-    }
+    const rest = [...flow.ins].filter(k => k !== key);
+    if (!rest.length) return { ok: false, reason: 'A venue needs at least one way in.' };
     return { ok: true };
   }
   if (way.kind === 'main') {
@@ -168,14 +172,12 @@ export function flowIssues(flow) {
   const mains = outs.filter(k => WAY_BY_KEY[k]?.kind === 'main');
   if (!ins.length) issues.push('There is no way in.');
   if (!mains.length) issues.push('There is no main way out.');
-  const alone = ins.find(k => WAY_BY_KEY[k]?.alone);
-  if (alone && ins.length > 1) issues.push(`${label(alone)} can’t be combined with ${list(ins.filter(k => k !== alone))}.`);
   if (outs.includes('reward_voucher') && outs.includes('reward_cashback')) {
     issues.push('Reward Slider Voucher and Reward Cashback can’t be on together.');
   }
-  if (!hasBinWayIn(flow.ins)) {
-    const needs = outs.filter(k => WAY_BY_KEY[k]?.needsBin);
-    if (needs.length) issues.push(`${list(needs)} needs a SmartBin way in: a BYO venue has no deposit to refund.`);
+  const outside = [...ins, ...outs].filter(k => !inProgramme(k, flow.programme));
+  if (outside.length) {
+    issues.push(`${list(outside)} ${outside.length > 1 ? 'aren’t' : 'isn’t'} part of the BYO programme: there is no deposit.`);
   }
   return issues;
 }
@@ -186,13 +188,15 @@ export function flowIssues(flow) {
  *   settings        the draft (or published) settings
  *   appMode         'tikkie_only' | 'byo' | 'standard' (resolveEffectiveMode)
  *   staffAppEnabled organizations.staff_app_enabled
- *   groupPayment    the group's paymentMethod, when the venue has none */
-export function deriveFlow({ settings, appMode, staffAppEnabled, groupPayment }) {
+ *   groupPayment    the group's paymentMethod, when the venue has none
+ *   programme       organizations.programme ('deposit' | 'byo') */
+export function deriveFlow({ settings, appMode, staffAppEnabled, groupPayment, programme }) {
   const s = settings || {};
+  const prog = programme === 'byo' || programme === 'deposit' ? programme : (appMode === 'byo' ? 'byo' : 'deposit');
   const ins = new Set();
   const bin = Array.isArray(s.binWaysIn)
     ? s.binWaysIn.filter(k => BIN_KEYS.includes(k))
-    : (appMode === 'byo' ? [] : ['bin_receipt_qr']);
+    : (prog === 'byo' ? [] : ['bin_receipt_qr']);
   bin.forEach(k => ins.add(k));
   const staticQr = s.featureStaticQr === undefined || s.featureStaticQr === null
     ? appMode === 'byo'
@@ -209,7 +213,7 @@ export function deriveFlow({ settings, appMode, staffAppEnabled, groupPayment })
     if (s.featureDirectRefunds !== false) outs.add('direct_refund');
   }
   if (s.featureDonations !== false) outs.add('donation');
-  return { ins, outs };
+  return { ins, outs, programme: prog };
 }
 
 /* The ways that lead a summary: a SmartBin way in before a BYO one, a main

@@ -115,7 +115,7 @@ const EMPTY_DATA = {
  * model, so the progress bar and the step numbers always reflect the
  * steps this particular org will actually go through. */
 const ALL_STEPS = [
-  { id: 'model',     title: 'Programme' },
+  { id: 'model',     title: 'Ways in & out' },
   { id: 'group',     title: 'Group', when: (m) => !!m && ORG_MODELS[m].group !== 'never' },
   { id: 'brand',     title: 'Brand' },
   { id: 'legal',     title: 'Company details', optional: true },
@@ -316,7 +316,7 @@ export default function OrgOnboardingWizard({ onClose, onCreated }) {
                   </li>
                 );
               })}
-              {!model && <li className="oow-rail__item oow-rail__item--hint">More steps once you pick a programme</li>}
+              {!model && <li className="oow-rail__item oow-rail__item--hint">More steps once you pick the ways in and out</li>}
             </ol>
           </nav>
 
@@ -421,10 +421,11 @@ function StepModel({ value, onChange }) {
   return (
     <div className="oow-form">
       <p className="oow-step-intro">
-        Which programme will this venue run? It decides how customers are paid, which dashboard
-        tabs exist, and what the rest of this wizard asks.
+        How will returned cups reach customers, and what do they get for them? It decides which
+        customer app the venue runs, which dashboard tabs exist, and what the rest of this wizard
+        asks. Every way in and out can be fine-tuned later in Settings → Ways & features.
       </p>
-      <div className="oow-models" role="radiogroup" aria-label="Programme">
+      <div className="oow-models" role="radiogroup" aria-label="Ways in and out">
         {ORG_MODEL_ORDER.map(key => {
           const m = ORG_MODELS[key];
           const on = value === key;
@@ -489,8 +490,8 @@ function StepGroup({ model, modelKey, value, groups, loading, orgName, onChange 
       <p className="oow-step-intro">
         {required ? (
           <>
-            A Bring Your Own venue <strong>must</strong> be in a group. The group tells the counter
-            QR scanner this is a Bring Your Own programme; without it, every scan is refused.
+            A BYO venue goes in a <strong>BYO group</strong>. The group gives it the BYO copy and
+            switches its Static QR tent on.
           </>
         ) : (
           <>
@@ -542,8 +543,8 @@ function StepGroup({ model, modelKey, value, groups, loading, orgName, onChange 
 
       {hiddenCount > 0 && (
         <p className="oow-note">
-          {hiddenCount} other group{hiddenCount === 1 ? ' is' : 's are'} not listed: they run a
-          different programme, and mixing programmes in one group would show customers the wrong app.
+          {hiddenCount} other group{hiddenCount === 1 ? ' is' : 's are'} not listed: they are a
+          different type, and mixing types in one group would show customers the wrong copy.
         </p>
       )}
     </div>
@@ -807,7 +808,7 @@ function StepEconomics({ data, modelKey, features, onChange }) {
           label="Direct refund per cup"
           hint={features.featureDirectRefunds
             ? 'Paid when a customer cashes out instead of choosing a reward.'
-            : 'Direct refunds are off for this programme, so this rate is not used for now.'}
+            : 'Direct Refund is off for these ways, so this rate is not used for now.'}
         >
           <div className="oow-prefix">
             <span className="oow-prefix__text">{symbol}</span>
@@ -898,7 +899,7 @@ function StepCopy({ data, grouped, onChange }) {
   return (
     <div className="oow-form">
       <p className="oow-step-intro">
-        The words on the customer’s home screen, filled in for the programme you picked. You can change them later in Client app.
+        The words on the customer’s home screen, filled in for the ways you picked. You can change them later in Client app.
         {grouped && ' A venue in a group shows the group’s headline instead.'}
       </p>
       <Field label="Headline">
@@ -935,7 +936,7 @@ function StepFeatures({ data, modelKey, onChange }) {
   const byo = modelKey === 'byo';
   return (
     <div className="oow-form">
-      <p className="oow-step-intro">Set for the programme you picked. You can change them later in Settings → Features.</p>
+      <p className="oow-step-intro">Set for the ways you picked. You can change them later in Settings → Ways & features.</p>
       <div className="oow-toggles">
         <ToggleRow
           label="Cup sharing"
@@ -944,19 +945,21 @@ function StepFeatures({ data, modelKey, onChange }) {
           onChange={(v) => onChange({ featureCupSharing: v })}
         />
         <ToggleRow
-          label="Donations"
-          hint="Customers can donate cups to a partner charity."
+          label="Donation"
+          hint="A support way out: customers give cups to a partner charity."
           value={data.featureDonations}
           onChange={(v) => onChange({ featureDonations: v })}
         />
-        <ToggleRow
-          label="Direct refunds"
-          hint={byo
-            ? 'Off for Bring Your Own: turning it on lets customers cash out instead of working toward a reward.'
-            : 'Customers can cash out their cups instead of choosing a reward.'}
-          value={data.featureDirectRefunds}
-          onChange={(v) => onChange({ featureDirectRefunds: v })}
-        />
+        {byo ? (
+          <p className="oow-note">Direct Refund needs a SmartBin way in: a BYO venue has no deposit to refund.</p>
+        ) : (
+          <ToggleRow
+            label="Direct Refund"
+            hint="A support way out: customers cash out their cups instead of choosing a reward."
+            value={data.featureDirectRefunds}
+            onChange={(v) => onChange({ featureDirectRefunds: v })}
+          />
+        )}
       </div>
     </div>
   );
@@ -1044,7 +1047,7 @@ function StepReview({ data, model, groups, steps }) {
   })();
 
   const rows = [
-    ['Programme', model?.label || '—'],
+    ['Ways in & out', model ? `${model.label} (${model.tagline})` : '—'],
     ...(model?.group === 'never' ? [] : [['Group', groupLabel]]),
     ['Name', data.brand.name || '—'],
     ['Customer app', data.brand.slug ? `/${data.brand.slug}/` : '—'],

@@ -288,7 +288,7 @@ export default function AdminAppDesign({ draftState }) {
           <fieldset className="dz-pane" disabled={readOnly} key={shownTab}>
             <legend className="dz-sr">{TABS.find(t => t.id === shownTab)?.label}</legend>
             {shownTab === 'colors' && tikkieMode && (
-              <Callout tone="info" icon={Palette} title="In the Deferred Tikkie app">
+              <Callout tone="info" icon={Palette} title="In the Deferred Refund wallet">
                 Progress and add button colours the wallet tile; Reward card colours the Collect button; Buttons and
                 header colours the add and account buttons. Page, text and success colours work as described below.
               </Callout>

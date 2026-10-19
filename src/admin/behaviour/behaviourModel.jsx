@@ -570,7 +570,7 @@ function tikkieInsights(byId, action) {
     out.push({
       id: 'expired', weight: 85, tone: 'warn',
       text: <><b>{fmtRate(expired.value)}</b> of payout links ({fmtInt(expired.numerator)}) expired before customers collected them. That money was never paid out.</>,
-      action: action('tikkielog', 'Tikkie payouts'),
+      action: action('tikkielog', 'Deferred Refund'),
     });
   }
   const collect = rate('tk_collect');
@@ -579,7 +579,7 @@ function tikkieInsights(byId, action) {
       out.push({
         id: 'collect', weight: 75, tone: 'warn',
         text: <>Customers collected only <b>{fmtRate(collect.value)}</b> of the payout links issued.</>,
-        action: action('tikkielog', 'Tikkie payouts'),
+        action: action('tikkielog', 'Deferred Refund'),
       });
     } else if (collect.value >= 70) {
       out.push({ id: 'collect', weight: 48, tone: 'up', text: <>Customers collected <b>{fmtRate(collect.value)}</b> of the payout links issued.</> });

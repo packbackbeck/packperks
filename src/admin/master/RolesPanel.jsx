@@ -12,7 +12,7 @@ const CELL_OPTIONS = [
   { id: 'view', label: 'View', icon: Eye },
   { id: 'edit', label: 'Change', icon: Pencil },
 ];
-const MODE_SHORT = { standard: 'Deposit', byo: 'BYO', tikkie_only: 'Deferred Tikkie' };
+const MODE_SHORT = { standard: 'Rewards', byo: 'BYO group', tikkie_only: 'Deferred Refund' };
 
 function presetTabs(preset, role) {
   const out = {};
@@ -240,7 +240,7 @@ export default function RolesPanel({ workspace }) {
                               {off && <span className="ms-chip ms-chip--off">Off for everyone</span>}
                             </span>
                             <span className="ms-matrix__tab-desc">
-                              {tab.modes.length < 3 ? tab.modes.map(m => MODE_SHORT[m]).join(' · ') : 'Every programme'}
+                              {tab.modes.length < 3 ? tab.modes.map(m => MODE_SHORT[m]).join(' · ') : 'Every venue'}
                               {tab.feature ? ' · needs its feature on' : ''}
                               {tab.needsGroup ? ' · grouped venues' : ''}
                             </span>

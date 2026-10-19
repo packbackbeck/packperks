@@ -49,7 +49,7 @@ const ACTION_LABELS = {
   'staff.remove':        { tone: 'danger',  label: 'Removed a staff member' },
   'staff.app_on':        { tone: 'success', label: 'Switched the staff app on' },
   'staff.app_off':       { tone: 'warning', label: 'Switched the staff app off' },
-  'org.mode':            { tone: 'warning', label: 'Changed a programme' },
+  'org.mode':            { tone: 'warning', label: 'Switched the customer app' },
   'org.archive':         { tone: 'danger',  label: 'Archived an organisation' },
   'org.restore':         { tone: 'success', label: 'Restored an organisation' },
   'report.export':       { tone: 'info',    label: 'Exported a report' },

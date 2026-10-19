@@ -10,6 +10,7 @@ import {
   duplicateOrganization, getRegionsConfig, listAllOrganizations, listOrgGroups, restoreOrganization, softDeleteOrganization,
 } from '../lib/adminApi';
 import { resolveEffectiveMode } from '../lib/orgModes';
+import { deriveFlow, isByo } from '../lib/flowModes';
 import { getAllRegions, regionForCountry, setRegions } from '../../lib/regions';
 import { logAction } from '../auth/actionLog';
 import {
@@ -18,8 +19,16 @@ import {
 import OrgEditor from './OrgEditor';
 import GroupsPanel from './GroupsPanel';
 import RegionsPanel from './RegionsPanel';
-import { ModeChip } from './OrgBits';
-import { clearReopen, modeLabel, peekReopen } from './orgShared';
+import { WaysChip } from './OrgBits';
+import { clearReopen, peekReopen } from './orgShared';
+
+const FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'reward_voucher', label: 'Voucher' },
+  { id: 'reward_cashback', label: 'Cashback' },
+  { id: 'deferred_refund', label: 'Deferred Refund' },
+  { id: 'byo', label: 'BYO' },
+];
 
 /* Organisations: every venue, the groups that tie venues together, and the
  * regions they run in. Each list opens its editor in a side drawer. */
@@ -28,6 +37,7 @@ export default function OrganisationsPanel({ onAddOrg, onNavigate, draftState, v
   const [orgs, setOrgs] = useState(null);
   const [groups, setGroups] = useState([]);
   const [modes, setModes] = useState({});
+  const [settingsById, setSettingsById] = useState({});
   const [regionsCfg, setRegionsCfg] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -43,18 +53,22 @@ export default function OrganisationsPanel({ onAddOrg, onNavigate, draftState, v
     ]);
     const keys = list.map(o => `published:${o.id}`);
     const { data: cfg } = keys.length
-      ? await supabase.from('app_config').select('key, mode:value->settings->>mode').in('key', keys)
+      ? await supabase.from('app_config').select('key, settings:value->settings').in('key', keys)
       : { data: [] };
-    const orgModes = Object.fromEntries((cfg || []).map(r => [r.key.replace('published:', ''), r.mode || null]));
+    // Each venue's published settings: its mode, and the switches its ways
+    // in and out are read from (lib/flowModes.js).
+    const orgSettings = Object.fromEntries((cfg || []).map(r => [r.key.replace('published:', ''), r.settings || {}]));
+    const orgModes = Object.fromEntries(Object.entries(orgSettings).map(([id, st]) => [id, st?.mode || null]));
     // Admin-added regions live in app_config; the registry only knows the seed until this runs.
     setRegions(regs || {});
-    return { list, grps, orgModes, regs: regs || {} };
+    return { list, grps, orgModes, orgSettings, regs: regs || {} };
   }, []);
 
-  const apply = useCallback(({ list, grps, orgModes, regs }) => {
+  const apply = useCallback(({ list, grps, orgModes, orgSettings, regs }) => {
     setOrgs(list);
     setGroups(grps);
     setModes(orgModes);
+    setSettingsById(orgSettings);
     setRegionsCfg(regs);
   }, []);
 
@@ -88,6 +102,15 @@ export default function OrganisationsPanel({ onAddOrg, onNavigate, draftState, v
   const modeOf = useCallback(
     (o) => resolveEffectiveMode(modes[o.id], o.group_id ? (groupById[o.group_id]?.mode || 'byo') : null),
     [modes, groupById],
+  );
+  const flowOf = useCallback(
+    (o) => deriveFlow({
+      settings: settingsById[o.id],
+      appMode: modeOf(o),
+      staffAppEnabled: !!o.staff_app_enabled,
+      groupPayment: o.group_id ? groupById[o.group_id]?.config?.settings?.paymentMethod || null : null,
+    }),
+    [settingsById, modeOf, groupById],
   );
   const liveCount = (orgs || []).filter(o => !o.deleted_at).length;
 
@@ -172,7 +195,7 @@ export default function OrganisationsPanel({ onAddOrg, onNavigate, draftState, v
         <OrgList
           orgs={orgs}
           groupById={groupById}
-          modeOf={modeOf}
+          flowOf={flowOf}
           activeOrgId={org.activeOrgId}
           busyId={busyId}
           liveCount={liveCount}
@@ -209,7 +232,7 @@ export default function OrganisationsPanel({ onAddOrg, onNavigate, draftState, v
         <OrgEditor
           key={editOrg.id}
           org={editOrg}
-          mode={modeOf(editOrg)}
+          flow={flowOf(editOrg)}
           group={editOrg.group_id ? groupById[editOrg.group_id] : null}
           isActive={editOrg.id === org.activeOrgId}
           liveCount={liveCount}
@@ -250,7 +273,7 @@ export default function OrganisationsPanel({ onAddOrg, onNavigate, draftState, v
 
 /* ── The list ─────────────────────────────────────────────────────── */
 function OrgList({
-  orgs, groupById, modeOf, activeOrgId, busyId, liveCount,
+  orgs, groupById, flowOf, activeOrgId, busyId, liveCount,
   onAddOrg, onEdit, onOpen, onSettings, onDuplicate, onArchive, onRestore,
 }) {
   const [query, setQuery] = useState('');
@@ -259,20 +282,26 @@ function OrgList({
 
   const live = useMemo(() => (orgs || []).filter(o => !o.deleted_at), [orgs]);
   const archivedCount = (orgs || []).length - live.length;
+  /* Filter by the main way out, or by BYO (no SmartBin way in). */
+  const matches = useCallback((o, f) => {
+    if (f === 'all') return true;
+    const flow = flowOf(o);
+    return f === 'byo' ? isByo(flow) : flow.outs.has(f);
+  }, [flowOf]);
   const counts = useMemo(() => {
-    const c = { all: live.length, standard: 0, byo: 0, tikkie_only: 0 };
-    live.forEach(o => { c[modeOf(o)] += 1; });
+    const c = {};
+    FILTERS.forEach(f => { c[f.id] = live.filter(o => matches(o, f.id)).length; });
     return c;
-  }, [live, modeOf]);
+  }, [live, matches]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (orgs || [])
       .filter(o => (showArchived ? true : !o.deleted_at))
-      .filter(o => filter === 'all' || o.deleted_at || modeOf(o) === filter)
+      .filter(o => filter === 'all' || o.deleted_at || matches(o, filter))
       .filter(o => !q || `${o.name} ${o.slug} ${o.partner_brand_name || ''}`.toLowerCase().includes(q))
       .sort((a, b) => Number(!!a.deleted_at) - Number(!!b.deleted_at) || a.name.localeCompare(b.name));
-  }, [orgs, query, filter, showArchived, modeOf]);
+  }, [orgs, query, filter, showArchived, matches]);
 
   return (
     <Card>
@@ -280,7 +309,7 @@ function OrgList({
         title="Organisations"
         icon={Building2}
         ruled
-        subtitle="Every venue: its profile, its programme and whether it is live. Only masters can add or change them."
+        subtitle="Every venue: its profile, its ways in and out and whether it is live. Only masters can add or change them."
         actions={(
           <>
             <span className="ms-search ms-search--card">
@@ -299,15 +328,10 @@ function OrgList({
       >
         <div className="ms-filters ms-filters--row">
           <Segmented
-            ariaLabel="Filter by programme"
+            ariaLabel="Filter by way out"
             value={filter}
             onChange={setFilter}
-            options={[
-              { id: 'all', label: 'All', count: counts.all },
-              { id: 'standard', label: modeLabel('standard'), count: counts.standard },
-              { id: 'byo', label: modeLabel('byo'), count: counts.byo },
-              { id: 'tikkie_only', label: modeLabel('tikkie_only'), count: counts.tikkie_only },
-            ]}
+            options={FILTERS.map(f => ({ id: f.id, label: f.label, count: counts[f.id] }))}
           />
           {archivedCount > 0 && (
             <ToggleChip pressed={showArchived} onClick={() => setShowArchived(v => !v)} icon={Archive}>
@@ -322,17 +346,16 @@ function OrgList({
         ) : visible.length === 0 ? (
           <EmptyState icon={Building2} title={query || filter !== 'all' ? 'No organisation matches' : 'No organisations yet'}
             action={!query && filter === 'all' && <Button variant="primary" icon={Plus} onClick={onAddOrg}>New organisation</Button>}>
-            {query || filter !== 'all' ? 'Try another name, address or programme.' : 'Create the first venue to get started.'}
+            {query || filter !== 'all' ? 'Try another name, address or way out.' : 'Create the first venue to get started.'}
           </EmptyState>
         ) : (
           <ul className="ms-orgs">
             <li className="ms-org ms-org--head" aria-hidden="true">
               <span>Organisation</span>
-              <span className="ms-org__cells"><span>Programme</span><span>Group</span><span>Region</span></span>
+              <span className="ms-org__cells"><span>Way in → out</span><span>Group</span><span>Region</span></span>
               <span />
             </li>
             {visible.map(o => {
-              const mode = modeOf(o);
               const group = o.group_id ? groupById[o.group_id] : null;
               const region = regionForCountry(o.country);
               const isActive = o.id === activeOrgId;
@@ -355,7 +378,7 @@ function OrgList({
                     </span>
                   </button>
                   <span className="ms-org__cells">
-                    <span className="ms-org__cell"><ModeChip mode={mode} /></span>
+                    <span className="ms-org__cell"><WaysChip flow={flowOf(o)} /></span>
                     <span className="ms-org__cell">
                       {group
                         ? <span className="ms-chip" title={`In the ${group.name} group`}><Layers size={11} aria-hidden="true" />{group.name}</span>

@@ -182,3 +182,42 @@
   .tb-paused { animation: none; }
   .admin-topbar { transition: none; }
 }
+
+/* Ways in and out chip: way in → way out, opens Ways & features. */
+.tb-flow { gap: 8px; padding: 0 10px 0 4px; font: inherit; text-align: left; }
+button.tb-flow { cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+button.tb-flow:hover { border-color: var(--ui-border-2); box-shadow: var(--ui-shadow-md); }
+button.tb-flow:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+.tb-flow--warn { border-color: var(--ui-warning-line, #F3C77A); }
+.tb-flow__half { display: inline-flex; align-items: center; gap: 7px; }
+.tb-flow__glyph {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, #8B6CFF 0%, #5B3FD6 60%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+.tb-flow__glyph--bin_nfc { background: linear-gradient(135deg, #FF7A4D, #E2481F); }
+.tb-flow__glyph--bin_display_qr { background: linear-gradient(135deg, #FFB25C, #F08A1C); }
+.tb-flow__glyph--bin_receipt_qr { background: linear-gradient(135deg, #FFD24D, #E8AE0C); }
+.tb-flow__glyph--staff_app { background: linear-gradient(135deg, #FF8E8E, #E85C5C); }
+.tb-flow__glyph--static_qr { background: linear-gradient(135deg, #FFC48A, #F39A4A); }
+.tb-flow__glyph--reward_voucher { background: linear-gradient(135deg, #A47BFF, #7A4BF0); }
+.tb-flow__glyph--reward_cashback { background: linear-gradient(135deg, #5CC2FF, #1E8FE8); }
+.tb-flow__glyph--deferred_refund { background: linear-gradient(135deg, #5EE0CF, #23A898); }
+.tb-flow__glyph--none { background: var(--ui-soft); color: var(--ui-muted); }
+.tb-flow__more { font-size: 11.5px; font-weight: 600; color: var(--ui-muted); }
+.tb-flow__arrow { flex: none; color: var(--ui-muted-2); }
+.tb-flow__tag {
+  margin-left: 2px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--ui-warning-tint);
+  color: var(--ui-warning);
+}

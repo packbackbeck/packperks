@@ -14,7 +14,7 @@ export function AdminDynamicQr({ onNavigate }) {
   return (
     <div className="ui-page">
       <PageHeader
-        title="Dynamic QR code"
+        title="SmartBin Receipt QR"
         subtitle="Make a single-use QR code a customer scans to collect cups. Each batch mints fresh cup codes that work once."
       />
       <AdminCupQr onNavigate={onNavigate} />

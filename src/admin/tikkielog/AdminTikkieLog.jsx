@@ -99,7 +99,7 @@ export default function AdminTikkieLog() {
   return (
     <div className="ui-page atl">
       <PageHeader
-        title="Tikkie payouts"
+        title="Deferred Refund"
         subtitle="Every time a customer collected their bin receipts as a Tikkie cashback link. Tikkie reports back when a link is paid, and the status here follows."
       >
         <Button icon={RefreshCw} onClick={load} disabled={loading}>

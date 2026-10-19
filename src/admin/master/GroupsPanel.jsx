@@ -8,8 +8,8 @@ import { ChoiceCard, ModeChip } from './OrgBits';
 import { GROUP_MODES, GROUP_MODE_TO_ORG, MODE_GLYPH, groupModeLabel, plural } from './orgShared';
 
 const NEW_GROUP_BLURB = {
-  deposit: 'SmartBin returns. For venues that already run Deposit Rewards and want one market page.',
-  byo: 'Customers bring their own cup and scan the counter QR code. The usual choice for a new group.',
+  deposit: 'SmartBin returns: the app talks about deposits and returns. For SmartBin venues that want one market page.',
+  byo: 'Customers bring their own cup and use a BYO way in (Static QR tent or Staff App). The usual choice for a new group.',
 };
 
 /* Groups: venues that share one customer profile, one market page and one
@@ -56,7 +56,7 @@ export default function GroupsPanel({ orgs, groups, modes, onChanged, onEditOrg 
         title="Groups"
         icon={Layers}
         ruled
-        subtitle="Venues that share one customer profile and one market page. The group sets their programme, their customer copy and how rewards are paid."
+        subtitle="Venues that share one customer profile and one market page. The group sets their type (SmartBin or BYO), their customer copy and how rewards are paid."
         actions={(
           <Button variant="primary" icon={Plus} onClick={() => { setCreateError(null); setCreating({ name: '', mode: 'byo' }); }}>
             New group
@@ -69,7 +69,7 @@ export default function GroupsPanel({ orgs, groups, modes, onChanged, onEditOrg 
         ) : groups.length === 0 ? (
           <EmptyState icon={Layers} title="No groups yet"
             action={<Button variant="primary" icon={Plus} onClick={() => setCreating({ name: '', mode: 'byo' })}>New group</Button>}>
-            A group lets customers use one profile across several venues. Bring Your Own venues always sit in one.
+            A group lets customers use one profile across several venues. BYO venues usually sit in one.
           </EmptyState>
         ) : (
           <div className="ms-table-wrap">
@@ -77,7 +77,7 @@ export default function GroupsPanel({ orgs, groups, modes, onChanged, onEditOrg 
               <thead>
                 <tr>
                   <th>Group</th>
-                  <th>Programme</th>
+                  <th>Type</th>
                   <th>Rewards paid by</th>
                   <th>Venues</th>
                   <th className="ui-num">Customers</th>
@@ -102,7 +102,7 @@ export default function GroupsPanel({ orgs, groups, modes, onChanged, onEditOrg 
                           </span>
                         </button>
                       </td>
-                      <td><ModeChip mode={GROUP_MODE_TO_ORG[g.mode]} /></td>
+                      <td><ModeChip mode={GROUP_MODE_TO_ORG[g.mode]} label={groupModeLabel(g.mode)} /></td>
                       <td>
                         <span className="ms-grid__titles">
                           <span className="ms-nowrap">{PAYMENT_METHOD_META[method || DEFAULT_PAYMENT_METHOD].label}</span>
@@ -132,7 +132,7 @@ export default function GroupsPanel({ orgs, groups, modes, onChanged, onEditOrg 
         )}
         <p className="ms-foot-note">
           {groups.length ? `${plural(groups.reduce((n, g) => n + (g.members || []).filter(m => !m.deleted_at).length, 0), 'venue')} of ${orgCount} ${orgCount === 1 ? 'is' : 'are'} in a group. ` : ''}
-          A venue with no group runs Deposit Rewards or Deferred Tikkie on its own.
+          A venue with no group runs on its own. Deferred Refund venues never sit in a group.
         </p>
       </CardBody>
 
@@ -173,8 +173,8 @@ export default function GroupsPanel({ orgs, groups, modes, onChanged, onEditOrg 
                 onKeyDown={e => { if (e.key === 'Enter') create(); }} />
             </Field>
             <div className="ui-field">
-              <span className="ui-field__label">Programme</span>
-              <div className="ms-choices ms-choices--2" role="radiogroup" aria-label="Programme">
+              <span className="ui-field__label">Type</span>
+              <div className="ms-choices ms-choices--2" role="radiogroup" aria-label="Group type">
                 {GROUP_MODES.map(m => (
                   <ChoiceCard
                     key={m}

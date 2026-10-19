@@ -1,0 +1,98 @@
+/* Ways in and out (FlowEditor). Prefixed wio- so it can't meet the
+   customer app's stylesheet in the shared bundle. Tiles reuse st-tile. */
+
+.wio { display: flex; flex-direction: column; gap: 22px; container-type: inline-size; }
+
+.wio-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow-sm);
+}
+.wio-head__eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-primary);
+}
+.wio-head__title { margin: 4px 0 0; font-size: 18px; font-weight: 700; letter-spacing: -0.015em; color: var(--ui-fg); text-wrap: balance; }
+.wio-head__blurb { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--ui-muted); }
+.wio-head__tags { display: flex; gap: 6px; flex: none; }
+
+.wio-issues { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--ui-fg-2); }
+
+.wio-side { display: flex; flex-direction: column; gap: 10px; }
+.wio-side__head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.wio-side__title { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--ui-fg); }
+.wio-side__hint { margin: 0; font-size: 12.5px; color: var(--ui-muted); }
+
+.wio-clusters { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: stretch; }
+/* Narrow by the editor's own width (Settings page or a drawer), not the
+   window's: the same editor sits in both. */
+@container (max-width: 860px) { .wio-clusters { grid-template-columns: minmax(0, 1fr); } }
+
+/* Every cluster has the same padding and head height, tinted or not, so
+   the tiles of the two clusters start on one line. */
+.wio-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px dashed transparent;
+  border-radius: 16px;
+}
+.wio-cluster--tinted { border-color: var(--ui-border-2); background: var(--ui-soft); }
+.wio-cluster__head { display: flex; flex-direction: column; gap: 2px; min-height: 50px; }
+@container (max-width: 860px) { .wio-cluster__head { min-height: 0; } }
+.wio-cluster__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted-2);
+}
+.wio-cluster__note { font-size: 12px; line-height: 1.4; color: var(--ui-muted); }
+.wio-cluster__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 196px), 1fr));
+  gap: 12px;
+  flex: 1;
+}
+
+.wio-tile--locked { background: var(--ui-card); }
+.wio-tile--locked .st-tile__summary { opacity: 0.8; }
+.wio-tile__title-row { flex-wrap: wrap; gap: 6px; }
+
+.wio-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.wio-tag--byo { background: var(--ui-warning-tint); color: var(--ui-warning); }
+.wio-tag--support { background: var(--ui-primary-softer); color: var(--ui-primary); }
+.wio-tag--soon { background: var(--ui-soft); color: var(--ui-muted); border: 1px dashed var(--ui-border-2); }
+
+.wio-note { font-size: 12px; font-weight: 600; color: var(--ui-primary); }
+.wio-reason {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ui-muted);
+}
+.wio-reason svg { flex: none; margin-top: 2px; }

@@ -1,4 +1,8 @@
-/* The three modes, and the only names they go by in the product:
+/* The three CUSTOMER APPS a venue can run. Since ways in and out
+ * (lib/flowModes.js) these are storage and plumbing, not what a person
+ * reads: the dashboard names a venue by its ways. The labels below are only
+ * for the few places that must say which app runs (the wallet or the
+ * rewards). The old names, kept here for the code keys:
  *
  *   Deposit Rewards  ('standard', group copy mode 'deposit')
  *       The full customer app: cup balance, rewards, direct refunds,
@@ -23,21 +27,21 @@ export const ORG_MODE_TIKKIE_ONLY = 'tikkie_only';
 export const ORG_MODE_META = {
   standard: {
     key: 'standard',
-    label: 'Deposit Rewards',
-    short: 'DR',
-    blurb: 'The full customer app: a cup balance, rewards, direct refunds and receipt claims.',
+    label: 'Rewards',
+    short: 'R',
+    blurb: 'The rewards app: cups build up toward a reward (Reward Cashback or Reward Slider Voucher).',
   },
   byo: {
     key: 'byo',
-    label: 'Bring Your Own',
+    label: 'Rewards · BYO group',
     short: 'BYO',
-    blurb: 'Customers bring a reusable cup and scan the counter QR toward a reward. Requires a group — picking this creates one (or flips the org\u2019s existing group to BYO).',
+    blurb: 'The rewards app, in a BYO group: customers bring their own cup and the copy speaks to that.',
   },
   tikkie_only: {
     key: ORG_MODE_TIKKIE_ONLY,
-    label: 'Deferred Tikkie',
-    short: 'DT',
-    blurb: 'Scanning a bin receipt adds its refund to the customer\u2019s wallet. They collect the whole balance whenever they like, as one Tikkie link. No rewards.',
+    label: 'Deferred Refund',
+    short: 'DR',
+    blurb: 'The wallet app: each return adds money to a wallet, collected later as one Tikkie link. No rewards.',
   },
 };
 
@@ -99,8 +103,8 @@ export const TIKKIE_ONLY_PAGES = new Set([
 export const ORG_MODELS = {
   deposit: {
     key: 'deposit',
-    label: 'Deposit Rewards',
-    tagline: 'The full SmartBin programme',
+    label: 'SmartBin + Rewards',
+    tagline: 'SmartBin Receipt QR → Reward',
     customer: 'Customers drop their packaging in the SmartBin, scan the printed receipt, and choose: cash out straight away, or save cups toward a menu reward.',
     dashboard: 'The whole dashboard — rewards, claims review, users, cup scans and analytics.',
     group: 'optional',
@@ -115,8 +119,8 @@ export const ORG_MODELS = {
   },
   byo: {
     key: 'byo',
-    label: 'Bring Your Own',
-    tagline: 'Bring your own cup',
+    label: 'BYO + Rewards',
+    tagline: 'Static QR tent or Staff App → Reward',
     customer: 'Customers bring a reusable cup, scan the QR on the counter, and collect cups toward a reward. No deposit and no direct cash-out.',
     dashboard: 'Rewards, claims review, users and the BYO QR codes page.',
     group: 'required',
@@ -132,8 +136,8 @@ export const ORG_MODELS = {
   },
   tikkie_only: {
     key: 'tikkie_only',
-    label: 'Deferred Tikkie',
-    tagline: 'Smart bin → wallet → Tikkie',
+    label: 'SmartBin + Deferred Refund',
+    tagline: 'SmartBin Receipt QR → Deferred Refund',
     customer: 'Customers drop their packaging in the SmartBin and scan the printed receipt. The refund goes into their wallet, and they collect the whole balance whenever they like as one Tikkie link. No account is needed to start; adding an email keeps the balance safe on a new phone.',
     dashboard: 'The Receipt Generator, the Tikkie payout log, backup cups, bin locations, customer emails, customers, behaviour, system health and reports. No rewards pages.',
     group: 'never',
@@ -161,7 +165,9 @@ const TIKKIE_ONLY_STRIP_KEYS = [
   'heroHeadline', 'heroSubtext',
   'donationRecipient', 'donationDescription',
   'maxCupsPerScan', 'maxCupsToShare', 'receiptMaxAgeDays',
-  'featureCupSharing', 'featureDonations', 'featureDirectRefunds',
+  // featureDonations is NOT stripped: Donation is a way out the wallet has
+  // too, and stripping it left the switch impossible to turn off.
+  'featureCupSharing', 'featureDirectRefunds',
   'maxHoldBalance', 'holdCapMessage',
   'maxCupsPerDay', 'dailyCapMessage',
   'balanceResetDays', 'resetWarningMessage',

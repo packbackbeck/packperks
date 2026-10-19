@@ -85,7 +85,7 @@ const CHANGELOG = [
     date: '2026-09-17',
     tag: 'Improved',
     title: 'A simpler top bar',
-    body: 'The top bar shows the venue’s programme, search, what a returned cup pays, Preview and Publish. Masters choose which of these it shows.',
+    body: 'The top bar shows the venue’s way in → way out, search, what a returned cup pays, Preview and Publish. Masters choose which of these it shows.',
   },
   {
     date: '2026-05-12',
@@ -211,7 +211,7 @@ export default function AdminSupport() {
        *  production too; the button opens it full-screen in a new tab. */}
       <Card id="sup-guide" className="sup-guide">
         <CardHeader
-          title="Bring Your Own guidebook"
+          title="BYO guidebook"
           icon={BookOpen}
           subtitle="A step-by-step walkthrough of the dashboard, from approving cup scans to setting up rewards and reading your reports."
           ruled
@@ -222,7 +222,7 @@ export default function AdminSupport() {
             </a>
           )}
         />
-        <iframe className="sup-guide__frame" src={GUIDE_URL} title="Bring Your Own guidebook" loading="lazy" />
+        <iframe className="sup-guide__frame" src={GUIDE_URL} title="BYO guidebook" loading="lazy" />
       </Card>
 
       {/* Forms */}

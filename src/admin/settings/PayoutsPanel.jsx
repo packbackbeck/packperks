@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Coins, Save, Send, TicketCheck, TriangleAlert, Users, Wallet } from 'lucide-react';
+import { Coins, Save, TriangleAlert, Wallet } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Button, Card, CardBody, CardHeader, Field, Modal, Switch } from '../ui';
+import { Button, Card, CardBody, CardHeader, Field, Switch } from '../ui';
 import { effectiveRates } from '../../lib/rates';
-import { DEFAULT_PAYMENT_METHOD, PAYMENT_METHODS, PAYMENT_METHOD_META } from '../../lib/paymentMethods';
+import { DEFAULT_PAYMENT_METHOD } from '../../lib/paymentMethods';
 import { getGroupPaymentMethod, getRewardBudget, saveRewardBudget } from '../lib/adminApi';
 import { useAdminMoney } from '../lib/adminMoney';
 import RewardBudgetMonitor from '../shared/RewardBudgetMonitor';
 
-const METHOD_ICON = { tikkie: Send, voucher: TicketCheck };
-
-/* Payouts: how a reward is settled, what a cup is worth, and the budget. */
-export default function PayoutsPanel({ draft, canEdit, mode, org }) {
+/* Payouts: what a cup is worth and the budget. How a reward is settled
+ * (Reward Cashback or Reward Slider Voucher) is a way out, in Features. */
+export default function PayoutsPanel({ draft, canEdit, mode, org, onNavigate }) {
   const { money, symbol } = useAdminMoney();
   const { settings, published } = draft;
   const { activeGroupId, activeOrgId } = org;
@@ -25,7 +24,6 @@ export default function PayoutsPanel({ draft, canEdit, mode, org }) {
     getGroupPaymentMethod(activeGroupId).then(v => { if (alive) setGroupMethod(v); }).catch(() => {});
     return () => { alive = false; };
   }, [activeGroupId]);
-  const [methodChange, setMethodChange] = useState(null); // { from, to }
 
   /* Claims still waiting are paid at the rate live when they are approved. */
   const pubRates = effectiveRates(published || settings);
@@ -52,17 +50,6 @@ export default function PayoutsPanel({ draft, canEdit, mode, org }) {
   const showRefund = !isByo || settings.featureDirectRefunds !== false;
   const inherited = groupMethod || DEFAULT_PAYMENT_METHOD;
   const current = settings.paymentMethod || null;
-  const methodOptions = [
-    {
-      key: null,
-      icon: Users,
-      label: activeGroupId ? 'Follow the group' : 'Use the default',
-      blurb: activeGroupId
-        ? `The group decides. Right now that is ${PAYMENT_METHOD_META[inherited].label.toLowerCase()}.`
-        : `${PAYMENT_METHOD_META[inherited].label}, the PackPerks default.`,
-    },
-    ...PAYMENT_METHODS.map(m => ({ key: m.key, icon: METHOD_ICON[m.key] || Wallet, label: m.label, blurb: m.blurb })),
-  ];
 
   return (
     <div className="st-stack">
@@ -71,32 +58,9 @@ export default function PayoutsPanel({ draft, canEdit, mode, org }) {
           <CardHeader
             title="How rewards are paid"
             icon={Wallet}
-            subtitle="What happens between a customer and your staff when a reward is claimed."
+            subtitle={`${current === 'voucher' || (!current && inherited === 'voucher') ? 'Reward Slider Voucher' : 'Reward Cashback'}${current ? '' : activeGroupId ? ', from the group' : ', the default'}. It is a way out: change it in Ways & features.`}
+            actions={onNavigate ? <Button size="sm" variant="outline" onClick={() => onNavigate('settings', { section: 'features' })}>Ways & features</Button> : null}
           />
-          <CardBody>
-            <div className="st-choices" role="radiogroup" aria-label="Payment method">
-              {methodOptions.map(o => {
-                const Icon = o.icon;
-                const selected = current === o.key;
-                return (
-                  <button
-                    key={o.key || 'inherit'}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={!canEdit}
-                    className={`st-choice${selected ? ' st-choice--on' : ''}`}
-                    onClick={() => { if (!selected) setMethodChange({ from: current, to: o.key }); }}
-                  >
-                    <span className="st-choice__icon" aria-hidden="true"><Icon size={17} /></span>
-                    <span className="st-choice__label">{o.label}</span>
-                    <span className="st-choice__blurb">{o.blurb}</span>
-                    {selected && <span className="st-choice__tick">In use</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </CardBody>
         </Card>
       )}
 
@@ -194,37 +158,6 @@ export default function PayoutsPanel({ draft, canEdit, mode, org }) {
 
       {!isTikkie && <BudgetCard draft={draft} canEdit={canEdit} orgId={activeOrgId} />}
 
-      <Modal
-        open={!!methodChange}
-        onClose={() => setMethodChange(null)}
-        title="Change how this venue pays rewards?"
-        subtitle="Customers see the new flow the next time they open the app after you publish."
-        icon={Wallet}
-        iconTone="amber"
-        footer={(
-          <>
-            <Button variant="outline" onClick={() => setMethodChange(null)}>Cancel</Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                draft.update('paymentMethod', methodChange.to, 'Payment method');
-                setMethodChange(null);
-              }}
-            >
-              Change it
-            </Button>
-          </>
-        )}
-      >
-        {methodChange && (
-          <p className="st-modal-text">
-            {(methodChange.to || inherited) === 'voucher'
-              ? 'Rewards are handed over at the counter: nothing is uploaded or checked, and no money is sent. Make sure staff know to take the phone and slide.'
-              : 'Customers photograph their receipt and add an email address; every claim arrives in Claims for review before the money is sent.'}
-            {' '}Claims already recorded don’t change.
-          </p>
-        )}
-      </Modal>
     </div>
   );
 }

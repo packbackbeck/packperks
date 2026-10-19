@@ -1,29 +1,52 @@
-import { CircleDollarSign, Clock, CupSoda, Gift, Pause, WalletCards } from 'lucide-react';
+import { ArrowRight, CircleDollarSign, Clock, Pause } from 'lucide-react';
 import FeatureSearch from './auth/FeatureSearch';
 import WorkflowDock from './auth/WorkflowDock';
 import { useOrg } from './context/OrgContext';
-import { ORG_MODE_META, resolveEffectiveMode } from './lib/orgModes';
+import { resolveEffectiveMode } from './lib/orgModes';
+import { WAY_BY_KEY, flowSummary, leadWays } from './lib/flowModes';
+import { useVenueFlow } from './flow/useVenueFlow';
 import { useAdminMoney } from './lib/adminMoney';
 import { topbarShows } from './lib/access';
 import { effectiveRates } from '../lib/rates';
 import './AdminTopBar.css';
 
-/* One glyph per programme model, on its own colour: a gift for Deposit
- * Rewards (cups turn into rewards), a cup for Bring Your Own, a wallet for
- * Deferred Tikkie (refunds collect in a wallet until paid out). */
-const MODE_GLYPH = { standard: Gift, byo: CupSoda, tikkie_only: WalletCards };
-
-function ModeChip({ mode }) {
-  const meta = ORG_MODE_META[mode] || ORG_MODE_META.standard;
-  const Glyph = MODE_GLYPH[mode] || Gift;
-  return (
-    <span className={`tb-mode tb-mode--${mode}`} title={meta.blurb}>
-      <span className="tb-mode__glyph"><Glyph size={15} strokeWidth={2.2} aria-hidden="true" /></span>
-      <span className="tb-mode__text">
-        <span className="tb-mode__eyebrow">Programme</span>
-        <span className="tb-mode__label">{meta.label}</span>
+/* The venue's ways in and out, at a glance: the lead way in → the lead
+ * way out, with how many more of each. Opens Ways & features. */
+function FlowChip({ settings, onOpen }) {
+  const { flow, byo, issues } = useVenueFlow(settings);
+  const { ins, outs } = leadWays(flow);
+  const half = (keys, eyebrow) => {
+    const lead = keys[0] ? WAY_BY_KEY[keys[0]] : null;
+    const Glyph = lead?.icon;
+    return (
+      <span className="tb-flow__half">
+        <span className={`tb-flow__glyph tb-flow__glyph--${lead?.key || 'none'}`}>
+          {Glyph && <Glyph size={14} strokeWidth={2.2} aria-hidden="true" />}
+        </span>
+        <span className="tb-mode__text">
+          <span className="tb-mode__eyebrow">{eyebrow}</span>
+          <span className="tb-mode__label">
+            {lead ? lead.short : 'None'}
+            {keys.length > 1 && <small className="tb-flow__more"> +{keys.length - 1}</small>}
+          </span>
+        </span>
       </span>
-    </span>
+    );
+  };
+  const title = `${flowSummary(flow, { short: false })}${byo ? ' · BYO' : ''}${issues.length ? ` · ${issues.length} rule${issues.length > 1 ? 's' : ''} broken` : ''}`;
+  const Tag = onOpen ? 'button' : 'span';
+  return (
+    <Tag
+      {...(onOpen ? { type: 'button', onClick: onOpen } : {})}
+      className={`tb-mode tb-flow${issues.length ? ' tb-flow--warn' : ''}`}
+      title={title}
+      aria-label={`Ways in and out: ${title}`}
+    >
+      {half(ins, 'Way in')}
+      <ArrowRight size={14} className="tb-flow__arrow" aria-hidden="true" />
+      {half(outs, 'Way out')}
+      {byo && <span className="tb-flow__tag">BYO</span>}
+    </Tag>
   );
 }
 
@@ -70,7 +93,12 @@ export default function AdminTopBar({ draftState, onNavigate, onPreview, allowed
 
       <header className={`admin-topbar${maintenance ? ' admin-topbar--maintenance' : ''}`}>
         <div className="admin-topbar__left">
-          {shows('programme') && <ModeChip mode={mode} />}
+          {shows('programme') && (
+            <FlowChip
+              settings={settings}
+              onOpen={canSeeSettings ? () => onNavigate?.('settings', { section: 'features' }) : null}
+            />
+          )}
           {maintenance && (
             <span
               className="tb-paused"

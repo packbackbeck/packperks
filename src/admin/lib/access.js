@@ -1,5 +1,5 @@
 import {
-  Activity, Blocks, CircleDollarSign, CircleHelp, ClipboardList, Clock, Eye, Gauge, Gift, HandCoins,
+  Activity, ArrowLeftRight, Blocks, CircleDollarSign, CircleHelp, ClipboardList, Clock, Eye, Gauge, Gift, HandCoins,
   HeartHandshake, HeartPulse, History, LayoutDashboard, Mail, MapPin, Palette, QrCode, Receipt, ReceiptText, Repeat, ScanLine, ScanQrCode,
   Search, Send, Settings, ShieldCheck, Smartphone, Store, TabletSmartphone, Users,
 } from 'lucide-react';
@@ -42,8 +42,8 @@ export const DISPLAY_KEY = 'workspace:display';
 /* What the top bar can show. `fixed` items can't be switched off;
  * `defaultOff` items start hidden until a master turns them on. */
 export const TOPBAR_ITEMS = [
-  { id: 'programme', label: 'Programme badge', icon: Gift,
-    description: 'Which programme the open venue runs.' },
+  { id: 'programme', label: 'Ways in and out', icon: ArrowLeftRight,
+    description: 'The open venue’s way in → way out. Opens Ways & features.' },
   { id: 'search', label: 'Search', icon: Search,
     description: 'Find any page or setting, also with ⌘K.' },
   { id: 'rates', label: 'Cashback and refund', icon: CircleDollarSign, defaultOff: true,
@@ -79,8 +79,9 @@ export function levelForLegacyRole(role) {
 export const TAB_GROUPS = [
   { id: 'analytics', label: 'Analytics' },
   { id: 'customers', label: 'Customers' },
-  { id: 'generate', label: 'Generate' },
-  { id: 'circulation', label: 'Circulation' },
+  // Ids kept from before ways in and out: roles and saved layouts use them.
+  { id: 'generate', label: 'Ways in' },
+  { id: 'circulation', label: 'Ways out' },
   { id: 'workspace', label: 'Workspace' },
 ];
 
@@ -119,31 +120,33 @@ export const TABS = [
   { id: 'smartbins', label: 'Smart bin locations', group: 'customers', icon: MapPin, modes: ['tikkie_only'], editable: true,
     description: 'Bin locations on the customer map.' },
 
-  { id: 'byorequests', label: 'Static QR code', group: 'generate', icon: ScanQrCode, modes: ALL_MODES, editable: true,
+  // Ways in: how a returned cup reaches the customer's phone.
+  { id: 'cupqr', label: 'SmartBin Receipt QR', group: 'generate', icon: QrCode, modes: ALL_MODES, editable: true,
+    description: 'Single-use QR codes for a set number of cups, the ones a SmartBin receipt carries: mint, print and revoke batches.' },
+  { id: 'staffapp', label: 'Staff App', group: 'generate', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff', beta: true,
+    description: 'The BYO way in where staff show a cup QR code on their phone: on or off, accounts, requests and every code made. Viewing is enough to approve requests.' },
+  { id: 'byorequests', label: 'Static QR tent', group: 'generate', icon: ScanQrCode, modes: ALL_MODES, editable: true,
     feature: 'featureStaticQr', featureDefault: { byo: true },
-    description: 'A counter QR code that gives each customer a cup, up to a daily limit. On by default for Bring Your Own.' },
-  { id: 'cupqr', label: 'Dynamic QR code', group: 'generate', icon: QrCode, modes: ALL_MODES, editable: true,
-    description: 'Single-use QR codes for a set number of cups: mint, print and revoke batches.' },
-  { id: 'receiptgen', label: 'Receipt generator', group: 'generate', icon: ReceiptText, modes: APP_MODES, editable: true,
-    description: 'Test purchase receipts that receipt verification always accepts, for claiming a reward without buying anything.' },
-  { id: 'staffapp', label: 'Staff app', group: 'generate', icon: TabletSmartphone, modes: ALL_MODES, editable: true, badge: 'staff', beta: true,
-    description: 'The phone app staff use to make cup QR codes: on or off, accounts, requests and every code made. Viewing is enough to approve requests.' },
-
-  { id: 'cupscans', label: 'Cup scans', group: 'circulation', icon: ScanLine, modes: APP_MODES, editable: true, badge: 'scans',
+    description: 'The BYO way in: a QR tent on the counter that gives each customer a cup, up to a limit. It can’t be combined with another way in.' },
+  { id: 'backupcups', label: 'Backup cups', group: 'generate', icon: Blocks, modes: ['tikkie_only'], editable: true, beta: true,
+    description: 'The codes a SmartBin prints when it is offline, and their alarm.' },
+  { id: 'cupscans', label: 'Cup scans', group: 'generate', icon: ScanLine, modes: APP_MODES, editable: true, badge: 'scans',
     description: 'Every cup scanned back, and the ones on hold.' },
+
+  // Ways out: what the customer gets for the cup.
   { id: 'claims', label: 'Claims', group: 'circulation', icon: Receipt, modes: APP_MODES, editable: true, badge: 'claims',
-    description: 'Cashback and refund claims to review and pay.' },
-  { id: 'tikkielog', label: 'Tikkie payouts', group: 'circulation', icon: HandCoins, modes: ['tikkie_only'], fixed: true, editable: true,
-    description: 'Every refund paid out through Tikkie.' },
+    description: 'Reward Cashback and Direct Refund claims to review and pay.' },
+  { id: 'tikkielog', label: 'Deferred Refund', group: 'circulation', icon: HandCoins, modes: ['tikkie_only'], fixed: true, editable: true,
+    description: 'Every wallet payout made as a Tikkie link.' },
+  { id: 'donations', label: 'Donations', group: 'circulation', icon: HeartHandshake, modes: ALL_MODES, feature: 'featureDonations', editable: true, beta: true,
+    description: 'The Donation way out: cups and balances given to charity, and the transfers made for them.' },
   { id: 'transactions', label: 'Cup shares', group: 'circulation', icon: Repeat, modes: APP_MODES, feature: 'featureCupSharing', editable: false, beta: true,
     description: 'Cups customers shared with each other.' },
-  { id: 'donations', label: 'Donations', group: 'circulation', icon: HeartHandshake, modes: ALL_MODES, feature: 'featureDonations', editable: true, beta: true,
-    description: 'Cups and balances given to charity, and the transfers made for them.' },
-  { id: 'backupcups', label: 'Backup cups', group: 'circulation', icon: Blocks, modes: ['tikkie_only'], editable: true, beta: true,
-    description: 'Offline fallback codes and their alarm.' },
+  { id: 'receiptgen', label: 'Receipt generator', group: 'circulation', icon: ReceiptText, modes: APP_MODES, editable: true,
+    description: 'Test purchase receipts that receipt verification always accepts, for trying Reward Cashback without buying anything.' },
 
   { id: 'settings', label: 'Settings', group: 'workspace', icon: Settings, modes: ALL_MODES, fixed: true, editable: true,
-    description: 'Features, payouts, limits, locations and the privacy policy.' },
+    description: 'Ways in and out, features, payouts, limits, locations and the privacy policy.' },
   { id: 'master', label: 'Master settings', group: 'workspace', icon: ShieldCheck, modes: ALL_MODES, masterOnly: true, fixed: true, editable: true,
     description: 'People, roles, organisations, the workspace and its data.' },
   { id: 'support', label: 'Help & support', group: 'workspace', icon: CircleHelp, modes: ALL_MODES, fixed: true, editable: false,

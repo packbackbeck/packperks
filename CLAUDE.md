@@ -53,8 +53,38 @@ brand_color, logo_url, group_id, deleted_at`). Venues sharing a programme sit
 in an `org_groups` row. Config is published to `app_config` under
 `published:<orgId>`, group config under `published:group:<groupId>`.
 
-**Mode** decides which app a venue runs. Three modes, three names — use
-exactly these in anything a person reads (`src/admin/lib/orgModes.js`):
+**Ways in and out** are how a venue is described, in every screen of the
+dashboard (`src/admin/lib/flowModes.js`, the one place the names and rules
+live). A venue has one or more of each:
+
+| Way in | | Way out | |
+|---|---|---|---|
+| SmartBin NFC tag | | Reward Slider Voucher | main |
+| SmartBin Display QR | | Reward Cashback | main |
+| SmartBin Receipt QR | | Deferred Refund | main |
+| Staff App | BYO | Donation | support |
+| Static QR tent | BYO | Direct Refund | support |
+
+Rules: Static QR tent combines with no other way in; Voucher and Cashback
+are never on together; a support way out needs a main one; a venue with no
+SmartBin way in is **BYO** (tagged) and can't have Deferred Refund or
+Direct Refund (no deposit); Deferred Refund next to a Reward or Direct
+Refund is allowed but **not built** (shown, locked) because the wallet and
+the rewards are separate customer apps. Each way maps onto a switch the app
+already reads (`binWaysIn`, `staff_app_enabled`, `featureStaticQr`,
+`paymentMethod`, `mode`, `featureDonations`, `featureDirectRefunds`), so
+`deriveFlow()` describes every venue, and one set up before the rules is
+shown with what it breaks (`flowIssues`). The switches live in Settings →
+Ways & features and Master settings → venue → Ways in & out (one component,
+`src/admin/flow/FlowEditor`); the top bar shows way in → way out. Switching
+to or from Deferred Refund changes the customer app: a master's switch,
+made at once after a typed confirm. A group is a **SmartBin group** or a
+**BYO group** (its copy and the Static QR tent default), not a programme.
+
+**Mode** is now plumbing: which customer app a venue runs. Three apps,
+named in the few places that must say which (`src/admin/lib/orgModes.js`);
+nothing a person reads calls a venue "Deposit Rewards", "Bring Your Own"
+or "Deferred Tikkie" any more:
 - **Deposit Rewards** (`standard`, group copy mode `deposit`) — full app: cup
   balance, rewards, direct refunds, receipt claims
 - **Bring Your Own** (group copy mode `byo`) — customers bring their own cup
@@ -263,14 +293,14 @@ is the same sums in JavaScript, for "Demo numbers".
 **Dashboard sidebar** (`TABS` and `TAB_GROUPS` in `src/admin/lib/access.js`,
 in sidebar order): Analytics (Dashboard, User analytics, System health,
 Reports & alerts), Customers (Users, Rewards & offers, Client app, Email
-templates, Future vendors, Smart bin locations), Generate (Static QR code,
-Dynamic QR code, Receipt generator, Staff app), Circulation (Cup scans,
-Claims, Tikkie payouts, Cup shares, Donations, Backup cups), Workspace
+templates, Future vendors, Smart bin locations), Ways in (SmartBin Receipt
+QR, Staff App, Static QR tent, Backup cups, Cup scans), Ways out (Claims,
+Deferred Refund, Donations, Cup shares, Receipt generator), Workspace
 (Settings, Master settings, Help & support, Version history, MockupMaster,
-PackPulse). Each tab's `modes` hides it where the programme has no use for it.
+PackPulse). The group ids are still `generate` and `circulation`. Each tab's `modes` hides it where the programme has no use for it.
 
-**Static QR code** (feature `featureStaticQr` in the org's published
-settings; Settings → Features; tab `byorequests`, labelled Static QR code). A
+**Static QR tent** (feature `featureStaticQr` in the org's published
+settings; a BYO way in in Settings → Ways & features; tab `byorequests`). A
 QR code that stays on the counter, `/<slug>/?byo=1[&loc=<location>]`: each
 scan gives one cup, up to a per-person limit over a rolling window
 (`app_config` `byo:cap:<orgId>` = `{ cap, windowMinutes, windowHours,
@@ -350,9 +380,9 @@ for (`getTikkieStatsMetrics`). A wallet payout whose link fails is deleted,
 so `bin-tikkie` first writes a `system_events` row (`tikkie_payout_link`,
 `failure`); that row is the only record of it.
 
-Three code pages, one tab each: **Dynamic QR code** (tab `cupqr`, single-use
-cup batches, every mode), **Static QR code** (`byorequests`) and **Receipt
-generator** (`receiptgen`, test purchase receipts for rewards, so not in
+Three code pages, one tab each: **SmartBin Receipt QR** (tab `cupqr`,
+single-use cup batches, every mode; formerly Dynamic QR code), **Static QR
+tent** (`byorequests`) and **Receipt generator** (`receiptgen`, test purchase receipts for rewards, so not in
 Deferred Tikkie).
 
 **Receipt designs** (`src/admin/cupqr/receiptDesigns.js`, Dynamic QR code →
@@ -404,8 +434,10 @@ Deferred Tikkie wallet treats "has colours" as "is branded", so hiding a
 section recoloured an unbranded wallet on the next publish. An empty
 design IS the defaults; store only what the venue set.
 
-Older labels — “Redirect Refund”, “Deferred Refund”, “Direct refund only”,
-“Titaan Direct Refund”, “Rewards only” — are stale. The code keys stay.
+Older labels — “Redirect Refund”, “Direct refund only”, “Titaan Direct
+Refund”, “Rewards only”, and since Oct 2026 “Deposit Rewards”, “Bring Your
+Own”, “Deferred Tikkie” and “Programme” — are stale in the dashboard. The
+code keys stay. (“Deferred Refund” is a way out again, by that name.)
 
 **Customer accounts.** No email is needed to collect cups: the device id
 (`src/lib/deviceId.js`) owns an anonymous `users` row. An email is asked for

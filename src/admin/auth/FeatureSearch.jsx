@@ -101,10 +101,10 @@ const Icon = {
  * lands on Settings rather than scrolling Overview. Each entry has
  * generous `keywords` so partial / fuzzy queries resolve well. */
 const FEATURES = [
-  // ── Deferred Tikkie (smart bin) ──────────────────────────────────────
+  // ── Deferred Refund (smart bin) ──────────────────────────────────────
   { id: 'f-backupcups',   name: 'Backup cups',             desc: "The bin's offline fallback codes",  group: 'Smart bin',  page: 'backupcups', icon: Icon.cup,     keywords: 'backup reserve fallback offline spare emergency bin codes uuid alert outage' },
   { id: 'f-backupalert',  name: 'Backup cup alerts',       desc: 'Who gets emailed on a fallback',    group: 'Smart bin',  page: 'backupcups', icon: Icon.reports, keywords: 'alert email notify recipients subject message backup offline warning' },
-  { id: 'f-tikkielog2',   name: 'Tikkie payouts',          desc: 'Every bin receipt paid via Tikkie', group: 'Smart bin',  page: 'tikkielog',  icon: Icon.reports, keywords: 'tikkie payout log cashback links redeemed expired bin receipts' },
+  { id: 'f-tikkielog2',   name: 'Deferred Refund',         desc: 'Every wallet payout via Tikkie', group: 'Smart bin',  page: 'tikkielog',  icon: Icon.reports, keywords: 'deferred refund tikkie payouts payout log wallet links redeemed expired bin receipts way out' },
 
   // ── Overview / dashboards ────────────────────────────────────────────
   { id: 'f-overview',     name: 'Overview',                desc: 'Dashboards, KPIs, charts',          group: 'Dashboards', page: 'overview', icon: Icon.overview, keywords: 'home dashboard kpi stats metric main analytics insights summary' },
@@ -154,7 +154,7 @@ const FEATURES = [
   { id: 'f-cust-device',  name: 'Customer device',         desc: 'Phone or web client used',          group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'device iphone android ipad mac phone agent' },
 
   // ── Organisation ──────────────────────────────────────────────────
-  { id: 'f-org',          name: 'Organisation',            desc: 'Profile, programme, archive',         group: 'Organisation', page: 'master', section: 'organisations',    icon: Icon.org,      keywords: 'company burger king info kvk btw vat' },
+  { id: 'f-org',          name: 'Organisation',            desc: 'Profile, ways in and out, archive',         group: 'Organisation', page: 'master', section: 'organisations',    icon: Icon.org,      keywords: 'company burger king info kvk btw vat' },
   { id: 'f-org-edit',     name: 'Edit organisation',       desc: 'Name, KvK, BTW, brand colour',      group: 'Organisation', page: 'master', section: 'organisations',    icon: Icon.org,      keywords: 'edit company kvk btw vat brand colour address' },
   { id: 'f-locations',    name: 'Locations',               desc: 'Restaurants in your org',           group: 'Organisation', page: 'settings', section: 'locations',    icon: Icon.org,      keywords: 'restaurants stores branches address city damrak amsterdam rotterdam utrecht' },
   { id: 'f-add-location', name: 'Add location',            desc: 'New restaurant in the program',     group: 'Organisation', page: 'settings', section: 'locations',    icon: Icon.org,      keywords: 'add new restaurant branch store location' },
@@ -165,6 +165,7 @@ const FEATURES = [
   { id: 'f-activity',     name: 'Activity Log',            desc: 'Audit trail of admin actions',      group: 'Organisation', page: 'master', section: 'activity',    icon: Icon.activity, keywords: 'history audit log who what when changes diff' },
 
   // ── Settings + meta ────────────────────────────────────────────────
+  { id: 'f-ways',         name: 'Ways in and out',         desc: 'How cups come in, what customers get', group: 'Settings', page: 'settings', section: 'features', icon: Icon.settings, keywords: 'ways in out mode modes programme smartbin nfc tag display qr receipt qr staff app static qr tent byo reward slider voucher cashback deferred refund donation direct refund support compatible' },
   { id: 'f-settings',     name: 'Settings',                desc: 'Cashback rates, features',          group: 'System',     page: 'settings', icon: Icon.settings, keywords: 'rate refund features toggle config' },
   { id: 'f-cashback-rate',name: 'Cashback rate',           desc: 'Paid to customers, per cup',       group: 'Settings',   page: 'settings', section: 'payouts', icon: Icon.settings, keywords: 'rate price euros per cup cashback amount' },
   { id: 'f-refund-rate',  name: 'Direct refund rate',      desc: 'Paid as a direct refund, per cup', group: 'Settings',   page: 'settings', section: 'payouts', icon: Icon.settings, keywords: 'refund rate price euros per cup direct' },
@@ -189,7 +190,7 @@ const FEATURES = [
   { id: 'f-design-preview', name: 'Live app preview',        desc: 'Preview the customer app',          group: 'Content',    page: 'appdesign', icon: Icon.reward,  keywords: 'preview phone live customer app mockup design' },
 
   // ── Static QR code (BYO counter QR) + held-scan review ─────────────
-  { id: 'f-byo',          name: 'Static QR code',          desc: 'Counter QR + held-scan review',     group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'static qr code byo bring your own counter qr poster reusable cup review pending held requests' },
+  { id: 'f-byo',          name: 'Static QR tent',          desc: 'BYO way in: counter QR + held scans',     group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'static qr tent code byo bring your own counter qr poster reusable cup review pending held requests way in' },
   { id: 'f-byo-qr',       name: 'Counter QR poster',       desc: 'Download the counter QR to print',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'counter qr poster download print png location bring your own byo scan' },
   { id: 'f-byo-cap',      name: 'Daily auto-credit limit', desc: 'Scans per customer before review',  group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'daily limit cap auto credit per customer per day hold review byo scans over limit' },
   { id: 'f-byo-held',     name: 'Review held BYO requests',desc: 'Approve or reject over-limit scans',group: 'Operations', page: 'byorequests', icon: Icon.qr,   keywords: 'held pending review approve reject over limit byo cup request credit awaiting' },
@@ -236,7 +237,7 @@ const FEATURES = [
   { id: 'f-topbar',       name: 'Top bar',                 desc: 'What the bar above every page shows', group: 'Master',   page: 'master', section: 'workspace', icon: Icon.settings, keywords: 'top bar header search time zone preview rates programme badge hide show' },
   { id: 'f-sparklines',   name: 'Mini graphs on tiles',    desc: 'Turn the tile graphs on or off',    group: 'Master',     page: 'master', section: 'workspace', icon: Icon.settings, keywords: 'sparkline mini graph chart tiles numbers kpi display' },
   { id: 'f-darkmode',     name: 'Dark mode',               desc: 'The switch, and following sunrise and sunset', group: 'Master', page: 'master', section: 'workspace', icon: Icon.settings, keywords: 'dark mode light theme night switch toggle automatic sunrise sunset appearance colours' },
-  { id: 'f-staff-app',    name: 'Staff app',               desc: 'Switch it on, add staff, approve requests', group: 'Operations', page: 'staffapp', icon: Icon.user, keywords: 'staff app packperks staff qr phone barista employees vendors add email approve request access nyu' },
+  { id: 'f-staff-app',    name: 'Staff App',               desc: 'BYO way in: staff, requests, codes', group: 'Operations', page: 'staffapp', icon: Icon.user, keywords: 'staff app packperks staff qr phone barista employees vendors add email approve request access nyu' },
   { id: 'f-staff-logs',   name: 'Staff app logs',          desc: 'Every code staff made, and who made it', group: 'Operations', page: 'staffapp', icon: Icon.qr, keywords: 'staff codes log history who made cups generated' },
   { id: 'f-delete-data',  name: 'Delete data',             desc: 'Remove an organisation’s records',  group: 'Master',     page: 'master', section: 'data', icon: Icon.settings, keywords: 'delete purge wipe clear remove scans claims events data records reset' },
   { id: 'f-merge-limit',  name: 'Weekly merge limit',      desc: 'Merges per customer per week',      group: 'People',     page: 'users',    icon: Icon.user,     keywords: 'merge limit weekly per customer per week account 0 zero hold review' },

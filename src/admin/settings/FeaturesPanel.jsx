@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, CupSoda, Gift, PanelsTopLeft, Power, WalletCards } from 'lucide-react';
+import { PanelsTopLeft, Power } from 'lucide-react';
 import { Badge, Button, InfoTip, Modal, Switch } from '../ui';
-import { ORG_MODE_META } from '../lib/orgModes';
 import { TAB_BY_ID } from '../lib/access';
 import { getGroupHideLiveVendors, setGroupHideLiveVendors } from '../lib/adminApi';
+import FlowEditor from '../flow/FlowEditor';
+import { useFlowActions, useVenueFlow } from '../flow/useVenueFlow';
 import { FEATURE_GROUPS, featuresFor, featureValue } from './settingsModel';
 
-const MODE_GLYPH = { standard: Gift, byo: CupSoda, tikkie_only: WalletCards };
-
-/* Features: one tile per switch, grouped by where the switch acts. */
-export default function FeaturesPanel({ draft, canEdit, mode, org, isMaster, onNavigate }) {
+/* Ways in and out first (what the venue IS), then the features: one tile
+ * per switch, grouped by where the switch acts. */
+export default function FeaturesPanel({ draft, draftState, canEdit, mode, org, isMaster }) {
   const { activeGroupId, activeGroup } = org;
   const hasGroup = !!activeGroupId;
   const features = featuresFor(mode, hasGroup);
@@ -28,6 +28,10 @@ export default function FeaturesPanel({ draft, canEdit, mode, org, isMaster, onN
   }, [activeGroupId]);
 
   const [confirmMaintenance, setConfirmMaintenance] = useState(false);
+  const venue = useVenueFlow(draft.settings);
+  const flowActions = useFlowActions({
+    draftState, flow: venue.flow, appMode: venue.appMode, notify: (label, direct) => draft.say(label, direct),
+  });
 
   function valueOf(f) {
     if (f.source === 'group') return !!groupFlags[f.key];
@@ -58,38 +62,19 @@ export default function FeaturesPanel({ draft, canEdit, mode, org, isMaster, onN
     draft.update(f.key, next, f.label);
   }
 
-  const onCount = features.filter(valueOf).length;
-  const unpublished = features.filter(f => f.source !== 'group' && draft.changed(f.key, f.fallback)).length;
-  const meta = ORG_MODE_META[mode] || ORG_MODE_META.standard;
-  const ModeGlyph = MODE_GLYPH[mode] || Gift;
-
   return (
     <div className="st-stack">
-      <section className="st-programme">
-        <span className={`st-programme__glyph st-programme__glyph--${mode}`} aria-hidden="true">
-          <ModeGlyph size={22} strokeWidth={2} />
-        </span>
-        <div className="st-programme__text">
-          <p className="st-programme__eyebrow">Programme</p>
-          <h2 className="st-programme__title">{meta.label}</h2>
-          <p className="st-programme__blurb">{shortBlurb(mode)}</p>
-        </div>
-        <div className="st-programme__side">
-          <div className="st-programme__stats">
-            <span><b>{onCount}</b> of {features.length} features on</span>
-            {unpublished > 0 && (
-              <Badge tone="warning">{unpublished} not published</Badge>
-            )}
-          </div>
-          {isMaster ? (
-            <Button size="sm" iconRight={ArrowRight} onClick={() => onNavigate?.('master', { section: 'organisations' })}>
-              Change programme
-            </Button>
-          ) : (
-            <span className="st-programme__note">A master can change the programme.</span>
-          )}
-        </div>
-      </section>
+      <FlowEditor
+        flow={venue.flow}
+        issues={venue.issues}
+        byo={venue.byo}
+        appMode={venue.appMode}
+        canEdit={canEdit}
+        canSwitchApp={canEdit && isMaster}
+        actions={flowActions}
+        venueName={org.activeOrg?.name}
+        inGroup={hasGroup}
+      />
 
       {groupError && <p className="st-error" role="alert">{groupError}</p>}
 
@@ -187,10 +172,4 @@ export default function FeaturesPanel({ draft, canEdit, mode, org, isMaster, onN
       </Modal>
     </div>
   );
-}
-
-function shortBlurb(mode) {
-  if (mode === 'tikkie_only') return 'Bin receipts add a refund to the customer’s wallet, collected later as one Tikkie link. No rewards.';
-  if (mode === 'byo') return 'Customers bring their own cup and scan the counter QR toward a reward.';
-  return 'The full customer app: a cup balance, rewards, direct refunds and receipt claims.';
 }

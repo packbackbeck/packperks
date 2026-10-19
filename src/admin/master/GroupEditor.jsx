@@ -21,7 +21,7 @@ const METHOD_ICON = { tikkie: Send, voucher: TicketCheck };
 
 const GROUP_MODE_BLURB = {
   deposit: 'Customers return packaging at the SmartBin and scan the receipt. The app talks about deposits and returns.',
-  byo: 'Customers bring their own cup and scan the counter QR code. Counter QR codes only give cups in a Bring Your Own group.',
+  byo: 'Customers bring their own cup and use a BYO way in. The Static QR tent is on here unless a venue switches it off.',
 };
 
 /* The button labels a grouped venue shows instead of its own. Only the ones
@@ -193,7 +193,7 @@ export default function GroupEditor({ group, orgs, modes, stats, initialTab = 's
         subtitle={<span className="ms-mono">/{group.slug}/</span>}
         badges={(
           <>
-            <ModeChip mode={GROUP_MODE_TO_ORG[group.mode]} />
+            <ModeChip mode={GROUP_MODE_TO_ORG[group.mode]} label={groupModeLabel(group.mode)} />
             <span className="ms-chip"><Wallet size={11} aria-hidden="true" />Rewards: {PAYMENT_METHOD_META[payment || DEFAULT_PAYMENT_METHOD].short.toLowerCase()}</span>
             <span className="ms-chip"><Store size={11} aria-hidden="true" />{plural(liveMembers.length, 'venue')}</span>
           </>
@@ -238,7 +238,7 @@ export default function GroupEditor({ group, orgs, modes, stats, initialTab = 's
   );
 }
 
-/* ── Settings: name, programme, payment method, delete ─────────────── */
+/* ── Settings: name, group type, payment method, delete ────────────── */
 function SettingsTab({ group, basics, setBasics, memberCount, copyChanged, unsavedCopy, busy, run, onClose }) {
   const [modeTarget, setModeTarget] = useState(null);
   const [payTarget, setPayTarget] = useState(null);
@@ -273,8 +273,8 @@ function SettingsTab({ group, basics, setBasics, memberCount, copyChanged, unsav
         )}
       </Sec>
 
-      <Sec title="Programme" icon={Zap} when="now" hint="Every venue in the group runs this programme. Deferred Tikkie is set per venue and never sits in a group.">
-        <div className="ms-choices ms-choices--2" role="radiogroup" aria-label="Programme">
+      <Sec title="Group type" icon={Zap} when="now" hint="Sets the customer copy of every venue in the group, and whether the Static QR tent is on by default. Each venue’s ways in and out are set on the venue. Deferred Refund venues never sit in a group.">
+        <div className="ms-choices ms-choices--2" role="radiogroup" aria-label="Group type">
           {GROUP_MODES.map(m => (
             <ChoiceCard
               key={m}
@@ -400,7 +400,7 @@ function SettingsTab({ group, basics, setBasics, memberCount, copyChanged, unsav
           }}
         >
           <ul className="tcm-list">
-            {memberCount > 0 && <li className="tcm-bad"><strong>{plural(memberCount, 'venue')}</strong> leave the group and run Deposit Rewards on their own.</li>}
+            {memberCount > 0 && <li className="tcm-bad"><strong>{plural(memberCount, 'venue')}</strong> leave the group and run on their own, with their own copy.</li>}
             {hasByoVenues && <li className="tcm-bad">Counter QR codes stop giving cups: <strong>printed counter QR codes stop working</strong>.</li>}
             <li className="tcm-bad">The market page at /{group.slug}/ stops working, and customers no longer share one profile across these venues.</li>
             <li>The group’s customer copy and payment default are deleted.</li>
@@ -457,7 +457,7 @@ function VenuesTab({ group, members, orgs, modes, busy, run, onEditOrg }) {
                     <span className="ms-venue__name">
                       {m.name}
                       {archived && <Badge tone="neutral">Archived</Badge>}
-                      {modes[m.id] === 'tikkie_only' && <ModeChip mode="tikkie_only" title="A Deferred Tikkie venue should not be in a group." />}
+                      {modes[m.id] === 'tikkie_only' && <ModeChip mode="tikkie_only" title="A Deferred Refund venue should not be in a group." />}
                     </span>
                     <span className="ms-venue__meta">
                       <span className="ms-mono">/{m.slug}/</span>
@@ -501,14 +501,14 @@ function VenuesTab({ group, members, orgs, modes, busy, run, onEditOrg }) {
             Add to group
           </Button>
         </div>
-        <p className="ms-note">Only venues without a group are listed. Deferred Tikkie venues can’t join a group.</p>
+        <p className="ms-note">Only venues without a group are listed. Deferred Refund venues can’t join a group.</p>
       </Sec>
 
       {confirm && (
         <TypedConfirmModal
           title={confirm.action === 'join' ? `Add ${confirm.org.name} to ${group.name}?` : `Take ${confirm.org.name} out of ${group.name}?`}
           intro={confirm.action === 'join'
-            ? 'The venue takes on the group’s programme and copy as soon as you confirm.'
+            ? 'The venue takes on the group’s type and copy as soon as you confirm.'
             : 'The venue keeps working on its own, without what it had from the group.'}
           word={confirm.action}
           confirmLabel={confirm.action === 'join' ? 'Add to group' : 'Take out of group'}
@@ -533,11 +533,11 @@ function VenuesTab({ group, members, orgs, modes, busy, run, onEditOrg }) {
                 <li>It appears on the market page at /{group.slug}/.</li>
                 {group.mode === 'byo'
                   ? <li>Counter QR codes start giving cups at this venue.</li>
-                  : <li className="tcm-bad">This is not a Bring Your Own group, so counter QR codes will <strong>not</strong> give cups here.</li>}
+                  : <li className="tcm-bad">This is a SmartBin group: the Static QR tent stays <strong>off</strong> here unless the venue switches it on.</li>}
               </>
             ) : (
               <>
-                <li>It goes back to <strong>Deposit Rewards</strong> and its own copy. The group keeps running for {plural(others, 'other venue')}.</li>
+                <li>It goes back to <strong>its own copy</strong>, outside the group. The group keeps running for {plural(others, 'other venue')}.</li>
                 {group.mode === 'byo' && (
                   <li className="tcm-bad"><strong>Its counter QR codes stop giving cups at once</strong>, including every code already printed.</li>
                 )}
@@ -584,7 +584,7 @@ function CopyTab({ group, copy, setCopy, preset, saved, busy, run }) {
           <input id={id('hh')} className="ui-input" value={copy.heroHeadline} onChange={set('heroHeadline')} />
         </Field>
         {isByo ? (
-          <p className="ms-note">Bring Your Own venues show no subtext under the headline.</p>
+          <p className="ms-note">Venues in a BYO group show no subtext under the headline.</p>
         ) : (
           <Field label="Subtext" htmlFor={id('hs')} hint={copy.heroSubtext !== preset.heroSubtext ? <UseDefault show onClick={reset({ heroSubtext: preset.heroSubtext })} /> : null}>
             <textarea id={id('hs')} className="ui-textarea" rows={2} value={copy.heroSubtext} onChange={set('heroSubtext')} />

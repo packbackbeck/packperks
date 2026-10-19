@@ -115,7 +115,7 @@ export function OrgProvider({ children }) {
       const [{ data, error: err }, { data: grpData }] = await Promise.all([
         supabase
           .from('organizations')
-          .select('id, name, slug, country, brand_color, logo_url, partner_brand_name, email_domain_hint, group_id, group_active, created_at, updated_at')
+          .select('id, name, slug, country, brand_color, logo_url, partner_brand_name, email_domain_hint, group_id, group_active, staff_app_enabled, created_at, updated_at')
           .is('deleted_at', null)
           .order('created_at', { ascending: true }),
         supabase.from('org_groups').select('id, name, slug'),
@@ -194,6 +194,9 @@ export function OrgProvider({ children }) {
   // functions actually see. Pages that must reflect live behaviour (the
   // receipt generator's payout figure) read this, not the admin draft.
   const [activeOrgSettings, setActiveOrgSettings] = useState(null);
+  // The group's published settings: its payment method decides a venue's
+  // Reward way out (Voucher or Cashback) when the venue sets none.
+  const [activeGroupSettings, setActiveGroupSettings] = useState(null);
   // Which org (and group) the mode above was read for. Until it matches the
   // active org, the mode is a guess and nothing should act on it.
   const [modeLoadedFor, setModeLoadedFor] = useState(null);
@@ -211,7 +214,7 @@ export function OrgProvider({ children }) {
     const gid = activeOrg?.group_id;
     if (!oid) {
       setActiveOrgSharing(false); setActiveGroupMode(null);
-      setActiveOrgMode(null); setActiveOrgSettings(null);
+      setActiveOrgMode(null); setActiveOrgSettings(null); setActiveGroupSettings(null);
       return undefined;
     }
     (async () => {
@@ -229,6 +232,7 @@ export function OrgProvider({ children }) {
       setActiveGroupMode(gid ? normalizeMode(grpCfg?.value?.settings?.mode) : null);
       setActiveOrgMode(orgCfg?.value?.settings?.mode || null);
       setActiveOrgSettings(orgCfg?.value?.settings || null);
+      setActiveGroupSettings(grpCfg?.value?.settings || null);
       setModeLoadedFor(`${oid}:${gid || ''}`);
     })();
     return () => { alive = false; };
@@ -290,6 +294,7 @@ export function OrgProvider({ children }) {
     activeGroupMode,      // 'byo' | 'deposit' for a grouped venue, null otherwise
     activeOrgMode,        // org-level mode: 'tikkie_only' | null
     activeOrgSettings,    // the org's published settings blob (or null)
+    activeGroupSettings,  // its group's published settings (or null)
     modeReady,            // have the two modes above been read for the active org?
   };
 

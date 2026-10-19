@@ -163,7 +163,7 @@ const SETTINGS_LABELS = {
   maxCupsToShare:        'Max cups per share',
   featureCupSharing:     'Cup sharing feature',
   featureDonations:      'Donations feature',
-  featureDirectRefunds:  'Direct refunds feature',
+  featureDirectRefunds:  'Direct Refund (way out)',
   maintenanceMode:       'Maintenance mode',
   privacyUrl:            'Privacy URL',
   termsUrl:              'Terms URL',

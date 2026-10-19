@@ -133,7 +133,7 @@ export default function AdminStaffApp() {
   return (
     <div className="ui-page sfa">
       <PageHeader
-        title="Staff app"
+        title="Staff App"
         subtitle="The phone app your venue staff use to turn returned cups into a QR code that customers scan."
       >
         <CopyLink />

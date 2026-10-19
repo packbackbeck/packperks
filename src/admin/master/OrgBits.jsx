@@ -1,15 +1,38 @@
-import { CircleCheck, Info, TriangleAlert, Zap } from 'lucide-react';
+import { ArrowRight, CircleCheck, Info, TriangleAlert, Zap } from 'lucide-react';
 import { Button, Modal } from '../ui';
+import { WAY_BY_KEY, flowIssues, flowSummary, isByo, leadWays } from '../lib/flowModes';
 import { MODE_GLYPH, modeLabel } from './orgShared';
 
 /* Small building blocks shared by the organisation, group and region editors. */
 
-export function ModeChip({ mode, title }) {
+export function ModeChip({ mode, title, label }) {
   const Glyph = MODE_GLYPH[mode] || MODE_GLYPH.standard;
   return (
     <span className={`ms-mode-chip ms-mode-chip--${mode}`} title={title}>
       <Glyph size={12} aria-hidden="true" />
-      {modeLabel(mode)}
+      {label || modeLabel(mode)}
+    </span>
+  );
+}
+
+/* A venue's ways in and out, in one line: lead way in → lead way out,
+ * "+n" for the rest, BYO when there is no SmartBin way in, and a warning
+ * when the setup breaks a rule (lib/flowModes.js). */
+export function WaysChip({ flow }) {
+  if (!flow) return null;
+  const { ins, outs } = leadWays(flow);
+  const issues = flowIssues(flow);
+  const part = (keys) => (keys.length
+    ? <>{WAY_BY_KEY[keys[0]].short}{keys.length > 1 && <small> +{keys.length - 1}</small>}</>
+    : 'None');
+  const title = `${flowSummary(flow, { short: false })}${issues.length ? `\n${issues.join('\n')}` : ''}`;
+  return (
+    <span className={`ms-ways${issues.length ? ' ms-ways--warn' : ''}`} title={title}>
+      {issues.length > 0 && <TriangleAlert size={11} aria-label="Breaks a rule" />}
+      <span>{part(ins)}</span>
+      <ArrowRight size={11} aria-hidden="true" />
+      <span>{part(outs)}</span>
+      {isByo(flow) && <span className="ms-ways__tag">BYO</span>}
     </span>
   );
 }

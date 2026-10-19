@@ -13,8 +13,8 @@ import LegalPanel from './LegalPanel';
 import './SettingsPage.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * Settings — one organisation's programme: features first, then payouts,
- * rules, locations and the privacy policy. Every change goes to the draft
+ * Settings — how one venue works: its ways in and out and its features
+ * first, then payouts, rules, locations and the privacy policy. Every change goes to the draft
  * (except the few that belong to shared config and say so); Publish in the
  * top bar puts it live.
  * ───────────────────────────────────────────────────────────────────── */
@@ -39,7 +39,7 @@ export default function AdminSettingsPage({ draftState, onNavigate, section }) {
 
   const statusLabel = draftState?.isDirty ? 'Unpublished changes' : 'Everything is published';
 
-  const panelProps = { draft, canEdit, mode, org, onNavigate, isMaster: !!access?.isMaster };
+  const panelProps = { draft, draftState, canEdit, mode, org, onNavigate, isMaster: !!access?.isMaster };
 
   return (
     <div className="ui-page st-page">

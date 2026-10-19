@@ -4,7 +4,7 @@ import { useAccess } from '../context/accessCtx';
 import { TABS, TAB_GROUPS, TOPBAR_ITEMS, topbarShows } from '../lib/access';
 import { Badge, BetaChip, Card, CardBody, CardHeader, Switch } from '../ui';
 
-const MODE_SHORT = { standard: 'Deposit Rewards', byo: 'Bring Your Own', tikkie_only: 'Deferred Tikkie' };
+const MODE_SHORT = { standard: 'Rewards', byo: 'Rewards · BYO group', tikkie_only: 'Deferred Refund' };
 
 /* Workspace: what the top bar shows, how the number tiles look and which
  * tabs exist, for everyone.
@@ -239,7 +239,7 @@ function TabsCard() {
                           <p className="ms-ws__desc">
                             {tab.description}
                             <span className="ms-ws__modes">
-                              {tab.modes.length === 3 ? 'Every programme' : tab.modes.map(m => MODE_SHORT[m]).join(', ')}
+                              {tab.modes.length === 3 ? 'Every venue' : tab.modes.map(m => MODE_SHORT[m]).join(', ')}
                             </span>
                           </p>
                         </div>

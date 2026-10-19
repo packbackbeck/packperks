@@ -297,7 +297,7 @@ export default function AdminByoRequests() {
   return (
     <div className="ui-page byoreq">
       <PageHeader
-        title="Static QR code"
+        title="Static QR tent"
         subtitle={tikkie
           ? `A QR code that stays on the counter. Each scan adds one cup’s refund to the customer’s wallet, up to ${limit.cap} ${limit.cap === 1 ? 'cup' : 'cups'} per person per ${savedWindowWords}.`
           : `A QR code that stays on the counter. Each customer collects up to ${limit.cap} ${limit.cap === 1 ? 'cup' : 'cups'} per ${savedWindowWords} automatically; extra scans wait below for you to approve or deny.`}

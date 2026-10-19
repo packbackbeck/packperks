@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  Banknote, Construction, EyeOff, HeartHandshake, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
-  QrCode, ScrollText, Share2, SlidersHorizontal, Sparkles, ToggleRight, Wallet,
+  Construction, EyeOff, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
+  ScrollText, Share2, SlidersHorizontal, Sparkles, ToggleRight, Wallet,
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ import {
  * ───────────────────────────────────────────────────────────────────── */
 
 export const SETTINGS_TABS = [
-  { id: 'features', label: 'Features', icon: ToggleRight },
+  { id: 'features', label: 'Ways & features', icon: ToggleRight },
   { id: 'payouts', label: 'Payouts', icon: Wallet },
   { id: 'rules', label: 'Rules & limits', icon: SlidersHorizontal },
   { id: 'locations', label: 'Locations', icon: MapPin },
@@ -42,6 +42,9 @@ export const FEATURE_GROUPS = [
   { id: 'availability', label: 'Availability' },
 ];
 
+/* Static QR tent, Donation and Direct Refund are ways in and out now
+ * (lib/flowModes.js, the Ways in and out block above these tiles), so
+ * they are not repeated here. */
 export const FEATURES = [
   {
     key: 'featureCupSharing', group: 'app', icon: Share2, tone: 'violet', modes: APP, fallback: true,
@@ -51,30 +54,10 @@ export const FEATURES = [
     tab: 'transactions',
   },
   {
-    key: 'featureDonations', group: 'app', icon: HeartHandshake, tone: 'rose', modes: ALL, fallback: true,
-    label: 'Donations',
-    summary: 'Customers give their cups, or their wallet balance, to your charity partner.',
-    detail: 'Switching it off removes the donate button from the app and the Donations tab from this dashboard. In Deferred Tikkie the customer picks how much of their balance to give. The charity’s name is set in Client app (Plastic Soup Foundation unless changed).',
-    tab: 'donations',
-  },
-  {
     key: 'tikkieActionButtons', group: 'app', icon: LayoutGrid, tone: 'violet', modes: TIKKIE, fallback: true,
     label: 'Collect and Donate buttons',
     summary: 'Two big buttons under the wallet: collect via Tikkie, and donate.',
-    detail: 'With nothing to collect, the first button becomes Scan a QR code. Donate shows only while Donations is on. Switched off, the wallet tile carries a single collect button instead, as before. Tapping the wallet always opens the collect instructions.',
-  },
-  {
-    key: 'featureStaticQr', group: 'app', icon: QrCode, tone: 'teal', modes: ALL, fallback: false, fallbackByMode: { byo: true },
-    label: 'Static QR code',
-    summary: 'A QR code at the counter that gives each customer a cup, up to a daily limit.',
-    detail: 'Print it once and leave it out: every scan adds one cup (in Deferred Tikkie, one cup’s refund to the wallet) until the person reaches the limit you set on the Static QR code page. On by default for Bring Your Own. Switching it off stops the code working and removes the Static QR code tab from this dashboard.',
-    tab: 'byorequests',
-  },
-  {
-    key: 'featureDirectRefunds', group: 'app', icon: Banknote, tone: 'emerald', modes: APP, fallback: true,
-    label: 'Direct refunds',
-    summary: 'Customers cash out their cups instead of choosing a reward.',
-    detail: 'Paid at the refund rate in Payouts, which is lower than the cashback rate.',
+    detail: 'With nothing to collect, the first button becomes Scan a QR code. Donate shows only while the Donation way out is on. Switched off, the wallet tile carries a single collect button instead, as before. Tapping the wallet always opens the collect instructions.',
   },
   {
     key: 'featureSmartSorting', group: 'app', icon: Sparkles, tone: 'amber', modes: APP, fallback: false,
@@ -156,5 +139,11 @@ export function useSettingsDraft(draftState) {
     setToast({ label, ts: Date.now(), direct: true });
   }
 
-  return { settings, published, update, changed, toast, notify };
+  /* A toast for a change made elsewhere (several keys at once, or saved
+   * at once): direct says which. */
+  function say(label, direct = false) {
+    setToast({ label, ts: Date.now(), direct });
+  }
+
+  return { settings, published, update, changed, toast, notify, say };
 }

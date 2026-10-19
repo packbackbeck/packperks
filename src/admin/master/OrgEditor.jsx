@@ -1,21 +1,22 @@
 import { useRef, useState } from 'react';
 import {
-  Archive, Building2, Copy, ExternalLink, Gift, Globe2, ImageUp, Landmark, Layers, Link2, Palette,
+  Archive, ArrowLeftRight, Building2, Copy, ExternalLink, Globe2, ImageUp, Landmark, Layers, Link2, Palette,
   Power, Settings, Store,
 } from 'lucide-react';
 import { useOrg } from '../context/OrgContext';
 import { OrgAvatar } from '../context/OrgSwitcher';
 import {
-  createOrgGroup, setOrgGroupMembership, setOrgGroupMode, setOrgMode, updateOrg, uploadRewardImage,
+  updateOrg, uploadRewardImage,
 } from '../lib/adminApi';
 import { formatMoney, getAllRegions, regionForCountry } from '../../lib/regions';
 import { logAction } from '../auth/actionLog';
 import { Badge, Button, Field } from '../ui';
-import TypedConfirmModal from '../shared/TypedConfirmModal';
+import FlowEditor from '../flow/FlowEditor';
+import { useFlowActions, useVenueFlow } from '../flow/useVenueFlow';
 import Drawer from './Drawer';
-import { Callout, ChoiceCard, DiscardModal, ModeChip, SaveFooter, Sec } from './OrgBits';
+import { Callout, DiscardModal, SaveFooter, Sec, WaysChip } from './OrgBits';
 import {
-  MODE_BLURB, MODE_GLYPH, modeLabel, payoutPromise, plural, providerInfo, rememberReopen, slugOk,
+  payoutPromise, providerInfo, rememberReopen, slugOk,
 } from './orgShared';
 
 /* Every column this editor saves, with the name a person reads. The team
@@ -49,7 +50,7 @@ const fromSource = (o) => Object.fromEntries(ALL_FIELDS.map(([k]) => [k, o[k] ??
 const changedIn = (fields, draft, source) => fields.filter(([k]) => text(draft[k]) !== text(source[k])).map(([, l]) => l);
 
 export default function OrgEditor({
-  org: source, mode, group, isActive, liveCount, initialTab = 'profile', busy,
+  org: source, flow, group, isActive, liveCount, initialTab = 'profile', busy,
   onClose, onSaved, onDuplicate, onArchive, onNavigate, pinSection, draftState,
 }) {
   const ctx = useOrg();
@@ -116,7 +117,8 @@ export default function OrgEditor({
   const tabs = [
     { id: 'profile', label: 'Profile', icon: Palette, count: profileChanges.length || undefined },
     { id: 'company', label: 'Company', icon: Landmark, count: companyChanges.length || undefined },
-    { id: 'programme', label: 'Programme', icon: Gift },
+    // Id kept from before ways in and out: reopen notes and deep links use it.
+    { id: 'programme', label: 'Ways in & out', icon: ArrowLeftRight },
     { id: 'status', label: 'Status', icon: Power },
   ];
   const region = regionForCountry(source.country);
@@ -133,7 +135,7 @@ export default function OrgEditor({
         subtitle={<span className="ms-mono">/{source.slug}/</span>}
         badges={(
           <>
-            <ModeChip mode={mode} />
+            <WaysChip flow={flow} />
             {group && <span className="ms-chip" title="The group this venue is in"><Layers size={11} aria-hidden="true" />Group: {group.name}</span>}
             <span className="ms-chip"><Globe2 size={11} aria-hidden="true" />{region ? `${region.label} · ${region.currency}` : 'No region'}</span>
             {isActive && <Badge tone="primary">Open now</Badge>}
@@ -149,22 +151,22 @@ export default function OrgEditor({
             error={error}
             onDiscard={() => { setDraft(fromSource(source)); setError(null); }}
             onSave={save}
-            cleanText={savedNote || (immediate
-              ? 'Changes on this tab apply when you confirm them.'
-              : 'Everything is saved.')}
+            cleanText={savedNote || (tab === 'programme'
+              ? 'Ways go to the draft; Publish puts them live. The Staff App and the customer app change at once.'
+              : immediate
+                ? 'Changes on this tab apply when you confirm them.'
+                : 'Everything is saved.')}
           />
         )}
       >
         {tab === 'profile' && <ProfileTab source={source} draft={draft} set={set} put={put} onError={setError} />}
         {tab === 'company' && <CompanyTab source={source} draft={draft} set={set} />}
         {tab === 'programme' && (
-          <ProgrammeTab
+          <WaysTab
             source={source}
-            mode={mode}
-            group={group}
             isActive={isActive}
             dirty={changes.length > 0}
-            ctx={ctx}
+            inGroup={!!group}
             draftState={draftState}
             onSaved={onSaved}
             onOpenOrg={() => { rememberReopen(source.id, 'programme'); pinSection?.(); ctx.switchOrg(source.id); }}
@@ -341,137 +343,52 @@ function CompanyTab({ source, draft, set }) {
   );
 }
 
-/* ── Programme: which app the venue runs ──────────────────────────── */
-function ProgrammeTab({ source, mode, group, isActive, dirty, ctx, draftState, onSaved, onOpenOrg }) {
-  const [target, setTarget] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const members = group?.members?.filter(m => !m.deleted_at) || [];
-  const others = Math.max(0, members.length - 1);
-
-  /* deposit and byo belong to the group; tikkie_only to the venue itself. */
-  async function changeMode(next) {
-    if (!isActive || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const orgId = source.id;
-      const groupId = source.group_id || null;
-      if (next === 'byo') {
-        await setOrgMode(orgId, null);
-        if (groupId) await setOrgGroupMode(groupId, 'byo');
-        else {
-          const grp = await createOrgGroup({ name: source.name || 'New group', mode: 'byo' });
-          await setOrgGroupMembership(orgId, grp.id);
-        }
-      } else if (next === 'tikkie_only') {
-        if (groupId) await setOrgGroupMembership(orgId, null);
-        await setOrgMode(orgId, 'tikkie_only');
-      } else {
-        await setOrgMode(orgId, null);
-        if (groupId) await setOrgGroupMode(groupId, 'deposit');
-      }
-      // Publishing sends the whole draft, so the draft must know the mode too.
-      draftState?.updateDraft?.(d => {
-        const settings = { ...d.settings };
-        if (next === 'tikkie_only') settings.mode = 'tikkie_only'; else delete settings.mode;
-        return { ...d, settings };
-      });
-      logAction({ action: 'org.mode', targetType: 'organization', targetId: orgId, before: { mode }, after: { mode: next } });
-      try { window.dispatchEvent(new Event('pp-org-mode-changed')); } catch { /* ignore */ }
-      await ctx.refresh?.(orgId);
-      await onSaved(`${source.name} now runs ${modeLabel(next)}.`);
-    } catch (e) {
-      setError(e?.message || 'Could not change the programme.');
-    } finally {
-      setBusy(false);
-      setTarget(null);
-    }
-  }
-
-  return (
-    <div className="ms-secs">
-      <Sec
-        title="Programme"
-        icon={Gift}
-        when="now"
-        hint="Decides which customer app the venue runs and which dashboard tabs it has."
-      >
-        {!isActive && (
+/* ── Ways in & out ─────────────────────────────────────────────────
+ * The same switches as Settings → Ways & features (flow/FlowEditor), for
+ * the open venue only: they write its draft, and only the open venue's
+ * draft is loaded. Switching to or from Deferred Refund changes the
+ * customer app at once, after a typed confirm. */
+function WaysTab({ source, isActive, dirty, inGroup, draftState, onSaved, onOpenOrg }) {
+  if (!isActive) {
+    return (
+      <div className="ms-secs">
+        <Sec title="Ways in & out" icon={ArrowLeftRight} hint="How a returned cup reaches the customer, and what they get for it.">
           <Callout
             tone="info"
-            title={`Open ${source.name} to change its programme`}
+            title={`Open ${source.name} to change its ways in and out`}
             action={<Button size="sm" onClick={onOpenOrg} disabled={dirty}>Open {source.name}</Button>}
           >
-            Its settings draft changes with the programme, and only the open organisation’s draft is loaded.
+            They are part of its settings draft, and only the open organisation’s draft is loaded.
             {dirty && ' Save or discard your changes first.'}
           </Callout>
-        )}
-        {error && <p className="ms-error" role="alert">{error}</p>}
-        <div className="ms-choices" role="radiogroup" aria-label="Programme">
-          {['standard', 'byo', 'tikkie_only'].map(m => (
-            <ChoiceCard
-              key={m}
-              on={mode === m}
-              tag="Now"
-              disabled={!isActive || busy}
-              icon={MODE_GLYPH[m]}
-              tone={m}
-              label={modeLabel(m)}
-              blurb={MODE_BLURB[m]}
-              onClick={() => { if (mode !== m) setTarget(m); }}
-            >
-              <span className="ms-choice__meta">
-                {m === 'standard' && 'Can stand alone or be in a group.'}
-                {m === 'byo' && (group ? 'Set on the group.' : 'Needs a group: one is created for this venue.')}
-                {m === 'tikkie_only' && (group ? 'Takes the venue out of its group.' : 'Never in a group.')}
-              </span>
-            </ChoiceCard>
-          ))}
-        </div>
-        {group && (
-          <p className="ms-note">
-            In the <b>{group.name}</b> group{others ? ` with ${plural(others, 'other venue')}` : ''}.
-            Deposit Rewards and Bring Your Own are set on the group, so switching between them changes
-            every venue in it.
-          </p>
-        )}
-      </Sec>
+        </Sec>
+      </div>
+    );
+  }
+  return <ActiveWays source={source} inGroup={inGroup} draftState={draftState} onSaved={onSaved} />;
+}
 
-      {target && (
-        <TypedConfirmModal
-          title={`Switch ${source.name} to ${modeLabel(target)}?`}
-          intro="The customer app changes as soon as you confirm. Nothing is deleted."
-          word="switch"
-          confirmLabel={`Switch to ${modeLabel(target)}`}
-          busy={busy}
-          onCancel={() => setTarget(null)}
-          onConfirm={() => changeMode(target)}
-        >
-          <ul className="tcm-list">
-            <li>Cups, balances, claims and payouts are <strong>kept</strong>.</li>
-            {group && target !== 'tikkie_only' && (
-              <li className="tcm-bad">
-                This changes the whole <strong>{group.name}</strong> group{members.length > 1 ? `: ${plural(members.length, 'venue')}` : ''}.
-                Its customer copy goes back to the {modeLabel(target)} default.
-              </li>
-            )}
-            {target === 'byo' && !group && (
-              <li className="tcm-bad">Bring Your Own needs a group, so the venue is <strong>put in a new group of its own</strong>.</li>
-            )}
-            {target === 'tikkie_only' && (
-              <li className="tcm-bad">The customer app stops showing rewards: bin receipts fill the Tikkie wallet instead.{group ? ' The venue leaves its group.' : ''}</li>
-            )}
-            {mode === 'tikkie_only' && (
-              <li className="tcm-bad">Bin receipts stop paying out through Tikkie, <strong>including receipts already printed</strong>.</li>
-            )}
-            {mode === 'byo' && (
-              <li className="tcm-bad">Counter QR codes stop giving cups: <strong>printed counter QR codes stop working</strong>.</li>
-            )}
-            <li>Features such as direct refunds stay as they are. Check them in Settings afterwards.</li>
-          </ul>
-        </TypedConfirmModal>
-      )}
+function ActiveWays({ source, inGroup, draftState, onSaved }) {
+  const venue = useVenueFlow(draftState?.draft?.settings);
+  const actions = useFlowActions({
+    draftState,
+    flow: venue.flow,
+    appMode: venue.appMode,
+    notify: (label, direct) => { if (direct) onSaved?.(`${source.name}: ${label}.`); },
+  });
+  return (
+    <div className="ms-secs">
+      <FlowEditor
+        flow={venue.flow}
+        issues={venue.issues}
+        byo={venue.byo}
+        appMode={venue.appMode}
+        canEdit
+        canSwitchApp
+        actions={actions}
+        venueName={source.name}
+        inGroup={inGroup}
+      />
     </div>
   );
 }

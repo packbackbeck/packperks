@@ -11,17 +11,19 @@ export const GROUP_MODE_TO_ORG = { deposit: 'standard', byo: 'byo' };
 export const GROUP_MODES = ['deposit', 'byo'];
 
 export const MODE_BLURB = {
-  standard: 'Customers return packaging at the SmartBin, scan the receipt, and save cups for a reward or cash out.',
-  byo: 'Customers bring their own cup and scan the QR code on the counter. Rewards, no deposit.',
-  tikkie_only: 'The SmartBin prints a receipt. Scans fill a wallet that customers collect as one Tikkie link. No rewards.',
+  standard: 'Cups build up toward a reward: Reward Cashback or Reward Slider Voucher.',
+  byo: 'Rewards for customers who bring their own cup, through a BYO way in.',
+  tikkie_only: 'Each return adds money to a wallet, collected later as one Tikkie link. No rewards.',
 };
 
 export function modeLabel(mode) {
-  return ORG_MODE_META[mode]?.label || 'Deposit Rewards';
+  return ORG_MODE_META[mode]?.label || 'Rewards';
 }
 
+/* A group is a SmartBin group or a BYO group: it sets the customer copy of
+ * every venue in it, and whether the Static QR tent is on by default. */
 export function groupModeLabel(mode) {
-  return modeLabel(GROUP_MODE_TO_ORG[mode] || 'byo');
+  return mode === 'deposit' ? 'SmartBin group' : 'BYO group';
 }
 
 /* A provider is live only when payments.js says so. An edge function on its

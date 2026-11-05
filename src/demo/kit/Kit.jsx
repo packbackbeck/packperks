@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import QRCodeLib from 'qrcode';
-import { POINTS_PER_CUP, nextReward, pointsFor, sortRewards } from '../brands';
+import { nextReward, pointsFor, sortRewards } from '../brands';
 import { euro } from '../i18n';
 import packbackLogo from '../../assets/images/packback-logo.svg';
 import DemoVoucher from './DemoVoucher';
@@ -54,13 +54,13 @@ export function Tiles() {
  * that need more than nine cups get two rows, filled top row first, as the
  * live app's CupProgress does. */
 export function CupTrack() {
-  const { wallet, rewards, fresh, freshKey } = useKit();
+  const { wallet, rewards, fresh, freshKey, ppc } = useKit();
   const ref = useRef(null);
   const [fills, setFills] = useState([0, 0]);
   const byCost = [...rewards].sort((a, b) => pointsFor(a) - pointsFor(b));
   const goal = nextReward(rewards, wallet.points) || byCost[byCost.length - 1];
   const slots = goal?.cupsNeeded || 0;
-  const have = Math.min(Math.floor(wallet.points / POINTS_PER_CUP), slots);
+  const have = Math.min(Math.floor(wallet.points / ppc), slots);
   const rowCount = slots + 1 > 10 ? 2 : 1;
   const perRow = Math.ceil((slots + 1) / rowCount);
 
@@ -105,12 +105,12 @@ export function CupTrack() {
 
 /** "Nog 20 punten tot Big Mac". */
 export function NextNote({ className }) {
-  const { wallet, rewards, t } = useKit();
+  const { wallet, rewards, t, amount } = useKit();
   const n = nextReward(rewards, wallet.points);
   return (
     <div className={cls('ppd-note', className)}>
       <span className="ppd-note-cup"><CupSvg /></span>
-      {n ? <span>{t('toGo', { n: pointsFor(n) - wallet.points })} <b>{n.name}</b></span> : <span>{t('allIn')}</span>}
+      {n ? <span>{t('toGo', { n: amount(pointsFor(n) - wallet.points) })} <b>{n.name}</b></span> : <span>{t('allIn')}</span>}
     </div>
   );
 }
@@ -170,7 +170,7 @@ function WalletBody() {
   return (
     <>
       <img className="ppd-sheet-logo" src={packbackLogo} alt="Packback" />
-      <div className="ppd-big"><b>{wallet.points}</b><span>{t('unit')}</span></div>
+      <div className="ppd-big"><b>{wallet.points}</b><span>{t(wallet.points === 1 ? 'unitOne' : 'unit')}</span></div>
       <NextNote className="is-center" />
       <CupTrack />
       <div className="ppd-steps">
@@ -216,12 +216,12 @@ function ScanBody() {
 }
 
 function DoneBody() {
-  const { wallet, rewards, t, openSheet, closeSheet, goRewards } = useKit();
+  const { wallet, rewards, t, ppc, amount, openSheet, closeSheet, goRewards } = useKit();
   const unlocked = rewards.filter(r => pointsFor(r) === wallet.points);
   return (
     <>
       <div className="ppd-done-badge"><CupSvg /></div>
-      <div className="ppd-plus">+{POINTS_PER_CUP} {t('unit')}</div>
+      <div className="ppd-plus">+{amount(ppc)}</div>
       <p>{unlocked.length ? t('unlocked', { name: unlocked.map(r => r.name).join(' / ') }) : t('thanks')}</p>
       <CupTrack />
       <div className="ppd-btn-row">
@@ -234,7 +234,7 @@ function DoneBody() {
 }
 
 function RedeemBody({ reward }) {
-  const { wallet, t, lang, openVoucher, closeSheet } = useKit();
+  const { wallet, t, lang, amount, openVoucher, closeSheet } = useKit();
   const cost = pointsFor(reward);
   return (
     <>
@@ -244,9 +244,9 @@ function RedeemBody({ reward }) {
       <div className="ppd-redeem-img"><img src={reward.image} alt="" style={{ transform: `scale(${reward.imageScale || 1})` }} /></div>
       <div className="ppd-chips">
         <span>{t('worth', { v: euro(lang, reward.euros) })}</span>
-        <span className="is-cost">{cost} {t('unit')}</span>
+        <span className="is-cost">{amount(cost)}</span>
       </div>
-      <p className="ppd-after">{t('leftAfter', { n: wallet.points - cost })}</p>
+      <p className="ppd-after">{t('leftAfter', { n: amount(wallet.points - cost) })}</p>
       <button type="button" className="ppd-btn" onClick={() => openVoucher(reward)}>{t('redeem')}</button>
       <button type="button" className="ppd-close" onClick={closeSheet}>{t('cancel')}</button>
     </>
@@ -256,7 +256,7 @@ function RedeemBody({ reward }) {
 /** Rendered by every brand app inside its screen, above everything else. */
 export function PackbackLayer({ appIcon }) {
   const kit = useKit();
-  const { sheet, closeSheet, voucher, closeVoucher, toastMsg, wallet, t, openSheet } = kit;
+  const { sheet, closeSheet, voucher, closeVoucher, toastMsg, wallet, t, ppc, amount, openSheet } = kit;
   const [notice, setNotice] = useState(false);
 
   // Greet the cup this page load returned.
@@ -275,9 +275,9 @@ export function PackbackLayer({ appIcon }) {
         <span className="ppd-notice-icon">{appIcon || <CupSvg />}</span>
         <span className="ppd-notice-text">
           <b>{t('earnedTitle')}</b>
-          <span>{t('earnedBody', { n: POINTS_PER_CUP })}</span>
+          <span>{t('earnedBody', { n: amount(ppc) })}</span>
         </span>
-        <span className="ppd-notice-plus">+{POINTS_PER_CUP}</span>
+        <span className="ppd-notice-plus">+{ppc}</span>
       </button>
 
       <Sheet open={!!sheet} onClose={closeSheet}>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { POINTS_PER_CUP, pointsFor } from './brands';
+import { pointsFor } from './brands';
 
 /* ─────────────────────────────────────────────────────────────────────
  * The demo wallet. Lives in this browser only (localStorage, one per
@@ -12,8 +12,8 @@ import { POINTS_PER_CUP, pointsFor } from './brands';
  * a second component on the same page from counting it twice.
  * ───────────────────────────────────────────────────────────────────── */
 
-// v2: 50 points a cup. A new key, so a balance from the old scale can't linger.
-const KEY = (brand) => `ppdemo:v2:${brand}`;
+// v3: points per cup set per brand. A new key, so a balance from an old scale can't linger.
+const KEY = (brand) => `ppdemo:v3:${brand}`;
 const EVENT = 'ppdemo:wallet';
 const LOAD_ID = typeof performance !== 'undefined' && performance.timeOrigin
   ? String(Math.round(performance.timeOrigin))
@@ -34,12 +34,12 @@ function write(brand, state) {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: brand }));
 }
 
-function withCup(state) {
+function withCup(state, ppc) {
   return {
     ...state,
-    points: state.points + POINTS_PER_CUP,
+    points: state.points + ppc,
     cups: state.cups + 1,
-    activity: [{ kind: 'cup', points: POINTS_PER_CUP, at: Date.now() }, ...state.activity].slice(0, 30),
+    activity: [{ kind: 'cup', points: ppc, at: Date.now() }, ...state.activity].slice(0, 30),
   };
 }
 
@@ -47,17 +47,17 @@ function withCup(state) {
 // StrictMode calling the initialiser twice still counts (and greets) once.
 const countedThisLoad = new Set();
 
-function loadAndCount(brand) {
+function loadAndCount(brand, ppc) {
   const current = read(brand);
   if (current.lastLoad === LOAD_ID) return current;
-  const next = { ...withCup(current), lastLoad: LOAD_ID };
+  const next = { ...withCup(current, ppc), lastLoad: LOAD_ID };
   write(brand, next);
   countedThisLoad.add(brand);
   return next;
 }
 
-export function useDemoWallet(brand) {
-  const [state, setState] = useState(() => loadAndCount(brand));
+export function useDemoWallet(brand, ppc) {
+  const [state, setState] = useState(() => loadAndCount(brand, ppc));
   // A cup was counted for this page load: the app greets it.
   const earnedOnLoad = countedThisLoad.has(brand);
 
@@ -82,7 +82,7 @@ export function useDemoWallet(brand) {
   }, [brand]);
 
   /** One more cup, without a refresh. */
-  const earn = useCallback(() => update(withCup), [update]);
+  const earn = useCallback(() => update(s => withCup(s, ppc)), [update, ppc]);
 
   /** Slide-to-redeem landed: the points leave the balance. */
   const redeem = useCallback((reward) => update((s) => {

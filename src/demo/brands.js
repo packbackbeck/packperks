@@ -7,31 +7,18 @@
  * slow network. useOrgRewards() replaces them with the live list when it
  * can read it, so a change in the dashboard shows up here too.
  *
- * How much a returned cup is worth (researched November 2026):
+ * Points per returned cup, per brand:
  *
- *   McDonald's NL already has points. MyMcDonald's Rewards gives 10
- *   points per euro spent and a Big Mac costs 600, so a point is worth
- *   about €0.01 of food and the programme hands back ~10% of spend.
+ *   McDonald's: 10 points a cup. MyMcDonald's Rewards gives 10 points per
+ *   euro spent, so returning a cup earns what spending €1 earns.
+ *   KFC: KFC NL has no points programme, so a point is simply a cup.
  *
- *   There is no deposit, so a returned cup is a pure incentive. We value
- *   it at ~€0.50 of free food (~€0.15 food cost to the restaurant: about
- *   what the single-use cup and lid it replaces cost, and far less than a
- *   reusable cup that never comes back). In MyM terms that is 50 points:
- *   one cup counts like €5 spent, +45% on a €11 meal, without cheapening
- *   McDonald's own programme. Rewards keep their real MyM prices.
- *
- *   KFC NL has no points programme, so Packback provides one at the same
- *   rate: ~100 points per euro of the product's price, rounded up to 50.
- *   The Colonel Burger is 800 rather than 900: the PackPerks app's cup
- *   track holds 16 cups at most (two rows of eight).
- *
- * The organisations store rewards in cups (cupsNeeded = points / 50), so
- * the PackPerks app and the dashboard keep counting cups.
+ * A reward costs its cups × the brand's points per cup, so the demo and
+ * the organisation's config (which counts cups) always agree.
  * ───────────────────────────────────────────────────────────────────── */
 
-export const POINTS_PER_CUP = 50;
-
-export const pointsFor = (reward) => Math.round((Number(reward?.cupsNeeded) || 0) * POINTS_PER_CUP);
+/** Points a reward costs: its cups × its brand's points per cup. */
+export const pointsFor = (reward) => Math.round((Number(reward?.cupsNeeded) || 0) * (reward?.ppc || 1));
 
 // KFC: the images are KFC's own ordering images, as in the KFC org's config.
 const KFC_IMG = 'https://deliverect-resizer.imgix.net/';
@@ -48,6 +35,7 @@ export const BRANDS = {
     name: 'KFC',
     orgSlug: 'kfc',
     path: '/demo/kfc',
+    pointsPerCup: 1,
     // Inside the KFC app the Packback parts wear the KFC org's palette
     // (Client app → Colours) and KFC's own button red.
     kit: {
@@ -90,6 +78,7 @@ export const BRANDS = {
     name: 'McDonald’s',
     orgSlug: 'mcdonalds',
     path: '/demo/mcdonalds',
+    pointsPerCup: 10,
     // McDonald's org palette (red tiles on a soft yellow), with the app's
     // own call-to-action style: yellow with dark text.
     kit: {
@@ -100,16 +89,6 @@ export const BRANDS = {
       // The voucher is Packback's own screen: the McDonald's org's colours.
       voucher: { brown: '#A50004', orange: '#DB0007', cream: '#FFF4D6', black: '#292929' },
     },
-    // Cups earn MyMcDonald's Rewards points, so the copy says so.
-    strings: {
-      nl: { unit: 'MyM punten', perCup: '1 beker = 50 MyM punten', toGo: 'Nog {n} MyM punten tot',
-            earnedBody: '+{n} MyM punten op je saldo', needMore: 'Nog {n} MyM punten nodig. Lever je bekers in!',
-            leftAfter: 'Daarna nog {n} MyM punten over', staffNote: 'Schuiven haalt <strong>{n} MyM punten</strong> van dit saldo.' },
-      en: { unit: 'MyM points', perCup: '1 cup = 50 MyM points', toGo: '{n} MyM points to go for',
-            earnedBody: '+{n} MyM points on your balance', needMore: '{n} more MyM points needed. Return your cups!',
-            leftAfter: '{n} MyM points left after', staffNote: 'Sliding takes <strong>{n} MyM points</strong> from this balance.' },
-    },
-    // MyMcDonald's Rewards prices (points), so cups land in their catalogue.
     rewards: [
       { id: 'mcd-big-mac', order: 0, name: 'Big Mac', cupsNeeded: 12, euros: 6.1, imageScale: 1, featured: true,
         image: mcdImg('ngk_gui_nl_main_big_mac'),
@@ -167,3 +146,6 @@ export function nextReward(rewards, points) {
     .sort((a, b) => pointsFor(a) - pointsFor(b) || a.order - b.order)
     .find(r => pointsFor(r) > points) || null;
 }
+
+// Every bundled reward knows its brand's points per cup.
+for (const b of Object.values(BRANDS)) b.rewards.forEach(r => { r.ppc = b.pointsPerCup; });

@@ -1,20 +1,19 @@
 /* Dutch and English copy for the demos. Brand names, product names and
  * the app's own English labels ("Order Now", "News") stay as they are.
- * A brand can override any key (brands.js → strings), e.g. McDonald's
- * calls the points "MyM punten". */
+ * A brand can override any key (brands.js → strings). */
 
 export const STRINGS = {
   nl: {
     // ── the Packback parts ──
-    unit: 'punten', unitShort: 'pnt',
+    unit: 'punten', unitOne: 'punt', unitShort: 'pnt',
     ppHead: 'Beker terug, punten erbij',
-    perCup: '1 beker = 50 punten',
-    toGo: 'Nog {n} punten tot',
+    perCup: '1 beker = {n}',
+    toGo: 'Nog {n} tot',
     allIn: 'Alle beloningen binnen bereik',
     redeem: 'Inwisselen', almost: 'Bijna!',
-    worth: 'Waarde {v}', leftAfter: 'Daarna nog {n} punten over',
-    needMore: 'Nog {n} punten nodig. Lever je bekers in!',
-    earnedTitle: 'Beker ingeleverd', earnedBody: '+{n} punten op je saldo',
+    worth: 'Waarde {v}', leftAfter: 'Daarna nog {n} over',
+    needMore: 'Nog {n} nodig. Lever je bekers in!',
+    earnedTitle: 'Beker ingeleverd', earnedBody: '+{n} op je saldo',
     returnCup: 'Beker inleveren', scanBin: 'Scan de QR-code op de Packback-bin.', simulate: 'Scan simuleren',
     thanks: 'Beker ingeleverd, dankjewel!', unlocked: '{name} is nu gratis!',
     another: 'Nog een', rewards: 'Beloningen', yourBalance: 'Jouw saldo',
@@ -23,7 +22,7 @@ export const STRINGS = {
     activity: 'Activiteit', justNow: 'Zojuist', minutesAgo: '{n} min geleden', cupBack: 'Beker ingeleverd',
     close: 'Sluiten', cancel: 'Annuleren', done: 'Klaar',
     showStaff: 'Laat dit zien aan de medewerker',
-    staffNote: 'Schuiven haalt <strong>{n} punten</strong> van dit saldo.',
+    staffNote: 'Schuiven haalt <strong>{n}</strong> van dit saldo.',
     slide: 'Schuif om in te wisselen', redeeming: 'Inwisselen…',
     redeemed: 'Ingewisseld', enjoy: 'Eet smakelijk!',
     notInDemo: 'Dit zit niet in de demo',
@@ -47,7 +46,7 @@ export const STRINGS = {
 
     // ── McDonald's ──
     mcdHello: 'Goedenavond, Beke', mcdCode: 'Mijn code',
-    ppHeadMcd: 'Breng je beker terug: +50 punten',
+    ppHeadMcd: 'Breng je beker terug: +10 punten',
     mcdNews: 'Nieuws', mcdFryday: 'It’s fry-day!', mcdFrydaySub: 'Speel de game en ontgrendel deals.',
     mcdDeals: 'Deals', mcdSeeAll: 'Bekijk alles',
     mcdDeal1: '6 Chicken McNuggets® 50% korting', mcdDeal2: 'McChicken® Menu deal', mcdDeal3: 'Gratis McFlurry® bij een menu',
@@ -60,15 +59,15 @@ export const STRINGS = {
   },
 
   en: {
-    unit: 'points', unitShort: 'pts',
+    unit: 'points', unitOne: 'point', unitShort: 'pts',
     ppHead: 'Bring cup back, get points',
-    perCup: '1 cup = 50 points',
-    toGo: '{n} points to go for',
+    perCup: '1 cup = {n}',
+    toGo: '{n} to go for',
     allIn: 'Every reward is within reach',
     redeem: 'Redeem', almost: 'Almost!',
-    worth: 'Worth {v}', leftAfter: '{n} points left after',
-    needMore: '{n} more points needed. Return your cups!',
-    earnedTitle: 'Cup returned', earnedBody: '+{n} points on your balance',
+    worth: 'Worth {v}', leftAfter: '{n} left after',
+    needMore: '{n} more needed. Return your cups!',
+    earnedTitle: 'Cup returned', earnedBody: '+{n} on your balance',
     returnCup: 'Return a cup', scanBin: 'Scan the QR code on the Packback bin.', simulate: 'Simulate scan',
     thanks: 'Cup returned, thank you!', unlocked: '{name} is now free!',
     another: 'Another one', rewards: 'Rewards', yourBalance: 'Your balance',
@@ -77,7 +76,7 @@ export const STRINGS = {
     activity: 'Activity', justNow: 'Just now', minutesAgo: '{n} min ago', cupBack: 'Cup returned',
     close: 'Close', cancel: 'Cancel', done: 'Done',
     showStaff: 'Show this to the staff at the counter',
-    staffNote: 'Sliding takes <strong>{n} points</strong> from this balance.',
+    staffNote: 'Sliding takes <strong>{n}</strong> from this balance.',
     slide: 'Slide to redeem', redeeming: 'Redeeming…',
     redeemed: 'Redeemed', enjoy: 'Enjoy your meal!',
     notInDemo: 'Not part of this demo',
@@ -98,7 +97,7 @@ export const STRINGS = {
     kfcChips: { all: 'All deals', pp: 'Points', kip: 'Chicken', menus: 'Meals', snacks: 'Snacks' },
 
     mcdHello: 'Good evening, Beke', mcdCode: 'My code',
-    ppHeadMcd: 'Bring your cup back: +50 points',
+    ppHeadMcd: 'Bring your cup back: +10 points',
     mcdNews: 'News', mcdFryday: 'It’s fry-day!', mcdFrydaySub: 'Play the game to unlock deals.',
     mcdDeals: 'Deals', mcdSeeAll: 'See all',
     mcdDeal1: '6pc Chicken McNuggets® 50% off', mcdDeal2: 'McChicken® Meal deal', mcdDeal3: 'Free McFlurry® with a meal',

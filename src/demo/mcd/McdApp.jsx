@@ -144,7 +144,7 @@ export default function McdApp() {
           <h1 className="mca-h1">{t('mcdDeals')}</h1>
           <button type="button" className="ppd-kit mca-nudge" onClick={() => go('rewards')}>
             <span className="mca-nudge-cup"><CupSvg /></span>
-            <span className="mca-nudge-text"><b>{t('ppHeadMcd')}</b><span>{t('perCup')}</span></span>
+            <span className="mca-nudge-text"><b>{t('ppHeadMcd')}</b><span>{t('perCup', { n: kit.amount(kit.ppc) })}</span></span>
             <span className="mca-nudge-pts">{wallet.points} {t('unitShort')}</span>
           </button>
           {[['nuggets_chicken_6', t('mcdDeal1')], ['ngk_gui_nl_main_app_mcchicken', t('mcdDeal2')], ['gui_nl_main_mcflurrymm', t('mcdDeal3')]].map(([pic, title]) => (

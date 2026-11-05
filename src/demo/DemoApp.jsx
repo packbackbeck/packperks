@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BRANDS, BRAND_LIST, POINTS_PER_CUP, brandForPath } from './brands';
+import { BRANDS, BRAND_LIST, brandForPath } from './brands';
 import { makeT } from './i18n';
 import { useDemoWallet } from './wallet';
 import { useOrgRewards } from './useOrgRewards';
@@ -128,11 +128,11 @@ function Panel({ brand, kit, t, lang, setLang }) {
       <div className="ppd-balance">
         <span>{t('demoBalance')}</span>
         <b>{wallet.points}</b>
-        <small>{t('unit')} · {wallet.cups === 1 ? t('cupReturnedOne') : t('cupsReturned', { n: wallet.cups })}</small>
+        <small>{t(wallet.points === 1 ? 'unitOne' : 'unit')} · {wallet.cups === 1 ? t('cupReturnedOne') : t('cupsReturned', { n: wallet.cups })}</small>
       </div>
 
       <button type="button" className="ppd-action is-primary" onClick={kit.earn}>{t('demoEarn')}</button>
-      <p className="ppd-hint"><span aria-hidden="true">↻</span>{t('demoRefresh', { n: POINTS_PER_CUP })}</p>
+      <p className="ppd-hint"><span aria-hidden="true">↻</span>{t('demoRefresh', { n: brand.pointsPerCup })}</p>
 
       <div className="ppd-row">
         <button type="button" className="ppd-action" onClick={wallet.reset}>{t('demoReset')}</button>
@@ -149,7 +149,7 @@ function Panel({ brand, kit, t, lang, setLang }) {
 
 function BrandDemo({ brand, lang, setLang }) {
   const t = useMemo(() => makeT(lang, brand.strings), [lang, brand]);
-  const wallet = useDemoWallet(brand.key);
+  const wallet = useDemoWallet(brand.key, brand.pointsPerCup);
   const { rewards, live } = useOrgRewards(brand);
   const kit = useKitState({ brand, lang, t, wallet, rewards, live });
   const vp = useViewport();

@@ -50,6 +50,7 @@ export function useOrgRewards(brand) {
             image: r.image || bundled[r.id]?.image || '',
             imageScale: Number(r.imageScale) || 1,
             featured: !!r.featured,
+            ppc: brand.pointsPerCup,
             // The dashboard holds one description; the bundled copy has both
             // languages, so keep it where the reward is the same one.
             desc: bundled[r.id]?.desc || { en: r.description || '', nl: r.description || '' },

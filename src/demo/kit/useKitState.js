@@ -19,6 +19,8 @@ export function useKitState({ brand, lang, t, wallet, rewards, live }) {
 
   return {
     brand, lang, t, wallet, rewards, live,
+    ppc: brand.pointsPerCup,
+    amount: (n) => `${n} ${t(Math.abs(n) === 1 ? 'unitOne' : 'unit')}`,
     // Pop the newest cup: on the load that returned it, and on every cup after.
     fresh: wallet.earnedOnLoad || freshKey > 0,
     freshKey,
@@ -28,7 +30,7 @@ export function useKitState({ brand, lang, t, wallet, rewards, live }) {
     earn: () => { wallet.earn(); setFreshKey(k => k + 1); setSheet({ mode: 'done' }); },
     openReward: (reward) => {
       const short = pointsFor(reward) - wallet.points;
-      if (short > 0) { toast(t('needMore', { n: short })); return; }
+      if (short > 0) { toast(t('needMore', { n: `${short} ${t(short === 1 ? 'unitOne' : 'unit')}` })); return; }
       setSheet({ mode: 'redeem', reward });
     },
     openVoucher: (reward) => { setSheet(null); setVoucher(reward); },

@@ -80,7 +80,7 @@ function useClock() {
 }
 
 export default function DemoVoucher({ reward, onClose }) {
-  const { brand, wallet, t, lang } = useKit();
+  const { brand, wallet, t, lang, amount } = useKit();
   const cardRef = useRef(null);
   useTilt(cardRef);
   const clock = useClock();
@@ -159,7 +159,7 @@ export default function DemoVoucher({ reward, onClose }) {
                 <span className="hv__avatar ppd-hv-avatar">B</span>
                 <span className="hv__holder-name">Beke</span>
               </div>
-              <span className="hv__balance"><strong>{wallet.points}</strong> {t('unit')}</span>
+              <span className="hv__balance"><strong>{wallet.points}</strong> {t(wallet.points === 1 ? 'unitOne' : 'unit')}</span>
             </div>
             <span className="hv__foil" aria-hidden="true" />
             <span className="hv__glare" aria-hidden="true" />
@@ -171,7 +171,7 @@ export default function DemoVoucher({ reward, onClose }) {
           <button type="button" className="hv__cta" onClick={() => setStaffStep(true)}>{t('showStaff')}</button>
         ) : (
           <div className="hv__staff">
-            <p className="hv__staff-note" dangerouslySetInnerHTML={{ __html: t('staffNote', { n: cost }) }} />
+            <p className="hv__staff-note" dangerouslySetInnerHTML={{ __html: t('staffNote', { n: amount(cost) }) }} />
             <SlideToConfirm label={doneAt ? t('redeeming') : t('slide')} color={v.brown}
               disabled={!!doneAt} onProgress={setProgress} onComplete={handleComplete} />
           </div>

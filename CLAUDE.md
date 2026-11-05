@@ -15,14 +15,15 @@ There are four apps in one codebase, picked by path in `src/main.jsx`:
   `/demo/mcdonalds`): Packback inside a brand's own app, for pitches. The
   demos say **Packback** (logo and copy), never PackPerks. **Client-only,
   on purpose**: the points live in localStorage (every page load counts as
-  one returned cup, 50 points), and the only network call is a read of the
+  one returned cup), and the only network call is a read of the
   brand's published rewards (`useOrgRewards.js`), so nothing a demo does can
   reach a dashboard. Never give it the supabase client, the customer app,
   or capture. Redeeming uses the real slider voucher's stylesheet and
-  `SlideToConfirm`, without `redeem_voucher`. Why 50 points a cup, and how
-  the KFC and McDonald's rewards are priced (no deposit; McDonald's at its
-  own MyMcDonald's Rewards prices), is written at the top of `brands.js`;
-  the orgs store the same rewards in cups (points ÷ 50). On a phone the
+  `SlideToConfirm`, without `redeem_voucher`. Points per cup are per brand
+  (`pointsPerCup` in `brands.js`): McDonald's 10 (what €1 spent earns in
+  MyMcDonald's Rewards), KFC 1 (it has no points programme, so a point is a
+  cup). A reward costs its org's `cupsNeeded` × that, so the demo and the
+  dashboard always agree. On a phone the
   page is only the app; the controls are on the laptop layout. KFC's Home
   and Profile are matched to screenshots of the real app (images in
   `public/demo/kfc/`); McDonald's is built after its App Store pages. Its

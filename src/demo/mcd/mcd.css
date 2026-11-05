@@ -1,0 +1,126 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * The McDonald's app (/demo/mcdonalds). See McdApp.jsx.
+ * ───────────────────────────────────────────────────────────────────── */
+
+.mca {
+  --mca-ink: #292929;
+  --mca-soft: #6F6F6F;
+  --mca-line: #E6E6E6;
+  --mca-yellow: #FFBC0D;
+  --mca-red: #DB0007;
+  --mca-font: "Figtree", "Helvetica Neue", Arial, sans-serif;  /* standing in for Speedee */
+  position: absolute; inset: 0; overflow: hidden; background: #fff; color: var(--mca-ink);
+  font-family: var(--mca-font);
+}
+
+/* ── Views ── */
+.mca-view { position: absolute; inset: 0; background: #fff; visibility: hidden; }
+.mca-view.is-on { visibility: visible; }
+.mca-header {
+  position: absolute; z-index: 5; left: 0; right: 0; top: 0; height: 106px; padding: 54px 16px 0 20px;
+  display: flex; align-items: center; justify-content: space-between; background: #fff;
+}
+.mca-logo { display: inline-flex; align-items: flex-end; gap: 1px; }
+.mca-logo span { font: 900 17px/1 var(--mca-font); color: var(--mca-red); letter-spacing: -.02em; margin-bottom: 1px; }
+.mca-logo svg { width: 31px; height: auto; }
+.mca-code {
+  display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 15px 0 12px; border-radius: 18px;
+  background: var(--mca-yellow); color: var(--mca-ink); font: 800 14px/1 var(--mca-font);
+}
+.mca-code .mca-icon { width: 18px; height: 18px; }
+.mca-scroll {
+  position: absolute; left: 0; right: 0; top: 106px; bottom: 0; overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none; overscroll-behavior: contain; padding: 0 16px;
+}
+.mca-scroll::-webkit-scrollbar { display: none; }
+.mca-end { height: calc(var(--ppd-tabbar, 86.4px) + 24px); }
+.mca-icon { display: block; width: 24px; height: 24px; }
+
+.mca-hello { margin: 6px 4px 14px; font: 800 26px/1.1 var(--mca-font); letter-spacing: -.01em; }
+.mca-h1 { margin: 4px 4px 6px; font: 800 30px/1.1 var(--mca-font); letter-spacing: -.015em; }
+.mca-sub { margin: 0 4px 16px; font: 500 15px/1.35 var(--mca-font); color: var(--mca-soft); }
+.mca-h2 { margin: 26px 4px 12px; font: 800 22px/1.1 var(--mca-font); letter-spacing: -.01em; }
+.mca-h2-row { display: flex; align-items: baseline; justify-content: space-between; }
+.mca-link { padding: 0 4px; color: var(--mca-ink); font: 700 14px/1 var(--mca-font); text-decoration: underline; text-underline-offset: 3px; }
+
+.mca-card { display: block; width: 100%; border: 1px solid var(--mca-line); border-radius: 12px; background: #fff; color: var(--mca-ink); text-align: left; cursor: pointer; }
+.mca-round {
+  flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--mca-yellow); color: var(--mca-ink);
+}
+.mca-round .mca-icon { width: 18px; height: 18px; }
+
+/* News */
+.mca-news { overflow: hidden; }
+.mca-news-art { position: relative; height: 170px; display: grid; place-items: center; background: #fff; }
+.mca-news-art::after { content: ""; position: absolute; left: 50%; bottom: 14px; width: 150px; height: 16px; margin-left: -75px; border-radius: 50%; background: rgba(0, 0, 0, .07); }
+.mca-news-art img { position: relative; z-index: 1; height: 150px !important; width: auto !important; }
+.mca-news-text { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 4px 16px 16px; }
+.mca-news-text h3 { font: 800 22px/1.1 var(--mca-font); }
+.mca-news-text p { margin-top: 5px; font: 500 13px/1.3 var(--mca-font); color: var(--mca-ink); }
+
+/* Deals */
+.mca-rail { display: flex; gap: 10px; margin: 0 -16px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+.mca-rail::-webkit-scrollbar { display: none; }
+.mca-deal-sm { flex: none; width: 168px; overflow: hidden; }
+.mca-deal-art { height: 112px; display: grid; place-items: center; background: #fff; border-bottom: 1px solid #F1F1F1; }
+.mca-deal-art img { height: 92px !important; width: auto !important; }
+.mca-deal-art.is-big { height: 150px; }
+.mca-deal-art.is-big img { height: 126px !important; }
+.mca-deal-sm h3, .mca-deal h3 { padding: 12px 14px 14px; font: 800 13.5px/1.25 var(--mca-font); }
+.mca-deal { margin-top: 12px; overflow: hidden; }
+.mca-deal h3 { font-size: 15px; }
+
+/* PackPerks inside the McDonald's app */
+.mca-pp { padding: 14px; border-radius: 16px; background: var(--ppd-bg); }
+.mca-pp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mca .ppd-brand img.mca-pp-arches { height: 16px; }
+.mca-pp-title { margin: 10px 2px 10px; font: 700 19px/1.15 var(--ppd-font); letter-spacing: -.01em; color: #000; }
+.mca-pp-big { display: flex; align-items: baseline; gap: 6px; margin: 12px 2px 12px; }
+.mca-pp-big b { font: 700 46px/1 var(--ppd-font); letter-spacing: -.02em; }
+.mca-pp-big span { font: 600 16px/1 var(--ppd-font); color: var(--ppd-muted); }
+.mca-pp-btn { margin-top: 14px; }
+.mca-rewards .ppd-reward { border: 1px solid var(--mca-line); }
+
+.mca-nudge {
+  display: flex; align-items: center; gap: 12px; width: 100%; margin: 10px 0 4px; padding: 12px 14px 12px 12px;
+  border: 0; border-radius: 14px; background: var(--ppd-bg); text-align: left; cursor: pointer;
+}
+.mca-nudge-cup { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--ppd-primary); color: #fff; }
+.mca-nudge-cup svg { width: 26px; height: 26px; }
+.mca-nudge-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mca-nudge-text b { font: 700 14.5px/1.2 var(--ppd-font); color: #000; }
+.mca-nudge-text span { font: 500 12.5px/1.2 var(--ppd-font); color: var(--ppd-muted); }
+.mca-nudge-pts { flex: none; height: 28px; padding: 0 10px; border-radius: 10px; background: var(--ppd-btn); color: var(--ppd-on-btn); font: 700 14px/28px var(--ppd-font); }
+
+/* More */
+.mca-me { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 14px; }
+.mca-avatar { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--mca-yellow); font: 900 20px/1 var(--mca-font); }
+.mca-me-text { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.mca-me-text b { font: 800 18px/1.1 var(--mca-font); }
+.mca-me-text span { font: 500 13.5px/1.2 var(--mca-font); color: var(--mca-soft); }
+.mca-chev { flex: none; width: 20px; height: 20px; color: var(--mca-soft); }
+.mca-list { margin-top: 12px; padding: 0 14px; cursor: default; }
+.mca-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 10px 0; color: var(--mca-ink); font-family: var(--mca-font); text-align: left; }
+.mca-row + .mca-row { border-top: 1px solid #F0F0F0; }
+.mca-row-icon { flex: none; width: 22px; height: 22px; margin: 0 7px; color: var(--mca-ink); }
+.mca-row-cup { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--ppd-primary); color: #fff; }
+.mca-row-cup svg { width: 24px; height: 24px; }
+.mca-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mca-row-text b { font: 700 15.5px/1.2 var(--mca-font); }
+.mca-row-text span { font: 500 12.5px/1.2 var(--mca-font); color: var(--mca-soft); }
+.mca-row-pts { flex: none; height: 26px; padding: 0 9px; border-radius: 9px; background: var(--ppd-btn); color: var(--ppd-on-btn); font: 700 13px/26px "DM Sans", sans-serif; }
+
+/* ── Tab bar ── */
+.mca-tabbar {
+  position: absolute; z-index: 20; left: 0; right: 0; bottom: 0; height: var(--ppd-tabbar, 86.4px);
+  display: flex; align-items: flex-start; padding: 7px 4px 0; background: #fff; border-top: 1px solid #ECECEC;
+}
+.mca-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0; color: var(--mca-soft); }
+.mca-tab.is-on { color: var(--mca-ink); }
+.mca-tab-icon { position: relative; display: grid; place-items: center; width: 44px; height: 30px; border-radius: 15px; }
+.mca-tab.is-on .mca-tab-icon { background: #FFF1C9; }
+.mca-tab.is-on .mca-icon { stroke-width: 2.2; }
+.mca-tab-label { font: 600 11.5px/1 var(--mca-font); }
+.mca-tab.is-on .mca-tab-label { font-weight: 800; }
+.mca-tab-dot { position: absolute; top: 3px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--mca-red); box-shadow: 0 0 0 2px #fff; }

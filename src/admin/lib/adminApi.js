@@ -3912,7 +3912,7 @@ export async function isOrgSlugAvailable(slug) {
   const clean = (slug || '').trim().toLowerCase();
   if (!clean) return false;
   // Paths the site already uses (src/main.jsx).
-  if (['admin', 'mockup', 'staff', 'vendor-support'].includes(clean) || clean.startsWith('support') || clean.startsWith('packpulse-embed')) return false;
+  if (['admin', 'mockup', 'staff', 'vendor-support', 'demo'].includes(clean) || clean.startsWith('support') || clean.startsWith('packpulse-embed')) return false;
   const { data, error } = await supabase
     .from('organizations').select('id').eq('slug', clean).maybeSingle();
   if (error) return true; // don't block creation on a check that failed

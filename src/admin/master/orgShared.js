@@ -43,7 +43,7 @@ export function payoutPromise(style, noun) {
 }
 
 /* Paths the site already uses (src/main.jsx); a venue can't take them. */
-export const RESERVED_SLUGS = new Set(['admin', 'mockup', 'staff', 'support', 'vendor-support', 'packpulse-embed']);
+export const RESERVED_SLUGS = new Set(['admin', 'mockup', 'staff', 'support', 'vendor-support', 'packpulse-embed', 'demo']);
 
 export function slugOk(slug) {
   const s = String(slug || '').trim();

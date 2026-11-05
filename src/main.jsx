@@ -11,6 +11,7 @@ import { RegionProvider } from './lib/RegionContext.jsx'
 import CollectPreview from './components/CollectPreview.jsx'
 import StaffApp from './staff/LazyStaffApp.jsx'
 import PackPulseEmbed from './admin/embed/PackPulseEmbed.jsx'
+import DemoApp from './demo/LazyDemoApp.jsx'
 import { bounceBackTo, misroutedReturnTarget } from './lib/oauth.js'
 
 const path = window.location.pathname
@@ -19,6 +20,8 @@ const isAdmin = path.startsWith('/admin')
 // One venue's dashboard pages inside PackPulse (docs/packpulse/INTEGRATION.md).
 const isPackPulseEmbed = path.startsWith('/packpulse-embed')
 const isMockup = path.startsWith('/mockup')
+// Sales demos of PackPerks inside a brand's own app (src/demo). Client-only.
+const isDemo = path === '/demo' || path.startsWith('/demo/')
 // Standalone contact-support pages. /vendor-support is intentionally unlinked —
 // share the URL directly with vendors. (Check vendor first: distinct prefixes.)
 const isVendorSupport = path.startsWith('/vendor-support')
@@ -29,13 +32,15 @@ const isRoot = path === '/' || path === ''
 
 // Back from Google at the wrong venue (lib/oauth.js): store the session,
 // then return to the venue the sign-in started on, before anything boots.
-const misrouted = !isAdmin && !isStaff && !isPackPulseEmbed && !isMockup ? misroutedReturnTarget() : null
+const misrouted = !isAdmin && !isStaff && !isPackPulseEmbed && !isMockup && !isDemo ? misroutedReturnTarget() : null
 
 if (misrouted) {
   bounceBackTo(misrouted)
 } else createRoot(document.getElementById('root')).render(
   <StrictMode>
-    {isPackPulseEmbed
+    {isDemo
+      ? <DemoApp />
+      : isPackPulseEmbed
       ? <PackPulseEmbed />
       : isStaff
       ? <StaffApp />
@@ -62,7 +67,7 @@ if (misrouted) {
 // Register the service worker for the customer app only (not admin/mockup/staff) so
 // "Add to Home Screen" install works. The SW has no fetch/cache handler, so
 // it's HMR-safe, and no push handler — notifications are email only.
-if ('serviceWorker' in navigator && !isAdmin && !isMockup && !isStaff && !isPackPulseEmbed) {
+if ('serviceWorker' in navigator && !isAdmin && !isMockup && !isStaff && !isPackPulseEmbed && !isDemo) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => { /* non-fatal */ })
   })

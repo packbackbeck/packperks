@@ -1,0 +1,160 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * /demo page chrome: the panel, the phone, and the full-screen phone
+ * mode. The brand apps and the PackPerks kit carry their own styles.
+ * ───────────────────────────────────────────────────────────────────── */
+
+/* Escape the customer app's 375px #root (index.css), like the other apps do. */
+#root:has(.ppd) { max-width: none !important; background: transparent; }
+body:has(.ppd) { display: block; background: #F3EFE8; }
+
+.ppd {
+  --ppd-ink: #1F1B16;
+  --ppd-soft: #6E665C;
+  --ppd-line: #E3DDD3;
+  min-height: 100dvh;
+  display: flex; align-items: center; justify-content: center; gap: 56px;
+  padding: 20px 24px;
+  font-family: "DM Sans", system-ui, sans-serif; color: var(--ppd-ink);
+}
+.ppd img { max-width: none; }
+
+/* ── Side panel ── */
+.ppd-panel { width: 340px; flex: none; display: flex; flex-direction: column; gap: 14px; }
+.ppd-logo { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ppd-soft); font-size: 13px; font-weight: 600; }
+.ppd-logo img { height: 22px; width: auto; }
+.ppd-logo span { padding: 3px 7px; border-radius: 6px; background: #fff; border: 1px solid var(--ppd-line); text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; }
+.ppd-panel h1 { margin: 6px 0 0; font-size: 30px; line-height: 1.05; letter-spacing: -.02em; }
+.ppd-lead { margin: 0; font-size: 15px; line-height: 1.45; color: #3B352E; }
+.ppd-refresh {
+  display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 14px; border-radius: 14px;
+  background: #fff; border: 1px solid var(--ppd-line); font-size: 14px; font-weight: 600; line-height: 1.3;
+}
+.ppd-refresh span { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--ppd-ink); color: #fff; font-size: 16px; }
+
+.ppd-controls { display: flex; flex-direction: column; gap: 12px; }
+.ppd-balance {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 10px;
+  padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid var(--ppd-line);
+}
+.ppd-balance span { font-size: 13px; color: var(--ppd-soft); }
+.ppd-balance b { grid-row: span 2; align-self: center; font-size: 24px; letter-spacing: -.01em; }
+.ppd-balance small { font-size: 12.5px; color: var(--ppd-soft); }
+.ppd-actions { display: flex; gap: 8px; }
+.ppd-action {
+  flex: 1; height: 42px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--ppd-line);
+  background: #fff; color: var(--ppd-ink); font: 600 14px/1 "DM Sans", sans-serif; cursor: pointer;
+}
+.ppd-action.is-primary { background: var(--ppd-ink); border-color: var(--ppd-ink); color: #fff; }
+.ppd-action:active { transform: scale(.98); }
+.ppd-row { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; color: var(--ppd-soft); }
+.ppd-seg { display: inline-flex; padding: 2px; border-radius: 9px; background: #fff; border: 1px solid var(--ppd-line); }
+.ppd-seg button {
+  padding: 5px 12px; border: 0; border-radius: 7px; background: none; color: var(--ppd-ink);
+  font: 600 12.5px/1 "DM Sans", sans-serif; cursor: pointer;
+}
+.ppd-seg button[aria-pressed="true"] { background: var(--ppd-ink); color: #fff; }
+.ppd-other {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center;
+  padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid var(--ppd-line);
+  color: var(--ppd-ink); text-decoration: none;
+}
+.ppd-other span { font-size: 12px; color: var(--ppd-soft); }
+.ppd-other b { font-size: 15px; }
+.ppd-other i { grid-row: 1 / span 2; grid-column: 2; font-style: normal; font-size: 18px; }
+.ppd-foot { margin: 0; font-size: 12px; line-height: 1.45; color: var(--ppd-soft); }
+.ppd-dot { display: inline-block; width: 7px; height: 7px; margin: 0 5px 1px 4px; border-radius: 50%; background: #C9C1B5; }
+.ppd-dot.is-live { background: #1A8737; }
+
+/* ── The phone ── */
+.ppd-phone-box { position: relative; flex: none; }
+.ppd-phone {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  width: 417px; height: 876px; padding: 12px; border-radius: 67px; background: #1a1a1c;
+  box-shadow: inset 0 0 0 1.5px #48484c, inset 0 0 0 5px #0d0d0e, 0 1px 0 1px #0b0b0c, 0 40px 70px -30px rgba(0, 0, 0, .45);
+}
+.ppd-phone::before, .ppd-phone::after { content: ""; position: absolute; width: 3px; border-radius: 2px; background: #2a2a2d; }
+.ppd-phone::before { left: -3px; top: 190px; height: 62px; box-shadow: 0 78px 0 #2a2a2d; }
+.ppd-phone::after { right: -3px; top: 250px; height: 96px; }
+
+.ppd-screen {
+  --ppd-safe-top: 54px;
+  --ppd-safe-bottom: 34px;
+  --ppd-tabbar: 86.4px;
+  position: relative; width: 393px; height: 852px; overflow: hidden; border-radius: 55px;
+  background: #fff; color: #000; isolation: isolate;
+  -webkit-user-select: none; user-select: none; -webkit-font-smoothing: antialiased;
+  /* A transformed ancestor contains anything position: fixed inside it. */
+  transform: translateZ(0);
+}
+.ppd-screen img { display: block; max-width: none; }
+.ppd-screen-inner { position: absolute; inset: 0; }
+
+.ppd-island { position: absolute; z-index: 60; top: 11px; left: 50%; width: 125px; height: 37px; margin-left: -62.5px; border-radius: 19px; background: #000; }
+.ppd-statusbar { position: absolute; z-index: 50; inset: 0 0 auto 0; height: 54px; pointer-events: none; }
+.ppd-sb-time {
+  position: absolute; left: -0.6px; top: 18.3px; width: 125px; text-align: center;
+  font: 600 17px/22px -apple-system, "SF Pro Text", system-ui, sans-serif; white-space: nowrap;
+}
+.ppd-sb-arrow { position: absolute; left: 86.478px; top: 21.3px; width: 17.04px !important; height: 16.188px !important; }
+.ppd-sb-right { position: absolute; left: 279.03px; top: 19.596px; width: 85.626px !important; height: 19.596px !important; }
+.ppd-home-indicator { position: absolute; z-index: 95; left: 126.8px; top: 839px; width: 140px; height: 5px; border-radius: 2.5px; background: #000; pointer-events: none; }
+
+/* ── On a phone: the app is the page ── */
+.ppd.ppd-is-device { display: block; padding: 0; min-height: 0; }
+.ppd-device { position: fixed; inset: 0; overflow: hidden; background: #fff; }
+.ppd-screen.is-device {
+  --ppd-safe-top: 52px;
+  --ppd-safe-bottom: max(10px, env(safe-area-inset-bottom));
+  --ppd-tabbar: 66px;
+  position: absolute; left: 0; top: 0; border-radius: 0; transform-origin: 0 0;
+}
+/* The phone already has a status bar: lift the app's own 40pt of it out of view. */
+.ppd-screen.is-device .ppd-screen-inner { top: -40px; }
+
+.ppd-fab {
+  position: fixed; z-index: 30; right: 10px; top: 46%;
+  width: 40px; height: 40px; padding: 7px; border: 0; border-radius: 12px; cursor: pointer;
+  background: rgba(255, 255, 255, .92); box-shadow: 0 6px 18px rgba(0, 0, 0, .18), 0 0 0 .5px rgba(0, 0, 0, .08);
+}
+.ppd-fab img { width: 100%; height: 100%; border-radius: 6px; }
+.ppd-drawer { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .4); opacity: 0; pointer-events: none; transition: opacity .25s; }
+.ppd-drawer.is-open { opacity: 1; pointer-events: auto; }
+.ppd-drawer-card {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0; background: #F3EFE8; transform: translateY(100%); transition: transform .3s cubic-bezier(.2, .8, .2, 1);
+}
+.ppd-drawer.is-open .ppd-drawer-card { transform: none; }
+.ppd-drawer-card h2 { margin: 0 0 4px; font-size: 20px; }
+.ppd-drawer-card > p { margin: 0 0 14px; font-size: 14px; color: #3B352E; }
+
+/* ── /demo index ── */
+.ppd-index { flex-direction: column; justify-content: flex-start; gap: 14px; padding: 48px 24px 60px; max-width: 760px; margin: 0 auto; }
+.ppd-index header { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.ppd-index header img { height: 26px; width: auto; }
+.ppd-index h1 { margin: 0; align-self: flex-start; font-size: 34px; letter-spacing: -.02em; }
+.ppd-index .ppd-lead { align-self: flex-start; max-width: 560px; }
+.ppd-cards { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+.ppd-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 22px; border-radius: 20px;
+  background: #fff; border: 1px solid var(--ppd-line); color: var(--ppd-ink); text-decoration: none;
+  transition: transform .15s, box-shadow .15s;
+}
+.ppd-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -18px rgba(0, 0, 0, .35); }
+.ppd-card-logo { display: grid; place-items: center; height: 110px; border-radius: 14px; }
+.ppd-card.is-kfc .ppd-card-logo { background: #FFF1E2; }
+.ppd-card.is-kfc .ppd-card-logo img { width: 120px; height: auto; }
+.ppd-card.is-mcdonalds .ppd-card-logo { background: #DB0007; }
+.ppd-card.is-mcdonalds .ppd-card-logo svg { width: 76px; height: auto; }
+.ppd-card b { font-size: 18px; }
+.ppd-card-go { font-size: 14px; font-weight: 600; color: var(--ppd-soft); }
+.ppd-index .ppd-foot { align-self: flex-start; margin-top: 10px; }
+
+@media (max-width: 960px) {
+  .ppd:not(.ppd-index):not(.ppd-is-device) { flex-direction: column; gap: 22px; padding: 24px 16px; }
+  .ppd-panel { width: min(100%, 520px); }
+}
+@media (max-width: 600px) {
+  .ppd-cards { grid-template-columns: 1fr; }
+  .ppd-index { padding: 28px 16px 40px; }
+  .ppd-index h1 { font-size: 28px; }
+}

@@ -4,13 +4,23 @@ Reusable-cup rewards. Customers return a cup, collect cups in a wallet, and
 redeem them for a drink or cashback. React + Vite + Supabase, no server of our
 own beyond edge functions.
 
-There are three apps in one codebase, picked by path in `src/main.jsx`:
+There are four apps in one codebase, picked by path in `src/main.jsx`:
 
-- **Customer app** — `src/` minus `src/admin` and `src/staff`. Per-org,
-  reached at `/<slug>/`.
+- **Customer app** — `src/` minus `src/admin`, `src/staff` and `src/demo`.
+  Per-org, reached at `/<slug>/`.
 - **Admin dashboard** — `src/admin/`, served at `/admin`, behind a login.
 - **PackPerks Staff** — `src/staff/`, served at `/staff`: venue staff make
   cup QR codes on their phone. Its own login (see *PackPerks Staff* below).
+- **Sales demos** — `src/demo/`, served at `/demo` (`/demo/kfc`,
+  `/demo/mcdonalds`): PackPerks inside a brand's own app, for pitches.
+  **Client-only, on purpose**: the points live in localStorage (every page
+  load counts as one returned cup, 10 points), and the only network call is
+  a read of the brand's published rewards (`useOrgRewards.js`), so nothing a
+  demo does can reach a dashboard. Never give it the supabase client, the
+  customer app, or capture. Redeeming uses the real slider voucher's
+  stylesheet and `SlideToConfirm`, without `redeem_voucher`. KFC's Home and
+  Profile are matched to screenshots of the real app (images in
+  `public/demo/kfc/`); McDonald's is built after its App Store pages.
 
 ---
 
@@ -815,7 +825,7 @@ printed cups are never deleted there. Add a kind in the function's list and
 in `ORG_DATA_TIME_COLUMN` (adminApi.js) together.
 
 **App paths are not venue addresses.** `src/main.jsx` sends `/admin…`,
-`/mockup…`, `/staff`, `/support…`, `/vendor-support…` and `/packpulse-embed` to their own apps
+`/mockup…`, `/staff`, `/support…`, `/vendor-support…`, `/packpulse-embed` and `/demo…` to their own apps
 before any venue lookup, so an organisation or group with such a slug would
 be unreachable. `RESERVED_SLUGS` (`src/admin/master/orgShared.js`) and
 `isOrgSlugAvailable` refuse them; add a new app path to both.

@@ -13,7 +13,7 @@ import { pointsFor } from './brands';
  * ───────────────────────────────────────────────────────────────────── */
 
 // v3: points per cup set per brand. A new key, so a balance from an old scale can't linger.
-const KEY = (brand) => `ppdemo:v3:${brand}`;
+const KEY = (brand) => `ppdemo:v4:${brand}`;
 const EVENT = 'ppdemo:wallet';
 const LOAD_ID = typeof performance !== 'undefined' && performance.timeOrigin
   ? String(Math.round(performance.timeOrigin))

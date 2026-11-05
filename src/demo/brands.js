@@ -9,8 +9,10 @@
  *
  * Points per returned cup, per brand:
  *
- *   McDonald's: 10 points a cup. MyMcDonald's Rewards gives 10 points per
- *   euro spent, so returning a cup earns what spending €1 earns.
+ *   McDonald's: 50 MyM points a cup. MyMcDonald's Rewards gives 10 points
+ *   per euro and a Big Mac costs 600, so a point is ~€0.01 of food and a
+ *   cup is ~€0.50 of it (as much as €5 spent earns). The org's cups × 50
+ *   are MyM's own prices: Cheeseburger 4 cups = 200, Big Mac 12 = 600.
  *   KFC: KFC NL has no points programme, so a point is simply a cup.
  *
  * A reward costs its cups × the brand's points per cup, so the demo and
@@ -78,7 +80,12 @@ export const BRANDS = {
     name: 'McDonald’s',
     orgSlug: 'mcdonalds',
     path: '/demo/mcdonalds',
-    pointsPerCup: 10,
+    pointsPerCup: 50,
+    // Cups earn MyMcDonald's Rewards points, at MyM's own prices.
+    strings: {
+      nl: { unit: 'MyM punten', unitOne: 'MyM punt' },
+      en: { unit: 'MyM points', unitOne: 'MyM point' },
+    },
     // McDonald's org palette (red tiles on a soft yellow), with the app's
     // own call-to-action style: yellow with dark text.
     kit: {

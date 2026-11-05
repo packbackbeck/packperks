@@ -46,7 +46,7 @@ export const STRINGS = {
 
     // ── McDonald's ──
     mcdHello: 'Goedenavond, Beke', mcdCode: 'Mijn code',
-    ppHeadMcd: 'Breng je beker terug: +10 punten',
+    ppHeadMcd: 'Breng je beker terug: +50 punten',
     mcdNews: 'Nieuws', mcdFryday: 'It’s fry-day!', mcdFrydaySub: 'Speel de game en ontgrendel deals.',
     mcdDeals: 'Deals', mcdSeeAll: 'Bekijk alles',
     mcdDeal1: '6 Chicken McNuggets® 50% korting', mcdDeal2: 'McChicken® Menu deal', mcdDeal3: 'Gratis McFlurry® bij een menu',
@@ -97,7 +97,7 @@ export const STRINGS = {
     kfcChips: { all: 'All deals', pp: 'Points', kip: 'Chicken', menus: 'Meals', snacks: 'Snacks' },
 
     mcdHello: 'Good evening, Beke', mcdCode: 'My code',
-    ppHeadMcd: 'Bring your cup back: +10 points',
+    ppHeadMcd: 'Bring your cup back: +50 points',
     mcdNews: 'News', mcdFryday: 'It’s fry-day!', mcdFrydaySub: 'Play the game to unlock deals.',
     mcdDeals: 'Deals', mcdSeeAll: 'See all',
     mcdDeal1: '6pc Chicken McNuggets® 50% off', mcdDeal2: 'McChicken® Meal deal', mcdDeal3: 'Free McFlurry® with a meal',

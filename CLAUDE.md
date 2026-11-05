@@ -20,9 +20,9 @@ There are four apps in one codebase, picked by path in `src/main.jsx`:
   reach a dashboard. Never give it the supabase client, the customer app,
   or capture. Redeeming uses the real slider voucher's stylesheet and
   `SlideToConfirm`, without `redeem_voucher`. Points per cup are per brand
-  (`pointsPerCup` in `brands.js`): McDonald's 10 (what €1 spent earns in
-  MyMcDonald's Rewards), KFC 1 (it has no points programme, so a point is a
-  cup). A reward costs its org's `cupsNeeded` × that, so the demo and the
+  (`pointsPerCup` in `brands.js`): McDonald's 50 MyM points (MyMcDonald's
+  Rewards gives 10 per euro, so the org's cups × 50 are MyM's own prices),
+  KFC 1 (it has no points programme, so a point is a cup). A reward costs its org's `cupsNeeded` × that, so the demo and the
   dashboard always agree. On a phone the
   page is only the app; the controls are on the laptop layout. KFC's Home
   and Profile are matched to screenshots of the real app (images in

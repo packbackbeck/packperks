@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrandRow, CupTrack, NextNote, PackPerksLayer, RewardList, Tiles } from '../kit/Kit';
+import { BrandRow, CupTrack, NextNote, PackbackLayer, RewardList, Tiles } from '../kit/Kit';
 import { CupSvg } from '../kit/icons';
 import { cls, useKit } from '../kit/kitCore';
 import './mcd.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * The McDonald's app (Netherlands) with PackPerks in it.
+ * The McDonald's app (Netherlands) with Packback in it.
  *
  * Built after the current global McDonald's app as its App Store pages
  * show it: the MyM header, heavy dark headings, white cards with a thin
@@ -13,8 +13,8 @@ import './mcd.css';
  * brand's typeface) isn't free to use, so Figtree stands in. Product
  * images are McDonald's own (mcdonalds.com/nl).
  *
- * PackPerks: a card on Home, a Rewards tab where points are redeemed,
- * a nudge on Deals and a row in More.
+ * Packback: a card on Home, cups earning MyMcDonald's Rewards points on
+ * the Rewards tab, a nudge on Deals and a row in More.
  * ───────────────────────────────────────────────────────────────────── */
 
 const ARCHES = 'm195.8 17.933c23.3 0 42.2 98.3 42.2 219.7h34c0-130.7-34.3-236.5-76.3-236.5-24 0-45.2 31.7-59.2 81.5-14-49.8-35.2-81.5-59-81.5-42 0-76.2 105.7-76.2 236.4h34c0-121.4 18.7-219.6 42-219.6s42.2 90.8 42.2 202.8h33.8c0-112 19-202.8 42.3-202.8';
@@ -156,7 +156,7 @@ export default function McdApp() {
         </>
       ))}
 
-      {/* ── Rewards: where PackPerks points are spent ── */}
+      {/* ── Rewards: MyM points from cups are spent here ── */}
       {view_('rewards', (
         <>
           <h1 className="mca-h1">Rewards</h1>
@@ -181,8 +181,8 @@ export default function McdApp() {
         <>
           <h1 className="mca-h1">{t('mcdMore')}</h1>
           <button type="button" className="mca-card mca-me" onClick={notInDemo}>
-            <span className="mca-avatar">T</span>
-            <span className="mca-me-text"><b>Tine</b><span>{t('mcdAccount')}</span></span>
+            <span className="mca-avatar">B</span>
+            <span className="mca-me-text"><b>Beke</b><span>{t('mcdAccount')}</span></span>
             <Icon name="chevron" className="mca-chev" />
           </button>
           <div className="mca-card mca-list">
@@ -217,7 +217,7 @@ export default function McdApp() {
         ))}
       </nav>
 
-      <PackPerksLayer />
+      <PackbackLayer />
     </div>
   );
 }

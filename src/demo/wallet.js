@@ -12,7 +12,8 @@ import { POINTS_PER_CUP, pointsFor } from './brands';
  * a second component on the same page from counting it twice.
  * ───────────────────────────────────────────────────────────────────── */
 
-const KEY = (brand) => `ppdemo:v1:${brand}`;
+// v2: 50 points a cup. A new key, so a balance from the old scale can't linger.
+const KEY = (brand) => `ppdemo:v2:${brand}`;
 const EVENT = 'ppdemo:wallet';
 const LOAD_ID = typeof performance !== 'undefined' && performance.timeOrigin
   ? String(Math.round(performance.timeOrigin))

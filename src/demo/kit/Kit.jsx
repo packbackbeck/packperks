@@ -2,19 +2,19 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import QRCodeLib from 'qrcode';
 import { POINTS_PER_CUP, nextReward, pointsFor, sortRewards } from '../brands';
 import { euro } from '../i18n';
-import ppWordmark from '../../assets/images/packperks-wordmark.svg';
+import packbackLogo from '../../assets/images/packback-logo.svg';
 import DemoVoucher from './DemoVoucher';
 import { CupSvg, StarSvg } from './icons';
 import { cls, useKit } from './kitCore';
 import './kit.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * The PackPerks kit: the parts PackPerks adds to a brand's app.
+ * The Packback kit: the parts Packback adds to a brand's app.
  *
  * One set of components for every brand. Each brand app supplies its own
  * palette (brand.kit → --ppd-* variables) and places the parts where its
  * screens have room; the sheets, the voucher and the notices live in
- * <PackPerksLayer/>, which every brand app renders inside its screen.
+ * <PackbackLayer/>, which every brand app renders inside its screen.
  * ───────────────────────────────────────────────────────────────────── */
 
 function Qr({ value, className }) {
@@ -28,16 +28,16 @@ function Qr({ value, className }) {
 
 /* ── Small parts the brand apps place themselves ── */
 
-/** "PackPerks × <brand>" — whose programme this is. */
+/** "Packback × <brand>", as the live app's header shows it. */
 export function BrandRow({ logo, logoClass }) {
   return (
     <span className="ppd-brand">
-      <img src={ppWordmark} alt="PackPerks" />×<img className={logoClass} src={logo} alt="" />
+      <img className="ppd-packback" src={packbackLogo} alt="Packback" />×<img className={logoClass} src={logo} alt="" />
     </span>
   );
 }
 
-/** The two tiles from the PackPerks app: return a cup, and the balance. */
+/** The two tiles from the live app: return a cup, and the balance. */
 export function Tiles() {
   const { wallet, t, openSheet } = useKit();
   return (
@@ -50,23 +50,29 @@ export function Tiles() {
   );
 }
 
-/** A slot per cup of the next reward, then a star for the reward. */
-export function CupTrack({ compact = false }) {
+/** A slot per cup of the next reward, then a star for the reward. Rewards
+ * that need more than nine cups get two rows, filled top row first, as the
+ * live app's CupProgress does. */
+export function CupTrack() {
   const { wallet, rewards, fresh, freshKey } = useKit();
   const ref = useRef(null);
-  const [fillW, setFillW] = useState(0);
+  const [fills, setFills] = useState([0, 0]);
   const byCost = [...rewards].sort((a, b) => pointsFor(a) - pointsFor(b));
   const goal = nextReward(rewards, wallet.points) || byCost[byCost.length - 1];
   const slots = goal?.cupsNeeded || 0;
   const have = Math.min(Math.floor(wallet.points / POINTS_PER_CUP), slots);
+  const rowCount = slots + 1 > 10 ? 2 : 1;
+  const perRow = Math.ceil((slots + 1) / rowCount);
 
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el) return undefined;
     const measure = () => {
-      const cups = el.querySelectorAll('.ppd-slot');
-      const last = cups[have - 1];
-      setFillW(have && last ? last.offsetLeft + last.offsetWidth + 10 : 0);
+      setFills([...el.querySelectorAll('.ppd-track-row')].map((row) => {
+        const full = row.querySelectorAll('.ppd-slot.is-full:not(.is-star)');
+        const last = full[full.length - 1];
+        return last ? last.offsetLeft + last.offsetWidth + 10 : 0;
+      }).concat([0, 0]).slice(0, 2));
     };
     measure();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
@@ -75,19 +81,24 @@ export function CupTrack({ compact = false }) {
   }, [have, slots]);
 
   if (!goal) return null;
+  const items = [
+    ...Array.from({ length: slots }, (_, i) => (
+      <span key={`${goal.id}-${i}-${i === have - 1 ? freshKey : 0}`}
+        className={cls('ppd-slot', i < have && 'is-full', fresh && i === have - 1 && 'is-new')}>
+        <CupSvg />
+      </span>
+    )),
+    <span key="star" className={cls('ppd-slot', 'is-star', wallet.points >= pointsFor(goal) && 'is-full')}><StarSvg /></span>,
+  ];
   return (
-    <div className={cls('ppd-track', compact && 'is-compact')} ref={ref}
+    <div className={cls('ppd-track', rowCount === 2 && 'is-two')} ref={ref}
       role="img" aria-label={`${wallet.points} / ${pointsFor(goal)}`}>
-      <div className="ppd-fill" style={{ width: fillW }} />
-      <div className="ppd-slots">
-        {Array.from({ length: slots }, (_, i) => (
-          <span key={`${goal.id}-${i}-${i === have - 1 ? freshKey : 0}`}
-            className={cls('ppd-slot', i < have && 'is-full', fresh && i === have - 1 && 'is-new')}>
-            <CupSvg />
-          </span>
-        ))}
-        <span className={cls('ppd-slot', 'is-star', wallet.points >= pointsFor(goal) && 'is-full')}><StarSvg /></span>
-      </div>
+      {Array.from({ length: rowCount }, (_, r) => (
+        <div className="ppd-track-row" key={r}>
+          <div className="ppd-fill" style={{ width: fills[r] }} />
+          <div className="ppd-slots">{items.slice(r * perRow, (r + 1) * perRow)}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -158,7 +169,7 @@ function WalletBody() {
   const { wallet, t, openSheet, closeSheet, goRewards } = useKit();
   return (
     <>
-      <img className="ppd-sheet-logo" src={ppWordmark} alt="PackPerks" />
+      <img className="ppd-sheet-logo" src={packbackLogo} alt="Packback" />
       <div className="ppd-big"><b>{wallet.points}</b><span>{t('unit')}</span></div>
       <NextNote className="is-center" />
       <CupTrack />
@@ -191,7 +202,7 @@ function ScanBody() {
   const { t, earn, closeSheet } = useKit();
   return (
     <>
-      <img className="ppd-sheet-logo" src={ppWordmark} alt="PackPerks" />
+      <img className="ppd-sheet-logo" src={packbackLogo} alt="Packback" />
       <h4>{t('returnCup')}</h4>
       <p>{t('scanBin')}</p>
       <div className="ppd-scan">
@@ -227,7 +238,7 @@ function RedeemBody({ reward }) {
   const cost = pointsFor(reward);
   return (
     <>
-      <img className="ppd-sheet-logo" src={ppWordmark} alt="PackPerks" />
+      <img className="ppd-sheet-logo" src={packbackLogo} alt="Packback" />
       <h4>{reward.name}</h4>
       <p>{reward.desc?.[lang] || ''}</p>
       <div className="ppd-redeem-img"><img src={reward.image} alt="" style={{ transform: `scale(${reward.imageScale || 1})` }} /></div>
@@ -243,7 +254,7 @@ function RedeemBody({ reward }) {
 }
 
 /** Rendered by every brand app inside its screen, above everything else. */
-export function PackPerksLayer({ appIcon }) {
+export function PackbackLayer({ appIcon }) {
   const kit = useKit();
   const { sheet, closeSheet, voucher, closeVoucher, toastMsg, wallet, t, openSheet } = kit;
   const [notice, setNotice] = useState(false);

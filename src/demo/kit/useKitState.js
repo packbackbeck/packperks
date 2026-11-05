@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { pointsFor } from '../brands';
 
 /* The state behind the kit, held by the demo page and handed to the brand
- * app and its PackPerksLayer through KitContext. */
+ * app and its PackbackLayer through KitContext. */
 export function useKitState({ brand, lang, t, wallet, rewards, live }) {
   const [sheet, setSheet] = useState(null);         // { mode, reward? }
   const [voucher, setVoucher] = useState(null);

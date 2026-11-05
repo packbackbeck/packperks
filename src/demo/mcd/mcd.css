@@ -71,7 +71,7 @@
 .mca-deal { margin-top: 12px; overflow: hidden; }
 .mca-deal h3 { font-size: 15px; }
 
-/* PackPerks inside the McDonald's app */
+/* Packback inside the McDonald's app */
 .mca-pp { padding: 14px; border-radius: 16px; background: var(--ppd-bg); }
 .mca-pp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mca .ppd-brand img.mca-pp-arches { height: 16px; }

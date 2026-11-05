@@ -12,15 +12,21 @@ There are four apps in one codebase, picked by path in `src/main.jsx`:
 - **PackPerks Staff** — `src/staff/`, served at `/staff`: venue staff make
   cup QR codes on their phone. Its own login (see *PackPerks Staff* below).
 - **Sales demos** — `src/demo/`, served at `/demo` (`/demo/kfc`,
-  `/demo/mcdonalds`): PackPerks inside a brand's own app, for pitches.
-  **Client-only, on purpose**: the points live in localStorage (every page
-  load counts as one returned cup, 10 points), and the only network call is
-  a read of the brand's published rewards (`useOrgRewards.js`), so nothing a
-  demo does can reach a dashboard. Never give it the supabase client, the
-  customer app, or capture. Redeeming uses the real slider voucher's
-  stylesheet and `SlideToConfirm`, without `redeem_voucher`. KFC's Home and
-  Profile are matched to screenshots of the real app (images in
-  `public/demo/kfc/`); McDonald's is built after its App Store pages.
+  `/demo/mcdonalds`): Packback inside a brand's own app, for pitches. The
+  demos say **Packback** (logo and copy), never PackPerks. **Client-only,
+  on purpose**: the points live in localStorage (every page load counts as
+  one returned cup, 50 points), and the only network call is a read of the
+  brand's published rewards (`useOrgRewards.js`), so nothing a demo does can
+  reach a dashboard. Never give it the supabase client, the customer app,
+  or capture. Redeeming uses the real slider voucher's stylesheet and
+  `SlideToConfirm`, without `redeem_voucher`. Why 50 points a cup, and how
+  the KFC and McDonald's rewards are priced (no deposit; McDonald's at its
+  own MyMcDonald's Rewards prices), is written at the top of `brands.js`;
+  the orgs store the same rewards in cups (points ÷ 50). On a phone the
+  page is only the app; the controls are on the laptop layout. KFC's Home
+  and Profile are matched to screenshots of the real app (images in
+  `public/demo/kfc/`); McDonald's is built after its App Store pages. Its
+  fonts are self-hosted in `public/fonts/` and declared in `demo.css` only.
 
 ---
 

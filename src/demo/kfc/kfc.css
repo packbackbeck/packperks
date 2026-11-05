@@ -8,7 +8,7 @@
   --card-red: #E01E1B;
   --roboto: "Roboto", system-ui, sans-serif;
   --bold: "Mukta", "Helvetica Neue", Arial, sans-serif;  /* closest free match to the app's bold face */
-  --kfa-pp-h: 190px;                                     /* how far News moves down for the PackPerks card */
+  --kfa-pp-h: 190px;                                     /* how far News moves down for the Packback card */
   position: absolute; inset: 0; overflow: hidden; background: #fff; color: #000;
 }
 .kfa-px { position: absolute; max-width: none; pointer-events: none; }
@@ -57,7 +57,7 @@
 .kfa-badge { position: absolute; left: 336.1px; top: 660.73px; width: 40.5px; height: 24.28px; border-radius: 12.14px; background: var(--red); }
 .kfa-badge-label { color: #fff; font-size: 14px; left: 336.1px; right: auto; width: 40.5px; }
 
-/* PackPerks card on Home */
+/* Packback card on Home */
 .kfa-pp-home { position: absolute; left: 14px; top: 567px; width: 365px; padding: 12px; border-radius: 15px; background: var(--ppd-bg); }
 .kfa-pp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kfa-pp-row .ppd-brand img.kfa-pp-kfc { height: 13px; }
@@ -123,7 +123,8 @@
   border: 1px solid #000; background: #fff; color: #000; font: 300 14px/30px var(--roboto);
 }
 .kfa-chip[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #fff; font-weight: 400; }
-.kfa .kfa-chip-mark { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: -3px; margin-right: 6px; }
+.kfa-chip-mark { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; margin-right: 5px; }
+.kfa-chip-mark svg { display: block; width: 100%; height: 100%; }
 
 .kfa-pp-deals { margin-top: 20px; padding: 14px 14px 16px; background: var(--ppd-bg); }
 .kfa-pp-deals h3 { font: 700 20px/1 var(--ppd-font); letter-spacing: -.01em; }

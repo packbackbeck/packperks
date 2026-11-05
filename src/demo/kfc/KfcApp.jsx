@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BrandRow, CupTrack, NextNote, PackPerksLayer, RewardList, Tiles } from '../kit/Kit';
+import { BrandRow, CupTrack, NextNote, PackbackLayer, RewardList, Tiles } from '../kit/Kit';
 import { CupSvg } from '../kit/icons';
 import { cls, useKit } from '../kit/kitCore';
 import { useBaselines } from '../useBaselines';
+import { nextReward, pointsFor } from '../brands';
 import './kfc.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * The KFC Netherlands app with PackPerks in it.
+ * The KFC Netherlands app with Packback in it.
  *
  * Home and Profile are matched to screenshots of the real app (every
  * position below is in iOS points on a 393 × 852 screen, read off them;
  * the images are crops of the same screenshots). Deals is a concept in
- * the app's style. PackPerks adds three things: the card on Home, the
- * points section on Deals, and the black PackPerks button on Profile.
+ * the app's style. Packback adds three things: the card on Home, the
+ * points section on Deals, and a black Packback button on Profile.
+ * KFC NL has no points programme, so these points are Packback's.
  * ───────────────────────────────────────────────────────────────────── */
 
 const A = '/demo/kfc';
@@ -21,7 +23,7 @@ const TAB_LEFT = [0.1, 78.7, 157.3, 235.9, 314.5];
 const ICON_LEFT = [23.756, 23.966, 24.176, 23.96, 24.17];
 const TAB_LABEL = { home: 'Home', locations: 'Locations', order: 'Order', deals: 'Deals', more: 'More' };
 
-// Concept deals (not from the app): what the Deals tab offers besides PackPerks.
+// Concept deals (not from the app): what the Deals tab offers besides Packback.
 const COUPONS = [
   { id: 'wings', cat: 'kip', art: 'wing', title: { nl: 'Wings Wednesday', en: 'Wings Wednesday' },
     desc: { nl: '20 Hot Wings voor €10', en: '20 Hot Wings for €10' }, meta: { nl: 'Alleen op woensdag', en: 'Wednesdays only' }, price: { nl: '€10,00', en: '€10.00' } },
@@ -83,7 +85,7 @@ function Header({ onProfile, back, onBack }) {
 
 export default function KfcApp() {
   const kit = useKit();
-  const { t, lang, wallet, toast, goRewardsRef } = kit;
+  const { t, lang, wallet, rewards, toast, goRewardsRef } = kit;
   const rootRef = useRef(null);
   const dealsScroll = useRef(null);
   const homeScroll = useRef(null);
@@ -111,15 +113,18 @@ export default function KfcApp() {
   };
 
   const chips = t('kfcChips');
+  // A goal of ten cups or more gets a two-row track, 44pt taller: News moves down with it.
+  const goal = nextReward(rewards, wallet.points) || [...rewards].sort((a, b) => pointsFor(b) - pointsFor(a))[0];
+  const ppShift = (goal?.cupsNeeded || 0) + 1 > 10 ? 234 : 190;
   const coupons = useMemo(() => COUPONS.filter(d => filter === 'all' || d.cat === filter), [filter]);
 
   return (
-    <div className="kfa" ref={rootRef} lang={lang}>
-      {/* ── HOME: matched to the screenshot, with the PackPerks card added ── */}
+    <div className="kfa" ref={rootRef} lang={lang} style={{ '--kfa-pp-h': `${ppShift}px` }}>
+      {/* ── HOME: matched to the screenshot, with the Packback card added ── */}
       <section className={cls('kfa-view', root === 'home' && 'is-root', root === 'home' && pushed && 'is-covered')}>
         <div className="kfa-home-scroll" ref={homeScroll}>
           <div className="kfa-home-canvas" data-origin>
-            <div className="kfa-t kfa-roboto kfa-greet" data-bl="141.86">Hi, Tine!</div>
+            <div className="kfa-t kfa-roboto kfa-greet" data-bl="141.86">Hi, Beke!</div>
             <div className="kfa-t kfa-roboto kfa-welcome" data-bl="166.14" dangerouslySetInnerHTML={{ __html: t('kfcWelcome') }} />
             <div className="kfa-banner" style={{ top: 234.726, height: 320.352 }}>
               <img src={`${A}/banner-doritos.jpg`} alt="Doritos Loaded Bag" style={{ width: 393.198, height: 320.352 }} />
@@ -151,7 +156,7 @@ export default function KfcApp() {
         <div className="kfa-header-bg"><Header onProfile={() => setPushed(true)} /></div>
       </section>
 
-      {/* ── DEALS: a concept in the app's style, with PackPerks points ── */}
+      {/* ── DEALS: a concept in the app's style, with Packback points ── */}
       <section className={cls('kfa-view', root === 'deals' && 'is-root', root === 'deals' && pushed && 'is-covered',
         filter === 'pp' && 'is-pp-only', filter !== 'all' && filter !== 'pp' && 'is-cat')}>
         <div className="kfa-scroll" ref={dealsScroll}>
@@ -162,7 +167,7 @@ export default function KfcApp() {
           <div className="kfa-chips" role="group">
             {['all', 'pp', 'kip', 'menus', 'snacks'].map(id => (
               <button key={id} type="button" className="kfa-chip" aria-pressed={filter === id} onClick={() => setFilter(id)}>
-                {id === 'pp' && <img className="kfa-chip-mark" src="/demo/shared/packperks-mark.svg" alt="" />}
+                {id === 'pp' && <span className="kfa-chip-mark"><CupSvg /></span>}
                 {chips[id]}
               </button>
             ))}
@@ -235,8 +240,8 @@ export default function KfcApp() {
           <div className="kfa-profile-canvas" data-origin>
             <Header back onBack={() => setPushed(false)} />
             <img className="kfa-px" src={`${A}/colonel.png`} alt="" style={{ left: 146.544, top: 158.472, width: 103.518, height: 103.518 }} />
-            <div className="kfa-t kfa-roboto kfa-name" data-bl="352.73">Tine</div>
-            <div className="kfa-t kfa-roboto kfa-phone-no" data-bl="374.03">31630037061</div>
+            <div className="kfa-t kfa-roboto kfa-name" data-bl="352.73">Beke</div>
+            <div className="kfa-t kfa-roboto kfa-phone-no" data-bl="374.03">31612345678</div>
 
             <button type="button" className="kfa-hit kfa-red-btn" style={{ left: 100.96, top: 423.87, width: 191.27, height: 41.75 }} onClick={notInDemo} />
             <div className="kfa-t kfa-roboto kfa-btn-label" data-bl="450.7">Update Profile</div>
@@ -252,10 +257,10 @@ export default function KfcApp() {
               <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 225.2 }}>Inbox</div>
             </div>
             <div className="kfa-rg">
-              <button type="button" className="kfa-hit kfa-ring" aria-label="PackPerks" style={{ left: 158.25 }} onClick={() => kit.openSheet('wallet')} />
+              <button type="button" className="kfa-hit kfa-ring" aria-label="Packback" style={{ left: 158.25 }} onClick={() => kit.openSheet('wallet')} />
               <span className="kfa-ring-cup"><CupSvg /></span>
               <span className="kfa-bubble">{wallet.points}</span>
-              <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 136.5 }}>PackPerks</div>
+              <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 136.5 }}>Packback</div>
               <div className="kfa-balance ppd-kit"><span>{wallet.points} {t('unitShort')}</span></div>
             </div>
 
@@ -269,7 +274,7 @@ export default function KfcApp() {
         </div>
       </section>
 
-      <PackPerksLayer />
+      <PackbackLayer />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────────────
- * The PackPerks kit inside a brand's app.
+ * The Packback kit inside a brand's app.
  *
- * The look is the PackPerks customer app's (DM Sans, 10px buttons, 15px
+ * The look is the live customer app's (DM Sans, 10px buttons, 15px
  * cards, the cup track); the colours are the brand's, set as --ppd-*
  * on its screen from brands.js. Everything is prefixed ppd- so none of
  * it can reach the customer app or the dashboard.
@@ -12,9 +12,10 @@
   font-family: var(--ppd-font);
 }
 
-/* ── PackPerks × brand ── */
+/* ── Packback × brand ── */
 .ppd-brand { display: inline-flex; align-items: center; gap: 6px; font: 400 13px/1 var(--ppd-font); color: var(--ppd-muted); }
 .ppd-brand img { display: block; height: 17px; width: auto; max-width: none; }
+.ppd-brand img.ppd-packback { height: 22px; }
 
 /* ── The two tiles ── */
 .ppd-tiles { display: flex; gap: 6px; }
@@ -29,15 +30,18 @@
 .ppd-tile:active, .ppd-btn:active, .ppd-go:active { filter: brightness(.93); }
 
 /* ── Cup track: a slot per cup of the next reward, a star for the reward ── */
-.ppd-track { position: relative; height: 56px; border-radius: 30px; background: var(--ppd-primary); overflow: hidden; }
-.ppd-track.is-compact { height: 48px; }
+.ppd-track { position: relative; border-radius: 30px; background: var(--ppd-primary); overflow: hidden; }
+.ppd-track-row { position: relative; height: 56px; }
+.ppd-track.is-two { padding: 6px 0; }
+.ppd-track.is-two .ppd-track-row { height: 44px; }
 .ppd-fill {
   position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 30px;
   background: var(--ppd-fill); transition: width .7s cubic-bezier(.2, .8, .2, 1);
 }
+.ppd-track.is-two .ppd-fill { border-radius: 0 22px 22px 0; }
 .ppd-slots { position: relative; display: flex; align-items: center; justify-content: space-evenly; height: 100%; padding: 0 6px; }
 .ppd-slot { width: 28px; height: 28px; color: rgba(255, 255, 255, .45); transition: color .3s; }
-.ppd-track.is-compact .ppd-slot { width: 24px; height: 24px; }
+.ppd-track.is-two .ppd-slot { width: 26px; height: 26px; }
 .ppd-slot.is-full { color: var(--ppd-fill-ink); }
 .ppd-slot.is-star.is-full { color: var(--ppd-on-primary); }
 .ppd-slot.is-new { animation: ppd-pop .6s cubic-bezier(.2, 1.5, .4, 1) .7s both; }
@@ -101,7 +105,7 @@
 .ppd-sheet-wrap.is-open .ppd-sheet-dim { opacity: 1; }
 .ppd-sheet-wrap.is-open .ppd-sheet { transform: none; }
 .ppd-grab { flex: none; width: 36px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ppd-muted) 35%, transparent); margin: 0 auto 14px; }
-.ppd-sheet-logo { display: block; height: 20px; width: auto; max-width: none; margin: 0 auto 12px; }
+.ppd-sheet-logo { display: block; height: 26px; width: auto; max-width: none; margin: 0 auto 12px; }
 .ppd-sheet h4 { margin: 0; font: 700 22px/1.15 var(--ppd-font); letter-spacing: -.01em; }
 .ppd-sheet p { margin: 6px 0 0; font: 400 14.5px/1.35 var(--ppd-font); color: #3b3733; }
 .ppd-sheet > .ppd-track, .ppd-sheet > .ppd-btn, .ppd-sheet > .ppd-btn-row, .ppd-sheet > .ppd-steps, .ppd-sheet > .ppd-activity { align-self: stretch; }

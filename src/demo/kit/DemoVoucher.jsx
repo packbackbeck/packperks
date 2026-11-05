@@ -8,7 +8,7 @@ import { useKit } from './kitCore';
 import '../../components/VoucherPage.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * The PackPerks slider voucher, as a demo.
+ * The PackPerks slider voucher (Packback's counter voucher), as a demo.
  *
  * Same card, same stylesheet and the same SlideToConfirm as the real
  * VoucherPage (src/components), so a demo shows exactly what a customer
@@ -156,8 +156,8 @@ export default function DemoVoucher({ reward, onClose }) {
             </div>
             <div className="hv__holder">
               <div className="hv__who">
-                <span className="hv__avatar ppd-hv-avatar">T</span>
-                <span className="hv__holder-name">Tine</span>
+                <span className="hv__avatar ppd-hv-avatar">B</span>
+                <span className="hv__holder-name">Beke</span>
               </div>
               <span className="hv__balance"><strong>{wallet.points}</strong> {t('unit')}</span>
             </div>

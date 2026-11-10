@@ -8,8 +8,8 @@
  * Writes docs/bin-receipts/<brand>/:
  *   header.png         the static top of every receipt, 1-bit, 512 dots
  *                      wide. The bin prints it as one raster image.
- *   preview-*.png      the whole receipt as it comes out, one per kind
- *                      (receipt, offline, demo), for people to look at.
+ *   preview-*.png      the whole receipt as it comes out, one per link in
+ *                      the brand's `links`, for people to look at.
  *                      The QR and the text under it are the bin's own
  *                      native printing; here they are drawn to match.
  *
@@ -59,9 +59,10 @@ const BRANDS = {
     cta: 'Scan to get your points',
     assureLines: ['1 cup = 1 point.', 'Redeem with points in the KFC app.'],
     restaurant: 'KFC Amsterdam Centraal',
+    // The KFC bin prints only the KFC app receipt (Nov 2026). A brand whose
+    // bin registers sessions would add receipt: '…/<slug>/?batch=<uuid>'
+    // here, and the footer then gets the session line.
     links: {
-      receipt: 'https://perks.packback.network/kfc/?batch=e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14',
-      offline: 'https://perks.packback.network/kfc/?byo=1',
       demo: 'https://perks.packback.network/demo/kfc',
     },
   },
@@ -250,7 +251,10 @@ const outDir = path.join(ROOT, 'docs/bin-receipts', brand);
 fs.mkdirSync(outDir, { recursive: true });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bin-receipt-'));
 
-for (const kind of ['header', 'receipt', 'offline', 'demo']) {
+for (const old of fs.readdirSync(outDir)) {
+  if (old.startsWith('preview-')) fs.rmSync(path.join(outDir, old));
+}
+for (const kind of ['header', ...Object.keys(BRANDS[brand].links)]) {
   const html = path.join(tmp, `${kind}.html`);
   fs.writeFileSync(html, page({ brand, kind }));
   const dom = chrome(['--dump-dom', `file://${html}`]);

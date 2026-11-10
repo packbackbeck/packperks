@@ -93,7 +93,7 @@ export default function KfcApp() {
   const rootRef = useRef(null);
   const dealsScroll = useRef(null);
   const homeScroll = useRef(null);
-  const [root, setRoot] = useState('home');
+  const [root, setRoot] = useState('deals');
   const [pushed, setPushed] = useState(false);
   const [filter, setFilter] = useState('all');
   const notInDemo = () => toast(t('notInDemo'));

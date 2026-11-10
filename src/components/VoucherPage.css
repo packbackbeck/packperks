@@ -207,10 +207,6 @@
    positioning box for the overhanging knob — drew a square behind the
    rounded track, hence the sharp white corners. */
 .hv__staff .stc__track { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(8px); }
-.hv__kiosk { gap: 8px; }
-.hv__kiosk-title { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.2; color: var(--black, #1F1B16); }
-.hv__kiosk .hv__cta { margin-top: 6px; align-self: center; }
-.hv__kiosk .hv__cta:disabled { opacity: .6; cursor: default; }
 .hv__err { margin: 0; font-size: 13.5px; font-weight: 700; color: #C0392B; }
 .hv__cancel {
   align-self: center; border: none; background: none; padding: 6px 10px;
@@ -243,3 +239,86 @@
   font-size: 12px; font-weight: 700; opacity: 0.95;
 }
 .hv__balance strong { font-weight: 800; }
+
+/* ─────────────────────────────────────────────────────────────────────
+ * KioskVoucher — the self-order kiosk voucher, laid out like KFC's and
+ * McDonald's own app vouchers (item, name, QR, code to type, Done) in
+ * PackPerks type and colours. --pb-brown is the venue's brand colour.
+ * ───────────────────────────────────────────────────────────────────── */
+.kv {
+  --kv-brand: var(--pb-brown, #502314);
+  position: fixed; inset: 0; z-index: 900; height: 100dvh;
+  display: flex; flex-direction: column;
+  background: var(--pb-cream, #F4EBDC); color: var(--black, #1F1B16);
+}
+.kv__bar {
+  flex: none; display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 18px 8px;
+}
+.kv__back {
+  width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff; color: var(--black, #1F1B16);
+  box-shadow: 0 2px 8px rgba(31, 27, 22, 0.08);
+}
+.kv__brand {
+  text-align: center; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--kv-brand); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kv__clock {
+  min-width: 40px; text-align: right;
+  font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 700; color: rgba(31, 27, 22, 0.5);
+}
+.kv__scroll {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 6px 22px 24px;
+}
+.kv__art {
+  position: relative; width: 100%; max-width: 340px; height: 190px; flex: none;
+  border-radius: 26px; overflow: hidden;
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 22px rgba(31, 27, 22, 0.07);
+}
+.kv__art img { max-width: 78%; max-height: 82%; object-fit: contain; display: block; }
+.kv__badge {
+  position: absolute; top: 14px; left: 14px; padding: 5px 12px; border-radius: 999px;
+  background: var(--kv-brand); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
+}
+.kv__name { margin: 18px 0 0; font-size: 25px; font-weight: 800; line-height: 1.15; letter-spacing: -0.015em; }
+.kv__cost { margin: 4px 0 0; font-size: 15px; font-weight: 600; color: rgba(31, 27, 22, 0.6); }
+.kv__code {
+  width: 100%; max-width: 340px; margin-top: 20px; padding: 20px 18px 18px; box-sizing: border-box;
+  background: #fff; border-radius: 26px; box-shadow: 0 6px 22px rgba(31, 27, 22, 0.07);
+  display: flex; flex-direction: column; align-items: center;
+}
+.kv__scan { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.25; }
+.kv__qr { width: 196px; height: 196px; margin-top: 14px; }
+.kv__qr img, .kv__qr span { display: block; width: 100%; height: 100%; }
+.kv__or { margin: 16px 0 0; font-size: 13px; font-weight: 600; color: rgba(31, 27, 22, 0.55); }
+.kv__digits { display: flex; gap: 5px; margin-top: 8px; }
+.kv__digits span {
+  width: 29px; height: 40px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--kv-brand) 7%, #fff);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--kv-brand) 22%, transparent);
+  font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--black, #1F1B16);
+}
+.kv__digits span:nth-child(4) { margin-right: 7px; }
+.kv__note { margin: 16px 0 0; max-width: 300px; font-size: 14px; line-height: 1.4; color: rgba(31, 27, 22, 0.7); }
+.kv__note strong { color: var(--black, #1F1B16); }
+.kv__foot {
+  flex: none; padding: 12px 22px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  background: var(--pb-cream, #F4EBDC);
+  box-shadow: 0 -10px 20px color-mix(in srgb, var(--pb-cream, #F4EBDC) 90%, transparent);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.kv__btn {
+  width: 100%; max-width: 340px; padding: 16px 14px; border: none; border-radius: 999px; cursor: pointer;
+  background: var(--kv-brand); color: #fff; font-family: inherit; font-size: 16px; font-weight: 800;
+  box-shadow: 0 8px 24px rgba(31, 27, 22, 0.18);
+}
+.kv__btn:active { transform: scale(0.985); }
+.kv__btn:disabled { opacity: .6; cursor: default; }
+.kv__err { margin: 0; font-size: 13.5px; font-weight: 700; color: #C0392B; text-align: center; }

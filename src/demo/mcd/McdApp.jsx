@@ -61,7 +61,7 @@ function Header({ right }) {
 export default function McdApp() {
   const kit = useKit();
   const { t, lang, wallet, toast, goRewardsRef, openSheet } = kit;
-  const [view, setView] = useState('home');
+  const [view, setView] = useState('deals');
   const scrolls = useRef({});
   const notInDemo = () => toast(t('notInDemo'));
   const tabs = t('mcdTabs');

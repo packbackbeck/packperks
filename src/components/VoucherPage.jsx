@@ -14,7 +14,7 @@ import './VoucherPage.css';
  * the cups come off the balance right there — one atomic RPC
  * (redeem_voucher). At a venue with `atKiosk` (Settings → Voucher at a
  * self-order kiosk) there is no staff and no slider: the customer scans
- * the QR at the self-order kiosk and taps Finish, the same RPC.
+ * the QR at the self-order kiosk and taps Done, the same RPC.
  * When the slide lands we hand straight back to the home screen, where
  * the receipt popup opens on top.
  *
@@ -144,42 +144,15 @@ function useClock() {
 
 const AVATAR_KEY = 'packperks_profile_avatar';
 
-export default function VoucherPage({ reward, org, userId, profile, cupCount = 0, atKiosk = false, onDone, onBack }) {
-  const money = useMoney();
-  const clock = useClock();
-  const cardRef = useRef(null);
-  useTilt(cardRef);
-  const [qr, setQr] = useState(null);
-  const [staffStep, setStaffStep] = useState(false);
-  const [progress, setProgress] = useState(0);
+/* Redeeming is the same at a counter and at a kiosk: one RPC, then hand
+ * the receipt back to the home screen. */
+function useRedeem({ reward, org, userId, onDone }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-
   const cups = reward?.cupsNeeded || 0;
   const amount = Number(reward?.euros ?? 0);
-  const animal = useMemo(() => animalForProfile(profile), [profile]);
-  // The same photo the profile page uses, if this device has one set.
-  const avatarUrl = useMemo(() => {
-    try { return localStorage.getItem(AVATAR_KEY) || null; } catch { return null; }
-  }, []);
 
-  // A reference, not a secret: who and what. No amount, no account.
-  const payload = useMemo(
-    () => `packperks:voucher:${userId || 'anon'}:${reward?.id || ''}`,
-    [userId, reward?.id],
-  );
-  useEffect(() => {
-    QRCodeLib.toDataURL(payload, { width: 280, margin: 1, color: { dark: '#1F1B16', light: '#FFFFFF' } })
-      .then(setQr).catch(() => {});
-  }, [payload]);
-
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
-
-  async function handleComplete() {
+  async function redeem() {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -210,6 +183,121 @@ export default function VoucherPage({ reward, org, userId, profile, cupCount = 0
       setBusy(false);
     }
   }
+
+  return { redeem, busy, error, cups, amount };
+}
+
+function useLockScroll() {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+}
+
+/** A stable short code for the voucher's QR, to type in when a scan fails. */
+function codeFor(text, digits = 8) {
+  let h = 2166136261;
+  for (const c of String(text)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  let out = String(Math.abs(h));
+  let h2 = h;
+  while (out.length < digits) { h2 = Math.imul(h2 ^ 0x9e37, 16777619); out += String(Math.abs(h2)); }
+  return out.slice(0, digits);
+}
+
+export default function VoucherPage(props) {
+  return props.atKiosk ? <KioskVoucher {...props} /> : <CounterVoucher {...props} />;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * At a self-order kiosk (KFC, McDonald's): laid out like their own app
+ * vouchers — the item large, its name and what it costs, the QR the
+ * kiosk scans, the code to type in instead, and Done. In PackPerks
+ * colours and type, on the venue's brand colour. No staff, no slider.
+ * ───────────────────────────────────────────────────────────────────── */
+function KioskVoucher({ reward, org, userId, onDone, onBack }) {
+  const clock = useClock();
+  useLockScroll();
+  const { redeem, busy, error, cups } = useRedeem({ reward, org, userId, onDone });
+  const [qr, setQr] = useState(null);
+  const payload = useMemo(
+    () => `packperks:voucher:${userId || 'anon'}:${reward?.id || ''}`,
+    [userId, reward?.id],
+  );
+  const code = useMemo(() => codeFor(payload), [payload]);
+  useEffect(() => {
+    QRCodeLib.toDataURL(payload, { width: 360, margin: 0, color: { dark: '#1F1B16', light: '#FFFFFF' } })
+      .then(setQr).catch(() => {});
+  }, [payload]);
+  const cupsText = `${cups} cup${cups === 1 ? '' : 's'}`;
+
+  return (
+    <div className="kv" role="dialog" aria-modal="true" aria-label={reward?.name}>
+      <header className="kv__bar">
+        <button type="button" className="kv__back" onClick={onBack} aria-label="Back">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <span className="kv__brand">{org?.partner_brand_name || org?.name}</span>
+        <span className="kv__clock">{clock}</span>
+      </header>
+
+      <main className="kv__scroll">
+        <div className="kv__art">
+          {reward?.image && <img src={reward.image} alt="" />}
+          <span className="kv__badge">Free</span>
+        </div>
+        <h1 className="kv__name">{reward?.name}</h1>
+        <p className="kv__cost">for {cupsText}</p>
+
+        <section className="kv__code">
+          <p className="kv__scan">Scan this code at the self-order kiosk</p>
+          <div className="kv__qr">{qr ? <img src={qr} alt="Voucher code" /> : <span />}</div>
+          <p className="kv__or">Or type in this code</p>
+          <div className="kv__digits" aria-label={code}>
+            {code.split('').map((d, i) => <span key={i}>{d}</span>)}
+          </div>
+        </section>
+        <p className="kv__note">Tap Done once it is scanned: <strong>{cupsText}</strong> leave your balance.</p>
+      </main>
+
+      <footer className="kv__foot">
+        {error && <p className="kv__err">{error}</p>}
+        <button type="button" className="kv__btn" disabled={busy} onClick={redeem}>
+          {busy ? 'One moment…' : 'Done'}
+        </button>
+      </footer>
+    </div>
+  );
+}
+
+function CounterVoucher({ reward, org, userId, profile, cupCount = 0, onDone, onBack }) {
+  const money = useMoney();
+  const clock = useClock();
+  const cardRef = useRef(null);
+  useTilt(cardRef);
+  const [qr, setQr] = useState(null);
+  const [staffStep, setStaffStep] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const { redeem: handleComplete, busy, error, cups, amount } = useRedeem({ reward, org, userId, onDone });
+  const animal = useMemo(() => animalForProfile(profile), [profile]);
+  // The same photo the profile page uses, if this device has one set.
+  const avatarUrl = useMemo(() => {
+    try { return localStorage.getItem(AVATAR_KEY) || null; } catch { return null; }
+  }, []);
+
+  // A reference, not a secret: who and what. No amount, no account.
+  const payload = useMemo(
+    () => `packperks:voucher:${userId || 'anon'}:${reward?.id || ''}`,
+    [userId, reward?.id],
+  );
+  useEffect(() => {
+    QRCodeLib.toDataURL(payload, { width: 280, margin: 1, color: { dark: '#1F1B16', light: '#FFFFFF' } })
+      .then(setQr).catch(() => {});
+  }, [payload]);
+
+  useLockScroll();
 
   const primary = 'var(--pb-brown, #502314)';
 
@@ -300,18 +388,7 @@ export default function VoucherPage({ reward, org, userId, profile, cupCount = 0
           </div>
         </div>
 
-        {atKiosk ? (
-          <div className="hv__staff hv__kiosk">
-            <p className="hv__kiosk-title">Scan this code at the self-order kiosk</p>
-            <p className="hv__staff-note">
-              Then tap Finish: <strong>{cups} cup{cups === 1 ? '' : 's'}</strong> leave this balance.
-            </p>
-            <button type="button" className="hv__cta" disabled={busy} onClick={handleComplete}>
-              {busy ? 'Finishing…' : 'Finish'}
-            </button>
-            {error && <p className="hv__err">{error}</p>}
-          </div>
-        ) : !staffStep ? (
+        {!staffStep ? (
           <button type="button" className="hv__cta" onClick={() => setStaffStep(true)}>
             Show this to the staff at the counter
           </button>

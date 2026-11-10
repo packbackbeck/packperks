@@ -467,9 +467,12 @@ opens — no *How does it work?* on the account page, and a locked reward
 tap only nudges the cup progress. Off for KFC and McDonald's.
 
 **Voucher at a self-order kiosk** (`voucherAtKiosk`, Settings → Ways &
-features, off unless set): the Reward Slider Voucher loses its slider —
-it says to scan the code at the self-order kiosk and Finish calls the same
-`redeem_voucher`; the reward buttons say *Redeem at the kiosk*. On for KFC
+features, off unless set): the Reward Slider Voucher becomes
+`KioskVoucher` (in `VoucherPage.jsx`), laid out like the demos' brand
+vouchers in PackPerks colours: the item, its name and cost, the QR to scan
+at the self-order kiosk, an 8-digit code to type in instead, and Done,
+which calls the same `redeem_voucher`; the reward buttons say *Redeem at
+the kiosk*. On for KFC
 and McDonald's.
 
 **Client app** (`appdesign`, formerly "Design & copy") is in every mode;

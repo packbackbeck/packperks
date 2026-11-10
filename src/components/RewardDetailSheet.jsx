@@ -123,7 +123,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                   <li className="rds-step">
                     <span className="rds-step__num">3</span>
                     <span className="rds-step__text">
-                      {atKiosk ? 'Tap Finish once it is scanned' : 'They slide to confirm'}, <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> leave your balance, and your <strong>{reward.name}</strong> is yours.
+                      {atKiosk ? 'Tap Done once it is scanned' : 'They slide to confirm'}, <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> leave your balance, and your <strong>{reward.name}</strong> is yours.
                     </span>
                   </li>
                 </>

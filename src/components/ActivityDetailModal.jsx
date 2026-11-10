@@ -29,7 +29,7 @@ const CLAIM_PHASE = {
     statusLabel: 'Not approved', statusColor: '#C73E1D',
   },
   /* Voucher: settled the moment staff slid (counter) or the customer
-   * tapped Finish (self-order kiosk) — nothing to review, nothing to collect. */
+   * tapped Done (self-order kiosk) — nothing to review, nothing to collect. */
   redeemed: {
     title: 'Reward redeemed', tone: 'green', icon: 'check',
     sub: 'Enjoy it — this reward is redeemed and the cups have left your balance.',

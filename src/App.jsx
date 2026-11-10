@@ -623,7 +623,7 @@ export default function App({ consentReady = true } = {}) {
   // afford yet only nudges the cup progress.
   const guideEnabled = liveSettings.featureHowItWorks !== false;
   // Settings → Ways & features → Voucher at a self-order kiosk: the
-  // customer scans the voucher at the kiosk and taps Finish, no slider.
+  // customer scans the voucher at the kiosk and taps Done, no slider.
   const voucherAtKiosk = isVoucher && liveSettings.voucherAtKiosk === true;
 
 

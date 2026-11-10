@@ -167,16 +167,18 @@ PackPerks Epson TM-m30III. The files are in
 
 | File | What it is |
 |---|---|
-| `header.png` | The top of every receipt, **512 × 557 dots**, pure black and white. Print it as one raster image, 1:1, centred. Don't scale it |
+| `header.png` | The top of every receipt, **512 × 587 dots**, pure black and white. Print it as one raster image, 1:1, centred. Don't scale it |
 | `preview-receipt.png` | The whole normal receipt, for reference |
 | `preview-offline.png` | The whole offline receipt (static QR), for reference |
 | `preview-demo.png` | The whole demo receipt, for reference |
 
-The header carries the Packback logo, **GET YOUR FREE REWARD**, one line on
-collecting cups for free KFC rewards, three boxes (*Collect your cups*,
-*Unlock free rewards*, *Keep track of your progress*) and **Scan to
-collect with Packback**. KFC has no deposit, so there is no refund, euro
-amount or cup count anywhere on the receipt.
+The receipt is worded for the **KFC app** it opens, in that app's own
+words: a small Packback logo, **GET YOUR FREE REWARD**, *Bring your cup
+back, get points in the KFC app.*, the app's three steps as boxes (*Return
+your cup*, *Scan for points*, *Redeem at the kiosk*) and **Scan to get your
+points**. Under the QR: *1 cup = 1 point.* and *Redeem with points in the
+KFC app.* KFC has no deposit, so there is no refund, euro amount or cup
+count anywhere on the receipt.
 
 ### What the bin prints, top to bottom
 
@@ -186,12 +188,12 @@ of white.
 
 | # | Block | How | Size and spacing |
 |---|---|---|---|
-| 1 | Header | `header.png`, raster image | 512 × 557 dots, already includes its own top margin and the gap under the headline |
+| 1 | Header | `header.png`, raster image | 512 × 587 dots, already includes its own top margin, the space between its blocks and 24 dots under the last line |
 | 2 | Gap | 1 blank line | 30 dots |
-| 3 | QR | The printer's own QR command, model 2, error correction **M**, centred | Module size **6 dots** for the receipt link, **7 dots** for the static and demo links (they are shorter, so fewer modules). Every QR comes out about 25–28 mm |
+| 3 | QR | The printer's own QR command, model 2, error correction **M**, centred | Module size **9 dots** for the receipt link, **11 dots** for the static and demo links (they are shorter, so fewer modules). Every QR comes out about **40–42 mm** |
 | 4 | Gap | 2 blank lines | 60 dots |
-| 5 | Two lines, bold, centred | `No app and no registration needed.` / `Fast and secure.` | Font A, emphasised |
-| 6 | Gap | 1 blank line | 30 dots |
+| 5 | Two lines, bold, centred | `1 cup = 1 point.` / `Redeem with points in the KFC app.` | Font A, emphasised |
+| 6 | Gap | 2 blank lines | 60 dots |
 | 7 | Rule | 42 × `-`, left aligned | Font A |
 | 8 | Footer, left aligned | `Time:` then `Restaurant:`, and on the normal receipt `Session ID:` | Label padded to 15 characters, value after it |
 | 9 | Paper before the cut | 2 blank lines, then a feed-and-cut | 60 dots |
@@ -209,13 +211,13 @@ footer filled in by the bin):
 
 ```xml
 <text align="center"/>
-<image width="512" height="557" color="color_1" mode="mono" align="center">…header.png, 1 bit a dot…</image>
+<image width="512" height="587" color="color_1" mode="mono" align="center">…header.png, 1 bit a dot…</image>
 <feed line="1"/>
-<symbol type="qrcode_model_2" level="level_m" width="6" height="6">https://perks.packback.network/kfc/?batch=…</symbol>
+<symbol type="qrcode_model_2" level="level_m" width="9" height="9">https://perks.packback.network/kfc/?batch=…</symbol>
 <feed line="2"/>
-<text em="true">No app and no registration needed.&#10;Fast and secure.&#10;</text>
+<text em="true">1 cup = 1 point.&#10;Redeem with points in the KFC app.&#10;</text>
 <text em="false"/>
-<feed line="1"/>
+<feed line="2"/>
 <text>------------------------------------------&#10;</text>
 <text align="left"/>
 <text>Time:          10 Nov 2026, 12:07&#10;</text>
@@ -225,7 +227,7 @@ footer filled in by the bin):
 <cut type="feed"/>
 ```
 
-For the offline and demo receipts, use `width="7" height="7"` on the
+For the offline and demo receipts, use `width="11" height="11"` on the
 `<symbol>` and leave out the `Session ID:` line. Any other ESC/POS printer
 does the same with its raster-image, QR and text commands.
 

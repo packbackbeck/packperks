@@ -42,17 +42,22 @@ function logoDataUrl() {
 }
 
 const BRANDS = {
+  /* The receipt opens the KFC app (the demo at /demo/kfc), so its words are
+   * that app's: "Bring cup back, get points", the three steps Return cup →
+   * Scan QR → Scan at the kiosk, and "Redeem with points". At KFC a point
+   * is a cup (pointsPerCup 1 in src/demo/brands.js). */
   kfc: {
     titleLines: ['GET YOUR', 'FREE REWARD'],
-    lede: 'Collect your returned cups with Packback and unlock free KFC rewards.',
-    // icon: 'cup' | 'gift' | 'bars'
+    // Lines as printed: set by hand so no word is left alone on a line.
+    lede: ['Bring your cup back,', 'get points in the KFC app.'],
+    // icon: 'cup' | 'qr' | 'gift' | 'bars'
     features: [
-      { icon: 'cup', lines: ['Collect your', 'cups'] },
-      { icon: 'gift', lines: ['Unlock free', 'rewards'] },
-      { icon: 'bars', lines: ['Keep track of', 'your progress'] },
+      { icon: 'cup', lines: ['Return', 'your cup'] },
+      { icon: 'qr', lines: ['Scan for', 'points'] },
+      { icon: 'gift', lines: ['Redeem at', 'the kiosk'] },
     ],
-    cta: 'Scan to collect with Packback',
-    assureLines: ['No app and no registration needed.', 'Fast and secure.'],
+    cta: 'Scan to get your points',
+    assureLines: ['1 cup = 1 point.', 'Redeem with points in the KFC app.'],
     restaurant: 'KFC Amsterdam Centraal',
     links: {
       receipt: 'https://perks.packback.network/kfc/?batch=e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14',
@@ -63,8 +68,16 @@ const BRANDS = {
 };
 
 /* Native-printed parts, in dots. One text line of the printer's Font A is
- * 24 dots tall on a 30-dot pitch; a "feed" is one empty line of 30 dots. */
-const LAYOUT = { qrModule: 6, line: 30, font: 24, cols: 42 };
+ * 24 dots tall on a 30-dot pitch; a "feed" is one empty line of 30 dots.
+ * The QR is sized to about 42 mm (qrTarget dots), whatever its link. */
+const LAYOUT = { qrTarget: 336, qrModuleMax: 12, line: 30, font: 24, cols: 42 };
+
+/* The header's spacing, in dots. Generous on purpose: every block gets
+ * room around it, so the receipt reads as a few clear steps. */
+const SPACE = {
+  top: 28, logoW: 110, afterLogo: 34, afterTitle: 20, afterLede: 40,
+  afterBoxes: 52, bottom: 24,
+};
 
 function qrMatrix(url) {
   const q = QRCode.create(url, { errorCorrectionLevel: 'M' });
@@ -84,7 +97,7 @@ function page({ brand, kind }) {
     ...(kind === 'receipt' ? [['Session ID:', sample.session]] : []),
   ];
   const data = {
-    W, kind, logo: logoDataUrl(), copy: b, layout: LAYOUT, footer,
+    W, kind, logo: logoDataUrl(), copy: b, layout: LAYOUT, space: SPACE, footer,
     qr: kind === 'header' ? null : qrMatrix(b.links[kind]),
   };
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -117,6 +130,13 @@ function icon(ctx, kind, cx, cy) {
     ctx.strokeRect(cx - 19, cy - 15, 38, 7);           // lid
     ctx.beginPath(); ctx.moveTo(cx - 13.5, cy + 2); ctx.lineTo(cx + 13.5, cy + 2); ctx.stroke(); // sleeve
     ctx.beginPath(); ctx.moveTo(cx + 4, cy - 15); ctx.lineTo(cx + 9, cy - 25); ctx.stroke();     // straw
+  } else if (kind === 'qr') {
+    // Three finder squares and a few modules, the same 40-dot footprint
+    // as the cup and the gift, with strokes heavy enough to survive print.
+    ctx.lineWidth = 3.5;
+    const f = (x, y) => { ctx.strokeRect(x + 1.75, y + 1.75, 13.5, 13.5); ctx.fillRect(x + 6, y + 6, 5, 5); };
+    f(cx - 20, cy - 22); f(cx + 3, cy - 22); f(cx - 20, cy + 1);
+    for (const [dx, dy] of [[3, 1], [12, 1], [8, 7], [3, 12], [14, 12]]) ctx.fillRect(cx + dx, cy + dy, 5, 5);
   } else if (kind === 'gift') {
     ctx.strokeRect(cx - 20, cy - 6, 40, 22);
     ctx.beginPath(); ctx.moveTo(cx - 22, cy - 6); ctx.lineTo(cx + 22, cy - 6); ctx.stroke();
@@ -131,17 +151,18 @@ function icon(ctx, kind, cx, cy) {
   ctx.restore();
 }
 function header(ctx, logo) {
-  const W = D.W, c = D.copy;
+  const W = D.W, c = D.copy, S = D.space;
   ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  let y = 18;
-  const lw = 220, lh = Math.round(lw * logo.height / logo.width);
-  ctx.drawImage(logo, (W - lw) / 2, y, lw, lh); y += lh + 22;
+  let y = S.top;
+  const lw = S.logoW, lh = Math.round(lw * logo.height / logo.width);
+  ctx.drawImage(logo, (W - lw) / 2, y, lw, lh); y += lh + S.afterLogo;
   ctx.font = 'bold 42px Arial, sans-serif';
   for (const ln of c.titleLines) { ctx.fillText(ln, W / 2, y + 38); y += 48; }
-  y += 12;
+  y += S.afterTitle;
   ctx.font = '23px Arial, sans-serif';
-  for (const ln of wrap(ctx, c.lede, W - 64)) { ctx.fillText(ln, W / 2, y + 22); y += 32; }
-  y += 22;
+  const lede = Array.isArray(c.lede) ? c.lede : wrap(ctx, c.lede, W - 64);
+  for (const ln of lede) { ctx.fillText(ln, W / 2, y + 22); y += 32; }
+  y += S.afterLede;
   const m = 18, gap = 14, boxW = (W - 2 * m - 2 * gap) / 3, boxH = 128;
   for (let i = 0; i < 3; i++) {
     const x = m + i * (boxW + gap), f = c.features[i];
@@ -150,20 +171,20 @@ function header(ctx, logo) {
     ctx.font = 'bold 19px Arial, sans-serif';
     let ty = y + 82; for (const ln of f.lines) { ctx.fillText(ln, x + boxW / 2, ty); ty += 24; }
   }
-  y += boxH + 34;
+  y += boxH + S.afterBoxes;
   ctx.font = 'bold 30px Arial, sans-serif';
-  ctx.fillText(c.cta, W / 2, y + 28); y += 40;
+  ctx.fillText(c.cta, W / 2, y + 28); y += 40 + S.bottom;
   return y;
 }
-/* The bin's own printing, drawn to match: QR at 6 dots a module, then the
- * text in a 12x24 printer font (42 columns), with the same feeds as
- * eposPrint: 1 line, QR, 2 lines, assurance, 1 line, rule, footer. */
+/* The bin's own printing, drawn to match: the QR, then the text in a 12x24
+ * printer font (42 columns). Feeds: 1 line, QR, 2 lines, the two bold
+ * lines, 2 lines, rule, footer. */
 function native(ctx, y) {
   const L = D.layout, W = D.W;
   y += L.line;                                          // feed 1
   // A short link makes a QR with fewer modules, so it gets bigger ones:
-  // every QR lands at about 25-28 mm, never below 6 dots a module.
-  const q = D.qr, mod = Math.max(L.qrModule, Math.min(8, Math.floor(224 / q.n)));
+  // every QR lands at about 40-42 mm.
+  const q = D.qr, mod = Math.min(L.qrModuleMax, Math.floor(L.qrTarget / q.n));
   const s = q.n * mod, x0 = Math.round((W - s) / 2);
   ctx.fillStyle = '#000';
   for (let r = 0; r < q.n; r++) for (let col = 0; col < q.n; col++)
@@ -171,7 +192,7 @@ function native(ctx, y) {
   y += s + 2 * L.line;                                  // QR, feed 2
   ctx.font = 'bold 20px Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (const ln of D.copy.assureLines) { ctx.fillText(ln, W / 2, y + 2); y += L.line; }
-  y += L.line;                                          // feed 1
+  y += 2 * L.line;                                      // feed 2
   ctx.font = '20px Menlo, monospace'; ctx.textAlign = 'left';
   const left = Math.round((W - L.cols * 12) / 2);
   ctx.fillText('-'.repeat(L.cols), left, y + 2); y += L.line;

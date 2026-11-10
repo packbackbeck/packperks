@@ -157,3 +157,15 @@
 .ach__bonus-note { margin: 10px 0 0; font-size: 11.5px; color: #8A8175; }
 
 .ach__why { margin: 14px 0 4px; padding-left: 18px; list-style: disc; font-size: 13px; line-height: 1.6; color: #5C554B; }
+
+/* A schedule whose email changed: payouts wait until the new one is confirmed. */
+.ac__plan-warn .ac__plan-icon { background: #FBF0D6; color: #8A6D1F; }
+.ac__confirm {
+  flex-shrink: 0; margin-left: auto; padding: 6px 12px; border-radius: 999px;
+  border: 1.5px solid #47478A; background: #fff; color: #47478A;
+  font-family: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;
+}
+.ac__confirm:disabled { opacity: 0.5; cursor: default; }
+
+/* The code sheet */
+.acv__code { letter-spacing: 0.4em; text-align: center; font-size: 22px; font-weight: 800; }

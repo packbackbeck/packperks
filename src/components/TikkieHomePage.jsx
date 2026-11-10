@@ -6,9 +6,10 @@ import {
   readStoredProfile, storeProfile, fetchWallet, scanBatch,
   scanBackupCups, scanStaticQr, redeemWallet, donateWallet, setEmail, savePendingEmail, checkBatch,
   getMarketingConsent, setMarketingConsent, oauthWalletLogin, signOutWallet, getAutoCashout, setAutoCashout,
+  verifyAutoCashout,
 } from '../lib/tikkieWallet';
 import { autoCashoutConfig } from '../lib/autoCashout';
-import AutoCashout, { AutoCashoutHelp } from './tikkie/AutoCashout';
+import AutoCashout, { AutoCashoutHelp, AutoCashoutVerify } from './tikkie/AutoCashout';
 import {
   getAuthInfo, peekOAuthIntent, startGoogleSignIn, switchGoogleAccount, takeOAuthIntent, takeOAuthReturnError,
 } from '../lib/oauth';
@@ -88,6 +89,7 @@ const UX_PREVIEW_DEMO = {
   'popup-limit': 'home',
   'popup-error': 'home',
   'popup-auto-help': 'auto-help',
+  'popup-auto-verify': 'auto-verify',
 };
 const UX_PARAMS = typeof window !== 'undefined'
   ? new URLSearchParams(window.location.search)
@@ -420,6 +422,7 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     if (DEMO === 'donate') return { type: 'donate' };
     if (DEMO === 'donated') return { type: 'donated', amount: 0.5, left: 0.4 };
     if (DEMO === 'auto-help') return { type: 'auto-help' };
+    if (DEMO === 'auto-verify') return { type: 'auto-verify', email: 'p•••@student.nl', tier: 'month' };
     return null;
   });
   /* Automatic cashout: what the venue offers, the schedule the server holds
@@ -756,6 +759,11 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
       setSchedule(data.auto_cashout || null);
       return;
     }
+    if (data?.status === 'verify_required') {
+      setPendingAutoTier(tier);
+      setPopup({ type: 'auto-verify', email: data.email, tier });
+      return;
+    }
     if (data?.error === 'email_required') {
       setPendingAutoTier(tier);
       setEmailSheet(true);
@@ -765,7 +773,9 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
       type: 'error',
       message: data?.error === 'auto_cashout_off'
         ? 'Automatic cashout isn’t available here right now. Your balance is unchanged.'
-        : 'We couldn’t save that just now. Please try again in a moment.',
+        : data?.error === 'rate_limited'
+          ? 'Too many tries for now. Please try again in a little while.'
+          : 'We couldn’t save that just now. Please try again in a moment.',
     });
     refreshWallet();
   }
@@ -775,12 +785,30 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     const tier = pendingAutoTier;
     setPendingAutoTier(null);
     if (!tier || !p?.email) return;
-    setSchedule({ tier, next_at: null });
     setAutoSaving(true);
     const data = await setAutoCashout(org?.id, tier);
     setAutoSaving(false);
-    if (data?.status === 'on') setSchedule(data.auto_cashout);
-    else refreshWallet();
+    if (data?.status === 'on') { setSchedule(data.auto_cashout); return; }
+    if (data?.status === 'verify_required') {
+      setPendingAutoTier(tier);
+      setPopup({ type: 'auto-verify', email: data.email, tier });
+    }
+  }
+
+  /* The code from the email: the tier is saved once it checks out. */
+  async function handleAutoVerify(code) {
+    if (DEMO) { setPopup(null); setSchedule({ tier: popup?.tier || 'month', next_at: demoNextAt(popup?.tier || 'month'), verified: true }); return null; }
+    const data = await verifyAutoCashout(org?.id, code);
+    if (data?.status === 'on') {
+      setSchedule(data.auto_cashout);
+      setPendingAutoTier(null);
+      setPopup(null);
+      return null;
+    }
+    return data?.error === 'code_expired' ? 'That code has expired. Send a new one.'
+      : data?.error === 'too_many_attempts' ? 'Too many tries. Send a new code.'
+        : data?.error === 'auto_cashout_off' ? 'Automatic cashout isn’t available here right now.'
+          : 'That code isn’t right. Check the email and try again.';
   }
 
   /* Donate: give `amount` of the balance to the charity partner. */
@@ -1155,6 +1183,8 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
               config={auto}
               tier={pendingAutoTier || schedule?.tier || 'off'}
               nextAt={schedule?.next_at || null}
+              unverified={!!schedule && schedule.verified === false && !pendingAutoTier}
+              onConfirm={() => handleAutoChange(schedule.tier)}
               email={profile?.email || null}
               balance={balance}
               owed={owed}
@@ -1432,6 +1462,15 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
 
       {popup?.type === 'auto-help' && (
         <AutoCashoutHelp config={auto} money={money} onClose={() => setPopup(null)} />
+      )}
+
+      {popup?.type === 'auto-verify' && (
+        <AutoCashoutVerify
+          email={popup.email}
+          onVerify={handleAutoVerify}
+          onResend={() => (DEMO ? Promise.resolve(true) : setAutoCashout(org?.id, popup.tier).then(d => d?.status === 'verify_required' || d?.status === 'on'))}
+          onClose={() => { setPopup(null); setPendingAutoTier(null); }}
+        />
       )}
 
       {popup?.type === 'donated' && (

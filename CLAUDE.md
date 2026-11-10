@@ -421,13 +421,18 @@ email: the point is not having to open the app and ask). The **?** opens
 `AutoCashoutHelp`. The venue switches it in Settings → Ways & features
 (`AutoCashoutCard`): `autoCashout`, `autoCashoutBonus`, and
 `autoCashoutBonusPct` `{ week, month, quarter }` (5/10/15 unless set; the
-server caps a bonus at 50%). A tier needs an email, so choosing one without
-one opens the email sheet first (and survives a Google round trip in the
-intent as `autoTier`). The schedule is in **its own table**,
+server caps a bonus at 50%). A tier needs a **verified** email (migration
+072): without one the email sheet opens first (and the tier survives a
+Google round trip in the intent as `autoTier`); a Google login with that
+address counts as proof, otherwise `set` emails a 6-digit code
+(`auto_cashout_codes`, 10 minutes, 5 tries) and `verify` saves the tier.
+The proven address is kept as `auto_cashouts.verified_email`; the run pays
+only while `users.email` still equals it, so a changed email pauses
+payouts and the card asks to confirm the new one. The schedule is in **its own table**,
 `auto_cashouts`, which no client role can write: a customer can update
 their own `users` row, and one who could move their own date to now would
 collect the bonus every hour. `auto-cashout` is both the wallet's door
-(`get`/`set`, identity = the device, like bin-tikkie) and the hourly run
+(`get`/`set`/`verify`, identity = the device, like bin-tikkie) and the hourly run
 (pg_cron at :23, header `x-cron-secret` = `app_config`
 `auto_cashout_cron`): it moves `next_at` on conditionally first (so two runs
 can't pay twice), sweeps exactly as `redeem` does, adds the bonus from the
@@ -437,7 +442,7 @@ back and retries in an hour. A payout it made carries `auto_cashout_tier`,
 `payout_amount` is the total, bonus included. `{dry_run: true, user_ids?,
 tier?}` with the secret shows what wallets would get without writing. It
 was built outside bin-tikkie on purpose, so the live payout function did
-not change. On for Unknown Campus (`t3`) since 10 Nov 2026.
+not change. The bonus is on the whole balance at payout time. On for Unknown Campus (`t3`) since 10 Nov 2026.
 
 Three code pages, one tab each: **SmartBin Receipt QR** (tab `cupqr`,
 single-use cup batches, every mode; formerly Dynamic QR code), **Static QR

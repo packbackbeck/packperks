@@ -23,11 +23,14 @@
 //               app_config 'auto_cashout_cron'.secret.
 //   dry run   — the same secret with { dry_run: true, user_ids?: [...],
 //               tier? }: what each wallet would be paid now. Reads only.
-//   the wallet — { action: 'get' | 'set', org_id, device_id, tier? }: the
-//               customer's own schedule. Like every bin-tikkie wallet call,
-//               holding the device that owns the wallet IS the identity.
-//               These live here rather than in bin-tikkie so the payout
-//               path's function didn't have to change for this feature.
+//   the wallet — { action: 'get' | 'set' | 'verify', org_id, device_id,
+//               tier?, code? }: the customer's own schedule. Like every
+//               bin-tikkie wallet call, holding the device that owns the
+//               wallet IS the identity. A tier is saved only for a verified
+//               email (migration 072): a Google login with that address, or
+//               a 6-digit code `set` sends and `verify` checks. These live
+//               here rather than in bin-tikkie so the payout path's
+//               function didn't have to change for this feature.
 //
 // verify_jwt is false: the cron caller has no JWT; the secret is the gate,
 // and the wallet calls only ever touch the calling device's own schedule.
@@ -244,7 +247,7 @@ async function sendLinkEmail(to: string, v: Venue, tier: string, o: {
   }
 }
 
-type Schedule = { user_id: string; org_id: string; tier: string; next_at: string };
+type Schedule = { user_id: string; org_id: string; tier: string; next_at: string; verified_email?: string | null };
 type Outcome = { user_id: string; result: string; amount?: number; bonus?: number; emailed?: boolean; error?: string };
 
 /* One due schedule, start to finish. */
@@ -273,6 +276,12 @@ async function runOne(s: Schedule, now: Date): Promise<Outcome> {
     // Nobody left to send it to: the schedule goes, the money stays in the wallet.
     await supabase.from("auto_cashouts").delete().eq("user_id", s.user_id);
     return { user_id: s.user_id, result: "dropped" };
+  }
+  // Only to the address that was proven. A changed email waits until the
+  // new one is confirmed in the app; the money stays in the wallet.
+  if (!s.verified_email || user.email.toLowerCase() !== s.verified_email.toLowerCase()) {
+    await note({ last_error: "email_unverified" });
+    return { user_id: s.user_id, result: "unverified" };
   }
 
   // 2. The payout row, then the atomic sweep (bin-tikkie redeemAction).
@@ -343,11 +352,11 @@ async function dryRun(userIds: string[] | null, tierOverride: string | null) {
   let rows: Schedule[] = [];
   if (userIds?.length) {
     const { data: users } = await supabase.from("users").select("id, org_id").in("id", userIds.slice(0, 50));
-    const { data: sched } = await supabase.from("auto_cashouts").select("user_id, org_id, tier, next_at").in("user_id", userIds.slice(0, 50));
+    const { data: sched } = await supabase.from("auto_cashouts").select("user_id, org_id, tier, next_at, verified_email").in("user_id", userIds.slice(0, 50));
     const byUser = new Map((sched || []).map((r) => [r.user_id, r as Schedule]));
     rows = (users || []).map((u) => byUser.get(u.id) || { user_id: u.id, org_id: u.org_id, tier: tierOverride || "week", next_at: new Date().toISOString() });
   } else {
-    const { data } = await supabase.from("auto_cashouts").select("user_id, org_id, tier, next_at")
+    const { data } = await supabase.from("auto_cashouts").select("user_id, org_id, tier, next_at, verified_email")
       .lte("next_at", new Date().toISOString()).order("next_at").limit(BATCH);
     rows = (data || []) as Schedule[];
   }
@@ -363,7 +372,9 @@ async function dryRun(userIds: string[] | null, tierOverride: string | null) {
       user_id: r.user_id, tier, next_at: r.next_at, venue_on: venueOn(v),
       has_email: !!u?.email, merged: !!u?.merged_into,
       deposit, bonus_pct: pct, bonus, total: Math.round((deposit + bonus) * 100) / 100,
-      would_pay: venueOn(v) && !!u?.email && !u?.merged_into && deposit > 0,
+      verified: !!u?.email && !!r.verified_email && u.email.toLowerCase() === r.verified_email.toLowerCase(),
+      would_pay: venueOn(v) && !!u?.email && !u?.merged_into && deposit > 0
+        && !!r.verified_email && u.email.toLowerCase() === r.verified_email.toLowerCase(),
       next_after: addInterval(new Date(), tier).toISOString(),
     });
   }
@@ -373,9 +384,11 @@ async function dryRun(userIds: string[] | null, tierOverride: string | null) {
 /* ── The wallet's own calls ─────────────────────────────────────────────
  * get — the schedule this device's wallet has, or null.
  * set — tier week | month | quarter, or off (the slider's zero). A tier
- *       needs the venue to have the feature on and the wallet to have an
- *       email, because that is where the link goes. The tier already set
+ *       needs the venue to have the feature on and the wallet to have a
+ *       PROVEN email, because that is where the link goes; otherwise it
+ *       emails a code and answers verify_required. The tier already set
  *       keeps its date; a different one starts its clock from now.
+ * verify — the code; a right one saves the tier it was sent for.
  * Nothing here moves money; the run above does, from the published
  * settings. The schedule table has no client policies (migration 071), so
  * this is the only way a customer reaches it, and only for their wallet. */
@@ -385,17 +398,19 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // slider is roomy (a campus shares one address); it fails open on errors.
 const RL_WINDOW_MS = 60 * 60 * 1000;
 const RL_MAX = 240;
-async function rateLimited(req: Request): Promise<boolean> {
+// Sending a code emails someone, so it gets bin-tikkie's tightest bucket.
+const RL_MAX_CODE = 10;
+async function rateLimited(req: Request, bucket = "auto-cashout", max = RL_MAX): Promise<boolean> {
   try {
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-    const key = `auto-cashout:${ip}`;
+    const key = `${bucket}:${ip}`;
     const now = Date.now();
     const { data } = await supabase.from("rate_limits").select("count, window_start").eq("key", key).maybeSingle();
     if (!data || now - new Date(data.window_start).getTime() > RL_WINDOW_MS) {
       await supabase.from("rate_limits").upsert({ key, count: 1, window_start: new Date().toISOString() });
       return false;
     }
-    if ((data.count ?? 0) >= RL_MAX) return true;
+    if ((data.count ?? 0) >= max) return true;
     await supabase.from("rate_limits").update({ count: (data.count ?? 0) + 1 }).eq("key", key);
     return false;
   } catch {
@@ -403,7 +418,109 @@ async function rateLimited(req: Request): Promise<boolean> {
   }
 }
 
-async function walletCall(body: Record<string, unknown>): Promise<Response> {
+/* ── Proving the email ─────────────────────────────────────────────────
+ * The link goes to the wallet's email, so a tier needs that address proven
+ * (migration 072): a Google login with it, or a 6-digit code sent to it.
+ * Codes: 10 minutes, 5 tries, one new code a minute, hashed at rest. */
+const CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_MAX_ATTEMPTS = 5;
+const CODE_RESEND_MS = 60 * 1000;
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function maskEmail(e: string): string {
+  const [u, d] = e.split("@");
+  return `${u.slice(0, 1)}${"•".repeat(Math.max(1, Math.min(4, u.length - 1)))}@${d}`;
+}
+
+/* A Google login proves the address Google confirmed. */
+async function provenByGoogle(authUserId: string | null, email: string): Promise<boolean> {
+  if (!authUserId) return false;
+  try {
+    const { data } = await supabase.auth.admin.getUserById(authUserId);
+    const u = data?.user;
+    return !!u?.email_confirmed_at && String(u.email || "").toLowerCase() === email.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+async function sendCode(req: Request, userId: string, email: string, tier: string, v: Venue): Promise<{ sent: boolean; error?: string }> {
+  const { data: prev } = await supabase.from("auto_cashout_codes")
+    .select("email, sent_at").eq("user_id", userId).maybeSingle();
+  // A code that went to this address less than a minute ago still stands.
+  if (prev && prev.email === email && Date.now() - new Date(prev.sent_at).getTime() < CODE_RESEND_MS) {
+    await supabase.from("auto_cashout_codes").update({ tier }).eq("user_id", userId);
+    return { sent: true };
+  }
+  if (await rateLimited(req, "auto-cashout-code", RL_MAX_CODE)) return { sent: false, error: "rate_limited" };
+  if (!BREVO_API_KEY) return { sent: false, error: "code_send_failed" };
+
+  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+  const now = new Date();
+  const { error } = await supabase.from("auto_cashout_codes").upsert({
+    user_id: userId, email, tier,
+    code_hash: await sha256Hex(code), attempts: 0,
+    sent_at: now.toISOString(), expires_at: new Date(now.getTime() + CODE_TTL_MS).toISOString(),
+  }, { onConflict: "user_id" });
+  if (error) return { sent: false, error: "db_error" };
+
+  const t = TIERS[tier];
+  const text = `${code} is your code to confirm this email for automatic cashout at ${v.name}.\n\n` +
+    `Once it's confirmed we send your deposit to this address ${t.every} as a Tikkie link. The code works for 10 minutes.\n\n` +
+    "Didn't ask for this? You can ignore this email.";
+  const html = `<!doctype html><html><body style="margin:0;background:#F6F1E8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1F1B16">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F6F1E8;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border-radius:18px;padding:28px 24px">
+<tr><td style="font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#8A8175">${esc(v.name)} · Automatic cashout</td></tr>
+<tr><td style="padding-top:10px;font-size:20px;font-weight:800">Confirm your email</td></tr>
+<tr><td style="padding-top:16px;font-size:38px;font-weight:800;letter-spacing:.18em">${code}</td></tr>
+<tr><td style="padding-top:14px;font-size:13px;line-height:1.55;color:#5C554B">Once it's confirmed we send your deposit to this address ${esc(t.every)} as a Tikkie link. The code works for 10 minutes.</td></tr>
+<tr><td style="padding-top:20px;border-top:1px solid #F0EAE0;font-size:12px;color:#8A8175">Didn't ask for this? You can ignore this email.</td></tr>
+</table></td></tr></table></body></html>`;
+  try {
+    const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": BREVO_API_KEY, "content-type": "application/json" },
+      body: JSON.stringify({
+        sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+        to: [{ email }],
+        subject: `${code} is your code for automatic cashout`,
+        textContent: text,
+        htmlContent: html,
+      }),
+    });
+    if (!r.ok) return { sent: false, error: "code_send_failed" };
+  } catch {
+    return { sent: false, error: "code_send_failed" };
+  }
+  return { sent: true };
+}
+
+/* Save (or keep) the schedule for a proven address. */
+async function saveSchedule(userId: string, orgId: string, tier: string, email: string) {
+  const { data: existing } = await supabase.from("auto_cashouts")
+    .select("tier, next_at, started_at").eq("user_id", userId).maybeSingle();
+  const now = new Date();
+  if (existing?.tier === tier) {
+    await supabase.from("auto_cashouts").update({ verified_email: email, last_error: null, updated_at: now.toISOString() }).eq("user_id", userId);
+    return { error: null, row: { ...existing, verified: true } };
+  }
+  const row = {
+    user_id: userId, org_id: orgId, tier,
+    started_at: now.toISOString(),
+    next_at: addInterval(now, tier).toISOString(),
+    verified_email: email,
+    last_error: null,
+    updated_at: now.toISOString(),
+  };
+  const { error } = await supabase.from("auto_cashouts").upsert(row, { onConflict: "user_id" });
+  return { error, row: { tier, next_at: row.next_at, started_at: row.started_at, verified: true } };
+}
+
+async function walletCall(req: Request, body: Record<string, unknown>): Promise<Response> {
   const orgId = String(body.org_id || "").trim();
   const deviceId = String(body.device_id || "").trim().slice(0, 64);
   if (!UUID_RE.test(orgId)) return json({ error: "not_found" }, 404);
@@ -413,49 +530,70 @@ async function walletCall(body: Record<string, unknown>): Promise<Response> {
   if (!v || v.settings.mode !== "tikkie_only") return json({ error: "not_found" }, 404);
 
   const { data: profile } = await supabase
-    .from("users").select("id, email")
+    .from("users").select("id, email, auth_user_id")
     .eq("org_id", orgId).eq("device_id", deviceId)
     .is("merged_into", null)
     .maybeSingle();
+  const email = String(profile?.email || "").trim().toLowerCase();
   const current = async () => {
     if (!profile) return null;
     const { data } = await supabase.from("auto_cashouts")
-      .select("tier, next_at, started_at").eq("user_id", profile.id).maybeSingle();
-    return data ?? null;
+      .select("tier, next_at, started_at, verified_email").eq("user_id", profile.id).maybeSingle();
+    if (!data) return null;
+    const { verified_email, ...rest } = data;
+    return { ...rest, verified: !!email && String(verified_email || "").toLowerCase() === email };
   };
 
   if (body.action === "get") return json({ auto_cashout: await current() });
 
+  if (!profile) return json({ error: body.action === "set" && body.tier === "off" ? "no_profile" : "email_required" }, 409);
+
+  if (body.action === "verify") {
+    const code = String(body.code || "").trim();
+    if (!/^[0-9]{6}$/.test(code)) return json({ error: "invalid_code" }, 400);
+    const { data: pending } = await supabase.from("auto_cashout_codes")
+      .select("email, tier, code_hash, attempts, expires_at").eq("user_id", profile.id).maybeSingle();
+    if (!pending || pending.email !== email) return json({ error: "invalid_code" }, 401);
+    if (new Date(pending.expires_at).getTime() < Date.now()) return json({ error: "code_expired" }, 401);
+    if ((pending.attempts ?? 0) >= CODE_MAX_ATTEMPTS) return json({ error: "too_many_attempts" }, 429);
+    if (pending.code_hash !== await sha256Hex(code)) {
+      await supabase.from("auto_cashout_codes").update({ attempts: (pending.attempts ?? 0) + 1 }).eq("user_id", profile.id);
+      return json({ error: "invalid_code" }, 401);
+    }
+    await supabase.from("auto_cashout_codes").delete().eq("user_id", profile.id);
+    if (v.settings.autoCashout !== true) return json({ error: "auto_cashout_off" }, 403);
+    const { error, row } = await saveSchedule(profile.id, orgId, pending.tier, email);
+    if (error) return json({ error: "db_error" }, 500);
+    return json({ status: "on", auto_cashout: row });
+  }
+
+  // action: set
   const tier = String(body.tier || "off");
   if (tier !== "off" && !TIERS[tier]) return json({ error: "invalid_tier" }, 400);
-  if (!profile) return json({ error: tier === "off" ? "no_profile" : "email_required" }, tier === "off" ? 404 : 409);
-
   if (tier === "off") {
     await supabase.from("auto_cashouts").delete().eq("user_id", profile.id);
+    await supabase.from("auto_cashout_codes").delete().eq("user_id", profile.id);
     return json({ status: "off", auto_cashout: null });
   }
   if (v.settings.autoCashout !== true) return json({ error: "auto_cashout_off" }, 403);
-  if (!profile.email) return json({ error: "email_required" }, 409);
+  if (!email) return json({ error: "email_required" }, 409);
 
-  const existing = await current();
-  if (existing?.tier === tier) return json({ status: "on", auto_cashout: existing });
-
-  const now = new Date();
-  const row = {
-    user_id: profile.id,
-    org_id: orgId,
-    tier,
-    started_at: now.toISOString(),
-    next_at: addInterval(now, tier).toISOString(),
-    last_error: null,
-    updated_at: now.toISOString(),
-  };
-  const { error } = await supabase.from("auto_cashouts").upsert(row, { onConflict: "user_id" });
+  // Already proven: the schedule's own address, or a Google login with it.
+  const { data: sched } = await supabase.from("auto_cashouts")
+    .select("verified_email").eq("user_id", profile.id).maybeSingle();
+  const proven = String(sched?.verified_email || "").toLowerCase() === email
+    || await provenByGoogle(profile.auth_user_id, email);
+  if (!proven) {
+    const sent = await sendCode(req, profile.id, email, tier, v);
+    if (!sent.sent) return json({ error: sent.error || "code_send_failed" }, sent.error === "rate_limited" ? 429 : 502);
+    return json({ status: "verify_required", email: maskEmail(email) });
+  }
+  const { error, row } = await saveSchedule(profile.id, orgId, tier, email);
   if (error) {
     console.error(`[auto-cashout] save failed: ${error.message}`);
     return json({ error: "db_error" }, 500);
   }
-  return json({ status: "on", auto_cashout: { tier, next_at: row.next_at, started_at: row.started_at } });
+  return json({ status: "on", auto_cashout: row });
 }
 
 Deno.serve(async (req) => {
@@ -470,9 +608,9 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* scheduled calls carry a tiny body */ }
 
   // The wallet: its own schedule, nothing else.
-  if (body.action === "get" || body.action === "set") {
+  if (body.action === "get" || body.action === "set" || body.action === "verify") {
     if (await rateLimited(req)) return json({ error: "rate_limited" }, 429);
-    return walletCall(body);
+    return walletCall(req, body);
   }
 
   const secret = req.headers.get("x-cron-secret") || "";
@@ -489,7 +627,7 @@ Deno.serve(async (req) => {
   const started = Date.now();
   const now = new Date();
   const { data: due, error } = await supabase.from("auto_cashouts")
-    .select("user_id, org_id, tier, next_at")
+    .select("user_id, org_id, tier, next_at, verified_email")
     .lte("next_at", now.toISOString())
     .order("next_at")
     .limit(BATCH);

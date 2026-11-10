@@ -103,6 +103,10 @@ export const getAutoCashout = (orgId) =>
 export const setAutoCashout = (orgId, tier) =>
   invokeAutoCashout({ action: 'set', org_id: orgId, device_id: deviceId(), tier });
 
+/* The 6-digit code `set` emailed when the address wasn't proven yet. */
+export const verifyAutoCashout = (orgId, code) =>
+  invokeAutoCashout({ action: 'verify', org_id: orgId, device_id: deviceId(), code });
+
 export const setEmail = (orgId, email, marketing) =>
   invokeBinTikkie({
     action: 'set_email', org_id: orgId, device_id: deviceId(),

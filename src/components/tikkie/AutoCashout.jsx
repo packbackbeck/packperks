@@ -30,7 +30,7 @@ function fmtDay(iso) {
 
 export default function AutoCashout({
   config, tier, nextAt, email, balance, owed, money, saving, claiming,
-  isLinkPayout, accent, onChange, onClaim, onHelp,
+  isLinkPayout, accent, unverified = false, onChange, onClaim, onHelp, onConfirm,
 }) {
   const committed = tier || 'off';
   const indexOf = (k) => Math.max(0, STOPS.indexOf(k));
@@ -139,13 +139,18 @@ export default function AutoCashout({
                   : <>First cashout in <b>{t.label}</b></>}
               </span>
             </li>
-            <li>
+            <li className={unverified ? 'ac__plan-warn' : undefined}>
               <span className="ac__plan-icon" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m3.5 6.5 8.5 6.5 8.5-6.5" /></svg>
               </span>
               <span className="ac__plan-email">
-                {email ? <>The link goes to <b>{email}</b></> : <>Add your email to get the link</>}
+                {unverified
+                  ? <>Confirm <b>{email}</b> to keep getting the link</>
+                  : email ? <>The link goes to <b>{email}</b></> : <>Add and confirm your email to get the link</>}
               </span>
+              {unverified && (
+                <button type="button" className="ac__confirm" onClick={onConfirm} disabled={saving}>Confirm</button>
+              )}
             </li>
             {pct > 0 && balance > 0 && (
               <li className="ac__plan-bonus">
@@ -226,6 +231,65 @@ export function AutoCashoutHelp({ config, money, onClose }) {
 
         <button type="button" className="tk-btn tk-btn--primary tk-btn--full" onClick={onClose}>Got it</button>
       </div>
+    </Sheet>
+  );
+}
+
+/* ── Confirm the email before a tier is saved: the link goes there, so the
+ * address has to be the customer's own (auto-cashout `verify`). ── */
+export function AutoCashoutVerify({ email, onVerify, onResend, onClose }) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [resent, setResent] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (busy || code.length !== 6) return;
+    setBusy(true);
+    setErr(null);
+    const problem = await onVerify(code);
+    setBusy(false);
+    if (problem) setErr(problem);
+  }
+
+  async function resend() {
+    setBusy(true);
+    setErr(null);
+    const ok = await onResend();
+    setBusy(false);
+    setCode('');
+    if (ok) setResent(true);
+    else setErr('We couldn’t send a new code just now. Please try again in a minute.');
+  }
+
+  return (
+    <Sheet onClose={busy ? undefined : onClose} label="Confirm your email">
+      <h2 className="tk-sheet__title">Confirm your email</h2>
+      <p className="tk-sheet__sub">
+        {resent ? 'A new code is on its way to ' : 'Enter the 6-digit code we sent to '}<strong>{email}</strong>.
+      </p>
+      <form onSubmit={submit} className="tk-sheet__stack tk-sheet__stack--spaced">
+        <input
+          className="tk-input acv__code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          aria-label="6-digit code"
+          placeholder="••••••"
+          maxLength={6}
+          value={code}
+          onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr(null); }}
+          disabled={busy}
+          autoFocus
+        />
+        {err && <p className="tk-err">{err}</p>}
+        <button type="submit" className="tk-btn tk-btn--primary tk-btn--full" disabled={busy || code.length !== 6}>
+          {busy ? 'Checking…' : 'Confirm'}
+        </button>
+        <button type="button" className="tk-btn tk-btn--full" onClick={resend} disabled={busy}>
+          Send a new code
+        </button>
+      </form>
     </Sheet>
   );
 }

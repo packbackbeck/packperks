@@ -125,9 +125,9 @@ so it works even when the bin has no connection at all.
 - **On the bin's screen:** show it all the time (or on the idle and
   "thank you" screens). Scanning it opens KFC's PackPerks page and adds one
   cup.
-- **On the offline receipt:** when step 5 above applies, print this QR
-  instead of the receipt QR, with a line such as "Scan to add your cup".
-  Don't print a cup count: the static QR adds **one cup per scan**, however
+- **On the offline receipt:** when step 5 above applies, print the same
+  receipt design (section 6) with this QR instead of the receipt QR. There
+  is no cup count on it: the static QR adds **one cup per scan**, however
   many cups went in.
 
 Every scan adds +1 cup, up to a per-person limit that PackPerks sets for
@@ -144,8 +144,9 @@ inside the KFC app** instead of the real KFC rewards.
 
 - A switch in the bin's settings: receipt mode `packperks` (default) or
   `demo`.
-- In `demo` mode, at the end of every session the bin prints a receipt with
-  a QR of `https://perks.packback.network/demo/kfc` and makes **no call to
+- In `demo` mode, at the end of every session the bin prints the same
+  receipt design (section 6) with a QR of
+  `https://perks.packback.network/demo/kfc` and makes **no call to
   PackPerks**. The demo runs entirely on the customer's phone: each time
   the page is opened counts as one returned cup, and nothing reaches KFC's
   real numbers.
@@ -156,18 +157,80 @@ inside the KFC app** instead of the real KFC rewards.
 
 ---
 
-## 6. The receipt
+## 6. The receipt design
 
-| | Receipt QR (`packperks`) | Offline receipt | Demo receipt (`demo`) |
+All three receipts share one design and differ only in their QR (and the
+session line in the footer). They are drawn for an **80 mm thermal roll at
+203 dpi: 512 dots across, 8 dots to the millimetre**, the same as the
+PackPerks Epson TM-m30III. The files are in
+[`bin-receipts/kfc/`](bin-receipts/kfc/):
+
+| File | What it is |
+|---|---|
+| `header.png` | The top of every receipt, **512 × 557 dots**, pure black and white. Print it as one raster image, 1:1, centred. Don't scale it |
+| `preview-receipt.png` | The whole normal receipt, for reference |
+| `preview-offline.png` | The whole offline receipt (static QR), for reference |
+| `preview-demo.png` | The whole demo receipt, for reference |
+
+The header carries the Packback logo, **GET YOUR FREE REWARD**, one line on
+collecting cups for free KFC rewards, three boxes (*Collect your cups*,
+*Unlock free rewards*, *Keep track of your progress*) and **Scan to
+collect with Packback**. KFC has no deposit, so there is no refund, euro
+amount or cup count anywhere on the receipt.
+
+### What the bin prints, top to bottom
+
+A *line* is one line of the printer's Font A: 12 × 24 dots on a 30-dot
+pitch (42 characters across 504 dots). A *blank line* is 30 dots (3.75 mm)
+of white.
+
+| # | Block | How | Size and spacing |
 |---|---|---|---|
-| QR | `url` from the response | `…/kfc/?byo=1` | `…/demo/kfc` |
-| Text | "3 cups returned" + "Scan to add your cups to KFC rewards" | "Scan to add your cup" | "Scan to try Packback in the KFC app" |
-| Euro amount | No | No | No |
+| 1 | Header | `header.png`, raster image | 512 × 557 dots, already includes its own top margin and the gap under the headline |
+| 2 | Gap | 1 blank line | 30 dots |
+| 3 | QR | The printer's own QR command, model 2, error correction **M**, centred | Module size **6 dots** for the receipt link, **7 dots** for the static and demo links (they are shorter, so fewer modules). Every QR comes out about 25–28 mm |
+| 4 | Gap | 2 blank lines | 60 dots |
+| 5 | Two lines, bold, centred | `No app and no registration needed.` / `Fast and secure.` | Font A, emphasised |
+| 6 | Gap | 1 blank line | 30 dots |
+| 7 | Rule | 42 × `-`, left aligned | Font A |
+| 8 | Footer, left aligned | `Time:` then `Restaurant:`, and on the normal receipt `Session ID:` | Label padded to 15 characters, value after it |
+| 9 | Paper before the cut | 2 blank lines, then a feed-and-cut | 60 dots |
 
-Make each QR big enough for a phone camera to read from a crumpled receipt
-(keep it well above 20 mm square; around 30 mm is comfortable on an 80 mm
-roll), with a white margin around it. The same goes for the QR on the
-screen: aim for at least 4 cm across at the screen's real size.
+Footer values:
+
+| Label | Value | Example |
+|---|---|---|
+| `Time:` | Day, short month, year, 24-hour time | `10 Nov 2026, 12:07` |
+| `Restaurant:` | The KFC restaurant's name, **27 characters at most** so it fits on one line after the label. Shorten it rather than let it wrap | `KFC Amsterdam Centraal` |
+| `Session ID:` | Normal receipt only: the first 8 characters of `session_id`, upper case | `E2A93D7C` |
+
+On an Epson printer with ePOS-Print the whole receipt is (QR value and
+footer filled in by the bin):
+
+```xml
+<text align="center"/>
+<image width="512" height="557" color="color_1" mode="mono" align="center">…header.png, 1 bit a dot…</image>
+<feed line="1"/>
+<symbol type="qrcode_model_2" level="level_m" width="6" height="6">https://perks.packback.network/kfc/?batch=…</symbol>
+<feed line="2"/>
+<text em="true">No app and no registration needed.&#10;Fast and secure.&#10;</text>
+<text em="false"/>
+<feed line="1"/>
+<text>------------------------------------------&#10;</text>
+<text align="left"/>
+<text>Time:          10 Nov 2026, 12:07&#10;</text>
+<text>Restaurant:    KFC Amsterdam Centraal&#10;</text>
+<text>Session ID:    E2A93D7C&#10;</text>
+<feed line="2"/>
+<cut type="feed"/>
+```
+
+For the offline and demo receipts, use `width="7" height="7"` on the
+`<symbol>` and leave out the `Session ID:` line. Any other ESC/POS printer
+does the same with its raster-image, QR and text commands.
+
+The QR on the bin's **screen** is the static link. Aim for at least 4 cm
+across at the screen's real size, with a white margin around it.
 
 What the customer sees when they scan a receipt QR: the KFC rewards app
 opens and the cups are added to their balance. One receipt credits once;
@@ -201,4 +264,8 @@ Checks before going live:
       fault.
 - [ ] With receipt mode `demo`, the receipt opens
       `https://perks.packback.network/demo/kfc` and no call is made.
-- [ ] No receipt shows a euro amount.
+- [ ] No receipt shows a euro amount or a cup count, and the restaurant name
+      fits on one line.
+- [ ] A printed receipt matches `preview-receipt.png`: the header is the same
+      size (not scaled) and the gaps are the same.
+- [ ] Each printed QR scans from about 20 cm away.

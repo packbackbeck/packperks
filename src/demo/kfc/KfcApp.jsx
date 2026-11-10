@@ -4,6 +4,7 @@ import { CupSvg } from '../kit/icons';
 import { cls, useKit } from '../kit/kitCore';
 import { useBaselines } from '../useBaselines';
 import { nextReward, pointsFor } from '../brands';
+import KfcVoucher from './KfcVoucher';
 import './kfc.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -11,7 +12,9 @@ import './kfc.css';
  *
  * Home and Profile are matched to screenshots of the real app (every
  * position below is in iOS points on a 393 × 852 screen, read off them;
- * the images are crops of the same screenshots). Deals is a concept in
+ * the images are crops of the same screenshots), except that the Doritos
+ * banner is half its height so the Packback card fits on the first screen.
+ * Every label follows the demo's language. Deals is a concept in
  * the app's style. Packback adds three things: the card on Home, the
  * points section on Deals, and a black Packback button on Profile.
  * KFC NL has no points programme, so these points are Packback's.
@@ -21,7 +24,8 @@ const A = '/demo/kfc';
 const TABS = ['home', 'locations', 'order', 'deals', 'more'];
 const TAB_LEFT = [0.1, 78.7, 157.3, 235.9, 314.5];
 const ICON_LEFT = [23.756, 23.966, 24.176, 23.96, 24.17];
-const TAB_LABEL = { home: 'Home', locations: 'Locations', order: 'Order', deals: 'Deals', more: 'More' };
+// Tabs that are not in the demo are drawn grey, so nobody expects them to work.
+const TAB_OFF = new Set(['locations', 'order', 'more']);
 
 // Concept deals (not from the app): what the Deals tab offers besides Packback.
 const COUPONS = [
@@ -124,13 +128,15 @@ export default function KfcApp() {
       <section className={cls('kfa-view', root === 'home' && 'is-root', root === 'home' && pushed && 'is-covered')}>
         <div className="kfa-home-scroll" ref={homeScroll}>
           <div className="kfa-home-canvas" data-origin>
-            <div className="kfa-t kfa-roboto kfa-greet" data-bl="141.86">Hi, Beke!</div>
+            <div className="kfa-t kfa-roboto kfa-greet" data-bl="141.86">{t('kfcHi')}</div>
             <div className="kfa-t kfa-roboto kfa-welcome" data-bl="166.14" dangerouslySetInnerHTML={{ __html: t('kfcWelcome') }} />
-            <div className="kfa-banner" style={{ top: 234.726, height: 320.352 }}>
+            {/* Half the screenshot's 320pt: the top of the artwork, with the
+                button redrawn on it so its label can be Dutch or English. */}
+            <div className="kfa-banner" style={{ top: 234.726, height: 160.176 }}>
               <img src={`${A}/banner-doritos.jpg`} alt="Doritos Loaded Bag" style={{ width: 393.198, height: 320.352 }} />
             </div>
-            <button type="button" className="kfa-hit kfa-order-btn" onClick={notInDemo} aria-label="Order Now" />
-            <div className="kfa-t kfa-bold kfa-order-label" data-bl="524.25">Order Now</div>
+            <button type="button" className="kfa-hit kfa-order-btn" onClick={notInDemo} aria-label={t('kfcOrderNow')} />
+            <div className="kfa-t kfa-bold kfa-order-label" data-bl="370.2">{t('kfcOrderNow')}</div>
 
             <article className="ppd-kit kfa-pp-home">
               <div className="kfa-pp-row">
@@ -144,9 +150,9 @@ export default function KfcApp() {
 
             {/* Its own origin: the text inside keeps the screenshot's coordinates. */}
             <div className="kfa-below" data-origin>
-              <div className="kfa-t kfa-bold kfa-news-title" data-bl="621.53">News</div>
-              <button type="button" className="kfa-hit" aria-label="View all news" style={{ left: 316, top: 600, width: 62, height: 30 }} onClick={notInDemo} />
-              <div className="kfa-t kfa-bold kfa-view-all" data-bl="621.53">View all</div>
+              <div className="kfa-t kfa-bold kfa-news-title" data-bl="621.53">{t('kfcNews')}</div>
+              <button type="button" className="kfa-hit" aria-label={t('kfcViewAll')} style={{ left: 296, top: 600, width: 82, height: 30 }} onClick={notInDemo} />
+              <div className="kfa-t kfa-bold kfa-view-all" data-bl="621.53">{t('kfcViewAll')}</div>
               <div className="kfa-news-card"><img src={`${A}/news-wings.jpg`} alt="Wings Wednesday" /></div>
               <div className="kfa-badge" />
               <div className="kfa-t kfa-roboto kfa-badge-label" data-bl="677.0">1/4</div>
@@ -186,7 +192,7 @@ export default function KfcApp() {
           <div className="kfa-std">
             <div className="kfa-sec"><h3>{t('kfcWeekDeal')}</h3><span>{t('kfcDaysLeft')}</span></div>
             <article className="kfa-feature">
-              <div className="kfa-feature-art"><span className="kfa-pill">App deal</span></div>
+              <div className="kfa-feature-art"><span className="kfa-pill">{t('kfcAppDeal')}</span></div>
               <div className="kfa-feature-body">
                 <h4>Doritos Loaded Bag</h4>
                 <p>{t('kfcFeatDesc')}</p>
@@ -223,14 +229,14 @@ export default function KfcApp() {
       {/* ── TAB BAR ── */}
       <nav className="kfa-tabbar" data-origin>
         {TABS.map((name, i) => (
-          <button key={name} type="button" className="kfa-hit kfa-tab" style={{ left: TAB_LEFT[i] }}
-            aria-label={TAB_LABEL[name]} aria-current={root === name ? 'page' : undefined} onClick={() => tab(name)}>
+          <button key={name} type="button" className={cls('kfa-hit', 'kfa-tab', TAB_OFF.has(name) && 'is-off')} style={{ left: TAB_LEFT[i] }}
+            aria-label={t('kfcTabs')[name]} aria-current={root === name ? 'page' : undefined} onClick={() => tab(name)}>
             <img alt="" src={`${A}/tab-${name}-${root === name ? 'red' : 'black'}.png`}
               style={{ left: ICON_LEFT[i], width: i === 0 ? 31.098 : 30.672, height: 31.098 }} />
           </button>
         ))}
         {TABS.map((name, i) => (
-          <div key={name} className="kfa-t kfa-roboto kfa-tab-label" data-bl="49.3" style={{ left: TAB_LEFT[i], right: 'auto', width: 78.6 }}>{TAB_LABEL[name]}</div>
+          <div key={name} className={cls('kfa-t', 'kfa-roboto', 'kfa-tab-label', TAB_OFF.has(name) && 'is-off')} data-bl="49.3" style={{ left: TAB_LEFT[i], right: 'auto', width: 78.6 }}>{t('kfcTabs')[name]}</div>
         ))}
       </nav>
 
@@ -244,37 +250,36 @@ export default function KfcApp() {
             <div className="kfa-t kfa-roboto kfa-phone-no" data-bl="374.03">31612345678</div>
 
             <button type="button" className="kfa-hit kfa-red-btn" style={{ left: 100.96, top: 423.87, width: 191.27, height: 41.75 }} onClick={notInDemo} />
-            <div className="kfa-t kfa-roboto kfa-btn-label" data-bl="450.7">Update Profile</div>
+            <div className="kfa-t kfa-roboto kfa-btn-label" data-bl="450.7">{t('kfcUpdate')}</div>
 
             <div className="kfa-rg kfa-rg-l">
-              <button type="button" className="kfa-hit kfa-ring" aria-label="My History" style={{ left: 70.17 }} onClick={notInDemo} />
+              <button type="button" className="kfa-hit kfa-ring" aria-label={t('kfcHistory')} style={{ left: 70.17 }} onClick={notInDemo} />
               <img className="kfa-px" src={`${A}/icon-history-white.png`} alt="" style={{ left: 78.81, top: 526.11, width: 60.066, height: 59.214 }} />
-              <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 48.63 }}>My History</div>
+              <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 48.63 }}>{t('kfcHistory')}</div>
             </div>
             <div className="kfa-rg kfa-rg-r">
-              <button type="button" className="kfa-hit kfa-ring" aria-label="Inbox" style={{ left: 246.45 }} onClick={notInDemo} />
+              <button type="button" className="kfa-hit kfa-ring" aria-label={t('kfcInbox')} style={{ left: 246.45 }} onClick={notInDemo} />
               <img className="kfa-px" src={`${A}/icon-inbox-white.png`} alt="" style={{ left: 254.748, top: 526.11, width: 60.918, height: 59.214 }} />
-              <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 225.2 }}>Inbox</div>
+              <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 225.2 }}>{t('kfcInbox')}</div>
             </div>
             <div className="kfa-rg">
               <button type="button" className="kfa-hit kfa-ring" aria-label="Packback" style={{ left: 158.25 }} onClick={() => kit.openSheet('wallet')} />
               <span className="kfa-ring-cup"><CupSvg /></span>
               <span className="kfa-bubble">{wallet.points}</span>
               <div className="kfa-t kfa-roboto kfa-ring-label" data-bl="617.9" style={{ left: 136.5 }}>Packback</div>
-              <div className="kfa-balance ppd-kit"><span>{wallet.points} {t('unitShort')}</span></div>
             </div>
 
             <button type="button" className="kfa-hit kfa-red-btn" style={{ left: 126.5, top: 678.2, width: 140.2, height: 41.3 }} onClick={notInDemo} />
-            <div className="kfa-t kfa-roboto kfa-btn-label is-sm" data-bl="705.0">Log out</div>
-            <button type="button" className="kfa-hit" aria-label="Privacy and Terms" style={{ left: 132, top: 728, width: 128, height: 28 }} onClick={notInDemo} />
-            <div className="kfa-t kfa-roboto kfa-link" data-bl="747.6">Privacy and Terms</div>
-            <button type="button" className="kfa-hit" aria-label="Delete my account" style={{ left: 132, top: 762, width: 128, height: 26 }} onClick={notInDemo} />
-            <div className="kfa-t kfa-roboto kfa-link" data-bl="779.1">Delete my account</div>
+            <div className="kfa-t kfa-roboto kfa-btn-label is-sm" data-bl="705.0">{t('kfcLogout')}</div>
+            <button type="button" className="kfa-hit" aria-label={t('kfcPrivacy')} style={{ left: 112, top: 728, width: 168, height: 28 }} onClick={notInDemo} />
+            <div className="kfa-t kfa-roboto kfa-link" data-bl="747.6">{t('kfcPrivacy')}</div>
+            <button type="button" className="kfa-hit" aria-label={t('kfcDelete')} style={{ left: 112, top: 762, width: 168, height: 26 }} onClick={notInDemo} />
+            <div className="kfa-t kfa-roboto kfa-link" data-bl="779.1">{t('kfcDelete')}</div>
           </div>
         </div>
       </section>
 
-      <PackbackLayer />
+      <PackbackLayer Voucher={KfcVoucher} />
     </div>
   );
 }

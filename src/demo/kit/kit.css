@@ -40,7 +40,9 @@
 }
 .ppd-track.is-two .ppd-fill { border-radius: 0 22px 22px 0; }
 .ppd-slots { position: relative; display: flex; align-items: center; justify-content: space-evenly; height: 100%; padding: 0 6px; }
-.ppd-slot { width: 28px; height: 28px; color: rgba(255, 255, 255, .45); transition: color .3s; }
+/* A cup still to come: white dimmed into the track, solid, so no line of the
+   icon shows through another. */
+.ppd-slot { width: 28px; height: 28px; color: color-mix(in srgb, #fff 48%, var(--ppd-primary)); transition: color .3s; }
 .ppd-track.is-two .ppd-slot { width: 26px; height: 26px; }
 .ppd-slot.is-full { color: var(--ppd-fill-ink); }
 .ppd-slot.is-star.is-full { color: var(--ppd-on-primary); }
@@ -186,6 +188,8 @@
   transform: translateY(calc(-100% - 70px)); transition: transform .5s cubic-bezier(.2, .9, .25, 1);
 }
 .ppd-notice.is-on { transform: none; }
+.ppd-notice.is-dragging { transition: none; }
+.ppd-notice { touch-action: none; user-select: none; -webkit-user-select: none; }
 .ppd-notice-icon {
   flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px;
   background: var(--ppd-primary); color: var(--ppd-on-primary);

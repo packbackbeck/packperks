@@ -124,3 +124,50 @@
 .mca-tab-label { font: 600 11.5px/1 var(--mca-font); }
 .mca-tab.is-on .mca-tab-label { font-weight: 800; }
 .mca-tab-dot { position: absolute; top: 3px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--mca-red); box-shadow: 0 0 0 2px #fff; }
+
+/* ── The voucher: a Packback reward as a MyMcDonald's coupon ── */
+.mcv {
+  position: absolute; inset: 0; z-index: 90; display: flex; flex-direction: column;
+  background: #fff; color: var(--mca-ink); font-family: var(--mca-font); animation: mcv-in .32s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes mcv-in { from { transform: translateY(100%); } }
+.mcv-head { flex: none; height: calc(var(--ppd-safe-top, 54px) + 48px); position: relative; }
+.mcv-back {
+  position: absolute; left: 10px; bottom: 4px; width: 44px; height: 44px; display: grid; place-items: center;
+  border: 0; background: none; color: var(--mca-ink); cursor: pointer;
+}
+.mcv-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 22px 18px; text-align: center; }
+.mcv-scroll::-webkit-scrollbar { display: none; }
+.mcv-art { height: 150px; display: grid; place-items: center; }
+.mcv-art img { height: 150px; width: auto; max-width: 100%; object-fit: contain; }
+.mcv-name { margin-top: 6px; font: 800 28px/1.1 var(--mca-font); letter-spacing: -.015em; }
+.mcv-cost { margin-top: 6px; font: 600 15px/1.2 var(--mca-font); color: var(--mca-soft); }
+.mcv-code { margin-top: 18px; padding: 18px 16px 16px; border: 1px solid var(--mca-line); border-radius: 12px; background: #fff; }
+.mcv-scan { font: 800 17px/1.25 var(--mca-font); }
+.mcv-qr { display: inline-block; margin-top: 14px; }
+.mcv-qr img, .mcv-qr span { display: block; width: 184px; height: 184px; max-width: none; }
+.mcv-or { margin-top: 14px; font: 500 14px/1.3 var(--mca-font); color: var(--mca-soft); }
+.mcv-digits { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+.mcv-digits span {
+  width: 44px; height: 54px; border-radius: 8px; background: #F6F6F6;
+  font: 800 30px/54px var(--mca-font); font-variant-numeric: tabular-nums;
+}
+.mcv-valid { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font: 700 14px/1 var(--mca-font); font-variant-numeric: tabular-nums; }
+.mcv-note { margin: 14px 8px 0; font: 500 14px/1.35 var(--mca-font); color: var(--mca-soft); }
+.mcv-foot { flex: none; padding: 10px 16px calc(var(--ppd-safe-bottom, 34px) + 8px); background: #fff; box-shadow: 0 -1px 0 var(--mca-line); }
+.mcv-btn {
+  display: block; width: 100%; height: 50px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--mca-yellow); color: var(--mca-ink); font: 800 17px/50px var(--mca-font);
+}
+.mcv-btn:active { filter: brightness(.95); }
+.mcv-done {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 0 30px var(--ppd-safe-bottom, 34px); background: #fff; text-align: center; animation: ppd-fade .3s ease both;
+}
+.mcv-done-art { width: 150px; height: 150px; margin-bottom: 14px; border-radius: 50%; background: #FFF4D6; display: grid; place-items: center; box-shadow: 0 0 0 6px var(--mca-yellow); }
+.mcv-done-art img { width: 120px; height: 120px; object-fit: contain; max-width: none; }
+.mcv-done b { font: 800 30px/1.1 var(--mca-font); letter-spacing: -.015em; }
+.mcv-done-what { font: 700 17px/1.2 var(--mca-font); }
+.mcv-done-when { font: 600 13px/1 var(--mca-font); color: var(--mca-soft); font-variant-numeric: tabular-nums; }
+.mcv-done-enjoy { margin-top: 4px; font: 500 15px/1.2 var(--mca-font); }
+.mcv-done .mcv-btn { max-width: 260px; margin-top: 22px; }

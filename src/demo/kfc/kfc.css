@@ -9,6 +9,7 @@
   --roboto: "Roboto", system-ui, sans-serif;
   --bold: "Mukta", "Helvetica Neue", Arial, sans-serif;  /* closest free match to the app's bold face */
   --kfa-pp-h: 190px;                                     /* how far News moves down for the Packback card */
+  --kfa-cut: 160.176px;                                  /* the Doritos banner is half the screenshot's 320pt */
   position: absolute; inset: 0; overflow: hidden; background: #fff; color: #000;
 }
 .kfa-px { position: absolute; max-width: none; pointer-events: none; }
@@ -37,15 +38,16 @@
 /* ── Home ── */
 .kfa-home-scroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; }
 .kfa-home-scroll::-webkit-scrollbar { display: none; }
-.kfa-home-canvas { position: relative; height: calc(852px + var(--kfa-pp-h)); }
+.kfa-home-canvas { position: relative; height: calc(852px + var(--kfa-pp-h) - var(--kfa-cut)); }
 .kfa-greet { font-size: 18px; line-height: 22px; left: -5.12px; }   /* the app sets it 2.6pt left of centre */
 .kfa-welcome { font-size: 16px; line-height: 19.17px; }
 .kfa-banner { position: absolute; left: 0; width: 393px; overflow: hidden; }
-.kfa-order-btn { left: 33.65px; top: 490.33px; width: 326.32px; height: 53.68px; background: #fff; border-radius: 5px; }
+/* Over the bag on the right, so the Doritos Loaded logo stays readable. */
+.kfa-order-btn { left: 206px; top: 345px; width: 172px; height: 38px; background: #fff; border-radius: 5px; box-shadow: 0 2px 8px rgba(0, 0, 0, .14); }
 .kfa-order-btn:active, .kfa-red-btn:active { filter: brightness(.94); }
-.kfa-order-label { color: var(--red); font-size: 23.06px; font-weight: 600; letter-spacing: -.228px; }
+.kfa-order-label { left: 206px; right: auto; width: 172px; color: var(--red); font-size: 18px; font-weight: 600; letter-spacing: -.2px; }
 
-.kfa-below { position: absolute; left: 0; top: var(--kfa-pp-h); width: 393px; height: 852px; pointer-events: none; }
+.kfa-below { position: absolute; left: 0; top: calc(var(--kfa-pp-h) - var(--kfa-cut)); width: 393px; height: 852px; pointer-events: none; }
 .kfa-below .kfa-hit { pointer-events: auto; }
 .kfa-news-title { left: 22.1px; right: auto; text-align: left; font-size: 21.84px; letter-spacing: .764px; }
 .kfa-view-all { left: auto; right: 21.13px; text-align: right; color: var(--red); font-size: 13.73px; letter-spacing: .236px; }
@@ -58,7 +60,7 @@
 .kfa-badge-label { color: #fff; font-size: 14px; left: 336.1px; right: auto; width: 40.5px; }
 
 /* Packback card on Home */
-.kfa-pp-home { position: absolute; left: 14px; top: 567px; width: 365px; padding: 12px; border-radius: 15px; background: var(--ppd-bg); }
+.kfa-pp-home { position: absolute; left: 14px; top: calc(567px - var(--kfa-cut)); width: 365px; padding: 12px; border-radius: 15px; background: var(--ppd-bg); }
 .kfa-pp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kfa-pp-row .ppd-brand img.kfa-pp-kfc { height: 13px; }
 .kfa-pp-title { margin: 9px 2px 9px; font: 700 19px/1.15 var(--ppd-font); letter-spacing: -.01em; }
@@ -75,11 +77,14 @@
 .kfa-tab { top: 0; height: 60px; width: 78.6px; }
 .kfa-tab img { position: absolute; top: 8.016px; max-width: none; }
 .kfa-tab-label { font-size: 11px; font-weight: 320; color: #111; }
+/* Not in the demo: solid grey, not faded. */
+.kfa-tab.is-off img { filter: invert(66%); }
+.kfa-tab-label.is-off { color: #A8A8A8; }
 
 /* ── Profile ── */
-.kfa-profile-scroll { position: absolute; inset: 0; overflow-y: auto; scrollbar-width: none; }
+.kfa-profile-scroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; touch-action: pan-y; }
 .kfa-profile-scroll::-webkit-scrollbar { display: none; }
-.kfa-profile-canvas { position: relative; height: 852px; }
+.kfa-profile-canvas { position: relative; height: 852px; overflow: hidden; }
 .kfa-name { font-size: 24px; }
 .kfa-phone-no { font-size: 16px; }
 .kfa-red-btn { background: var(--red); border-radius: 3px; }
@@ -182,3 +187,59 @@
 .kfa-fine { padding: 22px 30px 0; text-align: center; font: 300 12px/16px var(--roboto); color: #6b6b6b; }
 .kfa-fine u { color: #000; }
 .kfa-scroll-end { height: calc(var(--ppd-tabbar, 86.4px) + 30px); }
+
+/* ── The voucher: a Packback reward as one of KFC's app deals ── */
+.kfv {
+  position: absolute; inset: 0; z-index: 90; display: flex; flex-direction: column;
+  background: #fff; color: #000; font-family: var(--roboto); animation: kfv-in .32s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes kfv-in { from { transform: translateX(100%); } }
+.kfv-head { position: relative; flex: none; height: 106px; }
+.kfv-back { position: absolute; left: 12px; top: 56px; width: 40px; height: 46px; border: 0; background: none; padding: 0; cursor: pointer; }
+.kfv-back img { position: absolute; left: 10.578px; top: 8.752px; width: 16.188px; height: 28.542px; max-width: none; }
+.kfv-mark { position: absolute; left: 166.566px; top: 68.586px; width: 60.066px; height: 21.3px; max-width: none; }
+.kfv-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 6px 14px 16px; text-align: center; }
+.kfv-scroll::-webkit-scrollbar { display: none; }
+
+.kfv-card { display: flex; min-height: 124px; border: 1px solid #ececec; border-radius: 8.5px; background: #fff; text-align: left; box-shadow: 0 2px 10px rgba(0, 0, 0, .05); }
+/* The product photos are on white, so the bucket's stripes are red on white here. */
+.kfv-art { position: relative; flex: none; width: 128px; border-radius: 7.5px 0 0 7.5px; overflow: hidden; background: #fff; border-right: 1px solid #f1f1f1; }
+.kfv-art img { position: absolute; inset: 14px 6px 4px; width: calc(100% - 12px); height: calc(100% - 18px); object-fit: contain; max-width: none; }
+.kfv-stripes { position: absolute; z-index: 1; top: 0; left: 0; right: 0; display: flex; justify-content: space-evenly; }
+.kfv-stripes i { display: block; width: 16px; height: 9px; background: var(--red); }
+.kfv-badge {
+  position: absolute; z-index: 1; right: 5px; bottom: 5px; padding: 4px 7px 3px; border-radius: 6px;
+  background: var(--red); color: #fff; box-shadow: 0 0 0 2px #fff; font: 400 13px/1 Anton, var(--bold); text-transform: uppercase; letter-spacing: .03em;
+}
+.kfv-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 12px 12px 12px 14px; }
+.kfv-info h2 { font: 400 19px/1.12 Anton, var(--bold); letter-spacing: .01em; text-transform: uppercase; color: var(--red); }
+.kfv-valid { font: 400 14px/1 var(--roboto); color: #8a8a8a; font-variant-numeric: tabular-nums; }
+
+.kfv-scan { margin: 22px 10px 0; font: 700 19px/1.2 var(--bold); color: #000; }
+.kfv-qr { display: inline-block; margin-top: 14px; padding: 12px; border: 1px solid #e4e4e4; border-radius: 8.5px; background: #fff; }
+.kfv-qr img, .kfv-qr span { display: block; width: 196px; height: 196px; max-width: none; }
+.kfv-or { margin-top: 12px; font: 300 14px/1.2 var(--roboto); color: #6b6b6b; }
+.kfv-code { margin-top: 4px; font: 400 26px/1.1 Anton, var(--bold); letter-spacing: .12em; color: #000; font-variant-numeric: tabular-nums; }
+.kfv-note { margin: 12px 18px 0; font: 300 14px/18px var(--roboto); color: #000; }
+
+.kfv-foot { flex: none; padding: 10px 14px calc(var(--ppd-safe-bottom, 34px) + 8px); background: #fff; box-shadow: 0 -1px 0 #f0f0f0; }
+.kfv-btn {
+  display: block; width: 100%; height: 48px; border: 0; border-radius: 6px; cursor: pointer;
+  background: var(--red); color: #fff; font: 400 20px/48px Anton, var(--bold); letter-spacing: .04em; text-transform: uppercase;
+}
+.kfv-btn:active { filter: brightness(.93); }
+
+.kfv-done {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 0 30px calc(var(--ppd-safe-bottom, 34px)); background: #fff; text-align: center; animation: ppd-fade .3s ease both;
+}
+.kfv-done-art {
+  position: relative; width: 150px; height: 150px; margin-bottom: 12px; border-radius: 50%; overflow: hidden; background: #fff;
+  box-shadow: 0 0 0 5px #fff, 0 0 0 8px var(--red);
+}
+.kfv-done-art img { position: absolute; inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); object-fit: contain; max-width: none; }
+.kfv-done b { font: 400 34px/1 Anton, var(--bold); letter-spacing: .02em; text-transform: uppercase; color: var(--red); }
+.kfv-done-what { margin-top: 4px; font: 700 18px/1.2 var(--bold); }
+.kfv-done-when { font: 300 14px/1 var(--roboto); color: #6b6b6b; font-variant-numeric: tabular-nums; }
+.kfv-done-enjoy { margin-top: 4px; font: 300 16px/1.2 var(--roboto); }
+.kfv-done .kfv-btn { max-width: 260px; margin-top: 22px; }

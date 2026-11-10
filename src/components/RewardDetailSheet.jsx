@@ -27,7 +27,7 @@ const InfoIcon = () => (
   </svg>
 );
 
-export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked, isByo = false, isVoucher = false }) {
+export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick, onClaim, onClose, orgName, budgetBlocked = false, onBudgetBlocked, isByo = false, isVoucher = false, atKiosk = false }) {
   const money = useMoney();
   const { payout } = useRegion();
   if (!reward) return null;
@@ -115,13 +115,15 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                   <li className="rds-step">
                     <span className="rds-step__num">2</span>
                     <span className="rds-step__text">
-                      Tap <strong>Redeem at the counter</strong> and show the voucher to the staff at {brand}.
+                      {atKiosk
+                        ? <>Tap <strong>Redeem at the kiosk</strong> and scan the voucher’s QR code at the self-order kiosk at {brand}.</>
+                        : <>Tap <strong>Redeem at the counter</strong> and show the voucher to the staff at {brand}.</>}
                     </span>
                   </li>
                   <li className="rds-step">
                     <span className="rds-step__num">3</span>
                     <span className="rds-step__text">
-                      They slide to confirm, <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> leave your balance, and your <strong>{reward.name}</strong> is yours.
+                      {atKiosk ? 'Tap Finish once it is scanned' : 'They slide to confirm'}, <strong>{reward.cupsNeeded} cup{reward.cupsNeeded !== 1 ? 's' : ''}</strong> leave your balance, and your <strong>{reward.name}</strong> is yours.
                     </span>
                   </li>
                 </>
@@ -169,7 +171,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
                 ? `${cupsRemaining} more cup${cupsRemaining !== 1 ? 's' : ''} needed`
                 : budgetBlocked
                   ? 'Rewards paused'
-                  : isVoucher ? 'Redeem at the counter' : 'Get cashback'}
+                  : isVoucher ? (atKiosk ? 'Redeem at the kiosk' : 'Redeem at the counter') : 'Get cashback'}
             </button>
           ) : isUnlocked ? (
             /* Not the current goal, but the user already has enough cups for it —
@@ -178,7 +180,7 @@ export default function RewardDetailSheet({ reward, isSelected, cupCount, onPick
               className={`rds-btn rds-btn--primary ${budgetBlocked ? 'rds-btn--locked' : ''}`}
               onClick={budgetBlocked ? onBudgetBlocked : () => { onPick(reward.id); onClose(); onClaim?.(); }}
             >
-              {budgetBlocked ? 'Rewards paused' : isVoucher ? 'Redeem at the counter' : 'Claim cashback'}
+              {budgetBlocked ? 'Rewards paused' : isVoucher ? (atKiosk ? 'Redeem at the kiosk' : 'Redeem at the counter') : 'Claim cashback'}
             </button>
           ) : (
             <button className="rds-btn rds-btn--primary" onClick={() => { onPick(reward.id); onClose(); }}>

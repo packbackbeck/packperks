@@ -622,6 +622,9 @@ export default function App({ consentReady = true } = {}) {
   // opens: no entry on the account page, and a reward the customer can't
   // afford yet only nudges the cup progress.
   const guideEnabled = liveSettings.featureHowItWorks !== false;
+  // Settings → Ways & features → Voucher at a self-order kiosk: the
+  // customer scans the voucher at the kiosk and taps Finish, no slider.
+  const voucherAtKiosk = isVoucher && liveSettings.voucherAtKiosk === true;
 
 
   /* ── Init: load user + state from Supabase ── */
@@ -2102,6 +2105,7 @@ export default function App({ consentReady = true } = {}) {
         userId={userId}
         profile={profile}
         cupCount={cupCount}
+        atKiosk={voucherAtKiosk}
         onBack={() => setPage('home')}
         onDone={handleVoucherRedeemed}
       />
@@ -2611,6 +2615,7 @@ export default function App({ consentReady = true } = {}) {
               onExplain={handleLockedClaim}
               orgName={activeOrg?.partner_brand_name || activeOrg?.name}
               isVoucher={isVoucher}
+              atKiosk={voucherAtKiosk}
             />
             </Fragment>
           );
@@ -2644,6 +2649,7 @@ export default function App({ consentReady = true } = {}) {
           orgName={activeOrg?.partner_brand_name || activeOrg?.name}
           isByo={isByo}
           isVoucher={isVoucher}
+          atKiosk={voucherAtKiosk}
         />
       )}
 

@@ -33,7 +33,17 @@ export const STRINGS = {
     demoNote: 'Alleen in deze browser', demoLive: 'live beloningen',
     demoPickTitle: 'Packback in jouw app', demoOpen: 'Open demo',
 
+    // ── The brand's own voucher (KFC, McDonald's): scanned at the kiosk ──
+    vScan: 'Scan deze QR-code bij de bestelzuil',
+    vNote: 'Tik daarna op Klaar: er gaan {n} van je saldo af.',
+    vValid: 'Nog {t} geldig', vCode: 'Code', vOrCode: 'Of typ deze code in bij de bestelzuil',
+    vFor: 'voor {n}', vFree: 'Gratis', back: 'Terug',
+
     // ── KFC ──
+    kfcHi: 'Hoi, Beke!', kfcOrderNow: 'Bestel nu', kfcNews: 'Nieuws', kfcViewAll: 'Bekijk alles',
+    kfcTabs: { home: 'Home', locations: 'Locaties', order: 'Bestellen', deals: 'Deals', more: 'Meer' },
+    kfcUpdate: 'Profiel bewerken', kfcHistory: 'Geschiedenis', kfcInbox: 'Inbox', kfcLogout: 'Uitloggen',
+    kfcPrivacy: 'Privacy en voorwaarden', kfcDelete: 'Account verwijderen', kfcAppDeal: 'App-deal',
     kfcWelcome: 'Welkom! Ontdek al onze exclusieve app deals of<br>plaats snel je bestelling.',
     kfcDealsIntro: 'Exclusieve app deals, alleen voor jou. Activeer een deal en laat de code scannen.',
     kfcWithPoints: 'Inwisselen met punten',
@@ -86,6 +96,15 @@ export const STRINGS = {
     demoNote: 'Only in this browser', demoLive: 'live rewards',
     demoPickTitle: 'Packback in your app', demoOpen: 'Open demo',
 
+    vScan: 'Scan this QR code at the self-order kiosk',
+    vNote: 'Then tap Done: {n} come off your balance.',
+    vValid: 'Valid for {t}', vCode: 'Code', vOrCode: 'Or type this code in at the kiosk',
+    vFor: 'for {n}', vFree: 'Free', back: 'Back',
+
+    kfcHi: 'Hi, Beke!', kfcOrderNow: 'Order Now', kfcNews: 'News', kfcViewAll: 'View all',
+    kfcTabs: { home: 'Home', locations: 'Locations', order: 'Order', deals: 'Deals', more: 'More' },
+    kfcUpdate: 'Update Profile', kfcHistory: 'My History', kfcInbox: 'Inbox', kfcLogout: 'Log out',
+    kfcPrivacy: 'Privacy and Terms', kfcDelete: 'Delete my account', kfcAppDeal: 'App deal',
     kfcWelcome: 'Welcome! Discover all our exclusive app deals or<br>place your order in no time.',
     kfcDealsIntro: 'Exclusive app deals, just for you. Activate a deal and have the code scanned.',
     kfcWithPoints: 'Redeem with points',

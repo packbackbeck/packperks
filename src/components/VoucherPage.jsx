@@ -7,11 +7,14 @@ import SlideToConfirm from './SlideToConfirm';
 import './VoucherPage.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * VoucherPage — the counter-voucher way of settling a reward.
+ * VoucherPage — the voucher way of settling a reward.
  *
- * No receipt, no AI check, no payout link. The customer holds this
- * screen up; the staff member presses the button, slides, and the cups
- * come off the balance right there — one atomic RPC (redeem_voucher).
+ * No receipt, no AI check, no payout link. At a counter the customer
+ * holds this screen up; the staff member presses the button, slides, and
+ * the cups come off the balance right there — one atomic RPC
+ * (redeem_voucher). At a venue with `atKiosk` (Settings → Voucher at a
+ * self-order kiosk) there is no staff and no slider: the customer scans
+ * the QR at the self-order kiosk and taps Finish, the same RPC.
  * When the slide lands we hand straight back to the home screen, where
  * the receipt popup opens on top.
  *
@@ -141,7 +144,7 @@ function useClock() {
 
 const AVATAR_KEY = 'packperks_profile_avatar';
 
-export default function VoucherPage({ reward, org, userId, profile, cupCount = 0, onDone, onBack }) {
+export default function VoucherPage({ reward, org, userId, profile, cupCount = 0, atKiosk = false, onDone, onBack }) {
   const money = useMoney();
   const clock = useClock();
   const cardRef = useRef(null);
@@ -297,7 +300,18 @@ export default function VoucherPage({ reward, org, userId, profile, cupCount = 0
           </div>
         </div>
 
-        {!staffStep ? (
+        {atKiosk ? (
+          <div className="hv__staff hv__kiosk">
+            <p className="hv__kiosk-title">Scan this code at the self-order kiosk</p>
+            <p className="hv__staff-note">
+              Then tap Finish: <strong>{cups} cup{cups === 1 ? '' : 's'}</strong> leave this balance.
+            </p>
+            <button type="button" className="hv__cta" disabled={busy} onClick={handleComplete}>
+              {busy ? 'Finishing…' : 'Finish'}
+            </button>
+            {error && <p className="hv__err">{error}</p>}
+          </div>
+        ) : !staffStep ? (
           <button type="button" className="hv__cta" onClick={() => setStaffStep(true)}>
             Show this to the staff at the counter
           </button>

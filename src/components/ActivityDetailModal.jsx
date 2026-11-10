@@ -28,11 +28,11 @@ const CLAIM_PHASE = {
     sub: "We couldn't approve this claim. Here's what to check before trying again:",
     statusLabel: 'Not approved', statusColor: '#C73E1D',
   },
-  /* Counter voucher: settled the moment staff slid — nothing to review,
-   * nothing to collect. */
+  /* Voucher: settled the moment staff slid (counter) or the customer
+   * tapped Finish (self-order kiosk) — nothing to review, nothing to collect. */
   redeemed: {
     title: 'Reward redeemed', tone: 'green', icon: 'check',
-    sub: 'Enjoy it — this was redeemed at the counter and the cups have left your balance.',
+    sub: 'Enjoy it — this reward is redeemed and the cups have left your balance.',
     statusLabel: 'Redeemed', statusColor: '#1A8737',
   },
 };

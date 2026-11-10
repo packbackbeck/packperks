@@ -21,9 +21,11 @@ There are four apps in one codebase, picked by path in `src/main.jsx`:
   guide switch (`useOrgRewards.js`), so nothing a demo does can
   reach a dashboard. Never give it the supabase client, the customer app,
   or capture. Each demo shows one brand only: nothing in it links to the
-  other. The voucher is the real voucher card's stylesheet, scanned **at
-  the kiosk** (no counter, no staff, no slider; a button simulates the
-  scan), without `redeem_voucher`. Points per cup are per brand
+  other. The voucher is the **brand's own** (`kfc/KfcVoucher`,
+  `mcd/McdVoucher`, sharing `kit/useBrandVoucher`): KFC's deal card,
+  McDonald's MyM coupon, each with a QR for the self-order kiosk
+  ("bestelzuil"), a code to type in, ten minutes, and Done, which takes
+  the points (no `redeem_voucher`). Every label follows NL/EN. Points per cup are per brand
   (`pointsPerCup` in `brands.js`): McDonald's 50 MyM points (MyMcDonald's
   Rewards gives 10 per euro, so the org's cups × 50 are MyM's own prices),
   KFC 1 (it has no points programme, so a point is a cup). A reward costs its org's `cupsNeeded` × that, so the demo and the
@@ -435,6 +437,12 @@ Bevan — all OFL), same rule as DM Sans.
 on unless set false): the full-screen *How it works* guide. Off, it never
 opens — no *How does it work?* on the account page, and a locked reward
 tap only nudges the cup progress. Off for KFC and McDonald's.
+
+**Voucher at a self-order kiosk** (`voucherAtKiosk`, Settings → Ways &
+features, off unless set): the Reward Slider Voucher loses its slider —
+it says to scan the code at the self-order kiosk and Finish calls the same
+`redeem_voucher`; the reward buttons say *Redeem at the kiosk*. On for KFC
+and McDonald's.
 
 **Client app** (`appdesign`, formerly "Design & copy") is in every mode;
 Deferred Tikkie gets only Colours and Sections. *Sections* is what the

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrandRow, CupTrack, NextNote, PackbackLayer, RewardList, Tiles } from '../kit/Kit';
+import McdVoucher from './McdVoucher';
 import { CupSvg } from '../kit/icons';
 import { cls, useKit } from '../kit/kitCore';
 import './mcd.css';
@@ -217,7 +218,7 @@ export default function McdApp() {
         ))}
       </nav>
 
-      <PackbackLayer />
+      <PackbackLayer Voucher={McdVoucher} />
     </div>
   );
 }

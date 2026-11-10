@@ -207,6 +207,10 @@
    positioning box for the overhanging knob — drew a square behind the
    rounded track, hence the sharp white corners. */
 .hv__staff .stc__track { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(8px); }
+.hv__kiosk { gap: 8px; }
+.hv__kiosk-title { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.2; color: var(--black, #1F1B16); }
+.hv__kiosk .hv__cta { margin-top: 6px; align-self: center; }
+.hv__kiosk .hv__cta:disabled { opacity: .6; cursor: default; }
 .hv__err { margin: 0; font-size: 13.5px; font-weight: 700; color: #C0392B; }
 .hv__cancel {
   align-self: center; border: none; background: none; padding: 6px 10px;

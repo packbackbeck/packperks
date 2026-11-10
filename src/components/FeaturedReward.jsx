@@ -18,6 +18,7 @@ export default function FeaturedReward({
   onOpenRefund,
   onViewDetail,
   onExplain,
+  atKiosk = false,
   orgName,
   isVoucher = false,
 }) {
@@ -158,12 +159,12 @@ export default function FeaturedReward({
               className={`featured-reward__claim-btn ${(!isUnlocked || (isUnlocked && budgetBlocked)) ? 'featured-reward__claim-btn--locked' : ''}`}
               type="button"
               onClick={handleClaim}
-              aria-label={isUnlocked && budgetBlocked ? 'Rewards paused, try again later' : isVoucher ? 'Redeem at the counter' : `Get ${money(cashbackAmount)} cashback`}
+              aria-label={isUnlocked && budgetBlocked ? 'Rewards paused, try again later' : isVoucher ? (atKiosk ? 'Redeem at the kiosk' : 'Redeem at the counter') : `Get ${money(cashbackAmount)} cashback`}
             >
               {isUnlocked && budgetBlocked ? (
                 'Rewards paused'
               ) : isVoucher ? (
-                'Redeem at the counter'
+                atKiosk ? 'Redeem at the kiosk' : 'Redeem at the counter'
               ) : (
                 <>
                   <img src={cashbackIcon} alt="" className="featured-reward__claim-btn-icon" aria-hidden="true" />

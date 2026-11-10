@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  BookOpen, Construction, EyeOff, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
+  BookOpen, Construction, EyeOff, QrCode, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
   ScrollText, Share2, SlidersHorizontal, Sparkles, ToggleRight, Wallet,
 } from 'lucide-react';
 
@@ -70,6 +70,12 @@ export const FEATURES = [
     label: 'Step-by-step guide',
     summary: 'The “How it works” guide: full-screen steps on returning cups and getting a reward.',
     detail: 'Switched off, the guide never opens. “How does it work?” leaves the account page, and tapping a reward the customer can’t afford yet only shows how many cups are missing. The sales demos read this switch too.',
+  },
+  {
+    key: 'voucherAtKiosk', group: 'app', icon: QrCode, tone: 'amber', modes: APP, fallback: false,
+    label: 'Voucher at a self-order kiosk',
+    summary: 'Customers scan the voucher at the kiosk themselves, then tap Finish.',
+    detail: 'For venues where rewards are redeemed at a self-order kiosk instead of with staff. The Reward Slider Voucher loses its slider: it tells the customer to scan the QR at the kiosk, and Finish takes the cups off the balance. Only does something while the way out is Reward Slider Voucher.',
   },
   {
     key: 'requireEmailVerification', group: 'app', icon: MailCheck, tone: 'sky', modes: APP, fallback: true,

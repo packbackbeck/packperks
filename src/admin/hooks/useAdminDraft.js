@@ -45,6 +45,8 @@ export const DEFAULT_SETTINGS = {
   featureSmartSorting: false,
   // The “How it works” step-by-step guide. On unless a venue switches it off.
   featureHowItWorks: true,
+  // Reward Slider Voucher redeemed at a self-order kiosk: no slider, a Finish button.
+  voucherAtKiosk: false,
   featureDonations: true,
   featureDirectRefunds: true,
   maintenanceMode: false,

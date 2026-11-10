@@ -257,10 +257,29 @@ function RedeemBody({ reward }) {
 }
 
 /** Rendered by every brand app inside its screen, above everything else. */
-export function PackbackLayer({ appIcon }) {
+export function PackbackLayer({ appIcon, Voucher = DemoVoucher }) {
   const kit = useKit();
   const { sheet, closeSheet, voucher, closeVoucher, toastMsg, wallet, t, ppc, amount, openSheet } = kit;
   const [notice, setNotice] = useState(false);
+  // Swipe the notice up to put it away, as on a phone.
+  const drag = useRef(null);
+  const [dragY, setDragY] = useState(0);
+  const onNoticeDown = (e) => {
+    drag.current = { y: e.clientY, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onNoticeMove = (e) => {
+    if (!drag.current) return;
+    const dy = e.clientY - drag.current.y;
+    if (Math.abs(dy) > 4) drag.current.moved = true;
+    setDragY(Math.min(0, dy) + Math.max(0, dy) * 0.2);
+  };
+  const onNoticeUp = () => {
+    if (!drag.current) return;
+    if (dragY < -24) setNotice(false);
+    setDragY(0);
+    setTimeout(() => { drag.current = null; }, 0);
+  };
 
   // Greet the cup this page load returned.
   useEffect(() => {
@@ -273,8 +292,10 @@ export function PackbackLayer({ appIcon }) {
   const redeemReward = sheet?.mode === 'redeem' ? sheet.reward : null;
   return (
     <>
-      <button type="button" className={cls('ppd-notice', notice && 'is-on')}
-        onClick={() => { setNotice(false); openSheet('wallet'); }}>
+      <button type="button" className={cls('ppd-notice', notice && 'is-on', dragY !== 0 && 'is-dragging')}
+        style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}
+        onPointerDown={onNoticeDown} onPointerMove={onNoticeMove} onPointerUp={onNoticeUp} onPointerCancel={onNoticeUp}
+        onClick={() => { if (drag.current?.moved) return; setNotice(false); openSheet('wallet'); }}>
         <span className="ppd-notice-icon">{appIcon || <CupSvg />}</span>
         <span className="ppd-notice-text">
           <b>{t('earnedTitle')}</b>
@@ -290,7 +311,7 @@ export function PackbackLayer({ appIcon }) {
         {redeemReward && <RedeemBody reward={redeemReward} />}
       </Sheet>
 
-      {voucher && <DemoVoucher reward={voucher} onClose={closeVoucher} />}
+      {voucher && <Voucher reward={voucher} onClose={closeVoucher} />}
 
       <div className={cls('ppd-toast', toastMsg && 'is-on')} role="status" aria-live="polite">{toastMsg}</div>
     </>

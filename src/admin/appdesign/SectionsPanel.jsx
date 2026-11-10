@@ -28,6 +28,8 @@ export default function SectionsPanel({
   kind = 'rewards', sections, layout, settings, readOnly, onPatch, onOrder, onSetting, onReveal,
 }) {
   const defs = HOME_SECTIONS[kind];
+  // A section that only exists while a feature is on (Automatic cashout).
+  const needsOff = (d) => !!d.needsSetting && settings?.[d.needsSetting] !== true;
   const order = homeOrder(layout, kind);
   const custom = !!savedOrder(layout, kind);
   const [drag, setDrag] = useState(null);
@@ -36,6 +38,7 @@ export default function SectionsPanel({
   const isShown = (key) => {
     const d = defs[key];
     if (d.locked) return true;
+    if (needsOff(d)) return false;
     if (d.setting) return settings?.[d.setting] !== false;
     return sections[d.toggle] !== false;
   };
@@ -111,6 +114,10 @@ export default function SectionsPanel({
                   {d.locked ? (
                     <span className="dz-order__lock" title="This is the programme itself, so it always shows">
                       <Lock size={13} aria-hidden="true" /> Always
+                    </span>
+                  ) : needsOff(d) ? (
+                    <span className="dz-order__lock" title={`${d.needsLabel} is switched off in Settings → Ways & features`}>
+                      Off in Settings
                     </span>
                   ) : (
                     <Switch checked={on} disabled={readOnly} label={`Show ${d.label}`} onChange={(v) => setShown(key, v)} />

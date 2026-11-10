@@ -5,8 +5,10 @@ import { getSmartbinLocations } from '../lib/api';
 import {
   readStoredProfile, storeProfile, fetchWallet, scanBatch,
   scanBackupCups, scanStaticQr, redeemWallet, donateWallet, setEmail, savePendingEmail, checkBatch,
-  getMarketingConsent, setMarketingConsent, oauthWalletLogin, signOutWallet,
+  getMarketingConsent, setMarketingConsent, oauthWalletLogin, signOutWallet, getAutoCashout, setAutoCashout,
 } from '../lib/tikkieWallet';
+import { autoCashoutConfig } from '../lib/autoCashout';
+import AutoCashout, { AutoCashoutHelp } from './tikkie/AutoCashout';
 import {
   getAuthInfo, peekOAuthIntent, startGoogleSignIn, switchGoogleAccount, takeOAuthIntent, takeOAuthReturnError,
 } from '../lib/oauth';
@@ -85,6 +87,7 @@ const UX_PREVIEW_DEMO = {
   'popup-claimed': 'claimed',
   'popup-limit': 'home',
   'popup-error': 'home',
+  'popup-auto-help': 'auto-help',
 };
 const UX_PARAMS = typeof window !== 'undefined'
   ? new URLSearchParams(window.location.search)
@@ -123,7 +126,16 @@ const DEMO_WALLET = {
     claim_id: 'd0',
     expires_at: new Date(Date.now() + 30 * 864e5).toISOString(),
   },
+  autoCashout: { tier: 'month', next_at: new Date(Date.now() + 19 * 864e5).toISOString() },
 };
+
+/* The next date a sample schedule would get, for the demo states only. */
+function demoNextAt(tier) {
+  const d = new Date();
+  if (tier === 'week') d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + (tier === 'quarter' ? 3 : 1));
+  return d.toISOString();
+}
 
 function fmtWhen(iso) {
   if (!iso) return '';
@@ -253,7 +265,7 @@ function BinMap({ bins }) {
    the rewards apps' sign-in sheet: Google, or an email; one opt-in box
    (unticked until the customer ticks it, and carried to Google in the
    intent when ticked first); the privacy policy as a line, not a box. ── */
-function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, googleIntent = null, inSheet = false, change = false, currentEmail = null }) {
+function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, googleIntent = null, inSheet = false, change = false, currentEmail = null, title = null }) {
   const [email, setEmailVal] = useState('');
   const [marketing, setMarketing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -280,7 +292,7 @@ function EmailSection({ org, onSaved, onVerifyNeeded, onShowPolicy, googleIntent
   return (
     <section className={inSheet ? 'tikkie-home__emailsheet' : 'tikkie-home__section'}>
       {inSheet
-        ? <h2 className="tk-sheet__title">{change ? 'Change your email' : 'Save your balance'}</h2>
+        ? <h2 className="tk-sheet__title">{title || (change ? 'Change your email' : 'Save your balance')}</h2>
         : <h2 className="tikkie-home__section-title">Save your balance</h2>}
       <form className={`tikkie-home__emailcard${inSheet ? ' tikkie-home__emailcard--bare' : ''}`} onSubmit={submit}>
         <div className="tk-sheet__stack">
@@ -407,8 +419,15 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     if (DEMO === 'redeem') return { type: 'redeem' };
     if (DEMO === 'donate') return { type: 'donate' };
     if (DEMO === 'donated') return { type: 'donated', amount: 0.5, left: 0.4 };
+    if (DEMO === 'auto-help') return { type: 'auto-help' };
     return null;
   });
+  /* Automatic cashout: what the venue offers, the schedule the server holds
+   * for this wallet, and a tier waiting for an email to send the link to. */
+  const auto = autoCashoutConfig(settings);
+  const [schedule, setSchedule] = useState(DEMO && DEMO !== 'empty' ? DEMO_WALLET.autoCashout : null);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [pendingAutoTier, setPendingAutoTier] = useState(null);
   const [login, setLogin] = useState(() => (UX_PREVIEW === 'login' ? { email: '' } : null));
   const [showPolicy, setShowPolicy] = useState(UX_PREVIEW === 'privacy-policy');
   const [showAccount, setShowAccount] = useState(UX_PREVIEW === 'account');
@@ -505,6 +524,17 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     setOutstanding(data.outstanding || null);
   }, [org?.id]);
 
+  /* The automatic-cashout schedule lives with its own function; read it
+   * once there is a wallet and the venue offers the feature. */
+  useEffect(() => {
+    if (DEMO || !auto.on || !profile?.user_id || !org?.id) return undefined;
+    let alive = true;
+    getAutoCashout(org.id).then((d) => {
+      if (alive && d && !d.error) setSchedule(d.auto_cashout || null);
+    });
+    return () => { alive = false; };
+  }, [auto.on, profile?.user_id, org?.id]);
+
   const refreshWallet = useCallback(async () => {
     if (DEMO) return;
     const data = await fetchWallet(org?.id);
@@ -527,6 +557,12 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
         if (googleReturn.intent?.marketing === true) {
           setMarketing(true);
           setMarketingConsent(res.profile.user_id, true).then((ok) => { if (!ok) setMarketing(false); });
+        }
+        // Google was the email asked for by the automatic-cashout slider:
+        // the tier picked before leaving is saved now there is an address.
+        const autoTier = googleReturn.intent?.autoTier;
+        if (autoTier) {
+          setAutoCashout(org.id, autoTier).then((d) => { if (d?.status === 'on') setSchedule(d.auto_cashout); });
         }
         // The Google session did its job (bin-tikkie checked it); this mode's
         // wallet is keyed by the phone, so no login stays open in the browser.
@@ -699,6 +735,54 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     refreshWallet();
   }
 
+  /* Automatic cashout: save the slider's tier ('off' or a tier key). A
+   * tier sends the link by email, so without an address the email sheet
+   * opens first and the tier waits for it (pendingAutoTier). */
+  async function handleAutoChange(tier) {
+    if (DEMO) {
+      setSchedule(tier === 'off' ? null : { tier, next_at: demoNextAt(tier) });
+      return;
+    }
+    if (tier !== 'off' && !profile?.email) {
+      setPendingAutoTier(tier);
+      setEmailSheet(true);
+      return;
+    }
+    if (tier === 'off' && !schedule) return;
+    setAutoSaving(true);
+    const data = await setAutoCashout(org?.id, tier);
+    setAutoSaving(false);
+    if (data?.status === 'on' || data?.status === 'off') {
+      setSchedule(data.auto_cashout || null);
+      return;
+    }
+    if (data?.error === 'email_required') {
+      setPendingAutoTier(tier);
+      setEmailSheet(true);
+      return;
+    }
+    setPopup({
+      type: 'error',
+      message: data?.error === 'auto_cashout_off'
+        ? 'Automatic cashout isn’t available here right now. Your balance is unchanged.'
+        : 'We couldn’t save that just now. Please try again in a moment.',
+    });
+    refreshWallet();
+  }
+
+  /* The email the slider asked for is saved: now the tier can be. */
+  async function afterEmailForAuto(p) {
+    const tier = pendingAutoTier;
+    setPendingAutoTier(null);
+    if (!tier || !p?.email) return;
+    setSchedule({ tier, next_at: null });
+    setAutoSaving(true);
+    const data = await setAutoCashout(org?.id, tier);
+    setAutoSaving(false);
+    if (data?.status === 'on') setSchedule(data.auto_cashout);
+    else refreshWallet();
+  }
+
   /* Donate: give `amount` of the balance to the charity partner. */
   async function handleDonate(amount) {
     if (DEMO) { setPopup({ type: 'donated', amount, left: Math.max(0, balance - amount) }); return; }
@@ -793,6 +877,7 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     storeProfile(org?.id, null);
     setProfile(null);
     setMarketing(false);
+    setSchedule(null);   // the account keeps its schedule; this phone no longer shows it
     setSigningOut(false);
     if (thenGoogle) {
       switchGoogleAccount(googleIntent).catch(() => setSheetErr('Google sign-in isn’t available right now.'));
@@ -805,16 +890,20 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
 
   const signedInWith = profile?.email ? (profile.signed_in_with === 'google' ? 'google' : 'email') : null;
   const emailSheetNode = emailSheet ? (
-    <Sheet onClose={signingOut ? undefined : closeEmailSheet} label={signedInWith ? 'Your account' : 'Add your email'}>
+    <Sheet
+      onClose={signingOut ? undefined : () => { closeEmailSheet(); setPendingAutoTier(null); }}
+      label={signedInWith ? 'Your account' : 'Add your email'}
+    >
       {!signedInWith || sheetStep === 'change' ? (
         <EmailSection
           inSheet
           change={sheetStep === 'change'}
+          title={pendingAutoTier ? 'Where should we send your link?' : null}
           currentEmail={profile?.email || null}
           org={org}
           onShowPolicy={() => setShowPolicy(true)}
-          googleIntent={googleIntent}
-          onSaved={(p) => { closeEmailSheet(); applySavedProfile(p); refreshWallet(); }}
+          googleIntent={pendingAutoTier ? { ...googleIntent, autoTier: pendingAutoTier } : googleIntent}
+          onSaved={(p) => { closeEmailSheet(); applySavedProfile(p); afterEmailForAuto(p); refreshWallet(); }}
           onVerifyNeeded={(email) => { closeEmailSheet(); setLogin({ email, startAtCode: true }); }}
         />
       ) : sheetStep === 'confirm_signout' ? (
@@ -948,6 +1037,7 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
     activity: sections.showActivity !== false,
     impact: sections.showImpact !== false,
     bins: sections.showBinMap !== false,
+    autoCashout: auto.on && sections.showAutoCashout !== false,
   };
   const donateShown = donationsOn && sections.showDonate !== false;
   const order = savedOrder(design.layout, 'tikkie') || !hasActivity
@@ -1053,6 +1143,30 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
               )}
             </div>
             </Fragment>
+          );
+        }
+        if (key === 'autoCashout') {
+          /* ── Automatic cashout: how often the balance is paid out by
+                itself (venue setting autoCashout, lib/autoCashout.js) ── */
+          if (!show.autoCashout) return null;
+          return (
+            <AutoCashout
+              key={key}
+              config={auto}
+              tier={pendingAutoTier || schedule?.tier || 'off'}
+              nextAt={schedule?.next_at || null}
+              email={profile?.email || null}
+              balance={balance}
+              owed={owed}
+              money={money}
+              saving={autoSaving}
+              claiming={redeeming}
+              isLinkPayout={isLinkPayout}
+              accent={ownColors?.accent || null}
+              onChange={handleAutoChange}
+              onClaim={handleOpenTikkie}
+              onHelp={() => setPopup({ type: 'auto-help' })}
+            />
           );
         }
         if (key === 'email') {
@@ -1316,6 +1430,10 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
         />
       )}
 
+      {popup?.type === 'auto-help' && (
+        <AutoCashoutHelp config={auto} money={money} onClose={() => setPopup(null)} />
+      )}
+
       {popup?.type === 'donated' && (
         <Sheet onClose={() => setPopup(null)} label="Thank you">
           <div className="tk-icon tk-icon--ok" aria-hidden="true">
@@ -1344,9 +1462,9 @@ export default function TikkieHomePage({ org, settings: publishedSettings = NO_S
           batchId={batchId}
           initialEmail={login.email}
           startAtCode={login.startAtCode}
-          onClose={() => setLogin(null)}
+          onClose={() => { setLogin(null); setPendingAutoTier(null); }}
           onShowPolicy={() => setShowPolicy(true)}
-          onLoggedIn={(p) => { setLogin(null); applySavedProfile(p); refreshWallet(); }}
+          onLoggedIn={(p) => { setLogin(null); applySavedProfile(p); afterEmailForAuto(p); refreshWallet(); }}
         />
       )}
 

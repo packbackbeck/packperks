@@ -20,7 +20,7 @@
 
 export const HOME_ORDER = {
   rewards: ['headline', 'progress', 'featured', 'more'],
-  tikkie: ['wallet', 'actions', 'email', 'howPaid', 'activity', 'impact', 'bins'],
+  tikkie: ['wallet', 'actions', 'autoCashout', 'email', 'howPaid', 'activity', 'impact', 'bins'],
 };
 
 const LAYOUT_KEY = { rewards: 'home', tikkie: 'tikkieHome' };

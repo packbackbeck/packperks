@@ -411,6 +411,34 @@ for (`getTikkieStatsMetrics`). A wallet payout whose link fails is deleted,
 so `bin-tikkie` first writes a `system_events` row (`tikkie_payout_link`,
 `failure`); that row is the only record of it.
 
+**Automatic cashout** (Deferred Refund only; migration 071, edge function
+`auto-cashout`, `src/lib/autoCashout.js`). A slider on the wallet home
+(`components/tikkie/AutoCashout.jsx`, home section `autoCashout`) with four
+stops: Off, 1 week, 1 month, 3 months. Off is the wallet as before, with a
+*Claim deposit* button; a tier means the balance is swept and paid on that
+schedule, one Tikkie link, **emailed** (the one place a payout link is in an
+email: the point is not having to open the app and ask). The **?** opens
+`AutoCashoutHelp`. The venue switches it in Settings → Ways & features
+(`AutoCashoutCard`): `autoCashout`, `autoCashoutBonus`, and
+`autoCashoutBonusPct` `{ week, month, quarter }` (5/10/15 unless set; the
+server caps a bonus at 50%). A tier needs an email, so choosing one without
+one opens the email sheet first (and survives a Google round trip in the
+intent as `autoTier`). The schedule is in **its own table**,
+`auto_cashouts`, which no client role can write: a customer can update
+their own `users` row, and one who could move their own date to now would
+collect the bonus every hour. `auto-cashout` is both the wallet's door
+(`get`/`set`, identity = the device, like bin-tikkie) and the hourly run
+(pg_cron at :23, header `x-cron-secret` = `app_config`
+`auto_cashout_cron`): it moves `next_at` on conditionally first (so two runs
+can't pay twice), sweeps exactly as `redeem` does, adds the bonus from the
+**published** settings, mints, emails, and on a failed mint puts the money
+back and retries in an hour. A payout it made carries `auto_cashout_tier`,
+`bonus_pct` and `bonus_amount` (locked by `claims_guard_client_update`);
+`payout_amount` is the total, bonus included. `{dry_run: true, user_ids?,
+tier?}` with the secret shows what wallets would get without writing. It
+was built outside bin-tikkie on purpose, so the live payout function did
+not change. On for Unknown Campus (`t3`) since 10 Nov 2026.
+
 Three code pages, one tab each: **SmartBin Receipt QR** (tab `cupqr`,
 single-use cup batches, every mode; formerly Dynamic QR code), **Static QR
 tent** (`byorequests`) and **Receipt generator** (`receiptgen`, test purchase receipts for rewards, so not in
@@ -485,7 +513,7 @@ code keys stay. (“Deferred Refund” is a way out again, by that name.)
 (`src/lib/deviceId.js`) owns an anonymous `users` row. An email is asked for
 only when money leaves — a cashback claim or a direct refund — and is verified
 (signed in) wherever the venue has `requireEmailVerification` on. Payout links
-are shown in the app, never in the email.
+are shown in the app, never in the email, except Automatic cashout's (above).
 
 **The sign-in sheet is one short form, in every mode**: a title, *Continue
 with Google*, "or", an email field, one primary button, the marketing
@@ -701,6 +729,7 @@ access, so any account above vendor may use it.
 | `src/lib/uxCapture.js` | taps, scrolls and screen flow from the customer app |
 | `src/lib/oauth.js` | Sign in with Google: availability, the round trip's intent, errors on return |
 | `src/lib/appLayout.js` | the home screen's section order, for the app and Client app |
+| `src/lib/autoCashout.js` | Automatic cashout: tiers, bonus defaults, `autoCashoutConfig` (app and dashboard) |
 | `src/admin/behaviour/userflow/` | User flow, Heatmap and Session replay: tiles, the device (DeviceChrome), the embedded app (ScreenFrame), controls, flow, the replay player, capture settings |
 | `src/admin/lib/uxAggregate.js` | the User flow sums in JS — the demo's half of migration 061 |
 | `src/admin/lib/access.js` | tabs, roles, levels; who sees which tab and why |

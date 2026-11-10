@@ -74,6 +74,35 @@ export const redeemWallet = (orgId) =>
 export const donateWallet = (orgId, amount) =>
   invokeBinTikkie({ action: 'donate', org_id: orgId, device_id: deviceId(), amount });
 
+/* Automatic cashout (supabase/functions/auto-cashout): the schedule this
+ * device's wallet chose. Same device identity and the same plain fetch as
+ * the bin-tikkie calls. tier is 'week' | 'month' | 'quarter', or 'off';
+ * the server works out the dates and the bonus. */
+const AUTO_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-cashout`;
+async function invokeAutoCashout(body, timeoutMs = 15000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const resp = await fetch(AUTO_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${FN_ANON}`, apikey: FN_ANON },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    return await resp.json().catch(() => null);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export const getAutoCashout = (orgId) =>
+  invokeAutoCashout({ action: 'get', org_id: orgId, device_id: deviceId() });
+
+export const setAutoCashout = (orgId, tier) =>
+  invokeAutoCashout({ action: 'set', org_id: orgId, device_id: deviceId(), tier });
+
 export const setEmail = (orgId, email, marketing) =>
   invokeBinTikkie({
     action: 'set_email', org_id: orgId, device_id: deviceId(),

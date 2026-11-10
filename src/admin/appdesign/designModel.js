@@ -1,5 +1,5 @@
 import {
-  Activity, Banknote, BookOpen, CircleHelp, CirclePlus, CupSoda, EyeOff, Gift, HeartHandshake, House, Image, Leaf,
+  Activity, Banknote, BookOpen, CalendarClock, CircleHelp, CirclePlus, CupSoda, EyeOff, Gift, HeartHandshake, House, Image, Leaf,
   LayoutList, Mail, MapPin, MousePointerClick, Palette, Share2, Store, Type, LayoutGrid, User, Wallet,
 } from 'lucide-react';
 import { DEFAULT_DESIGN } from './designDefaults';
@@ -233,6 +233,7 @@ export const HOME_SECTIONS = {
   tikkie: {
     wallet: { label: 'Wallet', icon: Wallet, tone: 'orange', locked: true, summary: 'Available to collect: the amount, tap to collect.' },
     actions: { label: 'Collect and Donate buttons', icon: MousePointerClick, tone: 'violet', setting: 'tikkieActionButtons', summary: 'Two big buttons under the wallet. Off, the wallet carries one collect button.' },
+    autoCashout: { label: 'Automatic cashout', icon: CalendarClock, tone: 'teal', toggle: 'showAutoCashout', needsSetting: 'autoCashout', needsLabel: 'Automatic cashout', summary: 'The slider for how often the balance is sent automatically, with Claim deposit at Off. Shows only while Automatic cashout is on in Settings.' },
     email: { label: 'Save your balance', icon: Mail, tone: 'sky', toggle: 'showEmailCard', summary: 'The email form, for customers without one. The account screen offers it too.' },
     howPaid: { label: 'How you get paid', icon: CircleHelp, tone: 'emerald', toggle: 'showHowPaid', summary: 'How a Tikkie payout works, step by step.' },
     activity: { label: 'Activity', icon: Activity, tone: 'amber', toggle: 'showActivity', summary: 'Returns, payouts and donations, newest first.' },

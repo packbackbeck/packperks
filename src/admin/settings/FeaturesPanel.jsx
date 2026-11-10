@@ -4,6 +4,7 @@ import { Badge, Button, InfoTip, Modal, Switch } from '../ui';
 import { TAB_BY_ID } from '../lib/access';
 import { getGroupHideLiveVendors, setGroupHideLiveVendors } from '../lib/adminApi';
 import FlowEditor from '../flow/FlowEditor';
+import AutoCashoutCard from './AutoCashoutCard';
 import { useFlowActions, useVenueFlow } from '../flow/useVenueFlow';
 import { FEATURE_GROUPS, featuresFor, featureValue } from './settingsModel';
 
@@ -75,6 +76,12 @@ export default function FeaturesPanel({ draft, draftState, canEdit, mode, org, i
         venueName={org.activeOrg?.name}
         inGroup={hasGroup}
       />
+
+      {/* An extra on the Deferred Refund way out: the wallet pays itself
+          out on the customer's schedule, with an optional bonus. */}
+      {mode === 'tikkie_only' && (
+        <AutoCashoutCard draft={draft} canEdit={canEdit} orgId={org.activeOrgId} />
+      )}
 
       {groupError && <p className="st-error" role="alert">{groupError}</p>}
 

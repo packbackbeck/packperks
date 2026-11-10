@@ -7,7 +7,11 @@ import { pointsFor } from './brands';
  * claims or events to anyone's dashboard.
  *
  * Every page load counts as one returned cup, so refreshing the page is
- * how a demo "returns" a cup. A load is identified by
+ * how a demo "returns" a cup — until the balance reaches the cheapest
+ * reward (`cap`). From there a refresh adds nothing until a reward is
+ * redeemed and the balance drops below it again. The panel's button and
+ * the app's own scan still add a cup whenever they are used. A load is
+ * identified by
  * performance.timeOrigin, which keeps React StrictMode's double-run and
  * a second component on the same page from counting it twice.
  * ───────────────────────────────────────────────────────────────────── */
@@ -47,17 +51,22 @@ function withCup(state, ppc) {
 // StrictMode calling the initialiser twice still counts (and greets) once.
 const countedThisLoad = new Set();
 
-function loadAndCount(brand, ppc) {
+function loadAndCount(brand, ppc, cap) {
   const current = read(brand);
   if (current.lastLoad === LOAD_ID) return current;
+  if (cap > 0 && current.points >= cap) {
+    const seen = { ...current, lastLoad: LOAD_ID };
+    write(brand, seen);
+    return seen;
+  }
   const next = { ...withCup(current, ppc), lastLoad: LOAD_ID };
   write(brand, next);
   countedThisLoad.add(brand);
   return next;
 }
 
-export function useDemoWallet(brand, ppc) {
-  const [state, setState] = useState(() => loadAndCount(brand, ppc));
+export function useDemoWallet(brand, ppc, cap = 0) {
+  const [state, setState] = useState(() => loadAndCount(brand, ppc, cap));
   // A cup was counted for this page load: the app greets it.
   const earnedOnLoad = countedThisLoad.has(brand);
 

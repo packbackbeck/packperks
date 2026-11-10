@@ -3,7 +3,7 @@ import { pointsFor } from '../brands';
 
 /* The state behind the kit, held by the demo page and handed to the brand
  * app and its PackbackLayer through KitContext. */
-export function useKitState({ brand, lang, t, wallet, rewards, live }) {
+export function useKitState({ brand, lang, t, wallet, rewards, live, guide }) {
   const [sheet, setSheet] = useState(null);         // { mode, reward? }
   const [voucher, setVoucher] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
@@ -18,7 +18,7 @@ export function useKitState({ brand, lang, t, wallet, rewards, live }) {
   };
 
   return {
-    brand, lang, t, wallet, rewards, live,
+    brand, lang, t, wallet, rewards, live, guide,
     ppc: brand.pointsPerCup,
     amount: (n) => `${n} ${t(Math.abs(n) === 1 ? 'unitOne' : 'unit')}`,
     // Pop the newest cup: on the load that returned it, and on every cup after.

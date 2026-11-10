@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCodeLib from 'qrcode';
-import SlideToConfirm from '../../components/SlideToConfirm';
 import { pointsFor } from '../brands';
 import { euro } from '../i18n';
 import { CupSvg } from './icons';
@@ -8,13 +7,13 @@ import { useKit } from './kitCore';
 import '../../components/VoucherPage.css';
 
 /* ─────────────────────────────────────────────────────────────────────
- * The PackPerks slider voucher (Packback's counter voucher), as a demo.
+ * The PackPerks voucher card, as a kiosk voucher.
  *
- * Same card, same stylesheet and the same SlideToConfirm as the real
- * VoucherPage (src/components), so a demo shows exactly what a customer
- * would hold up at the counter. The one difference is what the slide
- * does: VoucherPage calls redeem_voucher, this takes the points off the
- * demo wallet in this browser. The brand's colours go in through the
+ * Same card and stylesheet as the real VoucherPage (src/components), but
+ * at KFC and McDonald's the customer scans its QR code at the ordering
+ * kiosk themselves: no counter, no staff, no slider. The demo's button
+ * stands in for that scan and takes the points off the demo wallet in
+ * this browser (VoucherPage would call redeem_voucher). The brand's colours go in through the
  * same --pb-* variables the customer app sets from Client app → Colours.
  * ───────────────────────────────────────────────────────────────────── */
 
@@ -85,8 +84,6 @@ export default function DemoVoucher({ reward, onClose }) {
   useTilt(cardRef);
   const clock = useClock();
   const [qr, setQr] = useState(null);
-  const [staffStep, setStaffStep] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [doneAt, setDoneAt] = useState(null);
   const cost = pointsFor(reward);
   const v = brand.kit.voucher;
@@ -104,7 +101,7 @@ export default function DemoVoucher({ reward, onClose }) {
 
   return (
     <div className="hv ppd-hv" style={{
-      '--vp': progress, '--pb-brown': v.brown, '--pb-orange': v.orange, '--pb-cream': v.cream, '--black': v.black,
+      '--vp': doneAt ? 1 : 0, '--pb-brown': v.brown, '--pb-orange': v.orange, '--pb-cream': v.cream, '--black': v.black,
     }}>
       <div className="hv__bg" aria-hidden="true">
         <span className="hv__wash hv__wash--l" />
@@ -167,15 +164,11 @@ export default function DemoVoucher({ reward, onClose }) {
           </div>
         </div>
 
-        {!staffStep ? (
-          <button type="button" className="hv__cta" onClick={() => setStaffStep(true)}>{t('showStaff')}</button>
-        ) : (
-          <div className="hv__staff">
-            <p className="hv__staff-note" dangerouslySetInnerHTML={{ __html: t('staffNote', { n: amount(cost) }) }} />
-            <SlideToConfirm label={doneAt ? t('redeeming') : t('slide')} color={v.brown}
-              disabled={!!doneAt} onProgress={setProgress} onComplete={handleComplete} />
-          </div>
-        )}
+        <div className="hv__staff ppd-hv-kiosk">
+          <p className="ppd-hv-kiosk-title">{t('scanKiosk')}</p>
+          <p className="hv__staff-note" dangerouslySetInnerHTML={{ __html: t('kioskNote', { n: amount(cost) }) }} />
+          <button type="button" className="hv__cta" disabled={!!doneAt} onClick={handleComplete}>{t('kioskSimulate')}</button>
+        </div>
       </main>
 
       {doneAt && (

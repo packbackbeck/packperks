@@ -618,6 +618,10 @@ export default function App({ consentReady = true } = {}) {
   ) === 'voucher';
   // A counter venue never asks for a receipt, so the last step is retold.
   const guideSteps = isVoucher ? voucherGuideSteps(rawGuideSteps) : rawGuideSteps;
+  // Settings → Ways & features → Step-by-step guide. Off, the guide never
+  // opens: no entry on the account page, and a reward the customer can't
+  // afford yet only nudges the cup progress.
+  const guideEnabled = liveSettings.featureHowItWorks !== false;
 
 
   /* ── Init: load user + state from Supabase ── */
@@ -1975,6 +1979,7 @@ export default function App({ consentReady = true } = {}) {
   // block, and remember to run the cup nudge once the guide closes.
   const handleLockedClaim = () => {
     setNudgeActive(true);
+    if (!guideEnabled) { handleNudge(cupsRemaining); return; }
     pendingNudgeRef.current = true;
     setHowItWorksOpen(true);
   };
@@ -2445,7 +2450,7 @@ export default function App({ consentReady = true } = {}) {
             setAccountCombined(false);
             setPage('home');
           }}
-          onOpenHowItWorks={() => setHowItWorksOpen(true)}
+          onOpenHowItWorks={guideEnabled ? () => setHowItWorksOpen(true) : undefined}
         />
         {signInSheetNode}
         {actionNoticeNode}
@@ -2487,7 +2492,7 @@ export default function App({ consentReady = true } = {}) {
           />
         )}
         {donateSheetNode}
-        {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
+        {howItWorksOpen && guideEnabled && <HowItWorks steps={guideSteps} onClose={() => setHowItWorksOpen(false)} onComplete={() => setHiwSeen(true)} />}
       </div>
     );
   }
@@ -2652,7 +2657,7 @@ export default function App({ consentReady = true } = {}) {
         />
       )}
 
-      {howItWorksOpen && <HowItWorks steps={guideSteps} onClose={closeGuide} onComplete={() => setHiwSeen(true)} />}
+      {howItWorksOpen && guideEnabled && <HowItWorks steps={guideSteps} onClose={closeGuide} onComplete={() => setHiwSeen(true)} />}
 
       <BudgetPausedModal
         open={budgetPausedOpen}

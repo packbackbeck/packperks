@@ -166,18 +166,21 @@ function Sheet({ open, onClose, children }) {
 }
 
 function WalletBody() {
-  const { wallet, t, openSheet, closeSheet, goRewards } = useKit();
+  const { wallet, t, guide, openSheet, closeSheet, goRewards } = useKit();
   return (
     <>
       <img className="ppd-sheet-logo" src={packbackLogo} alt="Packback" />
       <div className="ppd-big"><b>{wallet.points}</b><span>{t(wallet.points === 1 ? 'unitOne' : 'unit')}</span></div>
       <NextNote className="is-center" />
       <CupTrack />
-      <div className="ppd-steps">
-        <div><b>1</b>{t('step1')}</div>
-        <div><b>2</b>{t('step2')}</div>
-        <div><b>3</b>{t('step3')}</div>
-      </div>
+      {/* The org's Settings → Step-by-step guide decides this. */}
+      {guide && (
+        <div className="ppd-steps">
+          <div><b>1</b>{t('step1')}</div>
+          <div><b>2</b>{t('step2')}</div>
+          <div><b>3</b>{t('step3')}</div>
+        </div>
+      )}
       <div className="ppd-btn-row">
         <button type="button" className="ppd-btn is-dark" onClick={() => openSheet('scan')}>{t('returnCup')}</button>
         <button type="button" className="ppd-btn" onClick={goRewards}>{t('rewards')}</button>

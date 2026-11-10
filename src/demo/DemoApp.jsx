@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BRANDS, BRAND_LIST, brandForPath } from './brands';
+import { BRANDS, BRAND_LIST, brandForPath, pointsFor } from './brands';
 import { makeT } from './i18n';
 import { useDemoWallet } from './wallet';
 import { useOrgRewards } from './useOrgRewards';
@@ -109,21 +109,15 @@ function Phone({ vp, kit, children }) {
   );
 }
 
-/* The left side: controls, not reading. */
-function Panel({ brand, kit, t, lang, setLang }) {
+/* The left side: controls, not reading. One brand per demo: nothing here
+ * leads to the other one, so a KFC pitch never shows McDonald's. */
+function Panel({ kit, t, lang, setLang }) {
   const { wallet } = kit;
-  const q = lang === 'en' ? '?lang=en' : '';
   return (
     <aside className="ppd-panel">
-      <a className="ppd-logo" href={`/demo${q}`}>
+      <div className="ppd-logo">
         <img src={packbackLogo} alt="Packback" /><span>{t('demo')}</span>
-      </a>
-
-      <Seg label="Demo">
-        {BRAND_LIST.map(b => (
-          <a key={b.key} href={`${b.path}${q}`} aria-pressed={b.key === brand.key}>{b.name}</a>
-        ))}
-      </Seg>
+      </div>
 
       <div className="ppd-balance">
         <span>{t('demoBalance')}</span>
@@ -132,7 +126,7 @@ function Panel({ brand, kit, t, lang, setLang }) {
       </div>
 
       <button type="button" className="ppd-action is-primary" onClick={kit.earn}>{t('demoEarn')}</button>
-      <p className="ppd-hint"><span aria-hidden="true">↻</span>{t('demoRefresh', { n: brand.pointsPerCup })}</p>
+      <p className="ppd-hint"><span aria-hidden="true">↻</span>{t('demoRefresh')}</p>
 
       <div className="ppd-row">
         <button type="button" className="ppd-action" onClick={wallet.reset}>{t('demoReset')}</button>
@@ -149,9 +143,11 @@ function Panel({ brand, kit, t, lang, setLang }) {
 
 function BrandDemo({ brand, lang, setLang }) {
   const t = useMemo(() => makeT(lang, brand.strings), [lang, brand]);
-  const wallet = useDemoWallet(brand.key, brand.pointsPerCup);
-  const { rewards, live } = useOrgRewards(brand);
-  const kit = useKitState({ brand, lang, t, wallet, rewards, live });
+  // A refresh adds a cup until the cheapest reward is in reach.
+  const cap = Math.min(...brand.rewards.map(pointsFor));
+  const wallet = useDemoWallet(brand.key, brand.pointsPerCup, cap);
+  const { rewards, live, guide } = useOrgRewards(brand);
+  const kit = useKitState({ brand, lang, t, wallet, rewards, live, guide });
   const vp = useViewport();
   useHead(`Packback × ${brand.name}`);
   const App = brand.key === 'kfc' ? KfcApp : McdApp;
@@ -167,7 +163,7 @@ function BrandDemo({ brand, lang, setLang }) {
 
   return (
     <div className="ppd">
-      <Panel brand={brand} kit={kit} t={t} lang={lang} setLang={setLang} />
+      <Panel kit={kit} t={t} lang={lang} setLang={setLang} />
       {phone}
     </div>
   );

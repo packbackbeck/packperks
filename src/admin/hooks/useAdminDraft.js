@@ -43,6 +43,8 @@ export const DEFAULT_SETTINGS = {
   // Opt-in: changes which reward each customer is shown, so an org turns it
   // on deliberately rather than inheriting it.
   featureSmartSorting: false,
+  // The “How it works” step-by-step guide. On unless a venue switches it off.
+  featureHowItWorks: true,
   featureDonations: true,
   featureDirectRefunds: true,
   maintenanceMode: false,

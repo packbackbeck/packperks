@@ -15,11 +15,15 @@ There are four apps in one codebase, picked by path in `src/main.jsx`:
   `/demo/mcdonalds`): Packback inside a brand's own app, for pitches. The
   demos say **Packback** (logo and copy), never PackPerks. **Client-only,
   on purpose**: the points live in localStorage (every page load counts as
-  one returned cup), and the only network call is a read of the
-  brand's published rewards (`useOrgRewards.js`), so nothing a demo does can
+  one returned cup until the balance reaches the cheapest reward; then a
+  refresh adds nothing until a reward is redeemed), and the only network
+  call is a read of the brand's published rewards and its Step-by-step
+  guide switch (`useOrgRewards.js`), so nothing a demo does can
   reach a dashboard. Never give it the supabase client, the customer app,
-  or capture. Redeeming uses the real slider voucher's stylesheet and
-  `SlideToConfirm`, without `redeem_voucher`. Points per cup are per brand
+  or capture. Each demo shows one brand only: nothing in it links to the
+  other. The voucher is the real voucher card's stylesheet, scanned **at
+  the kiosk** (no counter, no staff, no slider; a button simulates the
+  scan), without `redeem_voucher`. Points per cup are per brand
   (`pointsPerCup` in `brands.js`): McDonald's 50 MyM points (MyMcDonald's
   Rewards gives 10 per euro, so the org's cups × 50 are MyM's own prices),
   KFC 1 (it has no points programme, so a point is a cup). A reward costs its org's `cupsNeeded` × that, so the demo and the
@@ -426,6 +430,11 @@ Epson the sheet goes out turned a quarter turn (`rasteriseForThermal`):
 printed upright on an 80 mm roll its QR lands at about 10 mm and will not
 scan. Fonts are self-hosted in `public/fonts/` (Figtree, Playfair Display,
 Bevan — all OFL), same rule as DM Sans.
+
+**Step-by-step guide** (`featureHowItWorks`, Settings → Ways & features,
+on unless set false): the full-screen *How it works* guide. Off, it never
+opens — no *How does it work?* on the account page, and a locked reward
+tap only nudges the cup progress. Off for KFC and McDonald's.
 
 **Client app** (`appdesign`, formerly "Design & copy") is in every mode;
 Deferred Tikkie gets only Colours and Sections. *Sections* is what the

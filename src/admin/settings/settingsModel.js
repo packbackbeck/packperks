@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Construction, EyeOff, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
+  BookOpen, Construction, EyeOff, LayoutGrid, Link2Off, MailCheck, MapPin, Presentation,
   ScrollText, Share2, SlidersHorizontal, Sparkles, ToggleRight, Wallet,
 } from 'lucide-react';
 
@@ -64,6 +64,12 @@ export const FEATURES = [
     label: 'Smart sorting',
     summary: 'Each customer sees the reward they are closest to first.',
     detail: 'Instead of the same flagship reward for everyone, the app features the reward nearest the customer’s balance, ideally one cup away. A first-timer holding one cup sees a goal they can finish on their next visit. Customers who pick a reward themselves keep it.',
+  },
+  {
+    key: 'featureHowItWorks', group: 'app', icon: BookOpen, tone: 'sky', modes: APP, fallback: true,
+    label: 'Step-by-step guide',
+    summary: 'The “How it works” guide: full-screen steps on returning cups and getting a reward.',
+    detail: 'Switched off, the guide never opens. “How does it work?” leaves the account page, and tapping a reward the customer can’t afford yet only shows how many cups are missing. The sales demos read this switch too.',
   },
   {
     key: 'requireEmailVerification', group: 'app', icon: MailCheck, tone: 'sky', modes: APP, fallback: true,

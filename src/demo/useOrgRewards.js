@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 
 /* ─────────────────────────────────────────────────────────────────────
- * The brand's live rewards, read from its PackPerks organisation.
+ * The brand's live rewards, read from its PackPerks organisation, and
+ * its Step-by-step guide switch (settings.featureHowItWorks).
  *
  * Two plain reads with the public key (the same rows the customer app
  * reads at /<slug>/): the organisation by slug, then its published
@@ -24,6 +25,8 @@ async function get(path) {
 export function useOrgRewards(brand) {
   const [rewards, setRewards] = useState(brand.rewards);
   const [live, setLive] = useState(false);
+  // Both demo orgs have the guide off, so that is the starting point.
+  const [guide, setGuide] = useState(false);
 
   useEffect(() => {
     // The page remounts this per brand (BrandDemo is keyed by it), so the
@@ -37,6 +40,7 @@ export function useOrgRewards(brand) {
         if (!id) return;
         const rows = await get(`app_config?key=eq.${encodeURIComponent(`published:${id}`)}&select=value`);
         const list = rows?.[0]?.value?.rewards;
+        if (!cancelled) setGuide(rows?.[0]?.value?.settings?.featureHowItWorks !== false);
         if (!Array.isArray(list)) return;
         const bundled = Object.fromEntries(brand.rewards.map(r => [r.id, r]));
         const mapped = list
@@ -62,5 +66,5 @@ export function useOrgRewards(brand) {
     return () => { cancelled = true; };
   }, [brand]);
 
-  return { rewards, live };
+  return { rewards, live, guide };
 }

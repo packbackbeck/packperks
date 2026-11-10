@@ -218,6 +218,11 @@
 .ppd-hv .hv__arcs { height: 230px; }
 .ppd-hv .hv__body { padding-bottom: calc(var(--ppd-safe-bottom, 34px) + 18px); }
 .ppd-hv-tile { background: #fff !important; }
+/* Kiosk voucher: the instruction, what it takes, the simulated scan. */
+.ppd-hv-kiosk { gap: 8px; }
+.ppd-hv-kiosk-title { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.2; color: var(--black, #1F1B16); }
+.ppd-hv-kiosk .hv__cta { margin-top: 6px; }
+.ppd-hv-kiosk .hv__cta:disabled { opacity: 0.6; cursor: default; }
 .ppd-hv .hv__img { max-width: none; }
 .ppd-hv-avatar { background: rgba(255, 255, 255, .22); font: 800 14px/1 var(--ppd-font, "DM Sans", sans-serif); color: #fff; }
 .ppd-hv-done {

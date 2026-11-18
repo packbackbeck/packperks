@@ -1,136 +1,148 @@
-# Connecting a smart bin to PackPerks — McDonald's
+# Smart bin setup — McDonald's
 
-For whoever writes the bin's software. The bin needs no PackPerks code or
-library: it makes **one HTTPS call per customer session** and prints **one
-QR code** on the receipt. Everything else (which venue, what the cups are
-worth, what the customer sees) is decided on the PackPerks side.
+For whoever writes the bin's software. The McDonald's bin needs no PackPerks code,
+library, account or connection: it shows **one QR on its screen** and
+prints **one receipt** after each customer session. Both QR codes are fixed
+links, so the bin works the same with or without internet.
 
 ---
 
-## 1. Configuration to put in the bin
+## 1. The two QR codes
+
+| QR | Where | Link | What a scan does |
+|---|---|---|---|
+| **Screen QR** | On the bin's **screen**, all the time | `https://perks.packback.network/mcdonalds/?byo=1` | Opens McDonald's PackPerks page and adds **+1 cup**, up to a per-person limit |
+| **Receipt QR** | Printed on the **receipt** after every session | `https://perks.packback.network/demo/mcdonalds` | Opens Packback inside the **McDonald's app** and adds 50 MyM points |
+
+Neither link ever changes. Generate both QR codes once and keep them in the
+bin.
+
+---
+
+## 2. Configuration to put in the bin
 
 | Setting | Value |
 |---|---|
-| Endpoint | `POST https://ozvcpbthnauitaphosfb.supabase.co/functions/v1/bin-mint-batch` |
-| Bin key (`X-Bin-Key` header) | **sent to you separately** — treat it like a password |
-| Receipt URL prefix | `https://perks.packback.network/mcdonalds/` |
+| Screen QR link | `https://perks.packback.network/mcdonalds/?byo=1` |
+| Receipt QR link | `https://perks.packback.network/demo/mcdonalds` |
+| Restaurant name (receipt footer) | The McDonald's restaurant's name, **27 characters at most**, e.g. `McDonald's Leidseplein` |
 
-The bin key is the only authentication (no API key, no login), and it is
-also what tells PackPerks this bin belongs to McDonald's. Keep it out of logs,
-screenshots and source control.
+There is no API to call and no key to store.
 
 ---
 
-## 2. What the bin does each session
+## 3. What the bin does
 
-1. **Session opens** → generate a fresh **UUID v4**: the `session_id`.
-2. **Each cup counted** → generate a UUID v4 for that cup (`cup_uuids`).
-   Optional for McDonald's, but recommended: it makes every cup traceable on both
-   sides and is a second guard against double counting.
-3. **Session closes** → send the call below.
-4. **On `200`** → print the receipt with a QR of the `url` from the
-   response (it is always `https://perks.packback.network/mcdonalds/?batch=<session_id>`).
-5. **On a network error, `5xx` or `429`** → retry with backoff, always with
-   the **same** `session_id` and the same `cup_uuids`. Retries are safe:
-   the same session is never counted twice.
+- **Always:** show the screen QR on the screen (or at least on the idle and
+  "thank you" screens).
+- **When a customer's session ends** (they have put their cups in): print
+  the receipt in section 5. Nothing is sent anywhere, so print straight
+  away, online or offline.
 
-> **Print after the response, not before.** For McDonald's, a receipt scanned
-> before PackPerks has received the call is shown to the customer as *not
-> valid*. Wait for the `200` (normally well under a second) and then print.
-> If the bin cannot reach PackPerks at all, keep the session in a queue
-> that survives a reboot and send it when the connection is back — but do
-> not hand out a receipt for it until it has gone through.
+---
 
-### The call
+## 4. What the customer gets
 
-```http
-POST /functions/v1/bin-mint-batch
-Host: ozvcpbthnauitaphosfb.supabase.co
-X-Bin-Key: <bin key>
-Content-Type: application/json
+**Screen QR.** Every scan adds one cup to the customer's balance on McDonald's
+PackPerks page, up to a per-person limit that PackPerks sets for McDonald's (two a
+day unless changed). A scan past the limit is not lost: it waits for
+approval, and the customer is told it is being checked. The bin doesn't
+need to know the limit.
 
-{
-  "cups": 3,
-  "session_id": "e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14",
-  "cup_uuids": [
-    "7b1d9a52-4e33-4c07-9a61-2f8b5d0e14aa",
-    "a3f6e281-9c4d-4b52-8e07-16d9f3a70b8c",
-    "c58a04f7-2b6e-4d19-b743-90e5c1f82d6b"
-  ]
-}
-```
+**Receipt QR.** Opens Packback inside the McDonald's app: the customer's
+MyM points (50 for every cup), the rewards they can redeem with them, and a
+MyM coupon to scan at the self-order kiosk. Each time the page is opened
+counts as one returned cup,
+until the customer has enough for their first reward. It runs entirely on
+the customer's phone, so nothing reaches McDonald's or PackPerks' real numbers.
 
-| Field | Rule |
+---
+
+## 5. The receipt design
+
+Drawn for an **80 mm thermal roll at 203 dpi: 512 dots across, 8 dots to
+the millimetre**, the same as the PackPerks Epson TM-m30III. The files are
+in [`bin-receipts/mcdonalds/`](bin-receipts/mcdonalds/):
+
+| File | What it is |
 |---|---|
-| `cups` | Whole number, 1–50 |
-| `session_id` | UUID **v4** (the version is checked; v1 is refused). New per session, the same on every retry, never reused |
-| `cup_uuids` | Optional. If sent: one UUID v4 per cup, as many as `cups`, no duplicates, and no id sent twice within 8 hours |
+| `header.png` | The top of the receipt, **512 × 587 dots**, pure black and white. Print it as one raster image, 1:1, centred. Don't scale it |
+| `preview-demo.png` | The whole receipt as it should come out, for reference |
 
-### The response (`200`)
+The receipt is worded for the **McDonald's app** it opens, in that app's own
+words: a small Packback logo, **GET YOUR FREE REWARD**, *Bring your cup
+back, get MyM points in the McDonald's app.*, the app's three steps as
+boxes (*Return your cup*, *Scan for MyM points*, *Redeem at the kiosk*) and
+**Scan to get your MyM points**. Under the QR: *1 cup = 50 MyM points.* and
+*Redeem them in the McDonald's app.* McDonald's has no deposit, so there is
+no refund, euro amount or cup count anywhere on the receipt.
 
-```json
-{
-  "batch_id": "e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14",
-  "url": "https://perks.packback.network/mcdonalds/?batch=e2a93d7c-7207-4d81-b0dc-d3c1da8c1c14",
-  "cups": 3,
-  "slug": "mcdonalds",
-  "reused": false
-}
-```
+### What the bin prints, top to bottom
 
-`reused: true` means this session had already been received and you are
-getting the same batch back — print it as normal. The response also
-carries `amount_eur` and `currency`: **ignore them at McDonald's**. McDonald's customers
-redeem cups for rewards in the app, not for money, so a euro amount on the
-receipt would be wrong.
+A *line* is one line of the printer's Font A: 12 × 24 dots on a 30-dot
+pitch (42 characters across 504 dots). A *blank line* is 30 dots (3.75 mm)
+of white.
 
-### Errors
+| # | Block | How | Size and spacing |
+|---|---|---|---|
+| 1 | Header | `header.png`, raster image | 512 × 587 dots, already includes its own top margin, the space between its blocks and 24 dots under the last line |
+| 2 | Gap | 1 blank line | 30 dots |
+| 3 | QR | The printer's own QR command, model 2, error correction **M**, **10 dots a module**, centred | 33 × 33 modules = 330 dots, about **41 mm** |
+| 4 | Gap | 2 blank lines | 60 dots |
+| 5 | Two lines, bold, centred | `1 cup = 50 MyM points.` / `Redeem them in the McDonald's app.` | Font A, emphasised |
+| 6 | Gap | 2 blank lines | 60 dots |
+| 7 | Rule | 42 × `-`, left aligned | Font A |
+| 8 | Footer, left aligned | `Time:` then `Restaurant:` | Label padded to 15 characters, value after it |
+| 9 | Paper before the cut | 2 blank lines, then a feed-and-cut | 60 dots |
 
-| Status | `error` | What to do |
+Footer values:
+
+| Label | Value | Example |
 |---|---|---|
-| `401` | `missing_bin_key` / `invalid_bin_key` | Configuration problem — check the key. Don't retry |
-| `400` | `invalid_cups`, `missing_session_id`, `invalid_session_id`, `cup_uuids_mismatch`, `invalid_cup_uuids`, `duplicate_cup_uuids` | A bug in the request. Don't retry; log it |
-| `409` | `cup_uuids_conflict` | Some cup ids were already used in another session in the last 8 hours. Don't retry; log it |
-| `429` | `rate_limited` | More than 120 sessions an hour from this bin. Retry later |
-| `500` | `mint_failed` (or any `5xx`) | Retry with the same `session_id` |
+| `Time:` | Day, short month, year, 24-hour time | `10 Nov 2026, 12:07` |
+| `Restaurant:` | The restaurant's name, **27 characters at most** so it fits on one line after the label. Shorten it rather than let it wrap | `McDonald's Leidseplein` |
 
----
+On an Epson printer with ePOS-Print the whole receipt is (time filled in by
+the bin):
 
-## 3. The receipt
-
-- A **QR code** of the `url`. Make it big enough for a phone camera to read
-  from a crumpled receipt (keep it well above 20 mm square; around 30 mm is
-  comfortable on an 80 mm roll), with a white margin around it.
-- The **number of cups** returned, e.g. "3 cups returned".
-- A short line such as "Scan to add your cups to McDonald's rewards".
-- **No euro amount** (see above).
-
-What the customer sees when they scan: the McDonald's rewards app opens and the
-cups are added to their balance. One receipt credits once; scanning it
-again shows that it was already used.
-
----
-
-## 4. Testing
-
-Every successful call adds **real cups** to McDonald's app, so keep test calls
-small and tell PackPerks when you are testing.
-
-```bash
-curl -X POST https://ozvcpbthnauitaphosfb.supabase.co/functions/v1/bin-mint-batch \
-  -H "X-Bin-Key: <bin key>" \
-  -H "Content-Type: application/json" \
-  -d '{"cups":1,"session_id":"<a new UUID v4>"}'
+```xml
+<text align="center"/>
+<image width="512" height="587" color="color_1" mode="mono" align="center">…header.png, 1 bit a dot…</image>
+<feed line="1"/>
+<symbol type="qrcode_model_2" level="level_m" width="10" height="10">https://perks.packback.network/demo/mcdonalds</symbol>
+<feed line="2"/>
+<text em="true">1 cup = 50 MyM points.&#10;Redeem them in the McDonald&apos;s app.&#10;</text>
+<text em="false"/>
+<feed line="2"/>
+<text>------------------------------------------&#10;</text>
+<text align="left"/>
+<text>Time:          10 Nov 2026, 12:07&#10;</text>
+<text>Restaurant:    McDonald&apos;s Leidseplein&#10;</text>
+<feed line="2"/>
+<cut type="feed"/>
 ```
 
-Checks before going live:
+Any other ESC/POS printer does the same with its raster-image, QR and text
+commands.
 
-- [ ] A normal session returns `200` and the QR on the printed receipt opens
-      `https://perks.packback.network/mcdonalds/?batch=…` on a phone.
-- [ ] Sending the same `session_id` twice returns the same `batch_id` with
-      `"reused": true`.
-- [ ] With the network unplugged, the session is queued, nothing is printed
-      until it goes through, and it is sent once the network is back —
-      including after a reboot.
-- [ ] A wrong key gives `401` and the bin shows a fault rather than printing.
-- [ ] The receipt shows the cup count and no euro amount.
+### The screen QR
+
+Show `https://perks.packback.network/mcdonalds/?byo=1` at **at least 4 cm across**
+at the screen's real size, black on white, with a white margin of at least
+four modules around it. Avoid placing it on a coloured or patterned
+background.
+
+---
+
+## 6. Testing
+
+- [ ] The screen shows the screen QR, and scanning it with a phone opens
+      McDonald's PackPerks page and adds a cup.
+- [ ] A finished session prints the receipt, and scanning its QR opens
+      `https://perks.packback.network/demo/mcdonalds` (Packback in the McDonald's app).
+- [ ] With the network unplugged, the receipt still prints the same.
+- [ ] The printed receipt matches `preview-demo.png`: the header is the same
+      size (not scaled) and the gaps are the same.
+- [ ] No receipt shows a euro amount or a cup count, and the restaurant
+      name fits on one line.
+- [ ] The receipt QR scans from about 30 cm away.

@@ -66,6 +66,26 @@ const BRANDS = {
       demo: 'https://perks.packback.network/demo/kfc',
     },
   },
+  /* The McDonald's app (the demo at /demo/mcdonalds): cups earn MyM points,
+   * 50 a cup (pointsPerCup in src/demo/brands.js), redeemed as a MyM coupon
+   * at the self-order kiosk. Header text is drawn in Arial, so it can carry
+   * a curly apostrophe; the native lines go through the printer's font, so
+   * they keep a straight one. */
+  mcdonalds: {
+    titleLines: ['GET YOUR', 'FREE REWARD'],
+    lede: ['Bring your cup back,', 'get MyM points in the McDonald’s app.'],
+    features: [
+      { icon: 'cup', lines: ['Return', 'your cup'] },
+      { icon: 'qr', lines: ['Scan for', 'MyM points'] },
+      { icon: 'gift', lines: ['Redeem at', 'the kiosk'] },
+    ],
+    cta: 'Scan to get your MyM points',
+    assureLines: ['1 cup = 50 MyM points.', "Redeem them in the McDonald's app."],
+    restaurant: "McDonald's Leidseplein",
+    links: {
+      demo: 'https://perks.packback.network/demo/mcdonalds',
+    },
+  },
 };
 
 /* Native-printed parts, in dots. One text line of the printer's Font A is

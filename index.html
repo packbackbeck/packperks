@@ -15,9 +15,9 @@
     <!-- Browser tab icon (Chrome/Safari/Firefox). The /vite.svg default
          was deleted; pointing at the real PackPerks favicon now. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- iOS home-screen bookmark icon (when users "Add to Home Screen").
-         Re-uses the same SVG; iOS renders it at 180×180 on a white tile. -->
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- iOS home-screen icon ("Add to Home Screen"). iOS ignores SVG here, so
+         this is a 180×180 full-bleed PNG of the logo; iOS rounds the corners. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <!-- Self-hosted DM Sans (no third-party font CDN). Preload the primary
          weight so first paint isn't blocked on the font. -->
     <link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin />

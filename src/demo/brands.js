@@ -54,7 +54,7 @@ export const BRANDS = {
                 nl: 'Pittige, krokante Zinger-filet op een sesambol met ijsbergsla, tomaat en burgermayo.' } },
       // The cheapest burger-or-wings on KFC's own menu (order.kfc.nl, Nov 2026):
       // 3 Hot Wings, €3.50. It replaced the cookie as the first reward.
-      { id: 'kfc-hot-wings-3', order: 1, name: '3 Hot Wings', cupsNeeded: 5, euros: 3.5, imageScale: 1.2,
+      { id: 'kfc-hot-wings-3', order: 1, name: '3 Hot Wings', cupsNeeded: 1, euros: 3.5, imageScale: 1.2,
         image: kfcImg('0p0P9JU-V3PfUl5tYtU3eP_xzqRNOkZ0-zPS7h1ZtPA', 'M0hvdFdpbmdzXzIwMjVfVWJlckVhdHNfMTkyMHgxMDgwcHgtNjdhZGU0YWUxNzc5ODYyNGRiYzE4ZTg3LmpwZw=='),
         desc: { en: 'Three spicy Hot Wings, seasoned with KFC’s mix of herbs and spices.',
                 nl: 'Drie pittige Hot Wings, gekruid met KFC’s mix van kruiden en specerijen.' } },

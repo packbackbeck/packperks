@@ -29,6 +29,9 @@ const isSupport = path.startsWith('/support')
 // The bare root has no venue slug. Show the model chooser instead of booting the
 // customer app (which would resolve a fallback org — historically Burger King).
 const isRoot = path === '/' || path === ''
+// For now the bare root opens the KFC venue's PackPerks app. Set to '' to bring
+// the model chooser back.
+const ROOT_REDIRECT = '/kfc/'
 
 // Back from Google at the wrong venue (lib/oauth.js): store the session,
 // then return to the venue the sign-in started on, before anything boots.
@@ -36,6 +39,9 @@ const misrouted = !isAdmin && !isStaff && !isPackPulseEmbed && !isMockup && !isD
 
 if (misrouted) {
   bounceBackTo(misrouted)
+} else if (isRoot && ROOT_REDIRECT) {
+  // keep the query and hash, so a sign-in that lands on the root still completes
+  window.location.replace(ROOT_REDIRECT + window.location.search + window.location.hash)
 } else createRoot(document.getElementById('root')).render(
   <StrictMode>
     {isDemo

@@ -9,12 +9,15 @@ import './MaintenancePage.css';
  * mailing backend wired here, so we store the request on the device and show
  * an honest confirmation — the point is that the wait feels handled, not that
  * a server email is guaranteed.
+ *
+ * `message` (the venue's `maintenanceMessage`, set in SQL) replaces all of
+ * it with that one line, e.g. a closed sales demo: "Demo link closed."
  * ───────────────────────────────────────────────────────────────────── */
 
 const NOTIFY_KEY = 'packperks_maintenance_notify';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function MaintenancePage() {
+export default function MaintenancePage({ message } = {}) {
   const [email, setEmail] = useState('');
   // 'idle' → form, 'done' → confirmation. Start 'done' if we already have a
   // request stored, so a reload doesn't ask again.
@@ -26,6 +29,16 @@ export default function MaintenancePage() {
   });
 
   const valid = EMAIL_RE.test(email.trim());
+
+  if (message) {
+    return (
+      <div className="mnt">
+        <div className="mnt__card">
+          <h1 className="mnt__title">{message}</h1>
+        </div>
+      </div>
+    );
+  }
 
   const submit = (e) => {
     e.preventDefault();

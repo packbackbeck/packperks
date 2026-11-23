@@ -2030,7 +2030,8 @@ export default function App({ consentReady = true } = {}) {
   // A preview is looking at the screens themselves — a heatmap of taps
   // from last week is not improved by today's maintenance notice.
   if (maintenanceOn && !isPreviewMode) {
-    return <MaintenancePage />;
+    const maintenanceMessage = tikkieOnly ? tikkieOnly.settings?.maintenanceMessage : liveSettings.maintenanceMessage;
+    return <MaintenancePage message={maintenanceMessage || null} />;
   }
 
   /* Tikkie-only mode: the redirect page IS the whole app for these orgs.

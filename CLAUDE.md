@@ -496,8 +496,15 @@ install dialog (`lib/addToHome.js` catches `beforeinstallprompt` at
 import), and then the button installs straight away. The home tab is
 `CupProgress`'s `footer`, so the "+N more" note sits under it. Hidden when the app already runs from
 the Home Screen. Rewards apps only (App.jsx), not Deferred Tikkie yet. On
-for KFC only. The manifest's `start_url` is `/`, which today redirects to
-`/kfc/`; a second venue needs a per-venue start URL before it turns this on.
+for KFC only. The manifest's `start_url` is `/`, and the bare root now
+redirects to https://packback.network (`ROOT_REDIRECT` in `main.jsx`), so
+an installed app opened from its start URL leaves PackPerks: venues need a
+per-venue start URL before this is offered again.
+
+**Maintenance message** (`maintenanceMessage`, published settings, set in
+SQL): with `maintenanceMode` on, the screen shows only that line instead of
+the usual notice and notify-me form. KFC: "Demo link closed." since 23 Nov
+2026.
 
 **Client app** (`appdesign`, formerly "Design & copy") is in every mode;
 Deferred Tikkie gets only Colours and Sections. *Sections* is what the

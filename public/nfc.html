@@ -114,6 +114,7 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
   border-top: 1px solid var(--line); padding-top: 12px;
 }
 .foot span { white-space: nowrap; }
+#dateBox { padding: 10px; margin: -10px; }
 .foot span b { color: var(--text); font-weight: 500; }
 @media (max-width: 640px) {
   .foot { grid-template-columns: repeat(2, auto); }
@@ -173,7 +174,7 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
 
   <footer class="foot mono">
     <span>TID <b>PPK-0417</b></span>
-    <span>DATE <b id="date">--</b></span>
+    <span id="dateBox">DATE <b id="date">--</b></span>
     <span>TAPS TODAY <b id="taps">0</b></span>
     <span>NFC <b>ON</b> · v2.4.1</span>
   </footer>
@@ -237,6 +238,19 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
     }).catch(function () {});
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) keepAwake(); });
+
+  // Double tap on the date: back to idle (staff reset).
+  var lastDateTap = 0;
+  document.getElementById('dateBox').addEventListener('pointerdown', function (e) {
+    e.stopPropagation();
+    keepAwake();
+    var now = Date.now();
+    if (now - lastDateTap < 400) { lastDateTap = 0; setIdle(); return; }
+    lastDateTap = now;
+    // A single tap still counts as a tap on the idle screen, after the
+    // double-tap window has passed.
+    setTimeout(function () { if (lastDateTap === now && !readyUntil) setReady(); }, 400);
+  });
 
   document.addEventListener('pointerdown', function () {
     keepAwake();

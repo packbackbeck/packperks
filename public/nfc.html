@@ -7,6 +7,12 @@
 <meta name="robots" content="noindex">
 <title>PackPerks Terminal</title>
 <link rel="icon" href="/favicon.svg">
+<link rel="manifest" href="/nfc.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Terminal">
 <style>
 :root {
   --bg: #05080f;
@@ -33,6 +39,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   touch-action: manipulation;
   cursor: pointer;
 }
@@ -115,7 +122,35 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
 }
 .foot span { white-space: nowrap; }
 #dateBox { padding: 10px; margin: -10px; }
-#corner { padding: 16px 18px; margin: -16px -18px; }
+#corner { position: relative; padding: 16px 18px; margin: -16px -18px; }
+#corner::after {
+  content: ""; position: absolute; left: 18px; right: 18px; bottom: 8px; height: 2px; border-radius: 1px;
+  background: var(--accent); transform: scaleX(0); transform-origin: right; opacity: 0;
+}
+#corner.holding::after { opacity: 1; transform: scaleX(1); transition: transform .8s linear; }
+#corner.armed::after { box-shadow: 0 0 8px var(--accent-glow); }
+
+.hint {
+  position: fixed; inset: 0; z-index: 10; display: none; align-items: flex-end; justify-content: center;
+  padding: 16px; background: rgba(0, 0, 0, .6); cursor: default;
+}
+.hint.open { display: flex; }
+.hint .card {
+  width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+  padding: 22px 20px 18px; margin-bottom: env(safe-area-inset-bottom);
+}
+.hint h2 { font-size: 20px; font-weight: 700; margin-bottom: 14px; }
+.hint ol { list-style: none; display: grid; gap: 10px; font-size: 16px; color: var(--muted); counter-reset: s; }
+.hint li { display: flex; gap: 12px; align-items: center; }
+.hint li::before {
+  counter-increment: s; content: counter(s); flex: none; width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--bg); background: var(--accent);
+}
+.hint li b { color: var(--text); font-weight: 600; }
+.hint button {
+  margin-top: 18px; width: 100%; height: 48px; border: 0; border-radius: 12px; font: inherit; font-size: 16px; font-weight: 600;
+  color: var(--bg); background: var(--accent); cursor: pointer;
+}
 .foot span b { color: var(--text); font-weight: 500; }
 @media (max-width: 640px) {
   .foot { grid-template-columns: repeat(2, auto); }
@@ -179,6 +214,18 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
     <span>TAPS TODAY <b id="taps">0</b></span>
     <span>NFC <b>ON</b> · v2.4.1</span>
   </footer>
+</div>
+
+<div class="hint" id="hint" role="dialog" aria-modal="true" aria-labelledby="hintTitle">
+  <div class="card">
+    <h2 id="hintTitle">Fullscreen on iPhone</h2>
+    <ol>
+      <li><span>Tap <b>•••</b>, then <b>Share</b></span></li>
+      <li><span>Tap <b>View More</b>, then <b>Add to Home Screen</b></span></li>
+      <li><span>Open <b>Terminal</b> from your Home Screen</span></li>
+    </ol>
+    <button type="button" id="hintOk">OK</button>
+  </div>
 </div>
 
 <script>
@@ -264,9 +311,51 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
   }
 
-  // Date: back to idle. Top-right corner: fullscreen on / off.
+  // Date (double tap): back to idle.
   onDoubleTap(document.getElementById('dateBox'), setIdle);
-  onDoubleTap(document.getElementById('corner'), toggleFullscreen);
+
+  // Top-right corner (press and hold): fullscreen on / off. The hold arms it
+  // and the release fires it, because on a phone only the finger lifting
+  // counts as the user gesture fullscreen needs. iPhone Safari has no page
+  // fullscreen at all, so there the hold explains the Home Screen route,
+  // which opens this page fullscreen (nfc.webmanifest).
+  var HOLD_MS = 800;
+  var corner = document.getElementById('corner');
+  var hint = document.getElementById('hint');
+  var holdTimer = 0, armed = false, holding = false, hintOpenedAt = 0;
+  function canFullscreen() { return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled); }
+  function isHomeScreenApp() {
+    return navigator.standalone === true || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+  }
+  function endHold() {
+    clearTimeout(holdTimer); holding = false; armed = false;
+    corner.classList.remove('holding', 'armed');
+  }
+  corner.addEventListener('pointerdown', function (e) {
+    e.stopPropagation(); keepAwake();
+    holding = true; armed = false;
+    corner.classList.add('holding');
+    holdTimer = setTimeout(function () {
+      armed = true; corner.classList.add('armed');
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, HOLD_MS);
+  });
+  corner.addEventListener('pointerup', function () {
+    if (!holding) return;
+    var wasArmed = armed;
+    endHold();
+    if (!wasArmed) { if (!readyUntil) setReady(); return; }
+    if (canFullscreen()) toggleFullscreen();
+    else if (!isHomeScreenApp()) { hintOpenedAt = Date.now(); hint.classList.add('open'); }
+  });
+  corner.addEventListener('pointercancel', endHold);
+  corner.addEventListener('pointerleave', function () { if (holding && !armed) endHold(); });
+
+  hint.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  hint.addEventListener('click', function (e) {
+    if (Date.now() - hintOpenedAt < 500) return; // the click from the hold's own release
+    if (e.target === hint || e.target.id === 'hintOk') hint.classList.remove('open');
+  });
 
   document.addEventListener('pointerdown', function () {
     keepAwake();

@@ -71,14 +71,14 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: clamp(18px, 4vh, 34px); text-align: center; min-height: 0;
 }
-.art { width: min(62vw, 42vh, 320px); aspect-ratio: 1; position: relative; }
-.art svg { width: 100%; height: 100%; overflow: visible; }
-.ring { position: absolute; inset: 14%; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: ripple 2.6s ease-out infinite; }
-.ring:nth-child(2) { animation-delay: .85s; }
-.ring:nth-child(3) { animation-delay: 1.7s; }
-body.ready .ring { animation-duration: 1.6s; }
-body.ready .ring:nth-child(2) { animation-delay: .53s; }
-body.ready .ring:nth-child(3) { animation-delay: 1.06s; }
+.art { width: min(86vw, 52vh, 460px); aspect-ratio: 1; position: relative; }
+.art svg { position: relative; z-index: 1; width: 100%; height: 100%; overflow: visible; }
+.ring { position: absolute; z-index: 0; inset: 14%; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: ripple 5s ease-out infinite; }
+.ring:nth-child(2) { animation-delay: 1.67s; }
+.ring:nth-child(3) { animation-delay: 3.33s; }
+body.ready .ring { animation-duration: 3.6s; }
+body.ready .ring:nth-child(2) { animation-delay: 1.2s; }
+body.ready .ring:nth-child(3) { animation-delay: 2.4s; }
 @keyframes ripple { 0% { transform: scale(.7); opacity: .7; } 100% { transform: scale(1.35); opacity: 0; } }
 
 .wave { stroke: var(--accent); animation: wave 1.8s ease-in-out infinite; }
@@ -92,16 +92,16 @@ body.ready .phone { opacity: 1; animation: approach 2.4s ease-in-out infinite; }
   45%, 60% { transform: translate(6px, -4px) rotate(4deg); }
 }
 
-h1 { font-size: clamp(30px, 7vw, 54px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
-.sub { font-size: clamp(16px, 3.4vw, 22px); color: var(--muted); max-width: 22ch; line-height: 1.35; }
+h1 { font-size: clamp(42px, 11vw, 84px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
+.sub { font-size: clamp(22px, 5.4vw, 34px); color: var(--muted); max-width: 20ch; line-height: 1.35; }
 .sub b { color: var(--text); font-weight: 600; }
 
 .count {
   display: none; align-items: center; gap: 10px;
-  font-size: 13px; color: var(--muted); letter-spacing: .06em;
+  font-size: 15px; color: var(--muted); letter-spacing: .06em;
 }
 body.ready .count { display: flex; }
-.track { width: 140px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.track { width: 180px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .track i { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left; }
 
 .view { display: contents; }
@@ -113,8 +113,9 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
   font-size: 11px; color: var(--muted); letter-spacing: .05em;
   border-top: 1px solid var(--line); padding-top: 12px;
 }
+.foot span { white-space: nowrap; }
 .foot span b { color: var(--text); font-weight: 500; }
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .foot { grid-template-columns: repeat(2, auto); }
   .bar .hide-sm { display: none; }
 }
@@ -162,7 +163,6 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
 
     <div class="view v-idle">
       <h1>Ready for cups</h1>
-      <p class="sub">Touch the screen to start</p>
     </div>
     <div class="view v-ready">
       <h1>Tap your phone</h1>

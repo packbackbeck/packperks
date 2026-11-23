@@ -115,6 +115,7 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
 }
 .foot span { white-space: nowrap; }
 #dateBox { padding: 10px; margin: -10px; }
+#corner { padding: 16px 18px; margin: -16px -18px; }
 .foot span b { color: var(--text); font-weight: 500; }
 @media (max-width: 640px) {
   .foot { grid-template-columns: repeat(2, auto); }
@@ -130,7 +131,7 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
       <span class="state" id="state">IDLE</span>
       <span class="hide-sm">PACKPERKS · NFC</span>
     </div>
-    <div class="right">
+    <div class="right" id="corner">
       <span id="clock">--:--:--</span>
       <span class="icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5.5 12a10 10 0 0 1 13 0"/><path d="M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
@@ -239,18 +240,33 @@ body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) keepAwake(); });
 
-  // Double tap on the date: back to idle (staff reset).
-  var lastDateTap = 0;
-  document.getElementById('dateBox').addEventListener('pointerdown', function (e) {
-    e.stopPropagation();
-    keepAwake();
-    var now = Date.now();
-    if (now - lastDateTap < 400) { lastDateTap = 0; setIdle(); return; }
-    lastDateTap = now;
-    // A single tap still counts as a tap on the idle screen, after the
-    // double-tap window has passed.
-    setTimeout(function () { if (lastDateTap === now && !readyUntil) setReady(); }, 400);
-  });
+  // Hidden staff controls. A double tap runs the action; a single tap
+  // still counts as a tap on the screen once the double-tap window passes.
+  function onDoubleTap(el, action) {
+    var last = 0;
+    // Keep the screen's own tap handler off this control.
+    el.addEventListener('pointerdown', function (e) { e.stopPropagation(); keepAwake(); });
+    // Detect on click: on a touch screen only the release grants the user
+    // activation that fullscreen needs, so pointerdown would be refused.
+    el.addEventListener('click', function () {
+      var now = Date.now();
+      if (now - last < 400) { last = 0; action(); return; }
+      last = now;
+      setTimeout(function () { if (last === now && !readyUntil) setReady(); }, 400);
+    });
+  }
+
+  function toggleFullscreen() {
+    var d = document, el = d.documentElement;
+    var isFull = d.fullscreenElement || d.webkitFullscreenElement;
+    if (isFull) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else if (el.requestFullscreen) el.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }
+
+  // Date: back to idle. Top-right corner: fullscreen on / off.
+  onDoubleTap(document.getElementById('dateBox'), setIdle);
+  onDoubleTap(document.getElementById('corner'), toggleFullscreen);
 
   document.addEventListener('pointerdown', function () {
     keepAwake();

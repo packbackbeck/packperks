@@ -69,7 +69,9 @@ function StarCircle({ lit, delay }) {
   );
 }
 
-export default function CupProgress({ collected, target, nudgeCount = 0 }) {
+/* `footer` hangs right under the track, above the "+N more" note (the Add
+ * to Home Screen tab uses it, so the note never splits it from the box). */
+export default function CupProgress({ collected, target, nudgeCount = 0, footer = null }) {
   const t = Math.max(0, target || 0);
   const isComplete = t > 0 && collected >= t;
   const progress = t > 0 ? Math.min(1, collected / t) : 0;
@@ -161,6 +163,7 @@ export default function CupProgress({ collected, target, nudgeCount = 0 }) {
           ))}
         </div>
       </div>
+      {footer && <div className="cup-progress__footer">{footer}</div>}
       {overflow && (
         <p className="cup-progress__overflow">+{collected - t} more</p>
       )}

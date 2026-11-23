@@ -24,21 +24,22 @@ import './AddToHomeSheet.css';
 const HOST = typeof window !== 'undefined' ? window.location.host.replace(/^www\./, '') : 'perks.packback.network';
 const ICON = '/apple-touch-icon.png';
 
-/* ── the drawings ─────────────────────────────────────────────────── */
+/* ── the drawings ──────────────────────────────────────────────────
+ * Each is cropped to just the part of the screen that matters, so the
+ * sheet stays short. */
 
-const Frame = ({ children, label }) => (
-  <svg className="a2hs-art" viewBox="0 0 300 150" role="img" aria-label={label}>
-    <rect x="0.5" y="0.5" width="299" height="149" rx="16" className="a2hs-art__bg" />
+const Frame = ({ children, label, h }) => (
+  <svg className="a2hs-art" viewBox={`0 0 300 ${h}`} role="img" aria-label={label}>
+    <rect x="0.5" y="0.5" width="299" height={h - 1} rx="14" className="a2hs-art__bg" />
     {children}
   </svg>
 );
 
-// faint page content behind a browser bar
-const PageLines = ({ top = 18 }) => (
+const PageLines = ({ top = 12, w = 200 }) => (
   <g className="a2hs-art__page">
-    <rect x="20" y={top} width="120" height="10" rx="5" />
-    <rect x="20" y={top + 18} width="200" height="7" rx="3.5" />
-    <rect x="20" y={top + 32} width="170" height="7" rx="3.5" />
+    <rect x="18" y={top} width={w * 0.6} height="9" rx="4.5" />
+    <rect x="18" y={top + 16} width={w} height="6" rx="3" />
+    <rect x="18" y={top + 28} width={w * 0.85} height="6" rx="3" />
   </g>
 );
 
@@ -49,8 +50,8 @@ const ShareGlyph = ({ x, y, s = 1, className = 'a2hs-art__ink' }) => (
   </g>
 );
 
-const PlusSquare = ({ x, y }) => (
-  <g transform={`translate(${x} ${y})`} className="a2hs-art__ink" fill="none" strokeWidth="1.8" strokeLinecap="round">
+const PlusSquare = ({ x, y, className = 'a2hs-art__ink' }) => (
+  <g transform={`translate(${x} ${y})`} className={className} fill="none" strokeWidth="1.8" strokeLinecap="round">
     <rect x="-8" y="-8" width="16" height="16" rx="4" />
     <path d="M0 -4 V4 M-4 0 H4" />
   </g>
@@ -59,28 +60,24 @@ const PlusSquare = ({ x, y }) => (
 function IosMenu() {
   // Safari (iOS 26+): the compact bar at the bottom, ••• opened to Share.
   return (
-    <Frame label="Safari's bar at the bottom of the screen, with the ••• button opened and Share highlighted">
-      <PageLines top={16} />
-      <g className="a2hs-art__card">
-        <rect x="150" y="18" width="132" height="76" rx="14" />
-      </g>
-      <rect x="156" y="24" width="120" height="30" rx="9" className="a2hs-hl-fill" />
-      <ShareGlyph x={172} y={40} className="a2hs-hl-ink" />
-      <text x="186" y="44" className="a2hs-art__t a2hs-art__t--strong a2hs-hl-text">Share</text>
-      <line x1="162" y1="60" x2="276" y2="60" className="a2hs-art__rule" />
-      <text x="166" y="80" className="a2hs-art__t">Add Bookmark</text>
-      {/* the bar */}
+    <Frame h={104} label="Safari's bar at the bottom, with ••• opened and Share highlighted">
+      <PageLines top={12} w={110} />
+      <g className="a2hs-art__card"><rect x="150" y="8" width="134" height="56" rx="13" /></g>
+      <rect x="155" y="12" width="124" height="27" rx="8" className="a2hs-hl-fill" />
+      <ShareGlyph x={171} y={26} className="a2hs-hl-ink" />
+      <text x="186" y="30" className="a2hs-art__t a2hs-art__t--strong a2hs-hl-text">Share</text>
+      <text x="165" y="56" className="a2hs-art__t a2hs-art__t--faint">Add Bookmark</text>
       <g className="a2hs-art__glass">
-        <circle cx="34" cy="122" r="17" />
-        <rect x="58" y="105" width="190" height="34" rx="17" />
-        <circle cx="266" cy="122" r="17" />
+        <circle cx="32" cy="84" r="14" />
+        <rect x="54" y="70" width="190" height="28" rx="14" />
+        <circle cx="266" cy="84" r="14" />
       </g>
-      <path d="M37 115 L30 122 L37 129" className="a2hs-art__ink" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <text x="153" y="126" textAnchor="middle" className="a2hs-art__t a2hs-art__t--url">{HOST}</text>
+      <path d="M35 78 L29 84 L35 90" className="a2hs-art__ink" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <text x="149" y="88" textAnchor="middle" className="a2hs-art__t a2hs-art__t--url">{HOST}</text>
       <g className="a2hs-art__ink-fill">
-        <circle cx="259" cy="122" r="2" /><circle cx="266" cy="122" r="2" /><circle cx="273" cy="122" r="2" />
+        <circle cx="260" cy="84" r="1.8" /><circle cx="266" cy="84" r="1.8" /><circle cx="272" cy="84" r="1.8" />
       </g>
-      <circle cx="266" cy="122" r="21" className="a2hs-hl-ring" />
+      <circle cx="266" cy="84" r="17.5" className="a2hs-hl-ring" />
     </Frame>
   );
 }
@@ -88,114 +85,116 @@ function IosMenu() {
 function IosChromeShare() {
   // Chrome on iPhone: Share sits in the address bar at the top.
   return (
-    <Frame label="Chrome's address bar on iPhone with the Share button highlighted">
-      <g className="a2hs-art__glass">
-        <rect x="16" y="16" width="268" height="36" rx="18" />
-      </g>
-      <text x="40" y="39" className="a2hs-art__t a2hs-art__t--url">{HOST}</text>
-      <ShareGlyph x={260} y={35} />
-      <circle cx="260" cy="34" r="19" className="a2hs-hl-ring" />
-      <PageLines top={74} />
+    <Frame h={58} label="Chrome's address bar on iPhone with the Share button highlighted">
+      <g className="a2hs-art__glass"><rect x="14" y="11" width="272" height="36" rx="18" /></g>
+      <text x="36" y="33" className="a2hs-art__t a2hs-art__t--url">{HOST}</text>
+      <ShareGlyph x={262} y={30} />
+      <circle cx="262" cy="29" r="17" className="a2hs-hl-ring" />
     </Frame>
   );
 }
 
-function IosShareSheet() {
+function IosViewMore() {
+  // iOS 26+ share sheet: a row of round actions, the last one View More.
+  const btn = (x, label, glyph, hl) => (
+    <g key={label}>
+      <circle cx={x} cy="34" r="22" className={hl ? 'a2hs-art__round a2hs-art__round--hl' : 'a2hs-art__round'} />
+      {glyph}
+      <text x={x} y="76" textAnchor="middle" className={`a2hs-art__t a2hs-art__t--small${hl ? ' a2hs-art__t--strong a2hs-hl-text' : ''}`}>{label}</text>
+    </g>
+  );
+  const ink = { className: 'a2hs-art__ink', fill: 'none', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
   return (
-    <Frame label="The share sheet list, with Add to Home Screen highlighted">
-      <g className="a2hs-art__apps">
-        {[34, 78, 122, 166].map(x => <rect key={x} x={x - 16} y="12" width="32" height="32" rx="9" />)}
-      </g>
-      <g className="a2hs-art__card">
-        <rect x="14" y="54" width="272" height="88" rx="14" />
-      </g>
-      <text x="30" y="74" className="a2hs-art__t">Copy</text>
-      <line x1="26" y1="83" x2="274" y2="83" className="a2hs-art__rule" />
-      <rect x="18" y="86" width="264" height="30" rx="9" className="a2hs-hl-fill" />
-      <text x="30" y="106" className="a2hs-art__t a2hs-art__t--strong a2hs-hl-text">Add to Home Screen</text>
-      <PlusSquare x={262} y={101} />
-      <line x1="26" y1="119" x2="274" y2="119" className="a2hs-art__rule" />
-      <text x="30" y="136" className="a2hs-art__t a2hs-art__t--faint">Find on Page</text>
+    <Frame h={90} label="The share sheet's row of actions with View More highlighted">
+      {btn(45, 'Copy', <g {...ink}><rect x="38" y="26" width="11" height="14" rx="2" /><path d="M43 26 V23 H54 V35 H49" /></g>)}
+      {btn(115, 'Reading List', <g {...ink}><path d="M104 29 H126 M104 35 H126 M104 41 H118" /></g>)}
+      {btn(185, 'Bookmark', <g {...ink}><path d="M185 23 L188.4 30 L196 30.8 L190.3 35.8 L192 43.3 L185 39.4 L178 43.3 L179.7 35.8 L174 30.8 L181.6 30 Z" /></g>)}
+      {btn(255, 'View More', <path d="M245 30 L255 40 L265 30" className="a2hs-hl-ink" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />, true)}
+      <circle cx="255" cy="34" r="26.5" className="a2hs-hl-ring" />
+    </Frame>
+  );
+}
+
+function IosShareList() {
+  return (
+    <Frame h={96} label="The share sheet list with Add to Home Screen highlighted">
+      <g className="a2hs-art__card"><rect x="14" y="8" width="272" height="80" rx="13" /></g>
+      <text x="30" y="28" className="a2hs-art__t a2hs-art__t--faint">Print</text>
+      <line x1="26" y1="37" x2="274" y2="37" className="a2hs-art__rule" />
+      <rect x="18" y="40" width="264" height="28" rx="8" className="a2hs-hl-fill" />
+      <PlusSquare x={38} y={54} className="a2hs-hl-ink" />
+      <text x="56" y="58" className="a2hs-art__t a2hs-art__t--strong a2hs-hl-text">Add to Home Screen</text>
+      <text x="56" y="83" className="a2hs-art__t a2hs-art__t--faint">Add to Quick Note</text>
     </Frame>
   );
 }
 
 function IosAdd() {
   return (
-    <Frame label="The Add to Home Screen screen with the Add button highlighted">
-      <text x="22" y="30" className="a2hs-art__t a2hs-art__t--ios-blue">Cancel</text>
-      <text x="150" y="30" textAnchor="middle" className="a2hs-art__t a2hs-art__t--strong">Add to Home Screen</text>
-      <text x="278" y="30" textAnchor="end" className="a2hs-art__t a2hs-art__t--ios-blue a2hs-art__t--strong">Add</text>
-      <rect x="244" y="12" width="42" height="26" rx="13" className="a2hs-hl-ring" />
-      <g className="a2hs-art__card">
-        <rect x="14" y="48" width="272" height="94" rx="14" />
-      </g>
-      <image href={ICON} x="26" y="58" width="40" height="40" style={{ clipPath: 'inset(0 round 10px)' }} />
-      <text x="78" y="74" className="a2hs-art__t a2hs-art__t--strong">PackPerks</text>
-      <text x="78" y="90" className="a2hs-art__t a2hs-art__t--faint">{HOST}</text>
-      <line x1="26" y1="108" x2="274" y2="108" className="a2hs-art__rule" />
-      <text x="26" y="130" className="a2hs-art__t">Open as Web App</text>
-      <rect x="236" y="117" width="38" height="22" rx="11" className="a2hs-art__switch" />
-      <circle cx="263" cy="128" r="9" fill="#fff" />
+    <Frame h={100} label="The Add to Home Screen screen with the Add button highlighted">
+      <text x="20" y="25" className="a2hs-art__t a2hs-art__t--ios-blue">Cancel</text>
+      <text x="150" y="25" textAnchor="middle" className="a2hs-art__t a2hs-art__t--strong">Add to Home Screen</text>
+      <text x="280" y="25" textAnchor="end" className="a2hs-art__t a2hs-art__t--ios-blue a2hs-art__t--strong">Add</text>
+      <rect x="246" y="8" width="42" height="25" rx="12.5" className="a2hs-hl-ring" />
+      <g className="a2hs-art__card"><rect x="14" y="40" width="272" height="52" rx="13" /></g>
+      <image href={ICON} x="24" y="48" width="36" height="36" style={{ clipPath: 'inset(0 round 9px)' }} />
+      <text x="70" y="63" className="a2hs-art__t a2hs-art__t--strong">PackPerks</text>
+      <text x="70" y="79" className="a2hs-art__t a2hs-art__t--faint">{HOST}</text>
     </Frame>
   );
 }
 
 function AndroidMenuButton() {
   return (
-    <Frame label="Chrome's address bar on Android with the ⋮ menu button highlighted">
+    <Frame h={58} label="Chrome's address bar on Android with the ⋮ menu button highlighted">
       <g className="a2hs-art__glass">
-        <rect x="14" y="16" width="210" height="36" rx="18" />
-        <rect x="234" y="22" width="22" height="22" rx="5" />
+        <rect x="14" y="11" width="212" height="36" rx="18" />
+        <rect x="236" y="18" width="22" height="22" rx="5" />
       </g>
-      <text x="34" y="39" className="a2hs-art__t a2hs-art__t--url">{HOST}</text>
-      <text x="245" y="38" textAnchor="middle" className="a2hs-art__t a2hs-art__t--tiny">1</text>
+      <text x="34" y="33" className="a2hs-art__t a2hs-art__t--url">{HOST}</text>
+      <text x="247" y="33" textAnchor="middle" className="a2hs-art__t a2hs-art__t--tiny">1</text>
       <g className="a2hs-art__ink-fill">
-        <circle cx="276" cy="27" r="2.2" /><circle cx="276" cy="34" r="2.2" /><circle cx="276" cy="41" r="2.2" />
+        <circle cx="277" cy="22" r="2.1" /><circle cx="277" cy="29" r="2.1" /><circle cx="277" cy="36" r="2.1" />
       </g>
-      <circle cx="276" cy="34" r="16" className="a2hs-hl-ring" />
-      <PageLines top={74} />
+      <circle cx="277" cy="29" r="15" className="a2hs-hl-ring" />
     </Frame>
   );
 }
 
 function AndroidMenu() {
   return (
-    <Frame label="Chrome's menu with Add to Home screen highlighted">
-      <PageLines top={18} />
-      <g className="a2hs-art__card">
-        <rect x="96" y="10" width="190" height="132" rx="12" />
-      </g>
-      <text x="112" y="34" className="a2hs-art__t">New tab</text>
-      <text x="112" y="62" className="a2hs-art__t">History</text>
-      <rect x="100" y="74" width="182" height="32" rx="8" className="a2hs-hl-fill" />
-      <g transform="translate(116 90)" className="a2hs-hl-ink" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <Frame h={92} label="Chrome's menu with Add to Home screen highlighted">
+      <PageLines top={12} w={70} />
+      <g className="a2hs-art__card"><rect x="96" y="6" width="190" height="80" rx="12" /></g>
+      <text x="112" y="26" className="a2hs-art__t a2hs-art__t--faint">New tab</text>
+      <text x="112" y="47" className="a2hs-art__t a2hs-art__t--faint">History</text>
+      <rect x="100" y="54" width="182" height="28" rx="8" className="a2hs-hl-fill" />
+      <g transform="translate(116 68)" className="a2hs-hl-ink" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="-5" y="-8" width="10" height="16" rx="2" /><path d="M8 -2 L8 4 M5 1 L11 1" />
       </g>
-      <text x="132" y="95" className="a2hs-art__t a2hs-art__t--strong a2hs-hl-text">Add to Home screen</text>
-      <text x="112" y="128" className="a2hs-art__t a2hs-art__t--faint">Settings</text>
+      <text x="132" y="73" className="a2hs-art__t a2hs-art__t--strong a2hs-hl-text">Add to Home screen</text>
     </Frame>
   );
 }
 
 function AndroidInstall() {
   return (
-    <Frame label="The install dialog with the Install button highlighted">
-      <g className="a2hs-art__card">
-        <rect x="34" y="14" width="232" height="124" rx="18" />
-      </g>
-      <text x="54" y="42" className="a2hs-art__t a2hs-art__t--strong">Install app</text>
-      <image href={ICON} x="54" y="56" width="34" height="34" style={{ clipPath: 'inset(0 round 9px)' }} />
-      <text x="98" y="71" className="a2hs-art__t a2hs-art__t--strong">PackPerks</text>
-      <text x="98" y="86" className="a2hs-art__t a2hs-art__t--faint">{HOST}</text>
-      <text x="166" y="122" textAnchor="middle" className="a2hs-art__t a2hs-art__t--md-blue">Cancel</text>
-      <text x="228" y="122" textAnchor="middle" className="a2hs-art__t a2hs-art__t--md-blue a2hs-art__t--strong">Install</text>
-      <rect x="200" y="104" width="56" height="26" rx="13" className="a2hs-hl-ring" />
+    <Frame h={96} label="The install dialog with the Install button highlighted">
+      <g className="a2hs-art__card"><rect x="34" y="8" width="232" height="80" rx="16" /></g>
+      <image href={ICON} x="50" y="18" width="30" height="30" style={{ clipPath: 'inset(0 round 15px)' }} />
+      <text x="90" y="31" className="a2hs-art__t a2hs-art__t--strong">PackPerks</text>
+      <text x="90" y="45" className="a2hs-art__t a2hs-art__t--faint">{HOST}</text>
+      <text x="166" y="74" textAnchor="middle" className="a2hs-art__t a2hs-art__t--md-blue">Cancel</text>
+      <text x="228" y="74" textAnchor="middle" className="a2hs-art__t a2hs-art__t--md-blue a2hs-art__t--strong">Install</text>
+      <rect x="200" y="57" width="56" height="25" rx="12.5" className="a2hs-hl-ring" />
     </Frame>
   );
 }
 
-/* ── the steps ────────────────────────────────────────────────────── */
+/* ── the steps ──────────────────────────────────────────────────────
+ * Only the visitor's own phone: Android gets Chrome's steps, everything
+ * else (iPhone, iPad, and a laptop opening the preview) the iPhone ones.
+ * Since iOS 26 the share sheet keeps Add to Home Screen behind View More. */
 
 function stepsFor(kind) {
   if (kind === 'android') {
@@ -205,19 +204,19 @@ function stepsFor(kind) {
       { art: <AndroidInstall />, title: <>Tap <b>Install</b></> },
     ];
   }
-  const chrome = isIosChrome();
   return [
-    chrome
+    isIosChrome()
       ? { art: <IosChromeShare />, title: <>Tap <b>Share</b> in the address bar</> }
       : { art: <IosMenu />, title: <>Tap <b>•••</b>, then <b>Share</b></>, note: 'No ••• at the bottom? Tap the Share button.' },
-    { art: <IosShareSheet />, title: <>Scroll down, tap <b>Add to Home Screen</b></> },
+    { art: <IosViewMore />, title: <>Tap <b>View More</b></> },
+    { art: <IosShareList />, title: <>Scroll down, tap <b>Add to Home Screen</b></> },
     { art: <IosAdd />, title: <>Tap <b>Add</b></> },
   ];
 }
 
 export default function AddToHomeSheet({ onClose }) {
   const detected = phoneKind();
-  const [kind, setKind] = useState(detected === 'android' ? 'android' : 'ios');
+  const kind = detected === 'android' ? 'android' : 'ios';
   const [canInstall, setCanInstall] = useState(canPromptInstall);
   const inApp = getInAppBrowserKind();
 
@@ -256,22 +255,6 @@ export default function AddToHomeSheet({ onClose }) {
         </header>
         <h2 className="a2hs-title" id="a2hs-title">Add to your Home Screen</h2>
 
-        <div className="a2hs-tabs" role="tablist" aria-label="Phone">
-          {[['ios', 'iPhone'], ['android', 'Android']].map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              role="tab"
-              aria-selected={kind === k}
-              className={`a2hs-tab-btn${kind === k ? ' a2hs-tab-btn--on' : ''}`}
-              onClick={() => setKind(k)}
-              data-ppk={`a2hs-tab-${k}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
         <div className="a2hs-body">
           {inApp && (
             <p className="a2hs-inapp">
@@ -280,7 +263,7 @@ export default function AddToHomeSheet({ onClose }) {
                 : <>First open this page in <b>Chrome</b>: tap <b>⋮</b>, then <b>Open in Chrome</b>.</>}
             </p>
           )}
-          <ol className="a2hs-steps" key={kind}>
+          <ol className="a2hs-steps">
             {steps.map((s, i) => (
               <li key={i} className="a2hs-step" style={{ animationDelay: `${i * 60}ms` }}>
                 <div className="a2hs-step__head">

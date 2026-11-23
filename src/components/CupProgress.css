@@ -227,3 +227,6 @@
 .cup-nudge__btn:active { transform: scale(0.97); }
 @keyframes cupNudgeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .cup-nudge { animation: none; } }
+
+/* Something hanging from the track (the Add to Home Screen tab). */
+.cup-progress__footer { display: flex; justify-content: center; }

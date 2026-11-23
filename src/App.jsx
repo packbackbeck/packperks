@@ -2592,23 +2592,23 @@ export default function App({ consentReady = true } = {}) {
               collected={cupCount}
               target={selectedReward.cupsNeeded}
               nudgeCount={nudgeCount}
+              footer={addToHomePlacement(activeOrg) === 'home' ? (
+                <button
+                  type="button"
+                  className={`a2hs-hang${selectedReward.cupsNeeded > 0 && cupCount >= selectedReward.cupsNeeded ? ' a2hs-hang--complete' : ''}`}
+                  onClick={openAddToHome}
+                  data-ppk="add-to-home"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3.5" y="3.5" width="17" height="17" rx="5" /><path d="M12 8.5v7M8.5 12h7" />
+                  </svg>
+                  Add to Home Screen
+                  <svg className="a2hs-hang__chev" width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M7 4l6 6-6 6" />
+                  </svg>
+                </button>
+              ) : null}
             />
-            {addToHomePlacement(activeOrg) === 'home' && (
-              <button
-                type="button"
-                className={`a2hs-hang${selectedReward.cupsNeeded > 0 && cupCount >= selectedReward.cupsNeeded ? ' a2hs-hang--complete' : ''}`}
-                onClick={openAddToHome}
-                data-ppk="add-to-home"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="3.5" y="3.5" width="17" height="17" rx="5" /><path d="M12 8.5v7M8.5 12h7" />
-                </svg>
-                Add to Home Screen
-                <svg className="a2hs-hang__chev" width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M7 4l6 6-6 6" />
-                </svg>
-              </button>
-            )}
 
             {/* "Collect N more cups" — its own block right after the progress bar,
                 shown once the user taps the locked CTA (and gone once unlocked). */}

@@ -28,7 +28,7 @@ import SignInSheet from './components/SignInSheet';
 import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
 import AddToHomeSheet from './components/AddToHomeSheet';
-import { addToHomePlacement } from './lib/addToHome';
+import { addToHomePlacement, canPromptInstall, promptInstall } from './lib/addToHome';
 import Onboarding from './components/onboarding/Onboarding';
 import MaintenancePage from './components/MaintenancePage';
 import { getOnboarding, setOnboarding, isOnboardingDone, markOnboardingSeen } from './lib/onboarding';
@@ -541,6 +541,16 @@ export default function App({ consentReady = true } = {}) {
   // Add to Home Screen: switched per venue in Master Settings
   // (organizations.add_to_home), on the home page or the account page.
   const [addToHomeOpen, setAddToHomeOpen] = useState(false);
+  // Chrome on Android hands us its own install dialog: the button installs
+  // straight away. Safari has no such door, so everywhere else (and if the
+  // customer cancels Chrome's dialog) the picture steps open.
+  const openAddToHome = async () => {
+    if (canPromptInstall()) {
+      const outcome = await promptInstall();
+      if (outcome === 'accepted') { track(EVENTS.ADD_TO_HOME_INSTALLED, { platform: 'android', direct: true }); return; }
+    }
+    setAddToHomeOpen(true);
+  };
   const [hiwSeen, setHiwSeen] = usePersistedState('hiw_seen', false);
   const [directRefundOpen, setDirectRefundOpen] = useState(false);
   const [refundCupCount, setRefundCupCount] = useState(0);
@@ -2460,7 +2470,7 @@ export default function App({ consentReady = true } = {}) {
             setPage('home');
           }}
           onOpenHowItWorks={guideEnabled ? () => setHowItWorksOpen(true) : undefined}
-          onOpenAddToHome={addToHomePlacement(activeOrg) === 'account' ? () => setAddToHomeOpen(true) : undefined}
+          onOpenAddToHome={addToHomePlacement(activeOrg) === 'account' ? openAddToHome : undefined}
         />
         {addToHomeOpen && <AddToHomeSheet onClose={() => setAddToHomeOpen(false)} />}
         {signInSheetNode}
@@ -2587,7 +2597,7 @@ export default function App({ consentReady = true } = {}) {
               <button
                 type="button"
                 className={`a2hs-hang${selectedReward.cupsNeeded > 0 && cupCount >= selectedReward.cupsNeeded ? ' a2hs-hang--complete' : ''}`}
-                onClick={() => setAddToHomeOpen(true)}
+                onClick={openAddToHome}
                 data-ppk="add-to-home"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

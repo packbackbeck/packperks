@@ -51,6 +51,8 @@ const EVENTS = {
   NAME_REGENERATED:       'name_regenerated',
   REWARD_CARD_OPENED:     'reward_card_opened',
   STORE_REQUESTED:        'store_requested',   // "Request it" on a coming-soon venue
+  ADD_TO_HOME_OPENED:     'add_to_home_opened',    // the Add to Home Screen sheet
+  ADD_TO_HOME_INSTALLED:  'add_to_home_installed', // Chrome's own install dialog, accepted
   // ── Onboarding funnel ──
   ONB_SCREEN_VIEWED:      'onboarding_screen_viewed',
   ONB_CTA:                'onboarding_cta_clicked',
@@ -86,6 +88,8 @@ const PERSISTED = new Set([
   EVENTS.ADD_CUPS_OPENED,
   EVENTS.BALANCE_OPENED,
   EVENTS.ACCOUNT_OPENED,
+  EVENTS.ADD_TO_HOME_OPENED,
+  EVENTS.ADD_TO_HOME_INSTALLED,
   EVENTS.HOWTO_OPENED,
   EVENTS.NAME_EDIT_OPENED,
   EVENTS.NAME_REGENERATED,

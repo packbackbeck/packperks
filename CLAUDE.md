@@ -480,6 +480,21 @@ which calls the same `redeem_voucher`; the reward buttons say *Redeem at
 the kiosk*. On for KFC
 and McDonald's.
 
+**Add to Home Screen** (`organizations.add_to_home`, migration 073: null =
+off, `home`, `account`; Master Settings → Organisations → venue → Profile).
+A column on the venue, not a published setting, so Publish can't wipe it.
+`home` hangs a tab under the cup progress (`.a2hs-hang`, same colour, turns
+green with it); `account` adds the first row under Help. Both open
+`AddToHomeSheet`: iPhone and Android tabs (the phone's own opens first),
+three steps each drawn after the real screens (Safari's ••• → Share → Add
+to Home Screen → Add; Chrome's ⋮ → Add to Home screen → Install), the
+control to tap ringed in `--pb-red`. Chrome on Android may hand us its own
+install dialog (`lib/addToHome.js` catches `beforeinstallprompt` at import),
+then the sheet offers it as one tap. Hidden when the app already runs from
+the Home Screen. Rewards apps only (App.jsx), not Deferred Tikkie yet. On
+for KFC only. The manifest's `start_url` is `/`, which today redirects to
+`/kfc/`; a second venue needs a per-venue start URL before it turns this on.
+
 **Client app** (`appdesign`, formerly "Design & copy") is in every mode;
 Deferred Tikkie gets only Colours and Sections. *Sections* is what the
 customer app shows and in what order:

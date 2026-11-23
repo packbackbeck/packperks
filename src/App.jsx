@@ -27,6 +27,8 @@ import AppErrorScreen from './components/AppErrorScreen';
 import SignInSheet from './components/SignInSheet';
 import HomeSkeleton from './components/HomeSkeleton';
 import HowItWorks from './components/HowItWorks';
+import AddToHomeSheet from './components/AddToHomeSheet';
+import { addToHomePlacement } from './lib/addToHome';
 import Onboarding from './components/onboarding/Onboarding';
 import MaintenancePage from './components/MaintenancePage';
 import { getOnboarding, setOnboarding, isOnboardingDone, markOnboardingSeen } from './lib/onboarding';
@@ -536,6 +538,9 @@ export default function App({ consentReady = true } = {}) {
   // "How it works" walkthrough. The intro button shows until the guide has
   // been opened once (first-time users), then stays out of the way.
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  // Add to Home Screen: switched per venue in Master Settings
+  // (organizations.add_to_home), on the home page or the account page.
+  const [addToHomeOpen, setAddToHomeOpen] = useState(false);
   const [hiwSeen, setHiwSeen] = usePersistedState('hiw_seen', false);
   const [directRefundOpen, setDirectRefundOpen] = useState(false);
   const [refundCupCount, setRefundCupCount] = useState(0);
@@ -2455,7 +2460,9 @@ export default function App({ consentReady = true } = {}) {
             setPage('home');
           }}
           onOpenHowItWorks={guideEnabled ? () => setHowItWorksOpen(true) : undefined}
+          onOpenAddToHome={addToHomePlacement(activeOrg) === 'account' ? () => setAddToHomeOpen(true) : undefined}
         />
+        {addToHomeOpen && <AddToHomeSheet onClose={() => setAddToHomeOpen(false)} />}
         {signInSheetNode}
         {actionNoticeNode}
         {liveSettings.featureDirectRefunds && (
@@ -2576,6 +2583,22 @@ export default function App({ consentReady = true } = {}) {
               target={selectedReward.cupsNeeded}
               nudgeCount={nudgeCount}
             />
+            {addToHomePlacement(activeOrg) === 'home' && (
+              <button
+                type="button"
+                className={`a2hs-hang${selectedReward.cupsNeeded > 0 && cupCount >= selectedReward.cupsNeeded ? ' a2hs-hang--complete' : ''}`}
+                onClick={() => setAddToHomeOpen(true)}
+                data-ppk="add-to-home"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3.5" y="3.5" width="17" height="17" rx="5" /><path d="M12 8.5v7M8.5 12h7" />
+                </svg>
+                Add to Home Screen
+                <svg className="a2hs-hang__chev" width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M7 4l6 6-6 6" />
+                </svg>
+              </button>
+            )}
 
             {/* "Collect N more cups" — its own block right after the progress bar,
                 shown once the user taps the locked CTA (and gone once unlocked). */}
@@ -2664,6 +2687,8 @@ export default function App({ consentReady = true } = {}) {
       )}
 
       {howItWorksOpen && guideEnabled && <HowItWorks steps={guideSteps} onClose={closeGuide} onComplete={() => setHiwSeen(true)} />}
+
+      {addToHomeOpen && <AddToHomeSheet onClose={() => setAddToHomeOpen(false)} />}
 
       <BudgetPausedModal
         open={budgetPausedOpen}

@@ -26,7 +26,7 @@ export async function getGroupBySlug(slug) {
     if (!group) return null
     const { data: members } = await supabase
       .from('organizations')
-      .select('id, name, slug, brand_color, logo_url, country, group_active, deleted_at')
+      .select('id, name, slug, brand_color, logo_url, country, group_active, deleted_at, add_to_home')
       .eq('group_id', group.id).is('deleted_at', null)
     return {
       group,
@@ -55,7 +55,7 @@ export async function getGroupContext(orgId) {
       supabase.from('org_groups').select('id, name, slug').eq('id', groupId).maybeSingle(),
       supabase.from('app_config').select('value').eq('key', `published:group:${groupId}`).maybeSingle(),
       supabase.from('organizations')
-        .select('id, name, slug, brand_color, logo_url, country, group_active, deleted_at')
+        .select('id, name, slug, brand_color, logo_url, country, group_active, deleted_at, add_to_home')
         .eq('group_id', groupId).is('deleted_at', null),
     ])
 

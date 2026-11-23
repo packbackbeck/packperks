@@ -106,6 +106,8 @@ export default function UserPage({
   onRetryClaim,
   onClose,
   onOpenHowItWorks,
+  // Add to Home Screen, where the venue put it on this page (Master Settings).
+  onOpenAddToHome,
   // Phase 3: "general" account view opened from the Stores hub — cupCount is
   // the SUM across every store, history is combined + tagged with a store name.
   combined = false,
@@ -820,6 +822,7 @@ export default function UserPage({
         <span className="user-page__section-title">Help</span>
         <div className="user-page__card user-page__card--list">
           {[
+            ...(onOpenAddToHome ? [{ label: 'Add to Home Screen', on: onOpenAddToHome }] : []),
             { label: 'Contact support', on: () => { try { sessionStorage.setItem('pp_open_page', 'user'); } catch { /* ignore */ } window.location.href = '/support'; } },
             ...(onOpenHowItWorks ? [{ label: 'How does it work?', on: () => { track(EVENTS.HOWTO_OPENED); onOpenHowItWorks?.(); } }] : []),
             { label: 'FAQ', on: () => setFaqOpen(true) },

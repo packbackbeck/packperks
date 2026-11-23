@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import {
   Archive, ArrowLeftRight, Building2, Copy, ExternalLink, Globe2, ImageUp, Landmark, Layers, Link2, Palette,
-  Power, Settings, Store,
+  Power, Settings, Smartphone, Store,
 } from 'lucide-react';
 import { useOrg } from '../context/OrgContext';
 import { OrgAvatar } from '../context/OrgSwitcher';
@@ -10,7 +10,7 @@ import {
 } from '../lib/adminApi';
 import { formatMoney, getAllRegions, regionForCountry } from '../../lib/regions';
 import { logAction } from '../auth/actionLog';
-import { Badge, Button, Field } from '../ui';
+import { Badge, Button, Field, Segmented, Switch } from '../ui';
 import FlowEditor from '../flow/FlowEditor';
 import { useFlowActions, useVenueFlow } from '../flow/useVenueFlow';
 import Drawer from './Drawer';
@@ -30,6 +30,7 @@ const PROFILE_FIELDS = [
   ['logo_width', 'Logo width'],
   ['brand_color', 'Brand colour'],
   ['country', 'Region'],
+  ['add_to_home', 'Add to Home Screen'],
 ];
 const COMPANY_FIELDS = [
   ['legal_name', 'Legal name'],
@@ -93,6 +94,7 @@ export default function OrgEditor({
         logo_width: draft.logo_width === '' || draft.logo_width == null ? null : Number(draft.logo_width),
         brand_color: draft.brand_color || DEFAULT_COLOR,
         country: clean(draft.country),
+        add_to_home: draft.add_to_home || null,
         legal_name: clean(draft.legal_name),
         kvk_number: clean(draft.kvk_number),
         btw_number: clean(draft.btw_number),
@@ -276,6 +278,33 @@ function ProfileTab({ source, draft, set, put, onError }) {
           <a className="ms-extlink" href={`/${source.slug}/`} target="_blank" rel="noopener noreferrer">
             <ExternalLink size={13} aria-hidden="true" />Open the customer app
           </a>
+        )}
+      </Sec>
+
+      <Sec title="Add to Home Screen" icon={Smartphone} when="save" hint="A button in the customer app that opens short iPhone and Android steps, with pictures, for putting the app on the Home Screen.">
+        <div className="ms-switchrow">
+          <div>
+            <p className="ms-switchrow__title">Offer Add to Home Screen</p>
+            <p className="ms-switchrow__hint">Hidden for anyone already using the app from their Home Screen.</p>
+          </div>
+          <Switch
+            id={id('a2hs')}
+            checked={!!draft.add_to_home}
+            label="Offer Add to Home Screen"
+            onChange={(on) => put({ add_to_home: on ? (draft.add_to_home || 'home') : '' })}
+          />
+        </div>
+        {draft.add_to_home && (
+          <Field label="Where it shows" hint={draft.add_to_home === 'home'
+            ? 'A tab under the cup progress on the home page.'
+            : 'A row under Help on the account page.'}>
+            <Segmented
+              ariaLabel="Where Add to Home Screen shows"
+              options={[{ id: 'home', label: 'Home page' }, { id: 'account', label: 'Account page' }]}
+              value={draft.add_to_home}
+              onChange={(v) => put({ add_to_home: v })}
+            />
+          </Field>
         )}
       </Sec>
 

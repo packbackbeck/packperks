@@ -765,7 +765,7 @@ access, so any account above vendor may use it.
 | `src/admin/master/` | Master Settings: people, roles, organisations, groups, regions, workspace, data, PackPulse |
 | `src/admin/embed/` | `/packpulse-embed`: one venue's pages inside PackPulse |
 | `src/admin/lib/adminMoney.js` | `useAdminMoney()` / `adminMoney()` — dashboard currency |
-| `src/admin/lib/demoData.js` | the “Demo numbers” dataset |
+| `src/admin/lib/demoData.js` | the “Demo numbers” dataset (vendor view when `vendorDemoNumbers` is on; `vendorDemoScale` in published settings multiplies its size, 6 for KFC, set in SQL) |
 | `src/admin/context/orgState.js` | module-level active org for non-React callers |
 | `src/lib/supabase.js` | the customer client; adds `x-device-id` to database calls |
 | `src/lib/deviceId.js` | the device id that owns an anonymous customer |

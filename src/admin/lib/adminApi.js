@@ -5,7 +5,7 @@ import { fmtDuration } from './behaviourFormat';
 import { getCopyPreset, normalizeMode } from '../../lib/copyPresets';
 import { EMAIL_TEMPLATE_KEY } from './emailTemplates';
 import { providerForCountry } from '../../lib/payments';
-import { demoAdminStatsRows, demoHealthRows, demoBehaviourRows, demoUxRows, resetDemoWorld } from './demoData';
+import { demoAdminStatsRows, demoHealthRows, demoBehaviourRows, demoUxRows, resetDemoWorld, setDemoScale } from './demoData';
 import {
   uxFlow, uxHeatmap, uxScreenSummary, uxScrollCurve, uxSlice, uxTargetSeries, uxTargets,
 } from './uxAggregate';
@@ -23,7 +23,8 @@ import { RATE_DEFAULTS } from '../../lib/rates';
  * ───────────────────────────────────────────────────────────────────── */
 let DEMO_MODE = false;
 
-export function setAdminDemoMode(on) {
+export function setAdminDemoMode(on, scale = 1) {
+  setDemoScale(scale);
   const next = !!on;
   if (next === DEMO_MODE) return;
   DEMO_MODE = next;

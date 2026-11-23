@@ -145,7 +145,7 @@ function AdminShell() {
   const demoNumbers = !!(draftState?.draft?.settings?.vendorDemoNumbers
     ?? draftState?.published?.settings?.vendorDemoNumbers);
   const demoActive = isVendorView && demoNumbers;
-  setAdminDemoMode(demoActive);
+  setAdminDemoMode(demoActive, settings?.vendorDemoScale);
 
   function setPage(next, opts) {
     const id = resolvePage(next);

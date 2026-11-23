@@ -186,7 +186,7 @@ function EmbedShell({ state, setState, post, parentOrigin }) {
   // Vendors see demo numbers when the venue turned them on; PackPulse sees
   // exactly what a vendor sees.
   const demo = !!settings.vendorDemoNumbers;
-  setAdminDemoMode(demo);
+  setAdminDemoMode(demo, settings.vendorDemoScale);
 
   const go = useCallback((next) => {
     if (!allowed.has(next)) return;

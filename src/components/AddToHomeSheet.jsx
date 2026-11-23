@@ -4,7 +4,6 @@ import {
   phoneKind, isIosChrome, canPromptInstall, onInstallPromptChange, promptInstall,
 } from '../lib/addToHome';
 import { getInAppBrowserKind, track, EVENTS } from '../utils/analytics';
-import ppLogo from '../assets/images/packperks-logo.svg';
 import './AddToHomeSheet.css';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -246,14 +245,13 @@ export default function AddToHomeSheet({ onClose }) {
     <div className="a2hs-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="a2hs-title">
       <div className="a2hs-sheet" onClick={(e) => e.stopPropagation()}>
         <header className="a2hs-head">
-          <img src={ppLogo} alt="PackPerks" className="a2hs-head__logo" />
+          <h2 className="a2hs-title" id="a2hs-title">Add to your Home Screen</h2>
           <button type="button" className="a2hs-close" onClick={onClose} aria-label="Close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </header>
-        <h2 className="a2hs-title" id="a2hs-title">Add to your Home Screen</h2>
 
         <div className="a2hs-body">
           {inApp && (

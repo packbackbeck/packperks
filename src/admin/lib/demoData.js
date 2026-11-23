@@ -99,7 +99,7 @@ function generate(orgId) {
 
   /* Customers arrive across the window, accelerating slightly — a store
    * that is growing rather than flat. */
-  const TOTAL_USERS = 380 + Math.floor(rand() * 70);
+  const TOTAL_USERS = Math.round((380 + Math.floor(rand() * 70)) * SCALE);
   for (let i = 0; i < TOTAL_USERS; i++) {
     // Skew arrivals toward the recent end: sqrt bias on a uniform draw.
     const frac = Math.pow(rand(), 0.72);
@@ -372,6 +372,18 @@ function generate(orgId) {
  * cheap but not free, and every page that asks must see the same data. */
 const CACHE = new Map();
 
+/* How big the demo programme is, from the venue's `vendorDemoScale`
+ * (published settings; 1 unless set). A campus café is the base; a chain
+ * like KFC shows several times the customers on the same shapes. The User
+ * flow visits grow with it up to 3×, which is plenty for a heatmap. */
+let SCALE = 1;
+export function setDemoScale(s) {
+  const n = Math.min(20, Math.max(1, Number(s) || 1));
+  if (n === SCALE) return;
+  SCALE = n;
+  resetDemoWorld();
+}
+
 export function demoWorld(orgId) {
   const key = String(orgId || 'default');
   if (!CACHE.has(key)) CACHE.set(key, generate(key));
@@ -617,7 +629,7 @@ function generateUx(orgId, modeKey) {
     }
   }
 
-  const TOTAL = 520 + Math.floor(rand() * 180);
+  const TOTAL = Math.round((520 + Math.floor(rand() * 180)) * Math.min(SCALE, 3));
   for (let i = 0; i < TOTAL; i++) {
     // Skewed toward the recent end, then nudged by the weekday rhythm the
     // rest of the demo uses, so the daily lines have the same shape.

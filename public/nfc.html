@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05080f">
+<meta name="robots" content="noindex">
+<title>PackPerks Terminal</title>
+<link rel="icon" href="/favicon.svg">
+<style>
+:root {
+  --bg: #05080f;
+  --panel: #0b111c;
+  --line: #1a2333;
+  --text: #e8eef8;
+  --muted: #6b7a92;
+  --accent: #2f7bff;
+  --accent-soft: rgba(47, 123, 255, .14);
+  --accent-glow: rgba(47, 123, 255, .45);
+}
+body.ready {
+  --accent: #22d36b;
+  --accent-soft: rgba(34, 211, 107, .14);
+  --accent-glow: rgba(34, 211, 107, .5);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+.screen {
+  position: fixed; inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background: radial-gradient(120% 70% at 50% 45%, var(--accent-soft), transparent 70%), var(--bg);
+  transition: background .6s ease;
+}
+.screen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border: 2px solid var(--accent); opacity: .35; border-radius: 0;
+  transition: border-color .6s ease;
+}
+
+/* status bar */
+.bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 12px; color: var(--muted); letter-spacing: .04em;
+}
+.bar .left, .bar .right { display: flex; align-items: center; gap: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+.state { color: var(--accent); font-weight: 600; letter-spacing: .14em; transition: color .6s; }
+.icon { display: inline-flex; align-items: center; gap: 4px; }
+.icon svg { width: 16px; height: 16px; }
+.batt { width: 22px; height: 11px; border: 1.5px solid var(--muted); border-radius: 3px; position: relative; padding: 1.5px; }
+.batt::after { content: ""; position: absolute; right: -4px; top: 3px; width: 2px; height: 4px; background: var(--muted); border-radius: 0 1px 1px 0; }
+.batt i { display: block; height: 100%; width: 78%; background: var(--text); border-radius: 1px; }
+
+/* middle */
+.main {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: clamp(18px, 4vh, 34px); text-align: center; min-height: 0;
+}
+.art { width: min(62vw, 42vh, 320px); aspect-ratio: 1; position: relative; }
+.art svg { width: 100%; height: 100%; overflow: visible; }
+.ring { position: absolute; inset: 14%; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: ripple 2.6s ease-out infinite; }
+.ring:nth-child(2) { animation-delay: .85s; }
+.ring:nth-child(3) { animation-delay: 1.7s; }
+body.ready .ring { animation-duration: 1.6s; }
+body.ready .ring:nth-child(2) { animation-delay: .53s; }
+body.ready .ring:nth-child(3) { animation-delay: 1.06s; }
+@keyframes ripple { 0% { transform: scale(.7); opacity: .7; } 100% { transform: scale(1.35); opacity: 0; } }
+
+.wave { stroke: var(--accent); animation: wave 1.8s ease-in-out infinite; }
+.wave.w2 { animation-delay: .2s; } .wave.w3 { animation-delay: .4s; }
+@keyframes wave { 0%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+.phone { transition: opacity .5s ease; opacity: 0; }
+body.ready .phone { opacity: 1; animation: approach 2.4s ease-in-out infinite; }
+@keyframes approach {
+  0%, 100% { transform: translate(34px, -30px) rotate(12deg); }
+  45%, 60% { transform: translate(6px, -4px) rotate(4deg); }
+}
+
+h1 { font-size: clamp(30px, 7vw, 54px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
+.sub { font-size: clamp(16px, 3.4vw, 22px); color: var(--muted); max-width: 22ch; line-height: 1.35; }
+.sub b { color: var(--text); font-weight: 600; }
+
+.count {
+  display: none; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--muted); letter-spacing: .06em;
+}
+body.ready .count { display: flex; }
+.track { width: 140px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.track i { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left; }
+
+.view { display: contents; }
+body:not(.ready) .v-ready, body.ready .v-idle { display: none; }
+
+/* footer */
+.foot {
+  display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 8px 16px;
+  font-size: 11px; color: var(--muted); letter-spacing: .05em;
+  border-top: 1px solid var(--line); padding-top: 12px;
+}
+.foot span b { color: var(--text); font-weight: 500; }
+@media (max-width: 520px) {
+  .foot { grid-template-columns: repeat(2, auto); }
+  .bar .hide-sm { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="screen" id="screen">
+  <header class="bar mono">
+    <div class="left">
+      <span class="dot"></span>
+      <span class="state" id="state">IDLE</span>
+      <span class="hide-sm">PACKPERKS · NFC</span>
+    </div>
+    <div class="right">
+      <span id="clock">--:--:--</span>
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5.5 12a10 10 0 0 1 13 0"/><path d="M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+      </span>
+      <span class="batt" aria-hidden="true"><i></i></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="art" aria-hidden="true">
+      <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+      <svg viewBox="0 0 200 200">
+        <!-- terminal -->
+        <rect x="52" y="44" width="96" height="128" rx="16" fill="#0d1522" stroke="var(--accent)" stroke-width="3"/>
+        <rect x="64" y="56" width="72" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-opacity=".5" stroke-width="1.5"/>
+        <!-- contactless symbol -->
+        <g fill="none" stroke-width="5" stroke-linecap="round" transform="translate(100 134)">
+          <path class="wave w1" d="M-14 -12 a17 17 0 0 1 0 24"/>
+          <path class="wave w2" d="M-3 -19 a27 27 0 0 1 0 38"/>
+          <path class="wave w3" d="M8 -26 a37 37 0 0 1 0 52"/>
+        </g>
+        <!-- phone -->
+        <g class="phone">
+          <rect x="118" y="20" width="44" height="80" rx="9" fill="#111a29" stroke="var(--text)" stroke-width="3"/>
+          <rect x="133" y="26" width="14" height="3" rx="1.5" fill="var(--text)" opacity=".6"/>
+          <circle cx="140" cy="62" r="9" fill="none" stroke="var(--accent)" stroke-width="3"/>
+          <path d="M136 62l3 3 5-6" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="view v-idle">
+      <h1>Ready for cups</h1>
+      <p class="sub">Touch the screen to start</p>
+    </div>
+    <div class="view v-ready">
+      <h1>Tap your phone</h1>
+      <p class="sub">Hold it here to <b>claim your reward</b></p>
+      <div class="count mono"><div class="track"><i id="bar"></i></div><span id="left">60s</span></div>
+    </div>
+  </main>
+
+  <footer class="foot mono">
+    <span>TID <b>PPK-0417</b></span>
+    <span>DATE <b id="date">--</b></span>
+    <span>TAPS TODAY <b id="taps">0</b></span>
+    <span>NFC <b>ON</b> · v2.4.1</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var READY_MS = 60000;
+  var body = document.body;
+  var stateEl = document.getElementById('state');
+  var clockEl = document.getElementById('clock');
+  var dateEl = document.getElementById('date');
+  var tapsEl = document.getElementById('taps');
+  var barEl = document.getElementById('bar');
+  var leftEl = document.getElementById('left');
+  var readyUntil = 0;
+  var wakeLock = null;
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+  // A believable counter: a base that grows through the day, plus real taps.
+  function todayKey() { var d = new Date(); return 'ppk-nfc-taps:' + d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function readTaps() { try { return Number(localStorage.getItem(todayKey())) || 0; } catch (e) { return 0; } }
+  function writeTaps(n) { try { localStorage.setItem(todayKey(), String(n)); } catch (e) {} }
+  function baseTaps() { var d = new Date(); return Math.max(0, Math.floor((d.getHours() * 60 + d.getMinutes() - 7 * 60) / 6)); }
+
+  function tick() {
+    var d = new Date();
+    clockEl.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    dateEl.textContent = pad(d.getDate()) + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    tapsEl.textContent = String(baseTaps() + readTaps()).padStart(4, '0');
+
+    if (readyUntil) {
+      var left = readyUntil - Date.now();
+      if (left <= 0) return setIdle();
+      leftEl.textContent = Math.ceil(left / 1000) + 's';
+      barEl.style.transform = 'scaleX(' + (left / READY_MS) + ')';
+    }
+  }
+
+  function setReady() {
+    readyUntil = Date.now() + READY_MS;
+    body.classList.add('ready');
+    stateEl.textContent = 'READY';
+    writeTaps(readTaps() + 1);
+    if (navigator.vibrate) navigator.vibrate(40);
+    tick();
+  }
+  function setIdle() {
+    readyUntil = 0;
+    body.classList.remove('ready');
+    stateEl.textContent = 'IDLE';
+    tick();
+  }
+
+  function keepAwake() {
+    if (wakeLock || !('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (l) {
+      wakeLock = l; l.addEventListener('release', function () { wakeLock = null; });
+    }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) keepAwake(); });
+
+  document.addEventListener('pointerdown', function () {
+    keepAwake();
+    if (!readyUntil) setReady();
+  });
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  tick();
+  setInterval(tick, 250);
+})();
+</script>
+</body>
+</html>
